@@ -179,8 +179,8 @@ void main() {
   });
 
   group('visual sync', () {
-    test('visual offset defaults positive and clamps', () {
-      expect(controller.visualOffset, greaterThan(Duration.zero));
+    test('visual offset defaults to zero and clamps', () {
+      expect(controller.visualOffset, Duration.zero);
       controller.setVisualOffset(_ms * 9999);
       expect(controller.visualOffset, MetronomeController.maxVisualOffset);
       controller.setVisualOffset(_ms * -9999);

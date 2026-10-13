@@ -27,10 +27,10 @@ class MetronomeController extends ChangeNotifier {
   /// timers (macOS App Nap) without gaps.
   static const backgroundLookahead = Duration(seconds: 2);
 
-  /// How far the beat flash trails the engine clock. The engine clock is
-  /// the mix clock, ahead of the speakers, so positive. 20 ms was judged by
-  /// eye on a USB-dongle wireless headset (HyperX Cloud) on macOS.
-  static const defaultVisualOffset = Duration(milliseconds: 20);
+  /// How far the beat flash trails the engine clock. Measured by eye on
+  /// macOS: 0 ms on built-in speakers, 20 ms on a USB-dongle wireless
+  /// headset. Default to the speakers; higher-latency outputs adjust it.
+  static const defaultVisualOffset = Duration.zero;
   static const minVisualOffset = Duration(milliseconds: -200);
   // Covers Bluetooth output (~150-250 ms).
   static const maxVisualOffset = Duration(milliseconds: 500);

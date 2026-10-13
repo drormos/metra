@@ -143,11 +143,13 @@ void main() {
     expect(controller.visualOffset, start + const Duration(milliseconds: 10));
     await tester.tap(find.byTooltip('Flash earlier'));
     await tester.tap(find.byTooltip('Flash earlier'));
+    await tester.tap(find.byTooltip('Flash earlier'));
     await tester.pump();
-    expect(controller.visualOffset, start - const Duration(milliseconds: 10));
+    final expected = start - const Duration(milliseconds: 20);
+    expect(controller.visualOffset, expected);
     expect(
       tester.widget<Text>(find.byKey(MetronomeScreen.offsetKey)).data,
-      '+${(start - const Duration(milliseconds: 10)).inMilliseconds} ms',
+      '${expected.inMilliseconds} ms',
     );
   });
 }

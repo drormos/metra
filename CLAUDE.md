@@ -9,7 +9,7 @@ See `PLAN.md` for phases and scope. Work one step at a time and stop for review 
   - Never schedule a step whose time is already before `now + guard`. Skip it and keep the grid (past times play "as soon as possible", which is off-grid).
   - Keep every pending handle. Cancel with `stop(handle)` only for steps later than `now + guard`, so a sounding click is never cut. Tempo changes re-anchor at the last committed step and keep the bar position.
   - While playing, call `setAudioDeviceIdleTimeout(null)` and `await startAudioDevice()` before anchoring; restore the default on stop. The default 500 ms idle stop freezes the engine clock between slow beats.
-- **VISUAL SYNC:** Read `getEngineTime()` once per frame (a `Ticker`). Flash when engine time ≥ step time + visual offset. Engine time is the mix clock, which runs ahead of the speakers, so the user-adjustable offset is signed and defaults to a positive value. `getOutputLatency()` is zero unless render-ahead is enabled. Do not poll a voice's playback position.
+- **VISUAL SYNC:** Read `getEngineTime()` once per frame (a `Ticker`). Flash when engine time ≥ step time + visual offset. The user-adjustable offset is signed; it defaults to 0 ms (measured on MacBook speakers) and higher-latency outputs such as wireless headsets need a positive value. `getOutputLatency()` is zero unless render-ahead is enabled. Do not poll a voice's playback position.
 - **ENGINE LIFECYCLE:** `SoLoud.instance.init()` runs once in `main()`; calling it again unloads every sound. Listen to `audioDeviceStartFailures` and recover with `startAudioDevice()`. Headphone/route-change events are not in the public API; don't rely on them.
 - **SAMPLE RULES:** Click samples must have zero leading silence.
 
