@@ -35,6 +35,8 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
 - Render-ahead ring off (`renderAheadFrames` unset). Scheduled clicks don't need low reactive latency; the visual offset is user-calibrated.
 - `bufferSize` stays at the default 2048: scheduling is sample-accurate regardless, larger buffers avoid dropouts, and visual jitter is handled by extrapolation (Phase 1 step 5).
 - Max active voices raised to 32 for headroom at fast subdivisions.
+- A pattern change while playing restarts from the downbeat. Switching at the bar boundary comes with setlists (Phase 2 step 3).
+- Audio device failures trigger one automatic `startAudioDevice()` retry; if it fails, the controller exposes the error for the UI.
 
 ## Phase 2: Persistence, Setlists & Mobile Background
 **Goal:** Quick-access songs and setlists, reliable mobile playback.

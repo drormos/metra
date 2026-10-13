@@ -139,8 +139,8 @@ class ClickScheduler {
     refill();
   }
 
-  /// Hand every step up to now + [lookahead] to the engine.
-  @visibleForTesting
+  /// Hand every step up to now + [lookahead] to the engine. Runs on the
+  /// timer; call directly to apply a larger [lookahead] right away.
   void refill() {
     final grid = _grid;
     if (grid == null) return;

@@ -26,11 +26,12 @@ class SoloudClickOutput implements ClickOutput {
   final AudioSource _accent;
   final AudioSource _normal;
 
-  /// Automatic device starts that failed; recover with [recoverDevice].
-  Stream<AudioDeviceStartFailure> get deviceFailures =>
-      SoLoud.instance.audioDeviceStartFailures;
+  @override
+  Stream<void> get deviceFailures =>
+      SoLoud.instance.audioDeviceStartFailures.map((_) {});
 
-  Future<void> recoverDevice() => SoLoud.instance.startAudioDevice();
+  @override
+  Future<void> recover() => SoLoud.instance.startAudioDevice();
 
   @override
   Duration now() => SoLoud.instance.getEngineTime();

@@ -1,24 +1,26 @@
 import 'package:flutter/material.dart';
 
 import 'src/audio/soloud_click_output.dart';
+import 'src/controller/metronome_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  SoloudClickOutput? output;
+  MetronomeController? controller;
   Object? engineError;
   try {
-    output = await SoloudClickOutput.create();
+    controller = MetronomeController(await SoloudClickOutput.create());
+    AppLifecycleListener(onStateChange: controller.didChangeAppLifecycleState);
   } catch (e) {
     engineError = e;
   }
-  runApp(MetraApp(output: output, engineError: engineError));
+  runApp(MetraApp(controller: controller, engineError: engineError));
 }
 
 class MetraApp extends StatelessWidget {
-  const MetraApp({super.key, this.output, this.engineError});
+  const MetraApp({super.key, this.controller, this.engineError});
 
   /// Null when the engine failed to start (see [engineError]).
-  final SoloudClickOutput? output;
+  final MetronomeController? controller;
   final Object? engineError;
 
   @override

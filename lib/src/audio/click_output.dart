@@ -23,4 +23,10 @@ abstract interface class ClickOutput {
 
   /// Cancel a click that has not started yet.
   void cancel(ClickHandle handle);
+
+  /// Fires when the output device failed to start on its own.
+  Stream<void> get deviceFailures;
+
+  /// Try to start the output device again after a [deviceFailures] event.
+  Future<void> recover();
 }
