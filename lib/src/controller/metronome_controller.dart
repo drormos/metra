@@ -29,7 +29,7 @@ class MetronomeController extends ChangeNotifier {
 
   /// How far the beat flash trails the engine clock. The engine clock is
   /// the mix clock, ahead of the speakers, so positive. 20 ms was judged by
-  /// eye on MacBook speakers.
+  /// eye on a USB-dongle wireless headset (HyperX Cloud) on macOS.
   static const defaultVisualOffset = Duration(milliseconds: 20);
   static const minVisualOffset = Duration(milliseconds: -200);
   // Covers Bluetooth output (~150-250 ms).
