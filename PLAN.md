@@ -28,7 +28,7 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
 6. **Tap Tempo:** `Stopwatch` intervals from the last 4 taps. Drop intervals more than 30% off the median. Reset after 2 s idle. Clamp to 30–300. Apply through the controller's tempo-change path.
 7. **Acceptance Test (Drift Check):** `integration_test/drift_test.dart` runs the real engine on macOS, captures the mixer output, and checks every click against the ideal grid (±2 samples).
    - Automated: 30, 60, 120 and 300 BPM (`--dart-define=DRIFT_SECONDS=300` for the 5-minute runs), a mid-bar tempo change, stop/start, and a 1 s isolate stall (stands in for App Nap).
-   - Manual: headphones plugged and unplugged during playback, and the macOS app hidden for 60 s.
+   - Manual: headphones plugged and unplugged during playback, and the macOS app hidden for 60 s. **Not yet run; revisit before release.**
    - Run: `flutter test integration_test/drift_test.dart -d macos`.
 
 ### Engine Decisions
