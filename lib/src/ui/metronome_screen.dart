@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../controller/metronome_controller.dart';
+import 'beat_indicator.dart';
 
 /// Main screen: tempo readout, tempo steps and transport. Stateless; all
 /// metronome state lives in [controller].
@@ -12,6 +13,7 @@ class MetronomeScreen extends StatelessWidget {
 
   static const bpmKey = Key('bpm');
   static const playKey = Key('play');
+  static const offsetKey = Key('offset');
 
   @override
   Widget build(BuildContext context) {
@@ -57,16 +59,21 @@ class MetronomeScreen extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FittedBox(
-          child: Text(
-            '$bpm',
-            key: bpmKey,
-            style: theme.textTheme.displayLarge?.copyWith(
-              fontSize: 160,
-              fontWeight: FontWeight.w700,
-              // Fixed-width digits so the readout doesn't shift as it changes.
-              fontFeatures: const [FontFeature.tabularFigures()],
-              height: 1,
+        BeatIndicator(controller: controller),
+        const SizedBox(height: 24),
+        // Shrinks to fit short windows (landscape phones, small desktops).
+        Flexible(
+          child: FittedBox(
+            child: Text(
+              '$bpm',
+              key: bpmKey,
+              style: theme.textTheme.displayLarge?.copyWith(
+                fontSize: 160,
+                fontWeight: FontWeight.w700,
+                // Fixed-width digits so the readout doesn't shift as it changes.
+                fontFeatures: const [FontFeature.tabularFigures()],
+                height: 1,
+              ),
             ),
           ),
         ),
@@ -96,6 +103,8 @@ class MetronomeScreen extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: 16),
+        _offsetControl(theme),
         if (error != null) ...[
           const SizedBox(height: 24),
           Text(
@@ -104,6 +113,46 @@ class MetronomeScreen extends StatelessWidget {
             style: TextStyle(color: theme.colorScheme.error),
           ),
         ],
+      ],
+    );
+  }
+
+  // Calibrates the flash against what you hear (output latency varies by
+  // device, e.g. Bluetooth headphones).
+  Widget _offsetControl(ThemeData theme) {
+    final ms = controller.visualOffset.inMilliseconds;
+    const step = Duration(milliseconds: 10);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text('Flash offset', style: theme.textTheme.bodyMedium),
+        IconButton(
+          tooltip: 'Flash earlier',
+          onPressed:
+              controller.visualOffset > MetronomeController.minVisualOffset
+              ? () => controller.setVisualOffset(controller.visualOffset - step)
+              : null,
+          icon: const Icon(Icons.remove),
+        ),
+        SizedBox(
+          width: 72,
+          child: Text(
+            '${ms > 0 ? '+' : ''}$ms ms',
+            key: offsetKey,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+        ),
+        IconButton(
+          tooltip: 'Flash later',
+          onPressed:
+              controller.visualOffset < MetronomeController.maxVisualOffset
+              ? () => controller.setVisualOffset(controller.visualOffset + step)
+              : null,
+          icon: const Icon(Icons.add),
+        ),
       ],
     );
   }

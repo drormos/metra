@@ -7,7 +7,7 @@ import '../model/metronome_pattern.dart';
 import '../timing/beat_grid.dart';
 import 'click_output.dart';
 
-/// One step that has been handed to the engine and has not started yet.
+/// One step that has been handed to the engine.
 @immutable
 class ScheduledStep {
   const ScheduledStep(this.index, this.time, this.level, this.handle);
@@ -52,7 +52,10 @@ class ClickScheduler {
 
   final Duration refillInterval;
 
-  final List<ScheduledStep> _pending = [];
+  /// How long started steps stay queryable through [stepAt].
+  static const retention = Duration(seconds: 1);
+
+  final List<ScheduledStep> _steps = [];
   MetronomePattern _pattern = const MetronomePattern.standard();
   BeatGrid? _grid;
   int _nextStep = 0;
@@ -64,8 +67,14 @@ class ClickScheduler {
 
   bool get isRunning => _timer != null;
 
-  /// Steps handed to the engine that have not started yet, oldest first.
-  List<ScheduledStep> get pending => List.unmodifiable(_pending);
+  /// The latest step at or before engine time [time], or null. Covers
+  /// steps up to [retention] old, so visuals can trail the engine clock.
+  ScheduledStep? stepAt(Duration time) {
+    for (final step in _steps.reversed) {
+      if (step.time <= time) return step;
+    }
+    return null;
+  }
 
   /// Start a new session: step 0 plays [startLead] after now.
   Future<void> start({
@@ -96,12 +105,12 @@ class ClickScheduler {
     _timer?.cancel();
     _timer = null;
     _grid = null;
-    if (_pending.isNotEmpty) {
+    if (_steps.isNotEmpty) {
       final now = _output.now();
-      for (final step in _pending) {
+      for (final step in _steps) {
         if (step.time > now) _cancel(step);
       }
-      _pending.clear();
+      _steps.clear();
     }
     if (_prepared) {
       _prepared = false;
@@ -119,7 +128,7 @@ class ClickScheduler {
 
     final cutoff = _output.now() + guard;
     final lastCommitted = min(_nextStep - 1, grid.lastStepAtOrBefore(cutoff));
-    _pending.removeWhere((step) {
+    _steps.removeWhere((step) {
       if (step.index <= lastCommitted) return false;
       _cancel(step);
       return true;
@@ -146,7 +155,7 @@ class ClickScheduler {
     if (grid == null) return;
 
     final now = _output.now();
-    _pending.removeWhere((step) => step.time <= now);
+    _steps.removeWhere((step) => step.time <= now - retention);
 
     // A stalled timer must not play steps late (they would be off-grid):
     // skip to the first step that can still be placed exactly.
@@ -160,7 +169,7 @@ class ClickScheduler {
       final handle = level == StepLevel.silent
           ? null
           : _output.schedule(level, time);
-      _pending.add(ScheduledStep(_nextStep, time, level, handle));
+      _steps.add(ScheduledStep(_nextStep, time, level, handle));
       _nextStep++;
     }
   }

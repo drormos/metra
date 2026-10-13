@@ -24,7 +24,7 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
 5. **Visual Sync:**
    - A `Ticker` reads `getEngineTime()` once per frame. Flash when engine time ≥ step time + visual offset.
    - The offset is signed and user-adjustable, default positive (the engine clock leads audible output).
-   - The engine clock advances in mix-buffer steps (~46 ms at 2048 frames). Extrapolate between clock updates with a `Stopwatch` so the flash lands on the right frame.
+   - The engine clock advances in mix-buffer steps (~46 ms at 2048 frames). Extrapolate between clock updates with the Ticker's (monotonic) frame time so the flash lands on the right frame.
 6. **Tap Tempo:** `Stopwatch` intervals from the last 4 taps. Drop intervals more than 30% off the median. Reset after 2 s idle. Clamp to 30–300. Apply through the controller's tempo-change path.
 7. **Acceptance Test (Drift Check):**
    - Record 5 minutes at 30, 60, 120 and 300 BPM (DAW via loopback, or mixer output capture). Verify no drift against the grid.
@@ -36,6 +36,7 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
 - `bufferSize` stays at the default 2048: scheduling is sample-accurate regardless, larger buffers avoid dropouts, and visual jitter is handled by extrapolation (Phase 1 step 5).
 - Max active voices raised to 32 for headroom at fast subdivisions.
 - A pattern change while playing restarts from the downbeat. Switching at the bar boundary comes with setlists (Phase 2 step 3).
+- Visual offset defaults to +50 ms (about one 2048-frame buffer), adjustable from −200 to +500 ms in 10 ms steps to cover Bluetooth output. Not persisted until Phase 2.
 - Audio device failures trigger one automatic `startAudioDevice()` retry; if it fails, the controller exposes the error for the UI.
 
 ## Phase 2: Persistence, Setlists & Mobile Background

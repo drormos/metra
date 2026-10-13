@@ -221,4 +221,34 @@ void main() {
       expect(scheduler.isRunning, isFalse);
     });
   });
+
+  group('stepAt', () {
+    test('returns the latest step at or before a time', () async {
+      await start(); // 1120, 1620, ...
+      runFor(_ms * 700); // now 1700
+      expect(scheduler.stepAt(_ms * 1100), isNull);
+      expect(scheduler.stepAt(_ms * 1120)?.index, 0);
+      expect(scheduler.stepAt(_ms * 1619)?.index, 0);
+      expect(scheduler.stepAt(_ms * 1650)?.index, 1);
+      expect(scheduler.stepAt(_ms * 1650)?.level, StepLevel.normal);
+    });
+
+    test('keeps started steps for the retention window', () async {
+      await start();
+      runFor(_ms * 1050); // now 2050: step 0 (1120) is ~0.9 s old
+      expect(scheduler.stepAt(_ms * 1200)?.index, 0);
+      runFor(_ms * 200); // now 2250: step 0 is older than 1 s
+      expect(scheduler.stepAt(_ms * 1200), isNull);
+      expect(scheduler.stepAt(_ms * 1700)?.index, 1);
+    });
+
+    test('forgets cancelled steps and everything on stop', () async {
+      await start(bpm: 60); // 1120, 2120
+      runFor(_ms * 1050); // 2120 pending
+      scheduler.setTempo(120);
+      expect(scheduler.stepAt(_ms * 2120)?.time, isNot(_ms * 2120));
+      scheduler.stop();
+      expect(scheduler.stepAt(_ms * 99999), isNull);
+    });
+  });
 }

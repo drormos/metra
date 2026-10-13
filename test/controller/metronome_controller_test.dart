@@ -177,4 +177,36 @@ void main() {
     local.dispose();
     expect(output.live, isEmpty);
   });
+
+  group('visual sync', () {
+    test('visual offset defaults positive and clamps', () {
+      expect(controller.visualOffset, greaterThan(Duration.zero));
+      controller.setVisualOffset(_ms * 9999);
+      expect(controller.visualOffset, MetronomeController.maxVisualOffset);
+      controller.setVisualOffset(_ms * -9999);
+      expect(controller.visualOffset, MetronomeController.minVisualOffset);
+    });
+
+    test('no step while stopped', () {
+      expect(controller.visualStepAt(Duration.zero), isNull);
+    });
+
+    test('shows a step once engine time passes step time + offset', () async {
+      controller.setVisualOffset(_ms * 50);
+      await controller.play(); // first step at 1120
+      output.time = _ms * 1150;
+      expect(controller.visualStepAt(Duration.zero), isNull);
+      output.time = _ms * 1170;
+      expect(controller.visualStepAt(_ms * 20)?.index, 0);
+    });
+
+    test('extrapolates between engine clock updates', () async {
+      controller.setVisualOffset(Duration.zero);
+      await controller.play();
+      output.time = _ms * 1100;
+      expect(controller.visualStepAt(Duration.zero), isNull);
+      // Engine clock hasn't moved, but 30 ms of frames have passed.
+      expect(controller.visualStepAt(_ms * 30)?.index, 0);
+    });
+  });
 }

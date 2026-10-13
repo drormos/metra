@@ -107,4 +107,44 @@ void main() {
     await tester.pump();
     expect(find.textContaining('device unplugged'), findsOneWidget);
   });
+
+  testWidgets('beat indicator lights the step the engine has reached', (
+    tester,
+  ) async {
+    controller.setVisualOffset(const Duration(milliseconds: 50));
+    await pumpScreen(tester);
+    expect(find.byKey(const ValueKey('beat-0-off')), findsOneWidget);
+
+    await tester.tap(find.byKey(MetronomeScreen.playKey));
+    await tester.pump();
+    // First step at 120 ms engine time; flash due at 170 ms.
+    output.time = const Duration(milliseconds: 150);
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(find.byKey(const ValueKey('beat-0-off')), findsOneWidget);
+
+    output.time = const Duration(milliseconds: 180);
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(find.byKey(const ValueKey('beat-0-on')), findsOneWidget);
+    expect(find.byKey(const ValueKey('beat-1-off')), findsOneWidget);
+
+    await tester.tap(find.byKey(MetronomeScreen.playKey));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('beat-0-off')), findsOneWidget);
+  });
+
+  testWidgets('flash offset buttons adjust the offset', (tester) async {
+    await pumpScreen(tester);
+    final start = controller.visualOffset;
+    await tester.tap(find.byTooltip('Flash later'));
+    await tester.pump();
+    expect(controller.visualOffset, start + const Duration(milliseconds: 10));
+    await tester.tap(find.byTooltip('Flash earlier'));
+    await tester.tap(find.byTooltip('Flash earlier'));
+    await tester.pump();
+    expect(controller.visualOffset, start - const Duration(milliseconds: 10));
+    expect(
+      tester.widget<Text>(find.byKey(MetronomeScreen.offsetKey)).data,
+      '+${(start - const Duration(milliseconds: 10)).inMilliseconds} ms',
+    );
+  });
 }
