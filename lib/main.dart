@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'src/audio/soloud_click_output.dart';
 import 'src/controller/metronome_controller.dart';
+import 'src/ui/metronome_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,19 +26,40 @@ class MetraApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final controller = this.controller;
     return MaterialApp(
       title: 'Metra',
-      theme: ThemeData.dark(),
-      home: Scaffold(
-        body: Center(
-          // Placeholder until the UI shell (PLAN.md Phase 1 step 4).
-          child: Text(
-            engineError == null
-                ? 'Metra'
-                : 'Audio engine failed to start: $engineError',
-          ),
-        ),
-      ),
+      debugShowCheckedModeBanner: false,
+      theme: _highContrastTheme,
+      home: controller != null
+          ? MetronomeScreen(controller: controller)
+          : Scaffold(
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    'Audio engine failed to start: $engineError',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
     );
   }
 }
+
+final _highContrastTheme = ThemeData(
+  colorScheme: const ColorScheme.highContrastDark(
+    primary: Colors.amber,
+    onPrimary: Colors.black,
+    surface: Colors.black,
+    onSurface: Colors.white,
+  ),
+  scaffoldBackgroundColor: Colors.black,
+  outlinedButtonTheme: OutlinedButtonThemeData(
+    style: OutlinedButton.styleFrom(
+      foregroundColor: Colors.white,
+      side: const BorderSide(color: Colors.white, width: 2),
+    ),
+  ),
+);
