@@ -36,7 +36,7 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
 - `bufferSize` stays at the default 2048: scheduling is sample-accurate regardless, larger buffers avoid dropouts, and visual jitter is handled by extrapolation (Phase 1 step 5).
 - Max active voices raised to 32 for headroom at fast subdivisions.
 - A pattern change while playing restarts from the downbeat. Switching at the bar boundary comes with setlists (Phase 2 step 3).
-- Visual offset defaults to +50 ms (about one 2048-frame buffer), adjustable from −200 to +500 ms in 10 ms steps to cover Bluetooth output. Not persisted until Phase 2.
+- Visual offset defaults to +20 ms (set by eye on MacBook speakers), adjustable in the settings sheet from −200 to +500 ms in 10 ms steps to cover Bluetooth output. Not persisted until Phase 2.
 - Audio device failures trigger one automatic `startAudioDevice()` retry; if it fails, the controller exposes the error for the UI.
 
 ## Phase 2: Persistence, Setlists & Mobile Background

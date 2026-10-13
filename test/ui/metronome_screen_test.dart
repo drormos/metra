@@ -134,6 +134,9 @@ void main() {
 
   testWidgets('flash offset buttons adjust the offset', (tester) async {
     await pumpScreen(tester);
+    expect(find.byTooltip('Flash later'), findsNothing);
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
     final start = controller.visualOffset;
     await tester.tap(find.byTooltip('Flash later'));
     await tester.pump();

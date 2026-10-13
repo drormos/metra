@@ -32,6 +32,18 @@ class MetronomeScreen extends StatelessWidget {
       child: Focus(
         autofocus: true,
         child: Scaffold(
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            actions: [
+              Builder(
+                builder: (context) => IconButton(
+                  tooltip: 'Settings',
+                  icon: const Icon(Icons.tune),
+                  onPressed: () => _showSettings(context),
+                ),
+              ),
+            ],
+          ),
           body: SafeArea(
             child: Center(
               child: ConstrainedBox(
@@ -103,8 +115,6 @@ class MetronomeScreen extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        _offsetControl(theme),
         if (error != null) ...[
           const SizedBox(height: 24),
           Text(
@@ -116,6 +126,19 @@ class MetronomeScreen extends StatelessWidget {
       ],
     );
   }
+
+  void _showSettings(BuildContext context) => showModalBottomSheet<void>(
+    context: context,
+    builder: (context) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ListenableBuilder(
+          listenable: controller,
+          builder: (context, _) => _offsetControl(Theme.of(context)),
+        ),
+      ),
+    ),
+  );
 
   // Calibrates the flash against what you hear (output latency varies by
   // device, e.g. Bluetooth headphones).

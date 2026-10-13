@@ -28,8 +28,9 @@ class MetronomeController extends ChangeNotifier {
   static const backgroundLookahead = Duration(seconds: 2);
 
   /// How far the beat flash trails the engine clock. The engine clock is
-  /// the mix clock, ahead of the speakers by about one buffer, so positive.
-  static const defaultVisualOffset = Duration(milliseconds: 50);
+  /// the mix clock, ahead of the speakers, so positive. 20 ms was judged by
+  /// eye on MacBook speakers.
+  static const defaultVisualOffset = Duration(milliseconds: 20);
   static const minVisualOffset = Duration(milliseconds: -200);
   // Covers Bluetooth output (~150-250 ms).
   static const maxVisualOffset = Duration(milliseconds: 500);
