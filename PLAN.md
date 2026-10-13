@@ -26,9 +26,10 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
    - The offset is signed and user-adjustable, default 0 ms (measured on MacBook speakers).
    - The engine clock advances in mix-buffer steps (~46 ms at 2048 frames). Extrapolate between clock updates with the Ticker's (monotonic) frame time so the flash lands on the right frame.
 6. **Tap Tempo:** `Stopwatch` intervals from the last 4 taps. Drop intervals more than 30% off the median. Reset after 2 s idle. Clamp to 30–300. Apply through the controller's tempo-change path.
-7. **Acceptance Test (Drift Check):**
-   - Record 5 minutes at 30, 60, 120 and 300 BPM (DAW via loopback, or mixer output capture). Verify no drift against the grid.
-   - Also verify: a mid-bar tempo change, stop/start, headphones plugged and unplugged during playback, and the macOS app hidden for 60 s.
+7. **Acceptance Test (Drift Check):** `integration_test/drift_test.dart` runs the real engine on macOS, captures the mixer output, and checks every click against the ideal grid (±2 samples).
+   - Automated: 30, 60, 120 and 300 BPM (`--dart-define=DRIFT_SECONDS=300` for the 5-minute runs), a mid-bar tempo change, stop/start, and a 1 s isolate stall (stands in for App Nap).
+   - Manual: headphones plugged and unplugged during playback, and the macOS app hidden for 60 s.
+   - Run: `flutter test integration_test/drift_test.dart -d macos`.
 
 ### Engine Decisions
 - `playScheduled` + `getEngineTime()`, not `playClocked` (no 2 s window, known engine time per step for visuals and tempo changes).
@@ -37,6 +38,7 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
 - Max active voices raised to 32 for headroom at fast subdivisions.
 - A pattern change while playing restarts from the downbeat. Switching at the bar boundary comes with setlists (Phase 2 step 3).
 - Visual offset defaults to 0 ms (measured by eye on macOS: 0 ms on built-in speakers, 20 ms on a USB-dongle wireless headset), adjustable in the settings sheet from −200 to +500 ms in 10 ms steps to cover Bluetooth output. Not persisted until Phase 2.
+- The drift check captures the mixer output rather than recording the speakers. The engine clock is paced by the output device, so the mix timeline is what plays; capture must use the engine's channel count (it does not convert channels).
 - Audio device failures trigger one automatic `startAudioDevice()` retry; if it fails, the controller exposes the error for the UI.
 
 ## Phase 2: Persistence, Setlists & Mobile Background
