@@ -14,3 +14,7 @@ A sample-accurate metronome for Android and macOS, built with Flutter and flutte
     flutter analyze
 
 See `PLAN.md` for the roadmap.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
