@@ -152,4 +152,17 @@ void main() {
       '${expected.inMilliseconds} ms',
     );
   });
+
+  testWidgets('tap button and T key set the tempo', (tester) async {
+    await pumpScreen(tester);
+    await tester.tap(find.byKey(MetronomeScreen.tapKey));
+    expect(controller.bpm, 120); // one tap: no tempo yet
+    // Two taps microseconds apart: far above the range, so clamped.
+    await tester.tap(find.byKey(MetronomeScreen.tapKey));
+    expect(controller.bpm, MetronomeController.maxBpm);
+
+    controller.setBpm(120);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+    expect(controller.bpm, MetronomeController.maxBpm);
+  });
 }

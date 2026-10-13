@@ -7,6 +7,7 @@ import '../audio/click_output.dart';
 import '../audio/click_scheduler.dart';
 import '../model/metronome_pattern.dart';
 import '../timing/engine_clock_smoother.dart';
+import '../timing/tap_tempo.dart';
 
 /// App-facing metronome state: tempo, pattern, transport and audio errors.
 /// Widgets read and drive this; they hold no metronome state themselves.
@@ -46,6 +47,8 @@ class MetronomeController extends ChangeNotifier {
   bool _disposed = false;
   Duration _visualOffset = defaultVisualOffset;
   EngineClockSmoother _smoother = EngineClockSmoother();
+  final _tapClock = Stopwatch()..start();
+  final _tapTempo = TapTempo(minBpm: minBpm, maxBpm: maxBpm);
 
   int get bpm => _bpm;
   MetronomePattern get pattern => _pattern;
@@ -89,6 +92,12 @@ class MetronomeController extends ChangeNotifier {
   }
 
   void nudge(int delta) => setBpm(_bpm + delta);
+
+  /// Tap tempo: from the second tap on, sets the tempo from recent taps.
+  void tap() {
+    final bpm = _tapTempo.tap(_tapClock.elapsed);
+    if (bpm != null) setBpm(bpm);
+  }
 
   /// While playing, restarts from the downbeat with [pattern].
   Future<void> setPattern(MetronomePattern pattern) async {

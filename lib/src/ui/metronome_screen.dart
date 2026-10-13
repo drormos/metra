@@ -14,12 +14,14 @@ class MetronomeScreen extends StatelessWidget {
   static const bpmKey = Key('bpm');
   static const playKey = Key('play');
   static const offsetKey = Key('offset');
+  static const tapKey = Key('tap');
 
   @override
   Widget build(BuildContext context) {
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.space): controller.toggle,
+        const SingleActivator(LogicalKeyboardKey.keyT): controller.tap,
         const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
             controller.nudge(1),
         const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
@@ -106,13 +108,43 @@ class MetronomeScreen extends StatelessWidget {
         const SizedBox(height: 24),
         SizedBox(
           height: 72,
-          child: FilledButton(
-            key: playKey,
-            onPressed: controller.toggle,
-            child: Text(
-              controller.isPlaying ? 'Stop' : 'Play',
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
-            ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                // Tap registers on pointer down: tap-up timing varies with
+                // how long the finger rests, which skews the tempo.
+                child: Listener(
+                  onPointerDown: (_) => controller.tap(),
+                  child: OutlinedButton(
+                    key: tapKey,
+                    onPressed: () {},
+                    child: const Text(
+                      'Tap',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 2,
+                child: FilledButton(
+                  key: playKey,
+                  onPressed: controller.toggle,
+                  child: Text(
+                    controller.isPlaying ? 'Stop' : 'Play',
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         if (error != null) ...[
