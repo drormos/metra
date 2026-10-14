@@ -16,7 +16,6 @@ class RepeatButton extends StatefulWidget {
   const RepeatButton({
     super.key,
     required this.onPressed,
-    this.onRepeat,
     required this.child,
     this.style,
     this.accelerate = true,
@@ -31,8 +30,6 @@ class RepeatButton extends StatefulWidget {
   /// Null disables the button (and stops a running repeat).
   final VoidCallback? onPressed;
 
-  /// Fired for each repeat while held; defaults to [onPressed].
-  final VoidCallback? onRepeat;
   final Widget child;
   final ButtonStyle? style;
 
@@ -60,7 +57,7 @@ class _RepeatButtonState extends State<RepeatButton> {
       _held += interval;
       final onPressed = widget.onPressed;
       if (onPressed == null) return _stop();
-      (widget.onRepeat ?? onPressed)();
+      onPressed();
       if (_repeat != null) _scheduleNext(); // not stopped by the step
     });
   }

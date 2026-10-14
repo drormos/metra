@@ -708,7 +708,7 @@ void main() {
       expect(haptics, List.filled(4, 'lightImpact'));
     });
 
-    testWidgets('holding ±1 ticks only on multiples of 5', (tester) async {
+    testWidgets('holding ±1 ticks on every step', (tester) async {
       await pumpScreen(tester);
       final haptics = recordHaptics(tester);
       final gesture = await tester.startGesture(
@@ -719,8 +719,7 @@ void main() {
       await gesture.up();
       await tester.pump();
       expect(controller.bpm, 130);
-      // The press, then 125 and 130.
-      expect(haptics, List.filled(3, 'lightImpact'));
+      expect(haptics, List.filled(10, 'lightImpact')); // 121 … 130
     });
 
     testWidgets('a hold hitting 300 stops with a medium bump', (tester) async {

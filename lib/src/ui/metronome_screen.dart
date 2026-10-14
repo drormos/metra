@@ -543,12 +543,6 @@ class MetronomeScreen extends StatelessWidget {
                   controller.nudge(delta);
                 }
               : null,
-          // While held, tick only on reaching a multiple of 5.
-          onRepeat: () {
-            final before = controller.bpm;
-            controller.nudge(delta);
-            if (Haptics.reachesFive(before, controller.bpm)) Haptics.tick();
-          },
           // Shrinks instead of wrapping on narrow phones.
           child: FittedBox(
             child: Text(
