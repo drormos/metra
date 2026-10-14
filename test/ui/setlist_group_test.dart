@@ -21,7 +21,7 @@ void main() {
   late LibraryController library;
 
   setUp(() {
-    dir = Directory.systemTemp.createTempSync('metra_panel_test');
+    dir = Directory.systemTemp.createTempSync('metra_group_test');
   });
 
   tearDown(() {
@@ -33,9 +33,7 @@ void main() {
     }
   });
 
-  /// [panel]: also open the songs sheet (the stand-in for the picker),
-  /// through "Choose a setlist", so one setlist ("Setup") exists.
-  Future<void> pumpScreen(WidgetTester tester, {bool panel = false}) async {
+  Future<void> pumpScreen(WidgetTester tester) async {
     tester.view.physicalSize = const Size(400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -52,106 +50,7 @@ void main() {
         home: MetronomeScreen(controller: metronome, library: library),
       ),
     );
-    if (panel) {
-      library.addSetlist('Setup');
-      await tester.pump();
-      await tester.tap(find.text('Choose a setlist'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Song library'));
-      await tester.pumpAndSettle();
-    }
   }
-
-  Future<void> enterName(WidgetTester tester, String name) async {
-    await tester.enterText(find.byType(TextField), name);
-    await tester.tap(find.text('Save'));
-    await tester.pumpAndSettle();
-  }
-
-  testWidgets('save the current tempo as a song, then load it', (tester) async {
-    await pumpScreen(tester, panel: true);
-    metronome.setBpm(87);
-    await tester.tap(find.text('Save current as song'));
-    await tester.pumpAndSettle();
-    await enterName(tester, 'Ballad');
-
-    expect(find.widgetWithText(ListTile, 'Ballad'), findsOneWidget);
-    expect(
-      tester.widget<Text>(find.byKey(MetronomeScreen.titleKey)).data,
-      'Ballad',
-    );
-    expect(find.text('87 BPM · 4/4'), findsOneWidget);
-
-    metronome.setBpm(140);
-    await tester.tap(find.widgetWithText(ListTile, 'Ballad'));
-    await tester.pump();
-    expect(metronome.bpm, 87);
-  });
-
-  testWidgets('empty name is not saved', (tester) async {
-    await pumpScreen(tester, panel: true);
-    await tester.tap(find.text('Save current as song'));
-    await tester.pumpAndSettle();
-    await enterName(tester, '   ');
-    expect(library.songs, isEmpty);
-  });
-
-  testWidgets('create a setlist and add a song to it', (tester) async {
-    await pumpScreen(tester, panel: true);
-    library.addSong(
-      name: 'Opener',
-      bpm: 150,
-      pattern: const MetronomePattern.standard(),
-    );
-    await tester.tap(find.byTooltip('Setlist actions'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('New setlist').last); // the panel's menu
-    await tester.pumpAndSettle();
-    await enterName(tester, 'Friday');
-
-    // The new setlist is selected and empty.
-    expect(library.activeSetlist?.name, 'Friday');
-    expect(find.textContaining('This setlist is empty'), findsOneWidget);
-
-    library.setActiveSetlist(null);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Song actions'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Add to setlist'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Friday').last); // the dialog's option
-    await tester.pumpAndSettle();
-    expect(
-      library.setlists.firstWhere((l) => l.name == 'Friday').songIds,
-      hasLength(1),
-    );
-  });
-
-  testWidgets('delete a song after confirming', (tester) async {
-    await pumpScreen(tester, panel: true);
-    library.addSong(
-      name: 'Gone',
-      bpm: 100,
-      pattern: const MetronomePattern.standard(),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Song actions'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Delete song'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
-    expect(library.songs, hasLength(1));
-
-    await tester.tap(find.byTooltip('Song actions'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Delete song'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Delete'));
-    await tester.pumpAndSettle();
-    expect(library.songs, isEmpty);
-    expect(find.text('Gone'), findsNothing);
-  });
 
   group('setlist group', () {
     Future<void> withSet(WidgetTester tester) async {

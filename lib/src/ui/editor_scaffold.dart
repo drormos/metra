@@ -210,3 +210,31 @@ class LabeledField extends StatelessWidget {
     );
   }
 }
+
+/// The outlined "Search songs" field of the song library screens.
+class SearchField extends StatelessWidget {
+  const SearchField({super.key, required this.controller, this.onChanged});
+
+  final TextEditingController controller;
+  final ValueChanged<String>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(4),
+      borderSide: BorderSide(color: colors.border, width: 2),
+    );
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      decoration: InputDecoration(
+        hintText: 'Search songs',
+        prefixIcon: Icon(Icons.search, color: colors.muted),
+        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        border: border,
+        enabledBorder: border,
+      ),
+    );
+  }
+}

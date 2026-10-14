@@ -12,6 +12,7 @@ import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/setlist_group.dart';
 import 'package:metra/src/ui/setlist_picker.dart';
 import 'package:metra/src/ui/song_editor.dart';
+import 'package:metra/src/ui/song_library.dart';
 
 import '../audio/fake_click_output.dart';
 import 'test_theme.dart';
@@ -196,6 +197,14 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('picker-song-0')));
     await settle(tester);
     expect(library.currentSong!.id, ids[1]);
+  });
+
+  testWidgets('"Song library" opens the song library', (tester) async {
+    await pumpWithSets(tester);
+    await openFromHeader(tester);
+    await tester.tap(find.text('Song library'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SongLibrary), findsOneWidget);
   });
 
   testWidgets('the pencil on a picker row edits that song', (tester) async {

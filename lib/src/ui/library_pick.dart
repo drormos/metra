@@ -78,22 +78,9 @@ class _LibraryPickState extends State<LibraryPick> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
-            child: TextField(
+            child: SearchField(
               controller: _search,
               onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                hintText: 'Search songs',
-                prefixIcon: Icon(Icons.search, color: colors.muted),
-                contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(4),
-                  borderSide: BorderSide(color: colors.border, width: 2),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(4),
-                  borderSide: BorderSide(color: colors.border, width: 2),
-                ),
-              ),
             ),
           ),
           Divider(height: 1, color: colors.divider),

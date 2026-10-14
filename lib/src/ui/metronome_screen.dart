@@ -7,12 +7,12 @@ import '../model/click_sound.dart';
 import '../model/tempo_name.dart';
 import 'beat_indicator.dart';
 import 'haptics.dart';
-import 'library_panel.dart';
 import 'repeat_button.dart';
 import 'setlist_editor.dart';
 import 'setlist_group.dart';
 import 'setlist_picker.dart';
 import 'song_editor.dart';
+import 'song_library.dart';
 import 'subdivision_icon.dart';
 import 'tempo_ruler.dart';
 import 'theme.dart';
@@ -225,7 +225,8 @@ class MetronomeScreen extends StatelessWidget {
               ),
               // The old song panel stands in for the song library until
               // Phase 5.
-              onSongLibrary: () => _showSongs(context, library),
+              onSongLibrary: () =>
+                  openSongLibrary(context, library, controller),
               onNewSetlist: () => _newSetlist(context, library),
             ),
             onNewSetlist: () => _newSetlist(context, library),
@@ -467,19 +468,6 @@ class MetronomeScreen extends StatelessWidget {
     BuildContext context,
     LibraryController library,
   ) async => (await openSongEditor(context, library, controller))?.id;
-
-  void _showSongs(BuildContext context, LibraryController library) =>
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        builder: (context) => FractionallySizedBox(
-          heightFactor: 0.8,
-          child: SafeArea(
-            child: LibraryPanel(library: library, metronome: controller),
-          ),
-        ),
-      );
 
   void _showSettings(BuildContext context) => showModalBottomSheet<void>(
     context: context,
