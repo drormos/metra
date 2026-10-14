@@ -122,4 +122,14 @@ void main() {
     expect(fromOld.activeSetlistId, isNull);
     expect(fromOld.currentPosition, -1);
   });
+
+  test('a song without editedAt (older file) loads with null', () {
+    final json = const Song(
+      id: 'x',
+      name: 'Old',
+      bpm: 90,
+      pattern: MetronomePattern.standard(),
+    ).toJson()..remove('editedAt');
+    expect(Song.fromJson(json).editedAt, isNull);
+  });
 }

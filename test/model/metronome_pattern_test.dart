@@ -142,4 +142,62 @@ void main() {
       );
     });
   });
+
+  group('per-step editing', () {
+    final sixteenths = MetronomePattern.simple(beatsPerBar: 2, stepsPerBeat: 4);
+
+    test('toggleCell switches one subdivision soft <-> silent', () {
+      final gallop = sixteenths.toggleCell(0, 1);
+      expect(gallop.steps.take(4), [
+        StepLevel.accent,
+        StepLevel.silent,
+        StepLevel.soft,
+        StepLevel.soft,
+      ]);
+      expect(gallop.toggleCell(0, 1), sixteenths);
+      expect(() => sixteenths.toggleCell(0, 0), throwsRangeError);
+      expect(() => sixteenths.toggleCell(0, 4), throwsRangeError);
+    });
+
+    test('cycleBeat leaves the beat\'s cells alone', () {
+      final gallop = sixteenths.toggleCell(1, 2).cycleBeat(1);
+      expect(gallop.steps.skip(4), [
+        StepLevel.accent,
+        StepLevel.soft,
+        StepLevel.silent,
+        StepLevel.soft,
+      ]);
+    });
+
+    test('withBeats keeps existing beats and cells; new beats regular', () {
+      final edited = sixteenths.toggleCell(0, 1).cycleBeat(1);
+      final longer = edited.withBeats(3);
+      expect(longer.steps.take(8), edited.steps);
+      expect(longer.steps.skip(8), [
+        StepLevel.normal,
+        StepLevel.soft,
+        StepLevel.soft,
+        StepLevel.soft,
+      ]);
+      expect(longer.withBeats(1).steps, edited.steps.take(4));
+      expect(edited.withBeats(2, beatUnit: 8).timeSignature, '2/8');
+    });
+
+    test('withSubdivision: same value keeps cells, a new one starts on', () {
+      final gallop = sixteenths.toggleCell(0, 1);
+      expect(gallop.withSubdivision(4), same(gallop));
+      final triplets = gallop.withSubdivision(3);
+      expect(triplets.steps.take(3), [
+        StepLevel.accent,
+        StepLevel.soft,
+        StepLevel.soft,
+      ]);
+    });
+
+    test('isDefault: accent on 1, everything else plain', () {
+      expect(sixteenths.isDefault, isTrue);
+      expect(sixteenths.toggleCell(1, 3).isDefault, isFalse);
+      expect(sixteenths.cycleBeat(1).isDefault, isFalse);
+    });
+  });
 }

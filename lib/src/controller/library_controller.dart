@@ -170,16 +170,33 @@ class LibraryController extends ChangeNotifier {
     required int bpm,
     required MetronomePattern pattern,
   }) {
-    final song = Song(id: _newId(), name: name, bpm: bpm, pattern: pattern);
+    final song = Song(
+      id: _newId(),
+      name: name,
+      bpm: bpm,
+      pattern: pattern,
+      editedAt: DateTime.now(),
+    );
     _update(_library.copyWith(songs: [...songs, song]));
     return song;
   }
 
-  void updateSong(Song song) => _update(
-    _library.copyWith(
-      songs: [for (final s in songs) s.id == song.id ? song : s],
-    ),
-  );
+  void updateSong(Song song) {
+    final edited = song.copyWith(editedAt: DateTime.now());
+    _update(
+      _library.copyWith(
+        songs: [for (final s in songs) s.id == song.id ? edited : s],
+      ),
+    );
+  }
+
+  /// Most recently created or saved first; songs without a time last.
+  List<Song> get songsRecentlyEdited {
+    // Songs saved before edit times were recorded sort as oldest.
+    final epoch = DateTime.fromMillisecondsSinceEpoch(0);
+    return [...songs]
+      ..sort((a, b) => (b.editedAt ?? epoch).compareTo(a.editedAt ?? epoch));
+  }
 
   /// Also removes the song from every setlist.
   void deleteSong(String id) => _update(

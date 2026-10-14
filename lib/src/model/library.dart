@@ -10,6 +10,7 @@ class Song {
     required this.name,
     required this.bpm,
     required this.pattern,
+    this.editedAt,
   });
 
   final String id;
@@ -17,11 +18,21 @@ class Song {
   final int bpm;
   final MetronomePattern pattern;
 
-  Song copyWith({String? name, int? bpm, MetronomePattern? pattern}) => Song(
+  /// When the song was last created or saved; null for songs from before
+  /// this was recorded (they sort as oldest in "Recently edited").
+  final DateTime? editedAt;
+
+  Song copyWith({
+    String? name,
+    int? bpm,
+    MetronomePattern? pattern,
+    DateTime? editedAt,
+  }) => Song(
     id: id,
     name: name ?? this.name,
     bpm: bpm ?? this.bpm,
     pattern: pattern ?? this.pattern,
+    editedAt: editedAt ?? this.editedAt,
   );
 
   Map<String, Object?> toJson() => {
@@ -29,6 +40,7 @@ class Song {
     'name': name,
     'bpm': bpm,
     'pattern': pattern.toJson(),
+    'editedAt': editedAt?.millisecondsSinceEpoch,
   };
 
   factory Song.fromJson(Map<String, Object?> json) => Song(
@@ -36,6 +48,10 @@ class Song {
     name: json['name'] as String,
     bpm: json['bpm'] as int,
     pattern: MetronomePattern.fromJson(json['pattern'] as Map<String, Object?>),
+    editedAt: switch (json['editedAt']) {
+      final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
+      _ => null,
+    },
   );
 }
 

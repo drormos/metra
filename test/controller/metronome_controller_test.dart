@@ -237,16 +237,23 @@ void main() {
       expect(notifications, before);
     });
 
-    test('setMeter resets accents and keeps the subdivision', () {
+    test('setMeter keeps beat states and the subdivision', () {
       controller.setSubdivision(2);
-      controller.cycleBeat(1);
+      controller.cycleBeat(1); // beat 2 accented
       controller.setMeter(7, 8);
       expect(controller.pattern.timeSignature, '7/8');
       expect(controller.pattern.stepsPerBeat, 2);
-      expect(
-        controller.pattern.beatLevels.where((l) => l == StepLevel.accent),
-        hasLength(1),
-      );
+      expect(controller.pattern.beatLevels.take(3), [
+        StepLevel.accent,
+        StepLevel.accent,
+        StepLevel.normal,
+      ]);
+      controller.setMeter(3, 4);
+      expect(controller.pattern.beatLevels, [
+        StepLevel.accent,
+        StepLevel.accent,
+        StepLevel.normal,
+      ]);
     });
 
     test('while playing, a beat tap is heard from the next click', () async {

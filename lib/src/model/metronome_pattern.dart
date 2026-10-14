@@ -97,29 +97,74 @@ class MetronomePattern {
   /// Whether the absolute step [stepIndex] is the first step of a beat.
   bool isBeatStart(int stepIndex) => stepIndex % stepsPerBeat == 0;
 
-  /// Same beat levels, new subdivision.
+  /// Same beat levels, new subdivision; the new subdivision cells all
+  /// start on (soft). An unchanged subdivision returns this pattern.
   MetronomePattern withSubdivision(int stepsPerBeat) =>
-      MetronomePattern.fromBeats(
-        beatLevels,
+      stepsPerBeat == this.stepsPerBeat
+      ? this
+      : MetronomePattern.fromBeats(
+          beatLevels,
+          stepsPerBeat: stepsPerBeat,
+          beatUnit: beatUnit,
+        );
+
+  /// [beatsPerBar] beats in [beatUnit]: existing beats keep their levels
+  /// and cells, new beats are regular with their cells on.
+  MetronomePattern withBeats(int beatsPerBar, {int? beatUnit}) {
+    _validateSizes(beatsPerBar, stepsPerBeat);
+    return MetronomePattern(
+      beatsPerBar: beatsPerBar,
+      stepsPerBeat: stepsPerBeat,
+      beatUnit: beatUnit ?? this.beatUnit,
+      steps: [
+        for (var beat = 0; beat < beatsPerBar; beat++)
+          for (var cell = 0; cell < stepsPerBeat; cell++)
+            beat < this.beatsPerBar
+                ? steps[beat * stepsPerBeat + cell]
+                : (cell == 0 ? StepLevel.normal : StepLevel.soft),
+      ],
+    );
+  }
+
+  /// Beat [beat] goes normal → accent → silent → normal (first tap on a
+  /// plain beat accents it: the common case, e.g. 7/8 as 2+2+3). Only the
+  /// beat's own step changes; its subdivision cells keep their states.
+  MetronomePattern cycleBeat(int beat) {
+    final i = beat * stepsPerBeat;
+    return _withStep(i, switch (steps[i]) {
+      StepLevel.normal => StepLevel.accent,
+      StepLevel.accent => StepLevel.silent,
+      _ => StepLevel.normal,
+    });
+  }
+
+  /// Subdivision [cell] (1 … stepsPerBeat − 1) of [beat] toggles on (soft)
+  /// ↔ off (silent): how gallops and similar patterns are built.
+  MetronomePattern toggleCell(int beat, int cell) {
+    RangeError.checkValueInInterval(cell, 1, stepsPerBeat - 1, 'cell');
+    final i = beat * stepsPerBeat + cell;
+    return _withStep(
+      i,
+      steps[i] == StepLevel.silent ? StepLevel.soft : StepLevel.silent,
+    );
+  }
+
+  /// Whether this is the plain pattern for its shape: accent on 1, other
+  /// beats regular, every subdivision on.
+  bool get isDefault =>
+      this ==
+      MetronomePattern.simple(
+        beatsPerBar: beatsPerBar,
         stepsPerBeat: stepsPerBeat,
         beatUnit: beatUnit,
       );
 
-  /// Beat [beat] goes normal → accent → silent → normal (first tap on a
-  /// plain beat accents it: the common case, e.g. 7/8 as 2+2+3).
-  MetronomePattern cycleBeat(int beat) {
-    final levels = beatLevels;
-    levels[beat] = switch (levels[beat]) {
-      StepLevel.normal => StepLevel.accent,
-      StepLevel.accent => StepLevel.silent,
-      _ => StepLevel.normal,
-    };
-    return MetronomePattern.fromBeats(
-      levels,
-      stepsPerBeat: stepsPerBeat,
-      beatUnit: beatUnit,
-    );
-  }
+  MetronomePattern _withStep(int index, StepLevel level) => MetronomePattern(
+    beatsPerBar: beatsPerBar,
+    stepsPerBeat: stepsPerBeat,
+    beatUnit: beatUnit,
+    steps: [...steps]..[index] = level,
+  );
 
   Map<String, Object?> toJson() => {
     'beatsPerBar': beatsPerBar,

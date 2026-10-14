@@ -133,18 +133,14 @@ class MetronomeController extends ChangeNotifier {
     );
   }
 
-  /// Time signature (resets custom accents); while playing, the next beat
-  /// starts a bar in the new meter.
+  /// Time signature, keeping existing beat states (new beats regular);
+  /// while playing, the next beat starts a bar in the new meter.
   void setMeter(int beatsPerBar, int beatUnit) {
     if (beatsPerBar == _pattern.beatsPerBar && beatUnit == _pattern.beatUnit) {
       return;
     }
     _switchAtNextBeat(
-      MetronomePattern.simple(
-        beatsPerBar: beatsPerBar,
-        stepsPerBeat: _pattern.stepsPerBeat,
-        beatUnit: beatUnit,
-      ),
+      _pattern.withBeats(beatsPerBar, beatUnit: beatUnit),
       restartBar: true,
     );
   }
