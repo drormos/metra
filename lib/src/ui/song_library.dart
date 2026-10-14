@@ -66,11 +66,11 @@ class _SongLibraryState extends State<SongLibrary> {
   void _edit([Song? song]) =>
       openSongEditor(context, _library, widget.metronome, song: song);
 
-  /// Same as a picker row: while playing, restarts on beat 1. A song in
-  /// the loaded set takes its position there; any other shows "– of N".
+  /// Always Single song mode, from any mode; any setlist is unloaded.
+  /// While playing, restarts on beat 1, like a picker row.
   void _load(Song song) {
     Haptics.medium(); // the song changed
-    _library.playSong(song, widget.metronome);
+    _library.playSingleSong(song, widget.metronome);
     Navigator.popUntil(context, (route) => route.isFirst);
   }
 

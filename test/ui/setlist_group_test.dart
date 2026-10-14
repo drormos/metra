@@ -180,13 +180,13 @@ void main() {
       await tester.tap(find.byKey(EditorScaffold.actionKey));
       await tester.pumpAndSettle();
       expect(library.activeSetlist?.name, 'Saturday');
-      expect(find.text('– of 0'), findsOneWidget);
+      expect(find.textContaining(' of '), findsNothing, reason: 'empty set');
     });
 
     testWidgets('setlist mode: header, position, neighbours', (tester) async {
       await withSet(tester);
       expect(find.text('Friday set'), findsOneWidget);
-      expect(find.text('– of 3'), findsOneWidget);
+      expect(find.textContaining(' of 3'), findsNothing, reason: 'no song yet');
       expect(enabled(tester, SetlistGroup.previousKey), isFalse);
       expect(find.text('One'), findsOneWidget, reason: 'next = first song');
 

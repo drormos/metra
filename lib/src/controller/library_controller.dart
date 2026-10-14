@@ -83,9 +83,16 @@ class LibraryController extends ChangeNotifier {
   }
 
   /// The song last loaded into the metronome.
+  /// With a setlist loaded, only a song in that set counts: one removed
+  /// from it (or deleted) leaves the set with no current song, and "next"
+  /// is then its first song.
   Song? get currentSong {
     final id = _library.currentSongId;
-    return id == null ? null : songById(id);
+    final list = activeSetlist;
+    if (id == null || (list != null && !list.songIds.contains(id))) {
+      return null;
+    }
+    return songById(id);
   }
 
   /// Where the current song sits in [visibleSongs], or -1.
@@ -115,6 +122,16 @@ class LibraryController extends ChangeNotifier {
         songId: song.id,
         position: index ?? visibleSongs.indexWhere((s) => s.id == song.id),
       ),
+    );
+  }
+
+  /// A song from the library: always Single song mode, unloading any
+  /// setlist (choosing the set again starts at its first song). While
+  /// playing it restarts on beat 1 at the song's tempo.
+  void playSingleSong(Song song, MetronomeController metronome) {
+    metronome.loadSong(bpm: song.bpm, pattern: song.pattern);
+    _update(
+      _library.withSession(setlistId: null, songId: song.id, position: -1),
     );
   }
 

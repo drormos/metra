@@ -231,20 +231,17 @@ void main() {
     expect(metronome.bpm, 110);
   });
 
-  testWidgets('from the library with a set: outside it reads "– of N"', (
+  testWidgets('from the library with a set: Single song, the set unloaded', (
     tester,
   ) async {
     await pumpWithSets(tester);
-    final outside = library.addSong(
-      name: 'Solo',
-      bpm: 90,
-      pattern: const MetronomePattern.standard(),
-    );
+    library.playSong(library.visibleSongs[0], metronome, index: 0);
     await tester.pump();
-    await loadFromLibrary(tester, outside.name);
-    expect(library.activeSetlist?.name, 'Friday set');
-    expect(find.text('– of 3'), findsOneWidget);
-    expect(library.hasNext, isTrue, reason: 'leads back into the set');
+    await loadFromLibrary(tester, 'Two'); // a song that is in the set
+    expect(library.activeSetlist, isNull);
+    expect(library.singleSong, isTrue);
+    expect(find.text('Single song'), findsOneWidget);
+    expect(metronome.bpm, 110);
   });
 
   testWidgets('the pencil on a picker row edits that song', (tester) async {

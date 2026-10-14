@@ -97,7 +97,6 @@ class SetlistGroup extends StatelessWidget {
   /// An outlined dropdown-style control: it must look tappable.
   Widget _setlistHeader(MetraColors colors, Setlist setlist) {
     final index = library.currentIndex;
-    final position = index < 0 ? '–' : '${index + 1}';
     return OutlinedButton(
       key: headerKey,
       style: OutlinedButton.styleFrom(
@@ -116,14 +115,17 @@ class SetlistGroup extends StatelessWidget {
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
           ),
-          Text(
-            '$position of ${library.visibleSongs.length}',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: colors.muted,
+          // No current song (an empty set, or the song was removed from it):
+          // no position.
+          if (index >= 0)
+            Text(
+              '${index + 1} of ${library.visibleSongs.length}',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: colors.muted,
+              ),
             ),
-          ),
           const SizedBox(width: 10),
           const Icon(Icons.expand_more, size: 20),
         ],

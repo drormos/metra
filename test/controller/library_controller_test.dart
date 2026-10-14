@@ -366,18 +366,38 @@ void main() {
       expect(reopened.currentSong?.id, a.id);
     });
 
-    test('a song outside the loaded set: position -1, next re-enters', () {
+    test('a library song always enters Single song, unloading the set', () {
       final a = library.addSong(name: 'A', bpm: 100, pattern: waltz);
-      final b = library.addSong(name: 'B', bpm: 110, pattern: waltz);
       final gig = library.addSetlist('Gig');
       library
         ..addToSetlist(gig.id, a.id)
         ..setActiveSetlist(gig.id)
-        ..playSong(b, metronome);
-      expect(library.currentIndex, -1);
-      library.nextSong(metronome);
-      expect(library.currentSong?.name, 'A');
+        ..playSingleSong(a, metronome);
+      expect(library.activeSetlist, isNull);
+      expect(library.singleSong, isTrue);
+      expect(metronome.bpm, 100);
     });
+
+    test(
+      'a current song removed from the set: no current song, next = 1st',
+      () {
+        final a = library.addSong(name: 'A', bpm: 100, pattern: waltz);
+        final b = library.addSong(name: 'B', bpm: 110, pattern: waltz);
+        final gig = library.addSetlist('Gig');
+        library
+          ..addToSetlist(gig.id, a.id)
+          ..addToSetlist(gig.id, b.id)
+          ..setActiveSetlist(gig.id)
+          ..nextSong(metronome)
+          ..nextSong(metronome); // B
+        library.removeFromSetlist(gig.id, 1);
+        expect(library.currentSong, isNull);
+        expect(library.currentIndex, -1);
+        expect(library.songChanged(metronome), isFalse);
+        library.nextSong(metronome);
+        expect(library.currentSong?.name, 'A');
+      },
+    );
 
     test('reopens in the same setlist at the same song', () async {
       final gig = library.addSetlist('Gig');
