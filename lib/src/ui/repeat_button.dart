@@ -1,10 +1,17 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import 'haptics.dart';
+
 /// A filled button that fires once on tap and repeats while held
-/// (ui-spec.md: tempo buttons and the song editor's −/+). Repeats start
-/// after the platform long-press delay, every [interval].
+/// (ui-spec.md "Hold to repeat": tempo buttons, and the song editor's and
+/// time signature sheet's −/+). Holding fires after [holdDelay], then
+/// repeats at [startRate] steps per second; with [accelerate] it speeds up
+/// to [maxRate] by [fullSpeedAfter] of holding. Releasing stops at once.
+/// Reaching the end of the range (the caller disables the button) stops the
+/// repeat with a medium haptic bump.
 class RepeatButton extends StatefulWidget {
   const RepeatButton({
     super.key,
@@ -12,8 +19,14 @@ class RepeatButton extends StatefulWidget {
     this.onRepeat,
     required this.child,
     this.style,
-    this.interval = const Duration(milliseconds: 100),
+    this.accelerate = true,
   });
+
+  /// Starting values from the spec; tune on a phone.
+  static const holdDelay = Duration(milliseconds: 400);
+  static const startRate = 6.0;
+  static const maxRate = 15.0;
+  static const fullSpeedAfter = Duration(milliseconds: 1500);
 
   /// Null disables the button (and stops a running repeat).
   final VoidCallback? onPressed;
@@ -22,7 +35,9 @@ class RepeatButton extends StatefulWidget {
   final VoidCallback? onRepeat;
   final Widget child;
   final ButtonStyle? style;
-  final Duration interval;
+
+  /// Speed up while held (tempo); false keeps [startRate] (beats).
+  final bool accelerate;
 
   @override
   State<RepeatButton> createState() => _RepeatButtonState();
@@ -30,14 +45,37 @@ class RepeatButton extends StatefulWidget {
 
 class _RepeatButtonState extends State<RepeatButton> {
   Timer? _repeat;
+  // How long the button has been held, summed from the scheduled steps.
+  Duration _held = Duration.zero;
 
   void _start() {
     widget.onPressed?.call();
-    _repeat = Timer.periodic(widget.interval, (_) {
+    _held = RepeatButton.holdDelay;
+    _scheduleNext();
+  }
+
+  void _scheduleNext() {
+    final interval = Duration(microseconds: (1e6 / _rate()).round());
+    _repeat = Timer(interval, () {
+      _held += interval;
       final onPressed = widget.onPressed;
-      // Hitting a limit disables the button: stop instead of firing on.
-      onPressed == null ? _stop() : (widget.onRepeat ?? onPressed)();
+      if (onPressed == null) return _stop();
+      (widget.onRepeat ?? onPressed)();
+      if (_repeat != null) _scheduleNext(); // not stopped by the step
     });
+  }
+
+  /// Steps per second, ramping linearly from the first repeat until
+  /// [RepeatButton.fullSpeedAfter] of holding.
+  double _rate() {
+    if (!widget.accelerate) return RepeatButton.startRate;
+    final ramp =
+        ((_held - RepeatButton.holdDelay).inMicroseconds /
+                (RepeatButton.fullSpeedAfter - RepeatButton.holdDelay)
+                    .inMicroseconds)
+            .clamp(0.0, 1.0);
+    return RepeatButton.startRate +
+        (RepeatButton.maxRate - RepeatButton.startRate) * ramp;
   }
 
   void _stop() {
@@ -48,7 +86,10 @@ class _RepeatButtonState extends State<RepeatButton> {
   @override
   void didUpdateWidget(RepeatButton old) {
     super.didUpdateWidget(old);
-    if (widget.onPressed == null) _stop();
+    if (widget.onPressed == null && _repeat != null) {
+      _stop();
+      Haptics.medium(); // the hold hit the end of the range
+    }
   }
 
   @override
@@ -58,10 +99,22 @@ class _RepeatButtonState extends State<RepeatButton> {
   }
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-    onLongPressStart: widget.onPressed == null ? null : (_) => _start(),
-    onLongPressEnd: (_) => _stop(),
-    onLongPressCancel: _stop,
+  Widget build(BuildContext context) => RawGestureDetector(
+    gestures: {
+      LongPressGestureRecognizer:
+          GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
+            () => LongPressGestureRecognizer(
+              duration: RepeatButton.holdDelay,
+              debugOwner: this,
+            ),
+            (recognizer) => recognizer
+              ..onLongPressStart = (widget.onPressed == null
+                  ? null
+                  : (_) => _start())
+              ..onLongPressEnd = ((_) => _stop())
+              ..onLongPressCancel = _stop,
+          ),
+    },
     child: FilledButton(
       style: widget.style,
       onPressed: widget.onPressed,

@@ -1,6 +1,5 @@
 import 'dart:ui' show SemanticsAction;
 
-import 'package:flutter/gestures.dart' show kLongPressTimeout;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +7,7 @@ import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/click_sound.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
+import 'package:metra/src/ui/repeat_button.dart';
 import 'package:metra/src/ui/haptics.dart';
 import 'package:metra/src/ui/tempo_ruler.dart';
 
@@ -714,13 +714,29 @@ void main() {
       final gesture = await tester.startGesture(
         tester.getCenter(find.text('+1')),
       );
-      await tester.pump(kLongPressTimeout); // first press: 121
-      await tester.pump(const Duration(milliseconds: 950)); // repeats
+      await tester.pump(RepeatButton.holdDelay); // first press: 121
+      await tester.pump(const Duration(seconds: 1)); // repeats to 130
       await gesture.up();
       await tester.pump();
-      expect(controller.bpm, inInclusiveRange(130, 134));
+      expect(controller.bpm, 130);
       // The press, then 125 and 130.
       expect(haptics, List.filled(3, 'lightImpact'));
+    });
+
+    testWidgets('a hold hitting 300 stops with a medium bump', (tester) async {
+      controller.setBpm(MetronomeController.maxBpm - 12);
+      await pumpScreen(tester);
+      final haptics = recordHaptics(tester);
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text('+5')),
+      );
+      await tester.pump(RepeatButton.holdDelay);
+      await tester.pump(const Duration(seconds: 2));
+      await gesture.up();
+      await tester.pump();
+      expect(controller.bpm, MetronomeController.maxBpm);
+      expect(haptics.last, 'mediumImpact');
+      expect(haptics.where((h) => h == 'mediumImpact'), hasLength(1));
     });
 
     test('reaching a multiple of 5, either direction', () {
@@ -739,14 +755,34 @@ void main() {
       final gesture = await tester.startGesture(
         tester.getCenter(find.text('+1')),
       );
-      await tester.pump(kLongPressTimeout); // repeat starts: +1
-      await tester.pump(const Duration(milliseconds: 1000)); // +10 more
+      await tester.pump(RepeatButton.holdDelay); // first step: 121
+      await tester.pump(const Duration(seconds: 1)); // accelerating
       await gesture.up();
       await tester.pump();
       final held = controller.bpm;
-      expect(held, inInclusiveRange(129, 132));
+      expect(held, inInclusiveRange(129, 131));
       await tester.pump(const Duration(seconds: 1));
       expect(controller.bpm, held, reason: 'stops on release');
+    });
+
+    testWidgets('waits ~0.4 s, then 6 per second rising to 15', (tester) async {
+      controller.setBpm(MetronomeController.minBpm);
+      await pumpScreen(tester);
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text('+1')),
+      );
+      await tester.pump(const Duration(milliseconds: 350));
+      expect(controller.bpm, 30, reason: 'a normal tap never repeats');
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(controller.bpm, 31);
+      await tester.pump(const Duration(milliseconds: 340));
+      expect(controller.bpm, 33, reason: '~6 per second at first');
+      await tester.pump(const Duration(milliseconds: 760)); // held 1.5 s
+      final atFullSpeed = controller.bpm;
+      await tester.pump(const Duration(seconds: 1));
+      expect(controller.bpm - atFullSpeed, inInclusiveRange(14, 16));
+      await gesture.up();
+      await tester.pump();
     });
 
     testWidgets('a quick tap adds once', (tester) async {
@@ -762,7 +798,7 @@ void main() {
       final gesture = await tester.startGesture(
         tester.getCenter(find.text('+5')),
       );
-      await tester.pump(kLongPressTimeout);
+      await tester.pump(RepeatButton.holdDelay);
       await tester.pump(const Duration(seconds: 2));
       expect(controller.bpm, MetronomeController.maxBpm);
       await gesture.up();
