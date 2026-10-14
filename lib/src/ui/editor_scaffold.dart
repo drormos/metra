@@ -157,6 +157,7 @@ class LabeledField extends StatelessWidget {
     this.style,
     this.autofocus = false,
     this.onChanged,
+    this.error,
   });
 
   final String label;
@@ -164,6 +165,9 @@ class LabeledField extends StatelessWidget {
   final TextStyle? style;
   final bool autofocus;
   final ValueChanged<String>? onChanged;
+
+  /// Shown under the field, which turns red.
+  final String? error;
 
   @override
   Widget build(BuildContext context) {
@@ -191,6 +195,14 @@ class LabeledField extends StatelessWidget {
             enabledBorder: border,
             focusedBorder: border.copyWith(
               borderSide: BorderSide(color: colors.text, width: 2),
+            ),
+            errorText: error,
+            errorStyle: TextStyle(color: colors.accentSounding, fontSize: 13),
+            errorBorder: border.copyWith(
+              borderSide: BorderSide(color: colors.accentSounding, width: 2),
+            ),
+            focusedErrorBorder: border.copyWith(
+              borderSide: BorderSide(color: colors.accentSounding, width: 2),
             ),
           ),
         ),

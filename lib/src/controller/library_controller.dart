@@ -225,8 +225,8 @@ class LibraryController extends ChangeNotifier {
     return song;
   }
 
-  /// A default name for a new song: "Song N", N the next number not
-  /// already used.
+  /// A default name for a new song: "Song N", N the lowest number not
+  /// already used (worked out from the current names every time).
   String newSongName() =>
       _newName('Song', [for (final song in songs) song.name]);
 
@@ -235,13 +235,21 @@ class LibraryController extends ChangeNotifier {
       _newName('Setlist', [for (final list in setlists) list.name]);
 
   static String _newName(String prefix, List<String> names) {
-    final taken = names.toSet();
-    var n = names.length + 1;
-    while (taken.contains('$prefix $n')) {
+    final taken = {for (final name in names) _nameKey(name)};
+    var n = 1;
+    while (taken.contains(_nameKey('$prefix $n'))) {
       n++;
     }
     return '$prefix $n';
   }
+
+  /// Names compare without case or surrounding spaces.
+  static String _nameKey(String name) => name.trim().toLowerCase();
+
+  /// Whether another setlist (not [exceptId]) already has [name].
+  bool setlistNameTaken(String name, {String? exceptId}) => setlists.any(
+    (list) => list.id != exceptId && _nameKey(list.name) == _nameKey(name),
+  );
 
   void updateSong(Song song) {
     final edited = song.copyWith(editedAt: DateTime.now());

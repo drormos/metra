@@ -133,11 +133,16 @@ class _SetlistEditorState extends State<SetlistEditor> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final songs = [for (final id in _songIds) ?_library.songById(id)];
+    // Two sets with one name would be ambiguous in the picker.
+    final taken = _library.setlistNameTaken(
+      _name.text,
+      exceptId: widget.setlist?.id,
+    );
     return EditorScaffold(
       title: _isNew ? 'New setlist' : 'Setlist',
       actionLabel: 'Save',
       dirty: _dirty,
-      onAction: _name.text.trim().isEmpty ? null : _save,
+      onAction: _name.text.trim().isEmpty || taken ? null : _save,
       body: CustomScrollView(
         slivers: [
           SliverPadding(
@@ -151,6 +156,9 @@ class _SetlistEditorState extends State<SetlistEditor> {
                     controller: _name,
                     autofocus: _isNew,
                     onChanged: (_) => setState(() {}),
+                    error: taken
+                        ? 'Another setlist already has this name'
+                        : null,
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w600,

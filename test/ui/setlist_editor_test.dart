@@ -182,7 +182,7 @@ void main() {
     await pumpEditor(tester, editGig: false);
     expect(find.text('New setlist'), findsOneWidget);
     final field = tester.widget<TextField>(find.byType(TextField));
-    expect(field.controller!.text, 'Setlist 2');
+    expect(field.controller!.text, 'Setlist 1');
     expect(
       field.controller!.selection,
       const TextSelection(baseOffset: 0, extentOffset: 9),
@@ -212,7 +212,30 @@ void main() {
   testWidgets('a new set keeps its default name if left alone', (tester) async {
     await pumpEditor(tester, editGig: false);
     await save(tester);
-    expect(library.activeSetlist?.name, 'Setlist 2');
+    expect(library.activeSetlist?.name, 'Setlist 1');
+  });
+
+  testWidgets('two setlists can\'t share a name', (tester) async {
+    await pumpEditor(tester, editGig: false);
+    await tester.enterText(find.byType(TextField), ' gig ');
+    await tester.pump();
+    expect(find.text('Another setlist already has this name'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(EditorScaffold.actionKey))
+          .onPressed,
+      isNull,
+    );
+    await tester.enterText(find.byType(TextField), 'Gig 2');
+    await tester.pump();
+    expect(find.text('Another setlist already has this name'), findsNothing);
+  });
+
+  testWidgets('a set may keep its own name', (tester) async {
+    await pumpEditor(tester);
+    await tester.enterText(find.byType(TextField), 'GIG');
+    await tester.pump();
+    expect(find.text('Another setlist already has this name'), findsNothing);
   });
 
   group('add songs (pick mode)', () {

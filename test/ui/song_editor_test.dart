@@ -107,20 +107,20 @@ void main() {
   ) async {
     await pumpEditor(tester, edit: false);
     final field = tester.widget<TextField>(find.byType(TextField));
-    expect(field.controller!.text, 'Song 3');
+    expect(field.controller!.text, 'Song 1');
     expect(
       field.controller!.selection,
       const TextSelection(baseOffset: 0, extentOffset: 6),
     );
     expect(find.byKey(SongEditor.deleteKey), findsNothing);
     await save(tester);
-    expect(result!.name, 'Song 3');
+    expect(result!.name, 'Song 1');
     expect(result!.bpm, 120);
     expect(result!.pattern, const MetronomePattern.standard());
     expect(library.songs, hasLength(3));
   });
 
-  test('default names skip numbers already used', () async {
+  test('default names: the lowest free number, from current names', () async {
     final dir = Directory.systemTemp.createTempSync('metra_names_test');
     addTearDown(() => dir.deleteSync(recursive: true));
     final library = await LibraryController.load(
@@ -138,13 +138,15 @@ void main() {
         bpm: 120,
         pattern: const MetronomePattern.standard(),
       );
-    expect(library.newSongName(), 'Song 3');
-    library.addSong(
-      name: 'Song 3',
+    expect(library.newSongName(), 'Song 1', reason: 'still free');
+    final one = library.addSong(
+      name: 'song 1 ', // case and spaces don't make it a different name
       bpm: 120,
       pattern: const MetronomePattern.standard(),
     );
-    expect(library.newSongName(), 'Song 4');
+    expect(library.newSongName(), 'Song 3');
+    library.updateSong(one.copyWith(name: 'Ballad'));
+    expect(library.newSongName(), 'Song 1', reason: 'renamed: free again');
     await library.flush();
   });
 
