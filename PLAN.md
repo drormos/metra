@@ -62,3 +62,5 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
 ## Phase 3: Audio Assets & Polish
 1. **Click Sounds:** Selectable click profiles (e.g. woodblock, digital beep, cowbell), all with zero leading silence.
 2. **UI Polish:** Final high-contrast theme, animations, and responsive layouts for desktop and mobile.
+   - The UI design is being worked out separately (Claude on the web); apply it here.
+   - Show the active setlist on the main screen (name and position, e.g. "Friday gig · 2/5"), so it's clear which list next/previous steps through.
