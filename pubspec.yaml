@@ -53,6 +53,7 @@ dev_dependencies:
   fake_async: ^1.3.3
   integration_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -109,3 +110,18 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# App icon (ui-spec.md "App icon"). The PNGs are 1024px exports of
+# docs/design/app-icon*.svg (headless Chrome, transparent background); run
+# `dart run flutter_launcher_icons` after changing them.
+flutter_launcher_icons:
+  image_path: tool/icon/app-icon.png
+  android: true
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: tool/icon/app-icon-foreground.png
+  # The foreground SVG is already scaled into the safe area.
+  adaptive_icon_foreground_inset: 0
+  ios: true
+  remove_alpha_ios: true
+  macos:
+    generate: true
