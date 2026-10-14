@@ -11,6 +11,7 @@ import 'package:metra/src/ui/editor_scaffold.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/setlist_group.dart';
 import 'package:metra/src/ui/setlist_picker.dart';
+import 'package:metra/src/ui/song_library.dart';
 
 import '../audio/fake_click_output.dart';
 import 'test_theme.dart';
@@ -77,35 +78,50 @@ void main() {
     Rect groupRect(WidgetTester tester) =>
         tester.getRect(find.byType(SetlistGroup));
 
-    testWidgets('Free play with no setlists: create your first', (
+    testWidgets('Free play with no setlists: Create a setlist and Songs', (
       tester,
     ) async {
       await pumpScreen(tester);
       expect(find.text('Free play'), findsOneWidget);
-      expect(find.text('Create your first setlist'), findsOneWidget);
-      expect(find.byTooltip('New setlist'), findsNothing);
+      expect(find.text('Create a setlist'), findsOneWidget);
+      expect(find.text('Songs'), findsOneWidget);
+      expect(find.byTooltip('New setlist'), findsNothing, reason: 'no +');
     });
 
-    testWidgets('Free play with setlists: choose one, or + for new', (
+    testWidgets('Free play with setlists: Setlists opens the picker', (
       tester,
     ) async {
       await pumpScreen(tester);
       library.addSetlist('Friday set');
       await tester.pump();
-      expect(find.text('Choose a setlist'), findsOneWidget);
-      expect(find.byTooltip('New setlist'), findsOneWidget);
-      await tester.tap(find.text('Choose a setlist'));
+      expect(find.text('Create a setlist'), findsNothing);
+      await tester.tap(find.byKey(SetlistGroup.setlistsKey));
       await tester.pumpAndSettle();
       expect(find.text('What to play'), findsOneWidget);
     });
 
-    testWidgets('+ opens the setlist editor; saving loads the new set', (
+    testWidgets('Songs opens the song library', (tester) async {
+      await pumpScreen(tester);
+      await tester.tap(find.byKey(SetlistGroup.songsKey));
+      await tester.pumpAndSettle();
+      expect(find.byType(SongLibrary), findsOneWidget);
+    });
+
+    testWidgets('the Setlists and Songs buttons are the same size', (
       tester,
     ) async {
       await pumpScreen(tester);
-      library.addSetlist('Old');
-      await tester.pump();
-      await tester.tap(find.byTooltip('New setlist'));
+      expect(
+        tester.getSize(find.byKey(SetlistGroup.setlistsKey)),
+        tester.getSize(find.byKey(SetlistGroup.songsKey)),
+      );
+    });
+
+    testWidgets('Create a setlist opens the editor; saving loads the set', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      await tester.tap(find.text('Create a setlist'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'Saturday');
       await tester.pump();

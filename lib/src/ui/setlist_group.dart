@@ -4,6 +4,7 @@ import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/library.dart';
 import 'haptics.dart';
+import 'subdivision_icon.dart';
 import 'theme.dart';
 
 /// The framed setlist group at the bottom of the main screen (ui-spec.md).
@@ -15,17 +16,23 @@ class SetlistGroup extends StatelessWidget {
     required this.library,
     required this.metronome,
     required this.onOpenPicker,
+    required this.onSongLibrary,
     required this.onNewSetlist,
   });
 
   final LibraryController library;
   final MetronomeController metronome;
   final VoidCallback onOpenPicker;
+  final VoidCallback onSongLibrary;
+
+  /// Free play with no setlists yet: "Create a setlist".
   final VoidCallback onNewSetlist;
 
   static const headerKey = Key('setlist-header');
   static const previousKey = Key('previous-song');
   static const nextKey = Key('next-song');
+  static const setlistsKey = Key('free-play-setlists');
+  static const songsKey = Key('free-play-songs');
 
   @override
   Widget build(BuildContext context) {
@@ -105,24 +112,12 @@ class SetlistGroup extends StatelessWidget {
     );
   }
 
-  /// Quieter than previous/next: outlined and 52px tall, vertically
-  /// centred in the 68px row.
+  /// Two equal outlined buttons, quieter than previous/next (52px tall,
+  /// centred in the 68px row): Setlists opens the picker (with none yet,
+  /// "Create a setlist" opens the setlist editor); Songs opens the song
+  /// library, the way to play a single song.
   Widget _freePlayRow(MetraColors colors) {
-    if (library.setlists.isEmpty) {
-      return Center(
-        child: SizedBox(
-          height: 52,
-          width: double.infinity,
-          child: OutlinedButton(
-            onPressed: onNewSetlist,
-            child: const Text(
-              'Create your first setlist',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-          ),
-        ),
-      );
-    }
+    final none = library.setlists.isEmpty;
     return Center(
       child: SizedBox(
         height: 52,
@@ -130,37 +125,24 @@ class SetlistGroup extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                ),
-                onPressed: onOpenPicker,
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Choose a setlist',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    Icon(Icons.expand_more, size: 18, color: colors.muted),
-                  ],
-                ),
+              child: _freePlayButton(
+                colors,
+                key: setlistsKey,
+                icon: const Icon(Icons.format_list_bulleted, size: 18),
+                label: none ? 'Create a setlist' : 'Setlists',
+                onPressed: none ? onNewSetlist : onOpenPicker,
+                chevron: !none,
               ),
             ),
             const SizedBox(width: 8),
-            SizedBox(
-              width: 52,
-              child: Tooltip(
-                message: 'New setlist',
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(padding: EdgeInsets.zero),
-                  onPressed: onNewSetlist,
-                  child: const Icon(Icons.add, size: 20),
-                ),
+            Expanded(
+              child: _freePlayButton(
+                colors,
+                key: songsKey,
+                icon: const SubdivisionIcon(1, size: 18),
+                label: 'Songs',
+                onPressed: onSongLibrary,
+                chevron: true,
               ),
             ),
           ],
@@ -168,6 +150,36 @@ class SetlistGroup extends StatelessWidget {
       ),
     );
   }
+
+  Widget _freePlayButton(
+    MetraColors colors, {
+    required Key key,
+    required Widget icon,
+    required String label,
+    required VoidCallback onPressed,
+    required bool chevron,
+  }) => OutlinedButton(
+    key: key,
+    style: OutlinedButton.styleFrom(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+    ),
+    onPressed: onPressed,
+    child: Row(
+      children: [
+        icon,
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+        ),
+        if (chevron) Icon(Icons.expand_more, size: 18, color: colors.muted),
+      ],
+    ),
+  );
 
   /// Previous and next show the neighbouring song (no words), filled,
   /// disabled at the ends of the list.

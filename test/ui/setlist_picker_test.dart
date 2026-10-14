@@ -207,8 +207,8 @@ void main() {
     expect(find.byType(SongLibrary), findsOneWidget);
   });
 
-  /// Opens the library through the picker (in Free play via "Choose a
-  /// setlist") and taps [name]'s row.
+  /// Opens the library through the picker (in Free play via Setlists)
+  /// and taps [name]'s row.
   Future<void> loadFromLibrary(
     WidgetTester tester,
     String name, {
@@ -216,7 +216,7 @@ void main() {
   }) async {
     await tester.tap(
       freePlay
-          ? find.text('Choose a setlist')
+          ? find.byKey(SetlistGroup.setlistsKey)
           : find.byKey(SetlistGroup.headerKey),
     );
     await settle(tester);
@@ -341,7 +341,7 @@ void main() {
     expect(library.activeSetlist, isNull);
     expect(metronome.isPlaying, isTrue);
     expect(metronome.bpm, 100);
-    expect(find.text('Choose a setlist'), findsOneWidget);
+    expect(find.byKey(SetlistGroup.setlistsKey), findsOneWidget);
     metronome.stop();
   });
 
@@ -349,7 +349,7 @@ void main() {
     tester,
   ) async {
     await pumpWithSets(tester, loaded: false);
-    await tester.tap(find.text('Choose a setlist'));
+    await tester.tap(find.byKey(SetlistGroup.setlistsKey));
     await tester.pumpAndSettle();
     expect(find.text('What to play'), findsOneWidget);
     expect(find.byTooltip('Back'), findsNothing);

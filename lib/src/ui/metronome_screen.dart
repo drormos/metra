@@ -223,12 +223,11 @@ class MetronomeScreen extends StatelessWidget {
                 setlist: library.activeSetlist,
                 newSong: (context) => _newSong(context, library),
               ),
-              // The old song panel stands in for the song library until
-              // Phase 5.
               onSongLibrary: () =>
                   openSongLibrary(context, library, controller),
               onNewSetlist: () => _newSetlist(context, library),
             ),
+            onSongLibrary: () => openSongLibrary(context, library, controller),
             onNewSetlist: () => _newSetlist(context, library),
           ),
         ],
