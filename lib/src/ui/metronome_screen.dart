@@ -219,9 +219,13 @@ class MetronomeScreen extends StatelessWidget {
         height: 64,
         child: OutlinedButton(
           onPressed: enabled ? () => controller.nudge(delta) : null,
-          child: Text(
-            label,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+          // Shrinks instead of wrapping on narrow phones.
+          child: FittedBox(
+            child: Text(
+              label,
+              maxLines: 1,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+            ),
           ),
         ),
       ),

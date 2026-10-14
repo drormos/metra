@@ -1,5 +1,10 @@
+import 'dart:io';
+
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 
+import 'src/audio/headphone_guard.dart';
+import 'src/audio/metronome_audio_handler.dart';
 import 'src/audio/soloud_click_output.dart';
 import 'src/controller/metronome_controller.dart';
 import 'src/ui/metronome_screen.dart';
@@ -14,7 +19,28 @@ Future<void> main() async {
   } catch (e) {
     engineError = e;
   }
+  if (controller != null && Platform.isAndroid) {
+    await _initAndroidBackground(controller);
+  }
   runApp(MetraApp(controller: controller, engineError: engineError));
+}
+
+/// Keeps playing with the screen off or the app in the background. Failure
+/// only costs background playback, so it doesn't block the app.
+Future<void> _initAndroidBackground(MetronomeController controller) async {
+  try {
+    await AudioService.init(
+      builder: () => MetronomeAudioHandler(controller),
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.example.metra.playback',
+        androidNotificationChannelName: 'Metronome playback',
+        androidNotificationOngoing: true,
+      ),
+    );
+    await stopOnHeadphoneRemoval(controller);
+  } catch (e) {
+    debugPrint('Background playback unavailable: $e');
+  }
 }
 
 class MetraApp extends StatelessWidget {

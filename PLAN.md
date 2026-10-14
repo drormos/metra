@@ -39,11 +39,15 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
 - A pattern change while playing restarts from the downbeat. Switching at the bar boundary comes with setlists (Phase 2 step 3).
 - Visual offset defaults to 0 ms (measured by eye on macOS: 0 ms on built-in speakers, 20 ms on a USB-dongle wireless headset), adjustable in the settings sheet from −200 to +500 ms in 10 ms steps to cover Bluetooth output. Not persisted until Phase 2.
 - The drift check captures the mixer output rather than recording the speakers. The engine clock is paced by the output device, so the mix timeline is what plays; capture must use the engine's channel count (it does not convert channels).
+- No audio focus on Android: focus would pause the user's music, and playing along with a track is a core use. Instead the click stops when a personal output (headphones, Bluetooth, USB audio) disappears, so it never jumps to the speaker. (audio_session's "becoming noisy" event only fires with focus, so this watches device removal.)
+- Android 13+ notification permission is requested once at first launch (`MainActivity`); declining only hides the Play/Stop notification, playback still works.
 - Audio device failures trigger one automatic `startAudioDevice()` retry; if it fails, the controller exposes the error for the UI.
 
 ## Phase 2: Persistence, Setlists & Mobile Background
 **Goal:** Quick-access songs and setlists, reliable mobile playback.
 1. **Background Audio:** Integrate `audio_service` so playback continues with the Android screen off or the app in the background. The refill loop must keep running in the background; use a long lookahead while backgrounded.
+   - `MetronomeAudioHandler` mirrors the controller into audio_service: playing starts a `mediaPlayback` foreground service with Play/Stop in the notification and lock screen; swiping the app away stops.
+   - `MainActivity` must extend `AudioServiceActivity`. A plain `FlutterActivity` makes audio_service start a second engine that runs `main()` again and re-initializes SoLoud.
 2. **Persistence:** Simple JSON file storage for songs, setlists, and the visual latency offset.
 3. **Setlist UI:** Side panel (macOS) or sheet (Android) for switching songs without stopping playback. A song switch applies tempo and pattern at the next bar boundary.
 4. **Expanded Patterns:** UI for 3/4, 6/8, 7/8 and subdivisions (eighths, triplets, sixteenths), mapped to the Phase 1 `MetronomePattern` model (UI only; the model already supports these).
