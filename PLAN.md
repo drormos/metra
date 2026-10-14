@@ -3,6 +3,12 @@
 ## Overview
 A sample-accurate metronome for Android and macOS, built with Flutter and `flutter_soloud`. Click timing comes from the C++ engine clock, so playback doesn't drift.
 
+## Status (2026-10-14)
+- Done: Phases 1–3, Phase 4 steps 1–9, Phase 4b (±5 hold-repeat buttons), Phase 5 step 1 (pattern model).
+- Next: Phase 5 step 2, the song editor screen.
+- Waiting on the user: Phase 4 step 10 (Daylight colors on a real screen); feel of the ruler's fling threshold and haptic tick on the phone.
+- Working rules: one step per commit; stage specific paths (never `git add -A`: the user edits `docs/design/` in parallel); `flutter test` + `flutter analyze` before each commit; the engine drift suite (`flutter test integration_test/drift_test.dart -d macos`) after engine changes.
+
 ## Phase 1: Core Engine & MVP Controls
 **Goal:** Sample-accurate playback, decoupled architecture, verified timing. Each step ships with its own unit tests.
 
