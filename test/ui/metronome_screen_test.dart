@@ -489,18 +489,18 @@ void main() {
 
     testWidgets('a normal drag snaps ahead to a multiple of 5', (tester) async {
       await pumpScreen(tester);
-      // 98 px in half a second: faster than fine-tuning, not a fling.
+      // 98 px in 0.4 s: faster than fine-tuning, not a fling.
       await tester.timedDrag(
         ruler(),
         const Offset(-98, 0),
-        const Duration(milliseconds: 500),
+        const Duration(milliseconds: 400),
       );
       await tester.pumpAndSettle();
       expect(controller.bpm, 130, reason: '127 moving up');
       await tester.timedDrag(
         ruler(),
         const Offset(98, 0),
-        const Duration(milliseconds: 500),
+        const Duration(milliseconds: 400),
       );
       await tester.pumpAndSettle();
       expect(controller.bpm, 120, reason: '123 moving down');

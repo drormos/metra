@@ -40,8 +40,8 @@ class TempoRuler extends StatefulWidget {
   static const flingSpeed = 300.0;
 
   /// Recent finger speed (px/s) below which a drag counts as fine-tuning
-  /// and isn't snapped (~8 bpm/s). Tune on a real phone.
-  static const fineSpeed = 120.0;
+  /// and isn't snapped (~13 bpm/s). Tune on a real phone.
+  static const fineSpeed = 180.0;
 
   /// "Recent finger speed" is measured over this much of the latest
   /// movement, so a fast drag that slows down to creep onto 123 is judged
