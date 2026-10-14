@@ -96,7 +96,7 @@ class SetlistPicker extends StatefulWidget {
   final VoidCallback onSongLibrary;
   final VoidCallback onNewSetlist;
 
-  static const setNameKey = Key('picker-set-name');
+  static const backToSetlistsKey = Key('picker-back-to-setlists');
   static const freePlayKey = Key('picker-free-play');
 
   @override
@@ -133,38 +133,42 @@ class _SetlistPickerState extends State<SetlistPicker> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // "‹ Setlists" goes up a level; "Free play" leaves the set.
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 16, 4),
+          padding: const EdgeInsets.fromLTRB(8, 0, 16, 0),
+          child: Row(
+            children: [
+              TextButton.icon(
+                key: SetlistPicker.backToSetlistsKey,
+                style: TextButton.styleFrom(
+                  foregroundColor: colors.text,
+                  minimumSize: const Size(0, 44),
+                  padding: const EdgeInsets.fromLTRB(6, 0, 12, 0),
+                ),
+                onPressed: () => setState(() => _whatToPlay = true),
+                icon: const Icon(Icons.chevron_left, size: 22),
+                label: const Text(
+                  'Setlists',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+              ),
+              const Spacer(),
+              FreePlayButton(library: _library, closes: true),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 16, 4),
           child: Row(
             children: [
               Expanded(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    key: SetlistPicker.setNameKey,
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(0, 48),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                    ),
-                    onPressed: () => setState(() => _whatToPlay = true),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            setlist.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        const Icon(Icons.expand_more, size: 20),
-                      ],
-                    ),
+                child: Text(
+                  setlist.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -542,4 +546,37 @@ class _MetronomePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_MetronomePainter old) => old.color != color;
+}
+
+/// "Free play" (ui-spec.md "Detaching a song"): detaches the song and any
+/// setlist, keeping the click as it sounds; [closes] also closes the
+/// sheet or screen it sits on.
+class FreePlayButton extends StatelessWidget {
+  const FreePlayButton({super.key, required this.library, this.closes = false});
+
+  static const buttonKey = Key('free-play-button');
+
+  final LibraryController library;
+  final bool closes;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 40,
+    child: OutlinedButton(
+      key: buttonKey,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        minimumSize: const Size(0, 40),
+      ),
+      onPressed: () {
+        Haptics.medium(); // the song detached
+        library.detachSong();
+        if (closes) Navigator.pop(context);
+      },
+      child: const Text(
+        'Free play',
+        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+      ),
+    ),
+  );
 }

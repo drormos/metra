@@ -100,7 +100,7 @@ void main() {
       expect(find.text('What to play'), findsOneWidget);
     });
 
-    testWidgets('Single song: header and Go free', (tester) async {
+    testWidgets('Single song: header and its Free play button', (tester) async {
       final haptics = <Object?>[];
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.platform,
@@ -137,7 +137,7 @@ void main() {
       metronome.nudge(1); // unsaved change: Revert / Save to song showing
       await tester.pump();
       expect(find.byKey(MetronomeScreen.revertKey), findsOneWidget);
-      await tester.tap(find.byKey(SetlistGroup.goFreeKey));
+      await tester.tap(find.byKey(FreePlayButton.buttonKey));
       await tester.pump();
       expect(find.text('Free play'), findsOneWidget);
       expect(
@@ -214,7 +214,7 @@ void main() {
       await withSet(tester);
       await tester.tap(find.byKey(SetlistGroup.headerKey));
       await tester.pumpAndSettle();
-      expect(find.byKey(SetlistPicker.setNameKey), findsOneWidget);
+      expect(find.byKey(SetlistPicker.backToSetlistsKey), findsOneWidget);
       expect(find.text('3 songs'), findsOneWidget);
     });
 

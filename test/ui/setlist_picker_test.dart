@@ -271,7 +271,7 @@ void main() {
     expect(metronome.bpm, 110);
     expect(find.text('What to play'), findsNothing);
     expect(
-      find.byKey(SetlistPicker.setNameKey),
+      find.byKey(SetlistPicker.backToSetlistsKey),
       findsNothing,
       reason: 'closed',
     );
@@ -297,7 +297,7 @@ void main() {
       'song and returns to songs', (tester) async {
     await pumpWithSets(tester);
     await openFromHeader(tester);
-    await tester.tap(find.byKey(SetlistPicker.setNameKey));
+    await tester.tap(find.byKey(SetlistPicker.backToSetlistsKey));
     await tester.pumpAndSettle();
     expect(find.text('What to play'), findsOneWidget);
     expect(find.text('Setlists'), findsOneWidget);
@@ -308,7 +308,7 @@ void main() {
     expect(library.activeSetlist?.name, 'Saturday set');
     expect(find.text('0 songs'), findsOneWidget, reason: 'back on songs view');
 
-    await tester.tap(find.byKey(SetlistPicker.setNameKey));
+    await tester.tap(find.byKey(SetlistPicker.backToSetlistsKey));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Friday set'));
     await tester.pumpAndSettle();
@@ -323,7 +323,7 @@ void main() {
     library.nextSong(metronome);
     await metronome.play();
     await openFromHeader(tester);
-    await tester.tap(find.byKey(SetlistPicker.setNameKey));
+    await tester.tap(find.byKey(SetlistPicker.backToSetlistsKey));
     await settle(tester);
     await tester.tap(find.byKey(SetlistPicker.freePlayKey));
     await settle(tester);
@@ -345,11 +345,34 @@ void main() {
     expect(find.text('New setlist'), findsOneWidget);
   });
 
+  testWidgets('the songs view: "‹ Setlists" goes up, Free play detaches', (
+    tester,
+  ) async {
+    await pumpWithSets(tester);
+    library.playSong(library.visibleSongs[1], metronome, index: 1);
+    await metronome.play();
+    await openFromHeader(tester);
+    await tester.tap(find.byKey(SetlistPicker.backToSetlistsKey));
+    await settle(tester);
+    expect(find.text('What to play'), findsOneWidget);
+    await tester.tap(find.byTooltip('Back'));
+    await settle(tester);
+    await tester.tap(find.byKey(FreePlayButton.buttonKey));
+    await settle(tester);
+    expect(find.byType(SetlistPicker), findsNothing, reason: 'closed');
+    expect(library.activeSetlist, isNull);
+    expect(library.currentSong, isNull);
+    expect(metronome.isPlaying, isTrue);
+    expect(metronome.bpm, 110, reason: 'the click carries on');
+    metronome.stop();
+    await tester.pump();
+  });
+
   testWidgets('opening the picker never touches the click', (tester) async {
     await pumpWithSets(tester);
     await metronome.play();
     await openFromHeader(tester);
-    await tester.tap(find.byKey(SetlistPicker.setNameKey));
+    await tester.tap(find.byKey(SetlistPicker.backToSetlistsKey));
     await settle(tester);
     await tester.tapAt(const Offset(200, 20)); // outside: closes
     await settle(tester);
