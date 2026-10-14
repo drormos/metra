@@ -63,10 +63,18 @@ class _BeatIndicatorState extends State<BeatIndicator>
 
   @override
   Widget build(BuildContext context) {
-    // While playing, draw the pattern of the step being heard: after a song
-    // switch the controller already holds the next pattern until it starts.
+    // Draw the latest edits (a tapped block changes at once). Only while a
+    // switch to a different shape is pending (song, meter, subdivision)
+    // does the bar being heard win, so no block shows that isn't sounding.
     final step = _step;
-    final pattern = step?.pattern ?? _controller.pattern;
+    final latest = _controller.pattern;
+    final heard = step?.pattern;
+    final pattern =
+        heard == null ||
+            (heard.beatsPerBar == latest.beatsPerBar &&
+                heard.stepsPerBeat == latest.stepsPerBeat)
+        ? latest
+        : heard;
     final perBeat = pattern.stepsPerBeat;
     final soundingBeat = step == null ? null : step.barPosition ~/ perBeat;
     // Silent steps (a muted beat's own click) don't light anything.

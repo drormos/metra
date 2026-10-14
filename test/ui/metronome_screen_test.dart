@@ -358,4 +358,23 @@ void main() {
     expect(widths[3], greaterThan(40));
     expect(widths.toSet(), hasLength(1), reason: 'equal widths');
   });
+
+  testWidgets('a tapped block changes on screen at once while playing', (
+    tester,
+  ) async {
+    controller.setVisualOffset(Duration.zero);
+    await pumpScreen(tester);
+    await tester.tap(find.byKey(MetronomeScreen.playKey));
+    await tester.pump();
+    output.time = const Duration(milliseconds: 150); // beat 1 sounding
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(find.bySemanticsLabel(RegExp('^Beat 3, regular')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('beat-2-off')));
+    await tester.pump(); // one frame, no clock movement
+    expect(find.bySemanticsLabel(RegExp('^Beat 3, accented')), findsOneWidget);
+
+    await tester.tap(find.byKey(MetronomeScreen.playKey));
+    await tester.pump();
+  });
 }
