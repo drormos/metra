@@ -6,6 +6,7 @@ import '../controller/metronome_controller.dart';
 import '../model/click_sound.dart';
 import 'beat_indicator.dart';
 import 'library_panel.dart';
+import 'theme.dart';
 
 /// Main screen: tempo readout, tempo steps and transport, plus the song
 /// panel (beside it on wide screens, in a sheet on phones). Stateless; all
@@ -17,9 +18,6 @@ class MetronomeScreen extends StatelessWidget {
 
   /// Null when storage is unavailable: no song panel then.
   final LibraryController? library;
-
-  // Lifted off the black screen so a sheet's edge is visible.
-  static const _sheetColor = Color(0xFF1C1C1C);
 
   /// From this width the song panel sits beside the metronome.
   static const sidePanelWidth = 800.0;
@@ -78,7 +76,6 @@ class MetronomeScreen extends StatelessWidget {
         autofocus: true,
         child: Scaffold(
           appBar: AppBar(
-            backgroundColor: Colors.transparent,
             actions: [
               if (library != null && !wide)
                 Builder(
@@ -139,7 +136,8 @@ class MetronomeScreen extends StatelessWidget {
               '$bpm',
               key: bpmKey,
               style: theme.textTheme.displayLarge?.copyWith(
-                fontSize: 160,
+                fontFamily: MetraFonts.condensed,
+                fontSize: 172,
                 fontWeight: FontWeight.w700,
                 // Fixed-width digits so the readout doesn't shift as it changes.
                 fontFeatures: const [FontFeature.tabularFigures()],
@@ -149,7 +147,7 @@ class MetronomeScreen extends StatelessWidget {
           ),
         ),
         Text(
-          'BPM',
+          'bpm',
           textAlign: TextAlign.center,
           style: theme.textTheme.titleLarge?.copyWith(letterSpacing: 4),
         ),
@@ -195,7 +193,7 @@ class MetronomeScreen extends StatelessWidget {
                   key: playKey,
                   onPressed: controller.toggle,
                   child: Text(
-                    controller.isPlaying ? 'Stop' : 'Play',
+                    controller.isPlaying ? 'Stop' : 'Start',
                     style: const TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w700,
@@ -211,7 +209,7 @@ class MetronomeScreen extends StatelessWidget {
           Text(
             'Audio problem: $error',
             textAlign: TextAlign.center,
-            style: TextStyle(color: theme.colorScheme.error),
+            style: TextStyle(color: context.colors.accentSounding),
           ),
         ],
       ],
@@ -314,7 +312,6 @@ class MetronomeScreen extends StatelessWidget {
         context: context,
         isScrollControlled: true,
         showDragHandle: true,
-        backgroundColor: _sheetColor,
         builder: (context) => FractionallySizedBox(
           heightFactor: 0.8,
           child: SafeArea(
@@ -326,15 +323,18 @@ class MetronomeScreen extends StatelessWidget {
   void _showSettings(BuildContext context) => showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
-    backgroundColor: _sheetColor,
     builder: (context) => SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: ListenableBuilder(
-          listenable: controller,
+          listenable: Listenable.merge([controller, ?library]),
           builder: (context, _) => Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (library case final library?) ...[
+                _themePicker(Theme.of(context), library),
+                const SizedBox(height: 16),
+              ],
               _soundPicker(Theme.of(context)),
               const SizedBox(height: 16),
               _offsetControl(Theme.of(context)),
@@ -343,6 +343,31 @@ class MetronomeScreen extends StatelessWidget {
         ),
       ),
     ),
+  );
+
+  static const _themeModes = {
+    ThemeMode.system: 'System',
+    ThemeMode.dark: 'Dark',
+    ThemeMode.light: 'Light',
+  };
+
+  Widget _themePicker(ThemeData theme, LibraryController library) => Column(
+    children: [
+      Text('Theme', style: theme.textTheme.bodyMedium),
+      const SizedBox(height: 8),
+      Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 8,
+        children: [
+          for (final MapEntry(key: mode, value: label) in _themeModes.entries)
+            ChoiceChip(
+              label: Text(label),
+              selected: library.themeMode == mode,
+              onSelected: (_) => library.setThemeMode(mode),
+            ),
+        ],
+      ),
+    ],
   );
 
   Widget _soundPicker(ThemeData theme) => Column(
@@ -417,7 +442,11 @@ class MetronomeScreen extends StatelessWidget {
             child: Text(
               label,
               maxLines: 1,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                fontFamily: MetraFonts.condensed,
+                fontSize: 28,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),

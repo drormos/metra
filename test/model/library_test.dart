@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/model/click_sound.dart';
 import 'package:metra/src/model/library.dart';
@@ -91,5 +92,12 @@ void main() {
     expect(Library.fromJson(old).clickSound, ClickSound.classic);
     final odd = Library.empty.toJson()..['clickSound'] = 'kazoo';
     expect(Library.fromJson(odd).clickSound, ClickSound.classic);
+  });
+
+  test('theme mode survives JSON; missing falls back to system', () {
+    final dark = Library.empty.copyWith(themeMode: ThemeMode.dark);
+    expect(roundTrip(dark).themeMode, ThemeMode.dark);
+    final old = Library.empty.toJson()..remove('themeMode');
+    expect(Library.fromJson(old).themeMode, ThemeMode.system);
   });
 }

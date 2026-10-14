@@ -11,6 +11,7 @@ import 'src/controller/library_controller.dart';
 import 'src/controller/metronome_controller.dart';
 import 'src/storage/library_store.dart';
 import 'src/ui/metronome_screen.dart';
+import 'src/ui/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -81,42 +82,36 @@ class MetraApp extends StatelessWidget {
   final LibraryController? library;
   final Object? engineError;
 
+  static final _dark = metraTheme(MetraColors.stageBlack, Brightness.dark);
+  static final _light = metraTheme(MetraColors.daylight, Brightness.light);
+
   @override
   Widget build(BuildContext context) {
     final controller = this.controller;
-    return MaterialApp(
-      title: 'Metra',
-      debugShowCheckedModeBanner: false,
-      theme: _highContrastTheme,
-      home: controller != null
-          ? MetronomeScreen(controller: controller, library: library)
-          : Scaffold(
-              body: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Text(
-                    'Audio engine failed to start: $engineError',
-                    textAlign: TextAlign.center,
+    final library = this.library;
+    return ListenableBuilder(
+      // Rebuilds for the theme setting; a null library follows the OS.
+      listenable: Listenable.merge([?library]),
+      builder: (context, _) => MaterialApp(
+        title: 'Metra',
+        debugShowCheckedModeBanner: false,
+        theme: _light,
+        darkTheme: _dark,
+        themeMode: library?.themeMode ?? ThemeMode.system,
+        home: controller != null
+            ? MetronomeScreen(controller: controller, library: library)
+            : Scaffold(
+                body: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      'Audio engine failed to start: $engineError',
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 ),
               ),
-            ),
+      ),
     );
   }
 }
-
-final _highContrastTheme = ThemeData(
-  colorScheme: const ColorScheme.highContrastDark(
-    primary: Colors.amber,
-    onPrimary: Colors.black,
-    surface: Colors.black,
-    onSurface: Colors.white,
-  ),
-  scaffoldBackgroundColor: Colors.black,
-  outlinedButtonTheme: OutlinedButtonThemeData(
-    style: OutlinedButton.styleFrom(
-      foregroundColor: Colors.white,
-      side: const BorderSide(color: Colors.white, width: 2),
-    ),
-  ),
-);

@@ -10,6 +10,7 @@ import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 
 import '../audio/fake_click_output.dart';
+import 'test_theme.dart';
 
 void main() {
   late Directory dir;
@@ -37,6 +38,7 @@ void main() {
     ))!;
     await tester.pumpWidget(
       MaterialApp(
+        theme: testTheme,
         home: MetronomeScreen(controller: metronome, library: library),
       ),
     );

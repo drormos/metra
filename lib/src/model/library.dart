@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show ThemeMode, immutable;
 
 import 'click_sound.dart';
 import 'metronome_pattern.dart';
@@ -74,6 +74,7 @@ class Library {
     required this.lastPattern,
     required this.visualOffset,
     this.clickSound = ClickSound.classic,
+    this.themeMode = ThemeMode.system,
   });
 
   static const empty = Library(
@@ -94,6 +95,9 @@ class Library {
   final Duration visualOffset;
   final ClickSound clickSound;
 
+  /// System (follow the OS), dark or light.
+  final ThemeMode themeMode;
+
   Library copyWith({
     List<Song>? songs,
     List<Setlist>? setlists,
@@ -101,6 +105,7 @@ class Library {
     MetronomePattern? lastPattern,
     Duration? visualOffset,
     ClickSound? clickSound,
+    ThemeMode? themeMode,
   }) => Library(
     songs: songs ?? this.songs,
     setlists: setlists ?? this.setlists,
@@ -108,6 +113,7 @@ class Library {
     lastPattern: lastPattern ?? this.lastPattern,
     visualOffset: visualOffset ?? this.visualOffset,
     clickSound: clickSound ?? this.clickSound,
+    themeMode: themeMode ?? this.themeMode,
   );
 
   Map<String, Object?> toJson() => {
@@ -116,6 +122,7 @@ class Library {
     'lastPattern': lastPattern.toJson(),
     'visualOffsetMs': visualOffset.inMilliseconds,
     'clickSound': clickSound.name,
+    'themeMode': themeMode.name,
     'songs': [for (final song in songs) song.toJson()],
     'setlists': [for (final setlist in setlists) setlist.toJson()],
   };
@@ -139,6 +146,8 @@ class Library {
       clickSound:
           ClickSound.values.asNameMap()[json['clickSound']] ??
           ClickSound.classic,
+      themeMode:
+          ThemeMode.values.asNameMap()[json['themeMode']] ?? ThemeMode.system,
       songs: [
         for (final song in json['songs'] as List)
           Song.fromJson(song as Map<String, Object?>),

@@ -68,6 +68,21 @@ flutter:
   assets:
     - assets/clicks/
 
+  # Bundled, never fetched at runtime. See assets/fonts/README.md.
+  fonts:
+    - family: Saira
+      fonts:
+        - asset: assets/fonts/Saira-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Saira-SemiBold.ttf
+          weight: 600
+    - family: SairaExtraCondensed
+      fonts:
+        - asset: assets/fonts/SairaExtraCondensed-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/SairaExtraCondensed-Bold.ttf
+          weight: 700
+
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

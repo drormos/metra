@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/library_controller.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
@@ -238,5 +239,11 @@ void main() {
       library.nextSong(metronome);
       expect(library.currentSong, isNull);
     });
+  });
+
+  test('theme mode persists', () async {
+    expect(library.themeMode, ThemeMode.system);
+    library.setThemeMode(ThemeMode.light);
+    expect((await reload()).themeMode, ThemeMode.light);
   });
 }

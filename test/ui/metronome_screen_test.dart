@@ -7,6 +7,7 @@ import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 
 import '../audio/fake_click_output.dart';
+import 'test_theme.dart';
 
 void main() {
   late FakeClickOutput output;
@@ -19,7 +20,10 @@ void main() {
 
   Future<void> pumpScreen(WidgetTester tester) async {
     await tester.pumpWidget(
-      MaterialApp(home: MetronomeScreen(controller: controller)),
+      MaterialApp(
+        theme: testTheme,
+        home: MetronomeScreen(controller: controller),
+      ),
     );
     // Stop the scheduler timer before the test ends.
     addTearDown(controller.dispose);
@@ -31,7 +35,7 @@ void main() {
   testWidgets('shows the current bpm', (tester) async {
     await pumpScreen(tester);
     expect(bpmText(tester).data, '120');
-    expect(find.text('BPM'), findsOneWidget);
+    expect(find.text('bpm'), findsOneWidget);
   });
 
   testWidgets('step buttons change the tempo', (tester) async {
@@ -79,7 +83,7 @@ void main() {
     await tester.tap(find.byKey(MetronomeScreen.playKey));
     await tester.pump();
     expect(controller.isPlaying, isFalse);
-    expect(find.text('Play'), findsOneWidget);
+    expect(find.text('Start'), findsOneWidget);
   });
 
   testWidgets('keyboard: space toggles, arrows nudge', (tester) async {

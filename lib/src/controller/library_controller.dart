@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart'
+    show ChangeNotifier, ThemeMode, debugPrint, visibleForTesting;
 
 import '../model/library.dart';
 import '../model/metronome_pattern.dart';
@@ -20,6 +21,12 @@ class LibraryController extends ChangeNotifier {
   String? _currentSongId;
   // Position in [visibleSongs]; disambiguates a song listed twice.
   int _currentIndex = -1;
+
+  ThemeMode get themeMode => _library.themeMode;
+
+  void setThemeMode(ThemeMode mode) {
+    if (mode != themeMode) _update(_library.copyWith(themeMode: mode));
+  }
 
   List<Song> get songs => _library.songs;
   List<Setlist> get setlists => _library.setlists;

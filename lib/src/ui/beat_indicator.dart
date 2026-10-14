@@ -4,6 +4,7 @@ import 'package:flutter/scheduler.dart';
 import '../audio/click_scheduler.dart';
 import '../controller/metronome_controller.dart';
 import '../model/metronome_pattern.dart';
+import 'theme.dart';
 
 /// One dot per step of the bar; the current step lights up when the engine
 /// clock (plus the visual offset) reaches it. Checked once per frame.
@@ -67,7 +68,7 @@ class _BeatIndicatorState extends State<BeatIndicator>
     final litBeat = step == null
         ? null
         : step.barPosition ~/ pattern.stepsPerBeat;
-    final colors = Theme.of(context).colorScheme;
+    final colors = context.colors;
     // Scales down for long bars (12/8) on narrow phones.
     return FittedBox(
       fit: BoxFit.scaleDown,
@@ -86,14 +87,12 @@ class _BeatIndicatorState extends State<BeatIndicator>
     required int index,
     required StepLevel level,
     required bool lit,
-    required ColorScheme colors,
+    required MetraColors colors,
   }) {
     final accent = level == StepLevel.accent;
     final silent = level == StepLevel.silent;
     final size = accent ? 32.0 : 24.0;
-    final edge = silent
-        ? colors.onSurface.withValues(alpha: 0.3)
-        : colors.onSurface;
+    final edge = silent ? colors.mutedLine : colors.muted;
     return Semantics(
       button: true,
       label: 'Beat ${index + 1}: ${level.name}. Tap to change.',
@@ -113,8 +112,8 @@ class _BeatIndicatorState extends State<BeatIndicator>
                   : silent
                   ? edge
                   : accent
-                  ? colors.primary
-                  : colors.onSurface,
+                  ? colors.accentSounding
+                  : colors.beatSounding,
               border: Border.all(color: edge, width: 2),
             ),
           ),
