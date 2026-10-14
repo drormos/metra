@@ -51,6 +51,17 @@ class MetronomeScreen extends StatelessWidget {
       bindings: {
         const SingleActivator(LogicalKeyboardKey.space): controller.toggle,
         const SingleActivator(LogicalKeyboardKey.keyT): controller.tap,
+        // Bluetooth page-turner pedals send Page Up/Down or the arrows.
+        if (library != null) ...{
+          const SingleActivator(LogicalKeyboardKey.pageDown): () =>
+              library.nextSong(controller),
+          const SingleActivator(LogicalKeyboardKey.pageUp): () =>
+              library.previousSong(controller),
+          const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+              library.nextSong(controller),
+          const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+              library.previousSong(controller),
+        },
         const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
             controller.nudge(1),
         const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
@@ -114,18 +125,8 @@ class MetronomeScreen extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (library?.currentSong case final song?)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Text(
-              song.name,
-              key: songNameKey,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.titleMedium,
-            ),
-          ),
+        if (library != null && library!.visibleSongs.isNotEmpty)
+          _songSwitcher(theme, library!),
         BeatIndicator(controller: controller),
         const SizedBox(height: 24),
         // Shrinks to fit short windows (landscape phones, small desktops).
@@ -211,6 +212,41 @@ class MetronomeScreen extends StatelessWidget {
       ],
     );
   }
+
+  /// ◀ song name ▶ — steps through the selected setlist (or all songs).
+  Widget _songSwitcher(ThemeData theme, LibraryController library) => Padding(
+    padding: const EdgeInsets.only(bottom: 16),
+    child: Row(
+      children: [
+        IconButton(
+          tooltip: 'Previous song',
+          iconSize: 32,
+          onPressed: library.hasPrevious
+              ? () => library.previousSong(controller)
+              : null,
+          icon: const Icon(Icons.skip_previous),
+        ),
+        Expanded(
+          child: Text(
+            library.currentSong?.name ?? 'No song loaded',
+            key: songNameKey,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleMedium,
+          ),
+        ),
+        IconButton(
+          tooltip: 'Next song',
+          iconSize: 32,
+          onPressed: library.hasNext
+              ? () => library.nextSong(controller)
+              : null,
+          icon: const Icon(Icons.skip_next),
+        ),
+      ],
+    ),
+  );
 
   void _showSongs(BuildContext context, LibraryController library) =>
       showModalBottomSheet<void>(

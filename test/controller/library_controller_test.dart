@@ -186,4 +186,54 @@ void main() {
       expect(library.songs, hasLength(3), reason: 'song itself stays');
     });
   });
+
+  group('next / previous', () {
+    late MetronomeController metronome;
+
+    setUp(() => metronome = MetronomeController(FakeClickOutput()));
+    tearDown(() => metronome.dispose());
+
+    test('steps through the visible songs and stops at the ends', () {
+      for (final (name, bpm) in [('A', 100), ('B', 110), ('C', 120)]) {
+        library.addSong(name: name, bpm: bpm, pattern: waltz);
+      }
+      expect(library.hasPrevious, isFalse);
+      library.nextSong(metronome); // nothing current: first song
+      expect(library.currentSong?.name, 'A');
+      expect(metronome.bpm, 100);
+      library
+        ..nextSong(metronome)
+        ..nextSong(metronome)
+        ..nextSong(metronome); // past the end: stays on C
+      expect(library.currentSong?.name, 'C');
+      expect(library.hasNext, isFalse);
+      library.previousSong(metronome);
+      expect(library.currentSong?.name, 'B');
+      expect(metronome.bpm, 110);
+    });
+
+    test('follows setlist order, including a song listed twice', () {
+      final a = library.addSong(name: 'A', bpm: 100, pattern: waltz);
+      final b = library.addSong(name: 'B', bpm: 110, pattern: waltz);
+      final gig = library.addSetlist('Gig');
+      for (final id in [a.id, b.id, a.id]) {
+        library.addToSetlist(gig.id, id);
+      }
+      library.selectSetlist(gig.id);
+      library
+        ..nextSong(metronome)
+        ..nextSong(metronome)
+        ..nextSong(metronome);
+      expect(library.currentIndex, 2, reason: 'the second A, not the first');
+      expect(library.hasNext, isFalse);
+      library.previousSong(metronome);
+      expect(library.currentSong?.name, 'B');
+    });
+
+    test('nothing to step through when empty', () {
+      expect(library.hasNext, isFalse);
+      library.nextSong(metronome);
+      expect(library.currentSong, isNull);
+    });
+  });
 }

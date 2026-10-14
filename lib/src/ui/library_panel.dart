@@ -130,10 +130,10 @@ class LibraryPanel extends StatelessWidget {
   Widget _songTile(BuildContext context, Song song, int index, Setlist? list) {
     return ListTile(
       key: ValueKey('${song.id}-$index'),
-      selected: library.currentSong?.id == song.id,
+      selected: library.currentIndex == index,
       title: Text(song.name),
       subtitle: Text('${song.bpm} BPM · ${song.pattern.beatsPerBar} beats'),
-      onTap: () => library.playSong(song, metronome),
+      onTap: () => library.playSong(song, metronome, index: index),
       trailing: PopupMenuButton<String>(
         tooltip: 'Song actions',
         onSelected: (action) => switch (action) {

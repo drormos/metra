@@ -1,7 +1,12 @@
+import 'dart:io';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/audio/metronome_audio_handler.dart';
+import 'package:metra/src/controller/library_controller.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
+import 'package:metra/src/model/metronome_pattern.dart';
+import 'package:metra/src/storage/library_store.dart';
 
 import 'fake_click_output.dart';
 
@@ -54,5 +59,54 @@ void main() {
     await controller.play();
     await handler.onTaskRemoved();
     expect(controller.isPlaying, isFalse);
+  });
+
+  group('with songs', () {
+    late Directory dir;
+    late LibraryController library;
+
+    setUp(() async {
+      dir = Directory.systemTemp.createTempSync('metra_handler_test');
+      library = await LibraryController.load(
+        LibraryStore(File('${dir.path}/library.json')),
+      );
+      handler = MetronomeAudioHandler(controller, library: library);
+    });
+
+    tearDown(() async {
+      await library.flush();
+      dir.deleteSync(recursive: true);
+    });
+
+    test('shows previous/next once there are songs', () {
+      expect(handler.playbackState.value.controls, [MediaControl.play]);
+      library.addSong(
+        name: 'Opener',
+        bpm: 150,
+        pattern: const MetronomePattern.standard(),
+      );
+      expect(handler.playbackState.value.controls, [
+        MediaControl.skipToPrevious,
+        MediaControl.play,
+        MediaControl.skipToNext,
+      ]);
+    });
+
+    test('skip buttons switch songs; title shows the song', () async {
+      for (final (name, bpm) in [('One', 100), ('Two', 110)]) {
+        library.addSong(
+          name: name,
+          bpm: bpm,
+          pattern: const MetronomePattern.standard(),
+        );
+      }
+      await handler.skipToNext();
+      await handler.skipToNext();
+      expect(controller.bpm, 110);
+      expect(handler.mediaItem.value?.title, 'Two');
+      await handler.skipToPrevious();
+      expect(handler.mediaItem.value?.title, 'One');
+      expect(handler.mediaItem.value?.artist, '100 BPM');
+    });
   });
 }

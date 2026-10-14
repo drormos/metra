@@ -18,6 +18,8 @@ class LibraryController extends ChangeNotifier {
   int _idCounter = 0;
   String? _selectedSetlistId;
   String? _currentSongId;
+  // Position in [visibleSongs]; disambiguates a song listed twice.
+  int _currentIndex = -1;
 
   List<Song> get songs => _library.songs;
   List<Setlist> get setlists => _library.setlists;
@@ -46,11 +48,42 @@ class LibraryController extends ChangeNotifier {
   Song? get currentSong =>
       _currentSongId == null ? null : songById(_currentSongId!);
 
-  /// Load [song]; while playing it takes over at the next bar line.
-  void playSong(Song song, MetronomeController metronome) {
+  /// Where the current song sits in [visibleSongs], or -1.
+  int get currentIndex {
+    final songs = visibleSongs;
+    if (_currentIndex >= 0 &&
+        _currentIndex < songs.length &&
+        songs[_currentIndex].id == _currentSongId) {
+      return _currentIndex;
+    }
+    return songs.indexWhere((s) => s.id == _currentSongId);
+  }
+
+  /// With no current song in the list, "next" is the first song.
+  bool get hasNext => currentIndex < visibleSongs.length - 1;
+  bool get hasPrevious => currentIndex > 0;
+
+  /// Load [song] ([index] = its position in [visibleSongs], if known);
+  /// while playing it takes over at the next bar line.
+  void playSong(Song song, MetronomeController metronome, {int? index}) {
     metronome.switchTo(bpm: song.bpm, pattern: song.pattern);
     _currentSongId = song.id;
+    _currentIndex = index ?? visibleSongs.indexWhere((s) => s.id == song.id);
     notifyListeners();
+  }
+
+  /// Steps through [visibleSongs]; stops at the ends instead of wrapping,
+  /// so an extra press on stage can't jump back to the first song.
+  void nextSong(MetronomeController metronome) {
+    if (!hasNext) return;
+    final i = currentIndex + 1;
+    playSong(visibleSongs[i], metronome, index: i);
+  }
+
+  void previousSong(MetronomeController metronome) {
+    if (!hasPrevious) return;
+    final i = currentIndex - 1;
+    playSong(visibleSongs[i], metronome, index: i);
   }
 
   /// Saves the metronome's tempo and pattern as a new song, added to the
@@ -64,6 +97,7 @@ class LibraryController extends ChangeNotifier {
     final list = selectedSetlist;
     if (list != null) addToSetlist(list.id, song.id);
     _currentSongId = song.id;
+    _currentIndex = visibleSongs.length - 1;
     return song;
   }
 

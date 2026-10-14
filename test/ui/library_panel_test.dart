@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/library_controller.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
@@ -139,5 +140,78 @@ void main() {
     await tester.pumpAndSettle();
     expect(library.songs, isEmpty);
     expect(find.text('Gone'), findsNothing);
+  });
+
+  group('next / previous song', () {
+    Future<void> withSongs(WidgetTester tester) async {
+      await pumpScreen(tester, wide: false);
+      for (final (name, bpm) in [('One', 100), ('Two', 110), ('Three', 120)]) {
+        library.addSong(
+          name: name,
+          bpm: bpm,
+          pattern: const MetronomePattern.standard(),
+        );
+      }
+      await tester.pump();
+    }
+
+    String shownSong(WidgetTester tester) =>
+        tester.widget<Text>(find.byKey(MetronomeScreen.songNameKey)).data!;
+
+    bool enabled(WidgetTester tester, String tooltip) =>
+        tester
+            .widget<IconButton>(
+              find.ancestor(
+                of: find.byTooltip(tooltip),
+                matching: find.byType(IconButton),
+              ),
+            )
+            .onPressed !=
+        null;
+
+    testWidgets('hidden until there are songs', (tester) async {
+      await pumpScreen(tester, wide: false);
+      expect(find.byTooltip('Next song'), findsNothing);
+    });
+
+    testWidgets('buttons step through songs and disable at the ends', (
+      tester,
+    ) async {
+      await withSongs(tester);
+      expect(shownSong(tester), 'No song loaded');
+      expect(enabled(tester, 'Previous song'), isFalse);
+
+      await tester.tap(find.byTooltip('Next song'));
+      await tester.pump();
+      expect(shownSong(tester), 'One');
+      expect(metronome.bpm, 100);
+
+      await tester.tap(find.byTooltip('Next song'));
+      await tester.tap(find.byTooltip('Next song'));
+      await tester.pump();
+      expect(shownSong(tester), 'Three');
+      expect(enabled(tester, 'Next song'), isFalse);
+
+      await tester.tap(find.byTooltip('Previous song'));
+      await tester.pump();
+      expect(shownSong(tester), 'Two');
+    });
+
+    testWidgets('pedal keys: Page Down / Right next, Page Up / Left back', (
+      tester,
+    ) async {
+      await withSongs(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageDown);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+      expect(library.currentSong?.name, 'Two');
+      await tester.sendKeyEvent(LogicalKeyboardKey.pageUp);
+      await tester.pump();
+      expect(library.currentSong?.name, 'One');
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pump();
+      expect(library.currentSong?.name, 'One');
+    });
   });
 }

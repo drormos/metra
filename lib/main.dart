@@ -26,7 +26,7 @@ Future<void> main() async {
   if (controller != null) {
     library = await _loadLibrary();
     library?.attach(controller);
-    if (Platform.isAndroid) await _initAndroidBackground(controller);
+    if (Platform.isAndroid) await _initAndroidBackground(controller, library);
   }
   runApp(
     MetraApp(
@@ -54,10 +54,13 @@ Future<LibraryController?> _loadLibrary() async {
 
 /// Keeps playing with the screen off or the app in the background. Failure
 /// only costs background playback, so it doesn't block the app.
-Future<void> _initAndroidBackground(MetronomeController controller) async {
+Future<void> _initAndroidBackground(
+  MetronomeController controller,
+  LibraryController? library,
+) async {
   try {
     await AudioService.init(
-      builder: () => MetronomeAudioHandler(controller),
+      builder: () => MetronomeAudioHandler(controller, library: library),
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.example.metra.playback',
         androidNotificationChannelName: 'Metronome playback',
