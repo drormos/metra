@@ -44,7 +44,7 @@ class TempoRuler extends StatefulWidget {
 
   /// How long the finger rests on a value before lifting keeps it exactly.
   /// Shorter catches the brief pause many drags end with. Tune on a phone.
-  static const lockDelay = Duration(milliseconds: 200);
+  static const lockDelay = Duration(milliseconds: 300);
 
   /// Drags that change the tempo by less than this (bpm) are fine-tuning:
   /// never snapped.
