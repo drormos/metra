@@ -420,8 +420,10 @@ class MetronomeScreen extends StatelessWidget {
   void _showSettings(BuildContext context) => showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
+    isScrollControlled: true, // as tall as its content needs
     builder: (context) => SafeArea(
-      child: Padding(
+      // Scrolls when the content is taller than the screen.
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: ListenableBuilder(
           listenable: Listenable.merge([controller, ?library]),
@@ -504,38 +506,44 @@ class MetronomeScreen extends StatelessWidget {
   Widget _offsetControl(ThemeData theme) {
     final ms = controller.visualOffset.inMilliseconds;
     const step = Duration(milliseconds: 10);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text('Flash offset', style: theme.textTheme.bodyMedium),
-        IconButton(
-          tooltip: 'Flash earlier',
-          onPressed:
-              controller.visualOffset > MetronomeController.minVisualOffset
-              ? () => controller.setVisualOffset(controller.visualOffset - step)
-              : null,
-          icon: const Icon(Icons.remove),
-        ),
-        SizedBox(
-          width: 72,
-          child: Text(
-            '${ms > 0 ? '+' : ''}$ms ms',
-            key: offsetKey,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontFeatures: [FontFeature.tabularFigures()],
+    // Shrinks rather than overflowing on narrow phones.
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Flash offset', style: theme.textTheme.bodyMedium),
+          IconButton(
+            tooltip: 'Flash earlier',
+            onPressed:
+                controller.visualOffset > MetronomeController.minVisualOffset
+                ? () =>
+                      controller.setVisualOffset(controller.visualOffset - step)
+                : null,
+            icon: const Icon(Icons.remove),
+          ),
+          SizedBox(
+            width: 72,
+            child: Text(
+              '${ms > 0 ? '+' : ''}$ms ms',
+              key: offsetKey,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
             ),
           ),
-        ),
-        IconButton(
-          tooltip: 'Flash later',
-          onPressed:
-              controller.visualOffset < MetronomeController.maxVisualOffset
-              ? () => controller.setVisualOffset(controller.visualOffset + step)
-              : null,
-          icon: const Icon(Icons.add),
-        ),
-      ],
+          IconButton(
+            tooltip: 'Flash later',
+            onPressed:
+                controller.visualOffset < MetronomeController.maxVisualOffset
+                ? () =>
+                      controller.setVisualOffset(controller.visualOffset + step)
+                : null,
+            icon: const Icon(Icons.add),
+          ),
+        ],
+      ),
     );
   }
 
