@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/library_controller.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/click_sound.dart';
+import 'package:metra/src/model/click_volumes.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/model/library.dart';
 import 'package:metra/src/storage/library_store.dart';
@@ -99,6 +100,8 @@ void main() {
       metronome.setPattern(waltz);
       metronome.setVisualOffset(const Duration(milliseconds: 30));
       metronome.setClickSound(ClickSound.cowbell);
+      const quiet = ClickVolumes(accent: 0.7, beat: 0.6, subdivision: 0.1);
+      metronome.setVolumes(quiet);
 
       final loaded = await reload();
       final next = MetronomeController(FakeClickOutput());
@@ -108,6 +111,7 @@ void main() {
       expect(next.pattern, waltz);
       expect(next.visualOffset, const Duration(milliseconds: 30));
       expect(next.clickSound, ClickSound.cowbell);
+      expect(next.volumes, quiet);
     });
 
     test('a fresh install keeps the defaults', () {

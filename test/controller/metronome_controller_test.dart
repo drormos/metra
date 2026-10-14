@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/click_sound.dart';
+import 'package:metra/src/model/click_volumes.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 
 import '../audio/fake_click_output.dart';
@@ -262,6 +263,15 @@ void main() {
       expect(output.clicks.first.cancelled, isTrue);
       expect(output.live, isEmpty, reason: 'beat 1 is now silent');
     });
+  });
+
+  test('volumes reach the output and notify once', () {
+    const quiet = ClickVolumes(accent: 0.6, beat: 0.5, subdivision: 0.2);
+    controller.setVolumes(quiet);
+    controller.setVolumes(quiet);
+    expect(controller.volumes, quiet);
+    expect(output.currentVolumes, quiet);
+    expect(notifications, 1);
   });
 
   group('click sound', () {

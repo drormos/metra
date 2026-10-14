@@ -12,7 +12,7 @@ enum ClickSound {
 
   final String label;
 
-  /// Soft subdivision clicks reuse the normal sample at lower volume.
+  /// Soft subdivision clicks reuse the normal sample (at their own volume).
   String assetFor(StepLevel level) =>
       'assets/clicks/${name}_${level == StepLevel.accent ? 'accent' : 'normal'}.wav';
 }

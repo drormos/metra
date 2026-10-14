@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' show ThemeMode, immutable;
 
 import 'click_sound.dart';
+import 'click_volumes.dart';
 import 'metronome_pattern.dart';
 
 @immutable
@@ -92,6 +93,7 @@ class Library {
     this.clickSound = ClickSound.classic,
     this.themeMode = ThemeMode.system,
     this.vibrate = true,
+    this.volumes = ClickVolumes.defaults,
     this.activeSetlistId,
     this.currentSongId,
     this.currentPosition = -1,
@@ -122,6 +124,8 @@ class Library {
   /// vibration setting still applies.
   final bool vibrate;
 
+  final ClickVolumes volumes;
+
   /// The loaded setlist; null is Free play (the first-launch default).
   final String? activeSetlistId;
 
@@ -139,6 +143,7 @@ class Library {
     ClickSound? clickSound,
     ThemeMode? themeMode,
     bool? vibrate,
+    ClickVolumes? volumes,
   }) => Library(
     songs: songs ?? this.songs,
     setlists: setlists ?? this.setlists,
@@ -148,6 +153,7 @@ class Library {
     clickSound: clickSound ?? this.clickSound,
     themeMode: themeMode ?? this.themeMode,
     vibrate: vibrate ?? this.vibrate,
+    volumes: volumes ?? this.volumes,
     activeSetlistId: activeSetlistId,
     currentSongId: currentSongId,
     currentPosition: currentPosition,
@@ -168,6 +174,7 @@ class Library {
     clickSound: clickSound,
     themeMode: themeMode,
     vibrate: vibrate,
+    volumes: volumes,
     activeSetlistId: setlistId,
     currentSongId: songId,
     currentPosition: position,
@@ -181,6 +188,7 @@ class Library {
     'clickSound': clickSound.name,
     'themeMode': themeMode.name,
     'vibrate': vibrate,
+    'volumes': volumes.toJson(),
     'activeSetlistId': activeSetlistId,
     'currentSongId': currentSongId,
     'currentPosition': currentPosition,
@@ -210,6 +218,10 @@ class Library {
       themeMode:
           ThemeMode.values.asNameMap()[json['themeMode']] ?? ThemeMode.system,
       vibrate: json['vibrate'] as bool? ?? true, // older files: on
+      volumes: switch (json['volumes']) {
+        final Map<String, Object?> v => ClickVolumes.fromJson(v),
+        _ => ClickVolumes.defaults, // older files
+      },
       // Optional: older files open in Free play.
       activeSetlistId: json['activeSetlistId'] as String?,
       currentSongId: json['currentSongId'] as String?,

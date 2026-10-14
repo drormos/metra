@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_soloud/flutter_soloud.dart';
 
 import '../model/click_sound.dart';
+import '../model/click_volumes.dart';
 import '../model/metronome_pattern.dart';
 import 'click_output.dart';
 
@@ -31,6 +32,12 @@ class SoloudClickOutput implements ClickOutput {
 
   final Map<ClickSound, ({AudioSource accent, AudioSource normal})> _sources;
   var _sound = ClickSound.classic;
+  var _volumes = ClickVolumes.defaults;
+
+  // The samples peak at 0.9 (accent) and 0.7 (normal) of full scale. This
+  // boost makes every level peak at its volume × 0.9, so the per-level
+  // volumes alone set the balance.
+  static const _normalBoost = 0.9 / 0.7;
 
   @override
   Stream<void> get deviceFailures =>
@@ -62,16 +69,24 @@ class SoloudClickOutput implements ClickOutput {
           ? _sources[_sound]!.accent
           : _sources[_sound]!.normal,
       at,
-      // Subdivisions sit under the beat so the pulse stays clear.
-      volume: level == StepLevel.soft ? 0.4 : 1,
+      volume: _gain(level),
     ),
   );
+
+  double _gain(StepLevel level) =>
+      _volumes.forLevel(level) * (level == StepLevel.accent ? 1 : _normalBoost);
 
   @override
   set sound(ClickSound value) => _sound = value;
 
   @override
-  void preview() => SoLoud.instance.play(_sources[_sound]!.accent);
+  set volumes(ClickVolumes value) => _volumes = value;
+
+  @override
+  void preview() => SoLoud.instance.play(
+    _sources[_sound]!.accent,
+    volume: _gain(StepLevel.accent),
+  );
 
   @override
   void cancel(ClickHandle handle) =>

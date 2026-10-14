@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/model/click_sound.dart';
+import 'package:metra/src/model/click_volumes.dart';
 import 'package:metra/src/model/library.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 
@@ -99,6 +100,18 @@ void main() {
     expect(roundTrip(dark).themeMode, ThemeMode.dark);
     final old = Library.empty.toJson()..remove('themeMode');
     expect(Library.fromJson(old).themeMode, ThemeMode.system);
+  });
+
+  test('volumes survive JSON; missing means defaults; odd values clamp', () {
+    expect(Library.empty.volumes, ClickVolumes.defaults);
+    const quiet = ClickVolumes(accent: 0.5, beat: 0.3, subdivision: 0);
+    expect(roundTrip(Library.empty.copyWith(volumes: quiet)).volumes, quiet);
+    final old = Library.empty.toJson()..remove('volumes');
+    expect(Library.fromJson(old).volumes, ClickVolumes.defaults);
+    expect(
+      ClickVolumes.fromJson({'accent': 3, 'beat': -1}),
+      const ClickVolumes(accent: 1, beat: 0, subdivision: 0.45),
+    );
   });
 
   test('"Vibrate on touch" survives JSON; missing means on', () {

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:metra/src/audio/click_output.dart';
 import 'package:metra/src/model/click_sound.dart';
+import 'package:metra/src/model/click_volumes.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 
 class FakeClick {
@@ -56,6 +57,10 @@ class FakeClickOutput implements ClickOutput {
 
   @override
   set sound(ClickSound value) => currentSound = value;
+
+  @override
+  set volumes(ClickVolumes value) => currentVolumes = value;
+  ClickVolumes currentVolumes = ClickVolumes.defaults;
 
   @override
   void preview() => previewCount++;

@@ -1,4 +1,5 @@
 import '../model/click_sound.dart';
+import '../model/click_volumes.dart';
 import '../model/metronome_pattern.dart';
 
 /// Opaque handle to one scheduled click.
@@ -27,6 +28,9 @@ abstract interface class ClickOutput {
 
   /// Sound for clicks scheduled from now on.
   set sound(ClickSound value);
+
+  /// Per-level volumes for clicks scheduled from now on.
+  set volumes(ClickVolumes value);
 
   /// Play one accent click right away (feedback when picking a sound).
   void preview();

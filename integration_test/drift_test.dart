@@ -197,8 +197,8 @@ void _expectAccentsEvery(int n, _OnsetRecorder recorder) {
   final peaks = recorder.peaks;
   for (var i = 0; i < peaks.length; i++) {
     final isAccent = i % n == 0;
-    // accent.wav peaks at 0.9, normal.wav at 0.7.
-    expect(peaks[i] > 0.8 * peaks[0], isAccent, reason: 'click $i accent');
+    // Default volumes: accents peak at 0.9, beats at 0.8 of that.
+    expect(peaks[i] > 0.9 * peaks[0], isAccent, reason: 'click $i accent');
   }
 }
 
@@ -206,7 +206,7 @@ void _expectAccentsEvery(int n, _OnsetRecorder recorder) {
 /// amplitude on their first sample, so an onset is the first sample above a
 /// threshold after a quiet gap.
 class _OnsetRecorder {
-  // Soft subdivision clicks peak near 0.2; a click's tail is far below this
+  // Soft subdivision clicks peak near 0.4; a click's tail is far below this
   // within the 50 ms gap.
   static const _threshold = 0.1;
   static const _minGapFrames = _sampleRate ~/ 20; // 50 ms > click length

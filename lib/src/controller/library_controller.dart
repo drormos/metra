@@ -340,19 +340,22 @@ class LibraryController extends ChangeNotifier {
     ),
   );
 
-  /// Restores the last session's tempo, pattern, flash offset and click
-  /// sound into [metronome], then saves them whenever they change.
+  /// Restores the last session's tempo, pattern, flash offset, click
+  /// sound and volumes into [metronome], then saves them whenever they
+  /// change.
   void attach(MetronomeController metronome) {
     metronome
       ..setBpm(_library.lastBpm)
       ..setPattern(_library.lastPattern)
       ..setVisualOffset(_library.visualOffset)
-      ..setClickSound(_library.clickSound, preview: false);
+      ..setClickSound(_library.clickSound, preview: false)
+      ..setVolumes(_library.volumes);
     metronome.addListener(() {
       if (metronome.bpm == _library.lastBpm &&
           metronome.pattern == _library.lastPattern &&
           metronome.visualOffset == _library.visualOffset &&
-          metronome.clickSound == _library.clickSound) {
+          metronome.clickSound == _library.clickSound &&
+          metronome.volumes == _library.volumes) {
         return;
       }
       _update(
@@ -361,6 +364,7 @@ class LibraryController extends ChangeNotifier {
           lastPattern: metronome.pattern,
           visualOffset: metronome.visualOffset,
           clickSound: metronome.clickSound,
+          volumes: metronome.volumes,
         ),
       );
     });
