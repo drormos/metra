@@ -75,6 +75,9 @@ class Library {
     required this.visualOffset,
     this.clickSound = ClickSound.classic,
     this.themeMode = ThemeMode.system,
+    this.activeSetlistId,
+    this.currentSongId,
+    this.currentPosition = -1,
   });
 
   static const empty = Library(
@@ -98,6 +101,14 @@ class Library {
   /// System (follow the OS), dark or light.
   final ThemeMode themeMode;
 
+  /// The loaded setlist; null is Free play (the first-launch default).
+  final String? activeSetlistId;
+
+  /// The song last loaded, and its position in the active setlist (-1 if
+  /// none or not in it), so the app reopens where it was left.
+  final String? currentSongId;
+  final int currentPosition;
+
   Library copyWith({
     List<Song>? songs,
     List<Setlist>? setlists,
@@ -114,6 +125,28 @@ class Library {
     visualOffset: visualOffset ?? this.visualOffset,
     clickSound: clickSound ?? this.clickSound,
     themeMode: themeMode ?? this.themeMode,
+    activeSetlistId: activeSetlistId,
+    currentSongId: currentSongId,
+    currentPosition: currentPosition,
+  );
+
+  /// The mode and current song; nulls here are meaningful (Free play, no
+  /// song), so they don't go through [copyWith].
+  Library withSession({
+    required String? setlistId,
+    required String? songId,
+    required int position,
+  }) => Library(
+    songs: songs,
+    setlists: setlists,
+    lastBpm: lastBpm,
+    lastPattern: lastPattern,
+    visualOffset: visualOffset,
+    clickSound: clickSound,
+    themeMode: themeMode,
+    activeSetlistId: setlistId,
+    currentSongId: songId,
+    currentPosition: position,
   );
 
   Map<String, Object?> toJson() => {
@@ -123,6 +156,9 @@ class Library {
     'visualOffsetMs': visualOffset.inMilliseconds,
     'clickSound': clickSound.name,
     'themeMode': themeMode.name,
+    'activeSetlistId': activeSetlistId,
+    'currentSongId': currentSongId,
+    'currentPosition': currentPosition,
     'songs': [for (final song in songs) song.toJson()],
     'setlists': [for (final setlist in setlists) setlist.toJson()],
   };
@@ -148,6 +184,10 @@ class Library {
           ClickSound.classic,
       themeMode:
           ThemeMode.values.asNameMap()[json['themeMode']] ?? ThemeMode.system,
+      // Optional: older files open in Free play.
+      activeSetlistId: json['activeSetlistId'] as String?,
+      currentSongId: json['currentSongId'] as String?,
+      currentPosition: json['currentPosition'] as int? ?? -1,
       songs: [
         for (final song in json['songs'] as List)
           Song.fromJson(song as Map<String, Object?>),

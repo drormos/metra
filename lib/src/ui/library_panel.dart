@@ -24,7 +24,7 @@ class LibraryPanel extends StatelessWidget {
     return ListenableBuilder(
       listenable: library,
       builder: (context, _) {
-        final setlist = library.selectedSetlist;
+        final setlist = library.activeSetlist;
         final songs = library.visibleSongs;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -85,7 +85,7 @@ class LibraryPanel extends StatelessWidget {
                   DropdownMenuItem(value: list.id, child: Text(list.name)),
               ],
               onChanged: (id) =>
-                  library.selectSetlist(id == _allSongs ? null : id),
+                  library.setActiveSetlist(id == _allSongs ? null : id),
             ),
           ),
           PopupMenuButton<String>(
@@ -201,7 +201,7 @@ class LibraryPanel extends StatelessWidget {
 
   Future<void> _newSetlist(BuildContext context) async {
     final name = await _askName(context, title: 'New setlist', initial: '');
-    if (name != null) library.selectSetlist(library.addSetlist(name).id);
+    if (name != null) library.setActiveSetlist(library.addSetlist(name).id);
   }
 
   Future<void> _renameSetlist(BuildContext context, Setlist list) async {

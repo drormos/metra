@@ -7,7 +7,10 @@ import 'package:flutter/material.dart';
 class MetraColors extends ThemeExtension<MetraColors> {
   const MetraColors({
     required this.background,
+    required this.sheet,
     required this.surface,
+    required this.divider,
+    required this.selectedRow,
     required this.border,
     required this.text,
     required this.muted,
@@ -19,7 +22,7 @@ class MetraColors extends ThemeExtension<MetraColors> {
     required this.mutedLine,
     required this.tickResting,
     required this.tickSounding,
-    required this.needle,
+    required this.accent,
     required this.primary,
     required this.onPrimary,
   });
@@ -27,7 +30,10 @@ class MetraColors extends ThemeExtension<MetraColors> {
   /// Dark theme.
   static const stageBlack = MetraColors(
     background: Color(0xFF000000),
+    sheet: Color(0xFF111111),
     surface: Color(0xFF1A1A1A),
+    divider: Color(0xFF1F1F1F),
+    selectedRow: Color(0xFF242424),
     border: Color(0xFF2E2E2E),
     text: Color(0xFFFFFFFF),
     muted: Color(0xFF8C8C8C),
@@ -39,7 +45,7 @@ class MetraColors extends ThemeExtension<MetraColors> {
     mutedLine: Color(0xFF7A7A7A),
     tickResting: Color(0xFF2A2A2A),
     tickSounding: Color(0xFFD0D0D0),
-    needle: Color(0xFFFF3B30),
+    accent: Color(0xFFFF3B30),
     primary: Color(0xFFFF3B30),
     onPrimary: Color(0xFF000000),
   );
@@ -47,7 +53,10 @@ class MetraColors extends ThemeExtension<MetraColors> {
   /// Light theme. Picked after the dark one; to be checked on a real screen.
   static const daylight = MetraColors(
     background: Color(0xFFF3F1EC),
+    sheet: Color(0xFFECE9E2),
     surface: Color(0xFFE3DFD6),
+    divider: Color(0xFFDCD8CF),
+    selectedRow: Color(0xFFDAD5CB),
     border: Color(0xFFCFCAC0),
     text: Color(0xFF111111),
     muted: Color(0xFF5E5A52),
@@ -59,15 +68,24 @@ class MetraColors extends ThemeExtension<MetraColors> {
     mutedLine: Color(0xFF8A857C),
     tickResting: Color(0xFFD8D3C9),
     tickSounding: Color(0xFF5E5A52),
-    needle: Color(0xFFD7261E),
+    accent: Color(0xFFD7261E),
     primary: Color(0xFF111111),
     onPrimary: Color(0xFFF3F1EC),
   );
 
   final Color background;
 
-  /// Filled buttons and sheets.
+  /// Bottom sheets.
+  final Color sheet;
+
+  /// Filled buttons.
   final Color surface;
+
+  /// Lines between list rows; the ruler's rules.
+  final Color divider;
+
+  /// The current row in a list (current song, current set).
+  final Color selectedRow;
 
   /// Outlines and frames.
   final Color border;
@@ -88,7 +106,8 @@ class MetraColors extends ThemeExtension<MetraColors> {
   final Color tickResting;
   final Color tickSounding;
 
-  final Color needle;
+  /// Tempo needle, current-song marker, checkmarks.
+  final Color accent;
   final Color primary;
   final Color onPrimary;
 
@@ -126,7 +145,7 @@ ThemeData metraTheme(MetraColors c, Brightness brightness) {
     fontFamily: MetraFonts.body,
     scaffoldBackgroundColor: c.background,
     canvasColor: c.background,
-    dividerColor: c.border,
+    dividerColor: c.divider,
     colorScheme: ColorScheme(
       brightness: brightness,
       primary: c.primary,
@@ -171,11 +190,12 @@ ThemeData metraTheme(MetraColors c, Brightness brightness) {
       style: TextButton.styleFrom(foregroundColor: c.text, textStyle: label),
     ),
     bottomSheetTheme: BottomSheetThemeData(
-      backgroundColor: c.surface,
-      modalBackgroundColor: c.surface,
+      backgroundColor: c.sheet,
+      modalBackgroundColor: c.sheet,
       dragHandleColor: c.muted,
     ),
-    dialogTheme: DialogThemeData(backgroundColor: c.surface),
-    popupMenuTheme: PopupMenuThemeData(color: c.surface),
+    dialogTheme: DialogThemeData(backgroundColor: c.sheet),
+    popupMenuTheme: PopupMenuThemeData(color: c.sheet),
+    dividerTheme: DividerThemeData(color: c.divider),
   );
 }

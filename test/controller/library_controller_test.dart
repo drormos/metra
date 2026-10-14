@@ -131,17 +131,17 @@ void main() {
       library.addToSetlist(gig.id, a.id);
 
       expect(library.visibleSongs.map((s) => s.name), ['A', 'B']);
-      library.selectSetlist(gig.id);
+      library.setActiveSetlist(gig.id);
       expect(library.visibleSongs.map((s) => s.name), ['B', 'A']);
-      library.selectSetlist(null);
-      expect(library.selectedSetlist, isNull);
+      library.setActiveSetlist(null);
+      expect(library.activeSetlist, isNull);
     });
 
     test('a deleted selected setlist falls back to all songs', () {
       final gig = library.addSetlist('Gig');
-      library.selectSetlist(gig.id);
+      library.setActiveSetlist(gig.id);
       library.deleteSetlist(gig.id);
-      expect(library.selectedSetlist, isNull);
+      expect(library.activeSetlist, isNull);
     });
 
     test('playSong loads tempo and pattern and marks it current', () {
@@ -154,11 +154,11 @@ void main() {
 
     test('saveCurrentAsSong adds to the selected setlist', () {
       final gig = library.addSetlist('Gig');
-      library.selectSetlist(gig.id);
+      library.setActiveSetlist(gig.id);
       metronome.setBpm(133);
       final song = library.saveCurrentAsSong('New', metronome);
       expect(song.bpm, 133);
-      expect(library.selectedSetlist!.songIds, [song.id]);
+      expect(library.activeSetlist!.songIds, [song.id]);
       expect(library.currentSong?.id, song.id);
     });
 
@@ -198,10 +198,13 @@ void main() {
     setUp(() => metronome = MetronomeController(FakeClickOutput()));
     tearDown(() => metronome.dispose());
 
-    test('steps through the visible songs and stops at the ends', () {
+    test('steps through the setlist and stops at the ends', () {
+      final gig = library.addSetlist('Gig');
       for (final (name, bpm) in [('A', 100), ('B', 110), ('C', 120)]) {
-        library.addSong(name: name, bpm: bpm, pattern: waltz);
+        final song = library.addSong(name: name, bpm: bpm, pattern: waltz);
+        library.addToSetlist(gig.id, song.id);
       }
+      library.setActiveSetlist(gig.id);
       expect(library.hasPrevious, isFalse);
       library.nextSong(metronome); // nothing current: first song
       expect(library.currentSong?.name, 'A');
@@ -224,7 +227,7 @@ void main() {
       for (final id in [a.id, b.id, a.id]) {
         library.addToSetlist(gig.id, id);
       }
-      library.selectSetlist(gig.id);
+      library.setActiveSetlist(gig.id);
       library
         ..nextSong(metronome)
         ..nextSong(metronome)
@@ -270,6 +273,80 @@ void main() {
       expect(check.bpm, 160, reason: 'the latest state was saved');
     },
   );
+
+  group('modes', () {
+    late MetronomeController metronome;
+
+    setUp(() => metronome = MetronomeController(FakeClickOutput()));
+    tearDown(() => metronome.dispose());
+
+    test('first launch is Free play: no stepping', () {
+      library.addSong(name: 'A', bpm: 100, pattern: waltz);
+      library.addSong(name: 'B', bpm: 110, pattern: waltz);
+      expect(library.activeSetlist, isNull);
+      expect(library.hasNext, isFalse);
+      library.nextSong(metronome);
+      expect(library.currentSong, isNull);
+    });
+
+    test('a library song in Free play shows as current, mode unchanged', () {
+      final a = library.addSong(name: 'A', bpm: 100, pattern: waltz);
+      library.playSong(a, metronome);
+      expect(library.currentSong?.name, 'A');
+      expect(library.activeSetlist, isNull);
+    });
+
+    test('switching to Free play only changes the mode', () async {
+      final a = library.addSong(name: 'A', bpm: 100, pattern: waltz);
+      final gig = library.addSetlist('Gig');
+      library
+        ..addToSetlist(gig.id, a.id)
+        ..setActiveSetlist(gig.id)
+        ..nextSong(metronome);
+      await metronome.play();
+      library.setActiveSetlist(null);
+      expect(metronome.isPlaying, isTrue);
+      expect(metronome.bpm, 100);
+      expect(library.activeSetlist, isNull);
+    });
+
+    test('a song outside the loaded set: position -1, next re-enters', () {
+      final a = library.addSong(name: 'A', bpm: 100, pattern: waltz);
+      final b = library.addSong(name: 'B', bpm: 110, pattern: waltz);
+      final gig = library.addSetlist('Gig');
+      library
+        ..addToSetlist(gig.id, a.id)
+        ..setActiveSetlist(gig.id)
+        ..playSong(b, metronome);
+      expect(library.currentIndex, -1);
+      library.nextSong(metronome);
+      expect(library.currentSong?.name, 'A');
+    });
+
+    test('reopens in the same setlist at the same song', () async {
+      final gig = library.addSetlist('Gig');
+      for (final name in ['A', 'B', 'C']) {
+        final song = library.addSong(name: name, bpm: 100, pattern: waltz);
+        library.addToSetlist(gig.id, song.id);
+      }
+      library
+        ..setActiveSetlist(gig.id)
+        ..nextSong(metronome)
+        ..nextSong(metronome);
+      final loaded = await reload();
+      expect(loaded.activeSetlist?.name, 'Gig');
+      expect(loaded.currentSong?.name, 'B');
+      expect(loaded.currentIndex, 1);
+    });
+
+    test('reopens in Free play when it was left there', () async {
+      final gig = library.addSetlist('Gig');
+      library
+        ..setActiveSetlist(gig.id)
+        ..setActiveSetlist(null);
+      expect((await reload()).activeSetlist, isNull);
+    });
+  });
 }
 
 class _CountingStore extends LibraryStore {

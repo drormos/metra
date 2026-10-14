@@ -23,10 +23,9 @@ void main() {
 
   tearDown(() => dir.deleteSync(recursive: true));
 
-  Future<void> pumpScreen(WidgetTester tester, {required bool wide}) async {
-    tester.view.physicalSize = wide
-        ? const Size(1200, 900)
-        : const Size(400, 900);
+  /// [panel]: also open the songs sheet (the stand-in for the picker).
+  Future<void> pumpScreen(WidgetTester tester, {bool panel = false}) async {
+    tester.view.physicalSize = const Size(400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     metronome = MetronomeController(FakeClickOutput());
@@ -42,6 +41,10 @@ void main() {
         home: MetronomeScreen(controller: metronome, library: library),
       ),
     );
+    if (panel) {
+      await tester.tap(find.text('Songs & setlists'));
+      await tester.pumpAndSettle();
+    }
   }
 
   Future<void> enterName(WidgetTester tester, String name) async {
@@ -50,16 +53,8 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('wide screens show the panel beside the metronome', (
-    tester,
-  ) async {
-    await pumpScreen(tester, wide: true);
-    expect(find.text('Save current as song'), findsOneWidget);
-    expect(find.text('Songs & setlists'), findsNothing);
-  });
-
-  testWidgets('narrow screens open the panel in a sheet', (tester) async {
-    await pumpScreen(tester, wide: false);
+  testWidgets('the songs button opens the panel in a sheet', (tester) async {
+    await pumpScreen(tester);
     expect(find.text('Save current as song'), findsNothing);
     await tester.tap(find.text('Songs & setlists'));
     await tester.pumpAndSettle();
@@ -67,7 +62,7 @@ void main() {
   });
 
   testWidgets('save the current tempo as a song, then load it', (tester) async {
-    await pumpScreen(tester, wide: true);
+    await pumpScreen(tester, panel: true);
     metronome.setBpm(87);
     await tester.tap(find.text('Save current as song'));
     await tester.pumpAndSettle();
@@ -87,7 +82,7 @@ void main() {
   });
 
   testWidgets('empty name is not saved', (tester) async {
-    await pumpScreen(tester, wide: true);
+    await pumpScreen(tester, panel: true);
     await tester.tap(find.text('Save current as song'));
     await tester.pumpAndSettle();
     await enterName(tester, '   ');
@@ -95,7 +90,7 @@ void main() {
   });
 
   testWidgets('create a setlist and add a song to it', (tester) async {
-    await pumpScreen(tester, wide: true);
+    await pumpScreen(tester, panel: true);
     library.addSong(
       name: 'Opener',
       bpm: 150,
@@ -108,10 +103,10 @@ void main() {
     await enterName(tester, 'Friday');
 
     // The new setlist is selected and empty.
-    expect(library.selectedSetlist?.name, 'Friday');
+    expect(library.activeSetlist?.name, 'Friday');
     expect(find.textContaining('This setlist is empty'), findsOneWidget);
 
-    library.selectSetlist(null);
+    library.setActiveSetlist(null);
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Song actions'));
     await tester.pumpAndSettle();
@@ -123,7 +118,7 @@ void main() {
   });
 
   testWidgets('delete a song after confirming', (tester) async {
-    await pumpScreen(tester, wide: true);
+    await pumpScreen(tester, panel: true);
     library.addSong(
       name: 'Gone',
       bpm: 100,
@@ -150,14 +145,17 @@ void main() {
 
   group('next / previous song', () {
     Future<void> withSongs(WidgetTester tester) async {
-      await pumpScreen(tester, wide: false);
+      await pumpScreen(tester);
+      final gig = library.addSetlist('Gig');
       for (final (name, bpm) in [('One', 100), ('Two', 110), ('Three', 120)]) {
-        library.addSong(
+        final song = library.addSong(
           name: name,
           bpm: bpm,
           pattern: const MetronomePattern.standard(),
         );
+        library.addToSetlist(gig.id, song.id);
       }
+      library.setActiveSetlist(gig.id);
       await tester.pump();
     }
 
@@ -176,7 +174,7 @@ void main() {
         null;
 
     testWidgets('hidden until there are songs', (tester) async {
-      await pumpScreen(tester, wide: false);
+      await pumpScreen(tester);
       expect(find.byTooltip('Next song'), findsNothing);
     });
 
@@ -224,7 +222,7 @@ void main() {
   for (final size in [const Size(360, 640), const Size(320, 568)]) {
     testWidgets('fits a ${size.width.toInt()}x${size.height.toInt()} phone '
         'with songs', (tester) async {
-      await pumpScreen(tester, wide: false);
+      await pumpScreen(tester);
       tester.view.physicalSize = size;
       library.addSong(
         name: 'A rather long song title that has to ellipsize',

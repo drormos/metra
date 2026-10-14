@@ -78,13 +78,20 @@ void main() {
       dir.deleteSync(recursive: true);
     });
 
-    test('shows previous/next once there are songs', () {
+    test('shows previous/next only with a setlist loaded', () {
       expect(handler.playbackState.value.controls, [MediaControl.play]);
-      library.addSong(
+      final song = library.addSong(
         name: 'Opener',
         bpm: 150,
         pattern: const MetronomePattern.standard(),
       );
+      expect(handler.playbackState.value.controls, [
+        MediaControl.play,
+      ], reason: 'Free play');
+      final gig = library.addSetlist('Gig');
+      library
+        ..addToSetlist(gig.id, song.id)
+        ..setActiveSetlist(gig.id);
       expect(handler.playbackState.value.controls, [
         MediaControl.skipToPrevious,
         MediaControl.play,
@@ -93,13 +100,16 @@ void main() {
     });
 
     test('skip buttons switch songs; title shows the song', () async {
+      final gig = library.addSetlist('Gig');
       for (final (name, bpm) in [('One', 100), ('Two', 110)]) {
-        library.addSong(
+        final song = library.addSong(
           name: name,
           bpm: bpm,
           pattern: const MetronomePattern.standard(),
         );
+        library.addToSetlist(gig.id, song.id);
       }
+      library.setActiveSetlist(gig.id);
       await handler.skipToNext();
       await handler.skipToNext();
       expect(controller.bpm, 110);

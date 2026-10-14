@@ -11,9 +11,8 @@ import 'subdivision_icon.dart';
 import 'tempo_ruler.dart';
 import 'theme.dart';
 
-/// Main screen: tempo readout, tempo steps and transport, plus the song
-/// panel (beside it on wide screens, in a sheet on phones). Stateless; all
-/// metronome state lives in [controller].
+/// Main screen (ui-spec.md), the same phone layout on every platform.
+/// Stateless; all metronome state lives in [controller].
 class MetronomeScreen extends StatelessWidget {
   const MetronomeScreen({super.key, required this.controller, this.library});
 
@@ -21,9 +20,6 @@ class MetronomeScreen extends StatelessWidget {
 
   /// Null when storage is unavailable: no song panel then.
   final LibraryController? library;
-
-  /// From this width the song panel sits beside the metronome.
-  static const sidePanelWidth = 800.0;
 
   static const bpmKey = Key('bpm');
   static const playKey = Key('play');
@@ -38,7 +34,6 @@ class MetronomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final library = this.library;
-    final wide = MediaQuery.sizeOf(context).width >= sidePanelWidth;
     final metronome = SafeArea(
       child: Center(
         child: ConstrainedBox(
@@ -77,29 +72,7 @@ class MetronomeScreen extends StatelessWidget {
         const SingleActivator(LogicalKeyboardKey.arrowDown, shift: true): () =>
             controller.nudge(-10),
       },
-      child: Focus(
-        autofocus: true,
-        child: Scaffold(
-          body: library != null && wide
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(child: metronome),
-                    const VerticalDivider(width: 1),
-                    SizedBox(
-                      width: 340,
-                      child: SafeArea(
-                        child: LibraryPanel(
-                          library: library,
-                          metronome: controller,
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-              : metronome,
-        ),
-      ),
+      child: Focus(autofocus: true, child: Scaffold(body: metronome)),
     );
   }
 
@@ -216,11 +189,10 @@ class MetronomeScreen extends StatelessWidget {
         if (library case final library?) ...[
           const SizedBox(height: 12),
           if (library.visibleSongs.isNotEmpty) _songSwitcher(context, library),
-          if (MediaQuery.sizeOf(context).width < sidePanelWidth)
-            TextButton(
-              onPressed: () => _showSongs(context, library),
-              child: const Text('Songs & setlists'),
-            ),
+          TextButton(
+            onPressed: () => _showSongs(context, library),
+            child: const Text('Songs & setlists'),
+          ),
         ],
         if (error != null) ...[
           const SizedBox(height: 12),

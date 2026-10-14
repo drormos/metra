@@ -7,7 +7,7 @@ import '../controller/metronome_controller.dart';
 /// Bridges [MetronomeController] to audio_service: while playing, Android
 /// keeps the app alive as a media foreground service (screen off or app in
 /// background) and shows the transport in the notification and lock
-/// screen, with previous/next song when there are songs.
+/// screen, with previous/next song when a setlist is loaded.
 class MetronomeAudioHandler extends BaseAudioHandler {
   MetronomeAudioHandler(this._controller, {this._library}) {
     Listenable.merge([_controller, ?_library]).addListener(_publish);
@@ -42,7 +42,9 @@ class MetronomeAudioHandler extends BaseAudioHandler {
     final playing = _controller.isPlaying;
     final transport = playing ? MediaControl.stop : MediaControl.play;
     final library = _library;
-    final songs = library != null && library.visibleSongs.isNotEmpty;
+    // Previous/next only inside a setlist (none in Free play).
+    final songs =
+        library?.activeSetlist != null && library!.visibleSongs.isNotEmpty;
     playbackState.add(
       PlaybackState(
         controls: songs

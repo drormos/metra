@@ -173,7 +173,7 @@ class _RulerPainter extends CustomPainter {
     final centre = size.width / 2;
 
     // Top and bottom rules.
-    fill.color = colors.surface;
+    fill.color = colors.divider;
     canvas
       ..drawRect(Rect.fromLTWH(0, 0, size.width, 2), fill)
       ..drawRect(Rect.fromLTWH(0, size.height - 2, size.width, 2), fill);
@@ -212,7 +212,7 @@ class _RulerPainter extends CustomPainter {
     }
 
     // Fixed needle on top.
-    fill.color = colors.needle;
+    fill.color = colors.accent;
     canvas.drawRect(Rect.fromLTWH(centre - 2, 0, 4, 22), fill);
   }
 

@@ -100,4 +100,26 @@ void main() {
     final old = Library.empty.toJson()..remove('themeMode');
     expect(Library.fromJson(old).themeMode, ThemeMode.system);
   });
+
+  test('session (setlist, song, position) survives JSON; old files are '
+      'Free play', () {
+    final session = Library.empty.withSession(
+      setlistId: 's',
+      songId: 'a',
+      position: 3,
+    );
+    final copy = roundTrip(session);
+    expect(copy.activeSetlistId, 's');
+    expect(copy.currentSongId, 'a');
+    expect(copy.currentPosition, 3);
+    expect(roundTrip(copy.copyWith(lastBpm: 99)).activeSetlistId, 's');
+
+    final old = Library.empty.toJson()
+      ..remove('activeSetlistId')
+      ..remove('currentSongId')
+      ..remove('currentPosition');
+    final fromOld = Library.fromJson(old);
+    expect(fromOld.activeSetlistId, isNull);
+    expect(fromOld.currentPosition, -1);
+  });
 }

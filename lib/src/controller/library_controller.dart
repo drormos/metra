@@ -19,10 +19,6 @@ class LibraryController extends ChangeNotifier {
   Library? _unsaved;
   Future<void>? _writing;
   int _idCounter = 0;
-  String? _selectedSetlistId;
-  String? _currentSongId;
-  // Position in [visibleSongs]; disambiguates a song listed twice.
-  int _currentIndex = -1;
 
   ThemeMode get themeMode => _library.themeMode;
 
@@ -33,52 +29,76 @@ class LibraryController extends ChangeNotifier {
   List<Song> get songs => _library.songs;
   List<Setlist> get setlists => _library.setlists;
 
-  /// The setlist shown in the song panel; null shows all songs.
-  Setlist? get selectedSetlist {
+  /// The loaded setlist; null is Free play. A deleted set reads as Free
+  /// play.
+  Setlist? get activeSetlist {
     for (final list in setlists) {
-      if (list.id == _selectedSetlistId) return list;
+      if (list.id == _library.activeSetlistId) return list;
     }
     return null;
   }
 
-  void selectSetlist(String? id) {
-    _selectedSetlistId = id;
-    notifyListeners();
+  /// Loads a setlist, or Free play with null. Only the mode changes: the
+  /// click keeps going as it is.
+  void setActiveSetlist(String? id) {
+    final position = id == null
+        ? -1
+        : (setlists
+                  .where((l) => l.id == id)
+                  .firstOrNull
+                  ?.songIds
+                  .indexOf(_library.currentSongId ?? '') ??
+              -1);
+    _update(
+      _library.withSession(
+        setlistId: id,
+        songId: _library.currentSongId,
+        position: position,
+      ),
+    );
   }
 
-  /// Songs of the selected setlist in order, or all songs.
+  /// Songs of the active setlist in order, or all songs in Free play.
   List<Song> get visibleSongs {
-    final list = selectedSetlist;
+    final list = activeSetlist;
     if (list == null) return songs;
     return [for (final id in list.songIds) ?songById(id)];
   }
 
   /// The song last loaded into the metronome.
-  Song? get currentSong =>
-      _currentSongId == null ? null : songById(_currentSongId!);
+  Song? get currentSong {
+    final id = _library.currentSongId;
+    return id == null ? null : songById(id);
+  }
 
   /// Where the current song sits in [visibleSongs], or -1.
   int get currentIndex {
     final songs = visibleSongs;
-    if (_currentIndex >= 0 &&
-        _currentIndex < songs.length &&
-        songs[_currentIndex].id == _currentSongId) {
-      return _currentIndex;
+    final id = _library.currentSongId;
+    final saved = _library.currentPosition;
+    if (saved >= 0 && saved < songs.length && songs[saved].id == id) {
+      return saved; // disambiguates a song listed twice
     }
-    return songs.indexWhere((s) => s.id == _currentSongId);
+    return songs.indexWhere((s) => s.id == id);
   }
 
-  /// With no current song in the list, "next" is the first song.
-  bool get hasNext => currentIndex < visibleSongs.length - 1;
-  bool get hasPrevious => currentIndex > 0;
+  /// Only inside a setlist (hands-free needs an order). With no current
+  /// song in the set, "next" is its first song.
+  bool get hasNext =>
+      activeSetlist != null && currentIndex < visibleSongs.length - 1;
+  bool get hasPrevious => activeSetlist != null && currentIndex > 0;
 
   /// Load [song] ([index] = its position in [visibleSongs], if known);
   /// while playing it takes over at the next bar line.
   void playSong(Song song, MetronomeController metronome, {int? index}) {
     metronome.switchTo(bpm: song.bpm, pattern: song.pattern);
-    _currentSongId = song.id;
-    _currentIndex = index ?? visibleSongs.indexWhere((s) => s.id == song.id);
-    notifyListeners();
+    _update(
+      _library.withSession(
+        setlistId: _library.activeSetlistId,
+        songId: song.id,
+        position: index ?? visibleSongs.indexWhere((s) => s.id == song.id),
+      ),
+    );
   }
 
   /// Steps through [visibleSongs]; stops at the ends instead of wrapping,
@@ -103,10 +123,15 @@ class LibraryController extends ChangeNotifier {
       bpm: metronome.bpm,
       pattern: metronome.pattern,
     );
-    final list = selectedSetlist;
+    final list = activeSetlist;
     if (list != null) addToSetlist(list.id, song.id);
-    _currentSongId = song.id;
-    _currentIndex = visibleSongs.length - 1;
+    _update(
+      _library.withSession(
+        setlistId: _library.activeSetlistId,
+        songId: song.id,
+        position: list == null ? -1 : visibleSongs.length - 1,
+      ),
+    );
     return song;
   }
 
