@@ -37,6 +37,7 @@ dependencies:
   flutter_soloud: ^5.2.1
   audio_service: ^0.18.19
   audio_session: ^0.2.4
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:

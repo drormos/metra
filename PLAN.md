@@ -50,6 +50,9 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
    - Verified on a real Android phone (speaker): keeps playing on the lock screen, when minimized, and alongside other music; stops when the app is swiped away. Unplugging headphones stops the click.
    - `MainActivity` must extend `AudioServiceActivity`. A plain `FlutterActivity` makes audio_service start a second engine that runs `main()` again and re-initializes SoLoud.
 2. **Persistence:** Simple JSON file storage for songs, setlists, and the visual latency offset.
+   - One `library.json` in the app support folder (`LibraryStore`): written to a temp file then renamed, so a crash mid-save can't corrupt it; an unreadable file is kept aside as `library.json.corrupt-<time>` and the app starts empty.
+   - `LibraryController` owns songs and setlists (deleting a song removes it from setlists) and saves on every change.
+   - Also restores the last session: tempo, pattern and flash offset.
 3. **Setlist UI:** Side panel (macOS) or sheet (Android) for switching songs without stopping playback. A song switch applies tempo and pattern at the next bar boundary.
 4. **Expanded Patterns:** UI for 3/4, 6/8, 7/8 and subdivisions (eighths, triplets, sixteenths), mapped to the Phase 1 `MetronomePattern` model (UI only; the model already supports these).
 

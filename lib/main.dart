@@ -2,11 +2,14 @@ import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'src/audio/headphone_guard.dart';
 import 'src/audio/metronome_audio_handler.dart';
 import 'src/audio/soloud_click_output.dart';
+import 'src/controller/library_controller.dart';
 import 'src/controller/metronome_controller.dart';
+import 'src/storage/library_store.dart';
 import 'src/ui/metronome_screen.dart';
 
 Future<void> main() async {
@@ -19,10 +22,26 @@ Future<void> main() async {
   } catch (e) {
     engineError = e;
   }
-  if (controller != null && Platform.isAndroid) {
-    await _initAndroidBackground(controller);
+  if (controller != null) {
+    (await _loadLibrary())?.attach(controller);
+    if (Platform.isAndroid) await _initAndroidBackground(controller);
   }
   runApp(MetraApp(controller: controller, engineError: engineError));
+}
+
+/// Saved songs, setlists and last-session settings. Without storage the
+/// app still runs, it just doesn't remember anything.
+Future<LibraryController?> _loadLibrary() async {
+  try {
+    final dir = await getApplicationSupportDirectory();
+    await dir.create(recursive: true);
+    return await LibraryController.load(
+      LibraryStore(File('${dir.path}/library.json')),
+    );
+  } catch (e) {
+    debugPrint('Library unavailable: $e');
+    return null;
+  }
 }
 
 /// Keeps playing with the screen off or the app in the background. Failure

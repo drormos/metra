@@ -65,6 +65,23 @@ class MetronomePattern {
   /// Whether the absolute step [stepIndex] is the first step of a beat.
   bool isBeatStart(int stepIndex) => stepIndex % stepsPerBeat == 0;
 
+  Map<String, Object?> toJson() => {
+    'beatsPerBar': beatsPerBar,
+    'stepsPerBeat': stepsPerBeat,
+    'steps': [for (final step in steps) step.name],
+  };
+
+  /// Throws on malformed data (unknown step names, wrong step count).
+  factory MetronomePattern.fromJson(Map<String, Object?> json) =>
+      MetronomePattern(
+        beatsPerBar: json['beatsPerBar'] as int,
+        stepsPerBeat: json['stepsPerBeat'] as int,
+        steps: [
+          for (final name in json['steps'] as List)
+            StepLevel.values.byName(name as String),
+        ],
+      );
+
   static void _validateSizes(int beatsPerBar, int stepsPerBeat) {
     if (beatsPerBar < 1) {
       throw ArgumentError.value(beatsPerBar, 'beatsPerBar', 'must be >= 1');
