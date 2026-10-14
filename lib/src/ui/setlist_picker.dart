@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/library.dart';
+import 'haptics.dart';
 import 'theme.dart';
 
 /// The setlist picker sheet (ui-spec.md, `setlist-picker` and
@@ -177,6 +178,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
       key: ValueKey('picker-song-$index'),
       onTap: () {
         // Same rules as next/previous; the sheet closes after.
+        Haptics.medium();
         _library.playSong(song, widget.metronome, index: index);
         Navigator.pop(context);
       },
@@ -366,6 +368,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
         _library.setActiveSetlist(setlist.id);
         final songs = _library.visibleSongs;
         if (songs.isNotEmpty) {
+          Haptics.medium(); // the song changes
           _library.playSong(songs.first, widget.metronome, index: 0);
         }
         setState(() => _whatToPlay = false);

@@ -6,6 +6,7 @@ import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 
 import '../controller/metronome_controller.dart';
+import 'haptics.dart';
 import 'theme.dart';
 
 /// Horizontal tempo ruler (ui-spec.md): a tick per bpm, a labeled tick
@@ -159,11 +160,7 @@ class _TempoRulerState extends State<TempoRuler>
   void _moveTo(double value) {
     final clamped = value.clamp(_min, _max);
     final previous = _value ?? _controller.bpm.toDouble();
-    if ((previous / 5).floor() != (clamped / 5).floor()) {
-      // Crossed a multiple of 5. Not selectionClick: Android's CLOCK_TICK is
-      // too faint to feel on many phones.
-      HapticFeedback.lightImpact();
-    }
+    if (Haptics.reachesFive(previous, clamped)) Haptics.tick();
     setState(() => _value = clamped);
     _controller.setBpm(clamped.round()); // no-op unless the whole value changed
     if (_glide.isAnimating && clamped != value) _glide.stop(); // hit an end

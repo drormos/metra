@@ -4,6 +4,7 @@ import 'package:flutter/scheduler.dart';
 import '../audio/click_scheduler.dart';
 import '../controller/metronome_controller.dart';
 import '../model/metronome_pattern.dart';
+import 'haptics.dart';
 import 'theme.dart';
 
 /// Beat blocks (ui-spec.md): one block per beat with a subdivision strip
@@ -147,7 +148,10 @@ class _BeatIndicatorState extends State<BeatIndicator>
           'Tap to change.',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => _controller.cycleBeat(beat),
+        onTap: () {
+          Haptics.tick();
+          _controller.cycleBeat(beat);
+        },
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: child,

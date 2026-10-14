@@ -6,6 +6,7 @@ import '../controller/metronome_controller.dart';
 import '../model/click_sound.dart';
 import '../model/tempo_name.dart';
 import 'beat_indicator.dart';
+import 'haptics.dart';
 import 'library_panel.dart';
 import 'repeat_button.dart';
 import 'setlist_editor.dart';
@@ -174,7 +175,10 @@ class MetronomeScreen extends StatelessWidget {
                 flex: 2,
                 child: FilledButton.icon(
                   key: playKey,
-                  onPressed: controller.toggle,
+                  onPressed: () {
+                    Haptics.medium();
+                    controller.toggle();
+                  },
                   icon: Icon(
                     controller.isPlaying ? Icons.stop : Icons.play_arrow,
                     size: 24,
@@ -190,7 +194,10 @@ class MetronomeScreen extends StatelessWidget {
                 // Tap registers on pointer down: tap-up timing varies with
                 // how long the finger rests, which skews the tempo.
                 child: Listener(
-                  onPointerDown: (_) => controller.tap(),
+                  onPointerDown: (_) {
+                    Haptics.tick();
+                    controller.tap();
+                  },
                   child: OutlinedButton(
                     key: tapKey,
                     onPressed: () {},
@@ -260,8 +267,10 @@ class MetronomeScreen extends StatelessWidget {
           key: subdivisionKey,
           tooltip: 'Subdivision: ${_subdivisionNames[pattern.stepsPerBeat]}',
           // Cycles 1 → 2 → 3 → 4 → 1; while playing, from the next beat.
-          onPressed: () =>
-              controller.setSubdivision(pattern.stepsPerBeat % 4 + 1),
+          onPressed: () {
+            Haptics.tick();
+            controller.setSubdivision(pattern.stepsPerBeat % 4 + 1);
+          },
           child: SubdivisionIcon(pattern.stepsPerBeat),
         ),
         const SizedBox(width: 8),
@@ -358,6 +367,7 @@ class MetronomeScreen extends StatelessWidget {
                   label: Text('$beats/$unit'),
                   selected: controller.pattern.timeSignature == '$beats/$unit',
                   onSelected: (_) {
+                    Haptics.tick();
                     controller.setMeter(beats, unit);
                     Navigator.pop(context);
                   },
@@ -527,7 +537,18 @@ class MetronomeScreen extends StatelessWidget {
             foregroundColor: context.colors.text,
             padding: EdgeInsets.zero,
           ),
-          onPressed: enabled ? () => controller.nudge(delta) : null,
+          onPressed: enabled
+              ? () {
+                  Haptics.tick();
+                  controller.nudge(delta);
+                }
+              : null,
+          // While held, tick only on reaching a multiple of 5.
+          onRepeat: () {
+            final before = controller.bpm;
+            controller.nudge(delta);
+            if (Haptics.reachesFive(before, controller.bpm)) Haptics.tick();
+          },
           // Shrinks instead of wrapping on narrow phones.
           child: FittedBox(
             child: Text(

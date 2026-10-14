@@ -9,6 +9,7 @@ class RepeatButton extends StatefulWidget {
   const RepeatButton({
     super.key,
     required this.onPressed,
+    this.onRepeat,
     required this.child,
     this.style,
     this.interval = const Duration(milliseconds: 100),
@@ -16,6 +17,9 @@ class RepeatButton extends StatefulWidget {
 
   /// Null disables the button (and stops a running repeat).
   final VoidCallback? onPressed;
+
+  /// Fired for each repeat while held; defaults to [onPressed].
+  final VoidCallback? onRepeat;
   final Widget child;
   final ButtonStyle? style;
   final Duration interval;
@@ -32,7 +36,7 @@ class _RepeatButtonState extends State<RepeatButton> {
     _repeat = Timer.periodic(widget.interval, (_) {
       final onPressed = widget.onPressed;
       // Hitting a limit disables the button: stop instead of firing on.
-      onPressed == null ? _stop() : onPressed();
+      onPressed == null ? _stop() : (widget.onRepeat ?? onPressed)();
     });
   }
 

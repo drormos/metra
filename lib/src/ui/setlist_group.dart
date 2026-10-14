@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/library.dart';
+import 'haptics.dart';
 import 'theme.dart';
 
 /// The framed setlist group at the bottom of the main screen (ui-spec.md).
@@ -185,7 +186,10 @@ class SetlistGroup extends StatelessWidget {
             colors: colors,
             song: previous,
             forward: false,
-            onPressed: () => library.previousSong(metronome),
+            onPressed: () {
+              Haptics.medium();
+              library.previousSong(metronome);
+            },
           ),
         ),
         const SizedBox(width: 8),
@@ -195,7 +199,10 @@ class SetlistGroup extends StatelessWidget {
             colors: colors,
             song: next,
             forward: true,
-            onPressed: () => library.nextSong(metronome),
+            onPressed: () {
+              Haptics.medium();
+              library.nextSong(metronome);
+            },
           ),
         ),
       ],

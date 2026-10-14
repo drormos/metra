@@ -8,6 +8,7 @@ import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/click_sound.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
+import 'package:metra/src/ui/haptics.dart';
 import 'package:metra/src/ui/tempo_ruler.dart';
 
 import '../audio/fake_click_output.dart';
@@ -662,6 +663,74 @@ void main() {
     expect(number.center.dx, closeTo(screen.center.dx, 0.5));
     final label = tester.getRect(find.text('bpm').last);
     expect(label.left, greaterThan(number.right));
+  });
+
+  group('haptics', () {
+    /// Records haptic types ('lightImpact', 'mediumImpact', ...).
+    List<String> recordHaptics(WidgetTester tester) {
+      final haptics = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'HapticFeedback.vibrate') {
+            haptics.add((call.arguments as String).split('.').last);
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      return haptics;
+    }
+
+    testWidgets('Start/Stop is medium', (tester) async {
+      await pumpScreen(tester);
+      final haptics = recordHaptics(tester);
+      await tester.tap(find.byKey(MetronomeScreen.playKey));
+      await tester.pump();
+      expect(haptics, ['mediumImpact']);
+      await tester.tap(find.byKey(MetronomeScreen.playKey));
+      await tester.pump();
+    });
+
+    testWidgets('small adjustments tick lightly', (tester) async {
+      await pumpScreen(tester);
+      final haptics = recordHaptics(tester);
+      await tester.tap(find.text('+1'));
+      await tester.tap(find.byKey(MetronomeScreen.tapKey));
+      await tester.tap(find.byKey(MetronomeScreen.subdivisionKey));
+      await tester.tap(find.byKey(const ValueKey('beat-1-off')));
+      await tester.pump(const Duration(seconds: 1));
+      expect(haptics, List.filled(4, 'lightImpact'));
+    });
+
+    testWidgets('holding ±1 ticks only on multiples of 5', (tester) async {
+      await pumpScreen(tester);
+      final haptics = recordHaptics(tester);
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text('+1')),
+      );
+      await tester.pump(kLongPressTimeout); // first press: 121
+      await tester.pump(const Duration(milliseconds: 950)); // repeats
+      await gesture.up();
+      await tester.pump();
+      expect(controller.bpm, inInclusiveRange(130, 134));
+      // The press, then 125 and 130.
+      expect(haptics, List.filled(3, 'lightImpact'));
+    });
+
+    test('reaching a multiple of 5, either direction', () {
+      expect(Haptics.reachesFive(124, 125), isTrue);
+      expect(Haptics.reachesFive(125, 126), isFalse);
+      expect(Haptics.reachesFive(126, 125), isTrue);
+      expect(Haptics.reachesFive(125, 124), isFalse);
+      expect(Haptics.reachesFive(123, 128), isTrue);
+      expect(Haptics.reachesFive(121, 124), isFalse);
+    });
   });
 
   group('hold to repeat', () {
