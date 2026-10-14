@@ -4,12 +4,15 @@ import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/library.dart';
 import 'editor_scaffold.dart';
+import 'haptics.dart';
 import 'song_editor.dart';
 import 'theme.dart';
 
 /// Opens the song library in browse mode (ui-spec.md "Song library",
 /// `song-library.reference.html`): every song, searchable, A–Z or recently
-/// edited; a row opens the song editor. Browsing never touches the click.
+/// edited. Tapping a row loads that song (the picker's rules, mode kept)
+/// and returns to the main screen; its pencil opens the song editor. The
+/// way to play a single song without a setlist.
 Future<void> openSongLibrary(
   BuildContext context,
   LibraryController library,
@@ -61,6 +64,14 @@ class _SongLibraryState extends State<SongLibrary> {
 
   void _edit([Song? song]) =>
       openSongEditor(context, _library, widget.metronome, song: song);
+
+  /// Same as a picker row: while playing, restarts on beat 1. A song in
+  /// the loaded set takes its position there; any other shows "– of N".
+  void _load(Song song) {
+    Haptics.medium(); // the song changed
+    _library.playSong(song, widget.metronome);
+    Navigator.popUntil(context, (route) => route.isFirst);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -191,10 +202,10 @@ class _SongLibraryState extends State<SongLibrary> {
 
   Widget _row(MetraColors colors, Song song) => InkWell(
     key: ValueKey('library-${song.id}'),
-    onTap: () => _edit(song),
+    onTap: () => _load(song),
     child: Container(
       height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.only(left: 24),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: colors.divider)),
       ),
@@ -244,6 +255,17 @@ class _SongLibraryState extends State<SongLibrary> {
               song.pattern.timeSignature,
               textAlign: TextAlign.right,
               style: TextStyle(fontSize: 14, color: colors.muted),
+            ),
+          ),
+          SizedBox(
+            width: 52,
+            height: 64,
+            child: IconButton(
+              key: ValueKey('library-edit-${song.id}'),
+              tooltip: 'Edit ${song.name}',
+              color: colors.muted,
+              onPressed: () => _edit(song),
+              icon: const Icon(Icons.edit_outlined, size: 20),
             ),
           ),
         ],

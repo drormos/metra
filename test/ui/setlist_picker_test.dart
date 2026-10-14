@@ -207,6 +207,57 @@ void main() {
     expect(find.byType(SongLibrary), findsOneWidget);
   });
 
+  /// Opens the library through the picker (in Free play via "Choose a
+  /// setlist") and taps [name]'s row.
+  Future<void> loadFromLibrary(
+    WidgetTester tester,
+    String name, {
+    bool freePlay = false,
+  }) async {
+    await tester.tap(
+      freePlay
+          ? find.text('Choose a setlist')
+          : find.byKey(SetlistGroup.headerKey),
+    );
+    await settle(tester);
+    await tester.tap(find.text('Song library'));
+    await tester.pumpAndSettle();
+    final song = library.songs.firstWhere((s) => s.name == name);
+    await tester.tap(find.byKey(ValueKey('library-${song.id}')));
+    await tester.pumpAndSettle();
+    expect(find.byType(SongLibrary), findsNothing);
+    expect(find.byType(SetlistPicker), findsNothing, reason: 'back to main');
+  }
+
+  testWidgets('from the library in Free play: stays Free play, titled', (
+    tester,
+  ) async {
+    await pumpWithSets(tester, loaded: false);
+    await loadFromLibrary(tester, 'Two', freePlay: true);
+    expect(library.activeSetlist, isNull);
+    expect(
+      tester.widget<Text>(find.byKey(MetronomeScreen.titleKey)).data,
+      'Two',
+    );
+    expect(metronome.bpm, 110);
+  });
+
+  testWidgets('from the library with a set: outside it reads "– of N"', (
+    tester,
+  ) async {
+    await pumpWithSets(tester);
+    final outside = library.addSong(
+      name: 'Solo',
+      bpm: 90,
+      pattern: const MetronomePattern.standard(),
+    );
+    await tester.pump();
+    await loadFromLibrary(tester, outside.name);
+    expect(library.activeSetlist?.name, 'Friday set');
+    expect(find.text('– of 3'), findsOneWidget);
+    expect(library.hasNext, isTrue, reason: 'leads back into the set');
+  });
+
   testWidgets('the pencil on a picker row edits that song', (tester) async {
     await pumpWithSets(tester);
     await openFromHeader(tester);

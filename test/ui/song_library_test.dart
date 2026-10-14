@@ -124,11 +124,22 @@ void main() {
     expect(listed(tester).first, 'Charlie');
   });
 
-  testWidgets('a row opens the song editor; saving updates the list', (
+  testWidgets('tapping a row loads the song and closes the library', (
     tester,
   ) async {
     await pumpLibrary(tester);
     await tester.tap(find.text('Delta'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SongLibrary), findsNothing);
+    expect(library.currentSong!.name, 'Delta');
+    expect(metronome.bpm, 120);
+  });
+
+  testWidgets('the pencil opens the song editor; saving updates the list', (
+    tester,
+  ) async {
+    await pumpLibrary(tester);
+    await tester.tap(find.byTooltip('Edit Delta'));
     await tester.pumpAndSettle();
     expect(find.byType(SongEditor), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'Echo');
