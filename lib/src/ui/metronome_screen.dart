@@ -7,6 +7,7 @@ import '../model/click_sound.dart';
 import '../model/tempo_name.dart';
 import 'beat_indicator.dart';
 import 'library_panel.dart';
+import 'repeat_button.dart';
 import 'setlist_editor.dart';
 import 'setlist_group.dart';
 import 'setlist_picker.dart';
@@ -70,9 +71,9 @@ class MetronomeScreen extends StatelessWidget {
         const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
             controller.nudge(-1),
         const SingleActivator(LogicalKeyboardKey.arrowUp, shift: true): () =>
-            controller.nudge(10),
+            controller.nudge(5),
         const SingleActivator(LogicalKeyboardKey.arrowDown, shift: true): () =>
-            controller.nudge(-10),
+            controller.nudge(-5),
       },
       child: Focus(autofocus: true, child: Scaffold(body: metronome)),
     );
@@ -154,13 +155,13 @@ class MetronomeScreen extends StatelessWidget {
         ),
         Row(
           children: [
-            _step('−10', -10, bpm > MetronomeController.minBpm),
+            _step('−5', -5, bpm > MetronomeController.minBpm),
             const SizedBox(width: 8),
             _step('−1', -1, bpm > MetronomeController.minBpm),
             const SizedBox(width: 8),
             _step('+1', 1, bpm < MetronomeController.maxBpm),
             const SizedBox(width: 8),
-            _step('+10', 10, bpm < MetronomeController.maxBpm),
+            _step('+5', 5, bpm < MetronomeController.maxBpm),
           ],
         ),
         const SizedBox(height: 12),
@@ -519,7 +520,8 @@ class MetronomeScreen extends StatelessWidget {
     child: SizedBox(
       height: 60,
       child: Builder(
-        builder: (context) => FilledButton(
+        // Holding repeats (ui-spec.md).
+        builder: (context) => RepeatButton(
           style: FilledButton.styleFrom(
             backgroundColor: context.colors.surface,
             foregroundColor: context.colors.text,

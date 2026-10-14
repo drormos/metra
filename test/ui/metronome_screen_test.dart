@@ -1,5 +1,6 @@
 import 'dart:ui' show SemanticsAction;
 
+import 'package:flutter/gestures.dart' show kLongPressTimeout;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -43,14 +44,14 @@ void main() {
 
   testWidgets('step buttons change the tempo', (tester) async {
     await pumpScreen(tester);
-    await tester.tap(find.text('+10'));
+    await tester.tap(find.text('+5'));
     await tester.pump();
-    expect(bpmText(tester).data, '130');
+    expect(bpmText(tester).data, '125');
     await tester.tap(find.text('−1'));
     await tester.pump();
-    expect(bpmText(tester).data, '129');
+    expect(bpmText(tester).data, '124');
     await tester.tap(find.text('+1'));
-    await tester.tap(find.text('−10'));
+    await tester.tap(find.text('−5'));
     await tester.pump();
     expect(controller.bpm, 120);
   });
@@ -67,7 +68,7 @@ void main() {
         )
         .enabled;
     expect(enabled('+1'), isFalse);
-    expect(enabled('+10'), isFalse);
+    expect(enabled('+5'), isFalse);
     expect(enabled('−1'), isTrue);
 
     controller.setBpm(MetronomeController.minBpm);
@@ -99,7 +100,7 @@ void main() {
     await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
-    expect(controller.bpm, 130);
+    expect(controller.bpm, 125);
 
     await tester.sendKeyEvent(LogicalKeyboardKey.space);
     await tester.pump();
@@ -474,5 +475,42 @@ void main() {
     expect(number.center.dx, closeTo(screen.center.dx, 0.5));
     final label = tester.getRect(find.text('bpm').last);
     expect(label.left, greaterThan(number.right));
+  });
+
+  group('hold to repeat', () {
+    testWidgets('holding +1 keeps adding until released', (tester) async {
+      await pumpScreen(tester);
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text('+1')),
+      );
+      await tester.pump(kLongPressTimeout); // repeat starts: +1
+      await tester.pump(const Duration(milliseconds: 1000)); // +10 more
+      await gesture.up();
+      await tester.pump();
+      final held = controller.bpm;
+      expect(held, inInclusiveRange(129, 132));
+      await tester.pump(const Duration(seconds: 1));
+      expect(controller.bpm, held, reason: 'stops on release');
+    });
+
+    testWidgets('a quick tap adds once', (tester) async {
+      await pumpScreen(tester);
+      await tester.tap(find.text('+5'));
+      await tester.pump(const Duration(seconds: 1));
+      expect(controller.bpm, 125);
+    });
+
+    testWidgets('repeat stops at the limit', (tester) async {
+      controller.setBpm(MetronomeController.maxBpm - 12);
+      await pumpScreen(tester);
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.text('+5')),
+      );
+      await tester.pump(kLongPressTimeout);
+      await tester.pump(const Duration(seconds: 2));
+      expect(controller.bpm, MetronomeController.maxBpm);
+      await gesture.up();
+      await tester.pump();
+    });
   });
 }

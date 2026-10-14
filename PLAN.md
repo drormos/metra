@@ -103,7 +103,7 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
 10. **Daylight check:** Check every Daylight color on a real screen.
 
 ## Phase 4b: Main-screen tweaks
-1. **Tempo buttons:** −5, −1, +1, +5 (was ±10; ±5 matches the ruler's labeled ticks). Holding a button repeats. Keyboard Shift+↑/↓ follows (±5).
+1. **Tempo buttons (done):** −5, −1, +1, +5 (was ±10; ±5 matches the ruler's labeled ticks). Holding a button repeats (`RepeatButton`: after the long-press delay, every 100 ms; stops at the 30/300 limits). Keyboard Shift+↑/↓ follows (±5).
 
 ## Phase 5: Songs — Editor, Library, Unsaved Changes
 **Goal:** The design's song screens and the "changes to a loaded song" behavior (`docs/design/ui-spec.md`). One commit per step.
