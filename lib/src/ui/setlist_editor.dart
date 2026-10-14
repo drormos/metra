@@ -46,15 +46,22 @@ class SetlistEditor extends StatefulWidget {
 }
 
 class _SetlistEditorState extends State<SetlistEditor> {
-  // The draft: nothing is saved until Save.
-  late final _name = TextEditingController(text: widget.setlist?.name ?? '');
+  // The draft: nothing is saved until Save. A new set's default name is
+  // selected, so typing replaces it and leaving it keeps it.
+  late final String _initialName =
+      widget.setlist?.name ?? widget.library.newSetlistName();
+  late final _name = TextEditingController(text: _initialName)
+    ..selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: _initialName.length,
+    );
   late List<String> _songIds = [...?widget.setlist?.songIds];
 
   LibraryController get _library => widget.library;
   bool get _isNew => widget.setlist == null;
 
   bool get _dirty =>
-      _name.text != (widget.setlist?.name ?? '') ||
+      _name.text != _initialName ||
       !_sameIds(_songIds, widget.setlist?.songIds ?? const []);
 
   static bool _sameIds(List<String> a, List<String> b) =>
@@ -127,7 +134,7 @@ class _SetlistEditorState extends State<SetlistEditor> {
     final colors = context.colors;
     final songs = [for (final id in _songIds) ?_library.songById(id)];
     return EditorScaffold(
-      title: 'Setlist',
+      title: _isNew ? 'New setlist' : 'Setlist',
       actionLabel: 'Save',
       dirty: _dirty,
       onAction: _name.text.trim().isEmpty ? null : _save,
@@ -149,21 +156,48 @@ class _SetlistEditorState extends State<SetlistEditor> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Text(
-                        songs.length == 1 ? '1 song' : '${songs.length} songs',
-                        style: TextStyle(fontSize: 14, color: colors.muted),
+                  if (songs.isEmpty)
+                    // Empty state (setlist-new.reference.html).
+                    Padding(
+                      padding: const EdgeInsets.only(top: 40, bottom: 12),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'No songs yet',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Add songs from your library, or create new ones '
+                            'as you go.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 14, color: colors.muted),
+                          ),
+                        ],
                       ),
-                      const Spacer(),
-                      if (songs.length > 1)
+                    )
+                  else ...[
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
                         Text(
-                          'Drag to reorder',
-                          style: TextStyle(fontSize: 13, color: colors.muted),
+                          songs.length == 1
+                              ? '1 song'
+                              : '${songs.length} songs',
+                          style: TextStyle(fontSize: 14, color: colors.muted),
                         ),
-                    ],
-                  ),
+                        const Spacer(),
+                        if (songs.length > 1)
+                          Text(
+                            'Drag to reorder',
+                            style: TextStyle(fontSize: 13, color: colors.muted),
+                          ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -203,10 +237,13 @@ class _SetlistEditorState extends State<SetlistEditor> {
                     height: 56,
                     child: FilledButton.icon(
                       key: SetlistEditor.addSongsKey,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: colors.surface,
-                        foregroundColor: colors.text,
-                      ),
+                      // The primary action while the set is empty.
+                      style: songs.isEmpty
+                          ? null
+                          : FilledButton.styleFrom(
+                              backgroundColor: colors.surface,
+                              foregroundColor: colors.text,
+                            ),
                       onPressed: _addSongs,
                       icon: const Icon(Icons.add, size: 20),
                       label: const Text(

@@ -177,25 +177,42 @@ void main() {
     expect(library.songs, hasLength(4));
   });
 
-  testWidgets('a new set: needs a name, can start with all songs, loads '
-      'when saved', (tester) async {
+  testWidgets('a new set: default name selected, empty state, loads when '
+      'saved', (tester) async {
     await pumpEditor(tester, editGig: false);
+    expect(find.text('New setlist'), findsOneWidget);
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.controller!.text, 'Setlist 2');
+    expect(
+      field.controller!.selection,
+      const TextSelection(baseOffset: 0, extentOffset: 9),
+    );
+    expect(find.text('No songs yet'), findsOneWidget);
     expect(find.byKey(SetlistEditor.deleteKey), findsNothing);
+    await tester.enterText(find.byType(TextField), '');
+    await tester.pump();
     expect(
       tester
           .widget<FilledButton>(find.byKey(EditorScaffold.actionKey))
           .onPressed,
       isNull,
-      reason: 'no name yet',
+      reason: 'no name',
     );
     await tester.tap(find.text('Start with all songs'));
     await tester.pump();
+    expect(find.text('No songs yet'), findsNothing);
     await tester.enterText(find.byType(TextField), 'All');
     await tester.pump();
     await save(tester);
     final all = library.setlists.firstWhere((l) => l.name == 'All');
     expect(names(all), ['Alpha', 'Bravo', 'Charlie', 'Delta']);
     expect(library.activeSetlist?.name, 'All');
+  });
+
+  testWidgets('a new set keeps its default name if left alone', (tester) async {
+    await pumpEditor(tester, editGig: false);
+    await save(tester);
+    expect(library.activeSetlist?.name, 'Setlist 2');
   });
 
   group('add songs (pick mode)', () {

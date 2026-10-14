@@ -227,13 +227,20 @@ class LibraryController extends ChangeNotifier {
 
   /// A default name for a new song: "Song N", N the next number not
   /// already used.
-  String newSongName() {
-    final taken = {for (final song in songs) song.name};
-    var n = songs.length + 1;
-    while (taken.contains('Song $n')) {
+  String newSongName() =>
+      _newName('Song', [for (final song in songs) song.name]);
+
+  /// "Setlist N", like [newSongName].
+  String newSetlistName() =>
+      _newName('Setlist', [for (final list in setlists) list.name]);
+
+  static String _newName(String prefix, List<String> names) {
+    final taken = names.toSet();
+    var n = names.length + 1;
+    while (taken.contains('$prefix $n')) {
       n++;
     }
-    return 'Song $n';
+    return '$prefix $n';
   }
 
   void updateSong(Song song) {

@@ -144,6 +144,12 @@ ThemeData metraTheme(MetraColors c, Brightness brightness) {
     brightness: brightness,
     fontFamily: MetraFonts.body,
     scaffoldBackgroundColor: c.background,
+    // A new song's or set's default name is shown selected in the accent.
+    textSelectionTheme: TextSelectionThemeData(
+      selectionColor: c.accent,
+      cursorColor: c.text,
+      selectionHandleColor: c.accent,
+    ),
     canvasColor: c.background,
     dividerColor: c.divider,
     colorScheme: ColorScheme(
