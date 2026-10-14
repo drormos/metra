@@ -12,7 +12,9 @@ import 'theme.dart';
 /// the tempo in 1-bpm steps, clamped to the metronome's range.
 ///
 /// Speed-sensitive: slow, small moves are 1 bpm per 14 px for precise
-/// picking; faster moves cover more bpm per pixel (up to [maxGain]×).
+/// picking; faster moves cover more bpm per pixel (up to [maxGain]×). One
+/// swipe, drag and coast together, covers at most [maxSwipeBpm], so the
+/// whole range takes two.
 /// Snapping: only a very slow, careful drag (recent finger speed below
 /// [fineSpeed]) stays exactly where it's released, so 123 is reachable. Any
 /// other drag slides to the next multiple of 5 in the direction it was
@@ -32,7 +34,7 @@ class TempoRuler extends StatefulWidget {
   /// Finger speeds (px/s) where acceleration starts and tops out.
   static const slowSpeed = 300.0;
   static const fastSpeed = 1500.0;
-  static const maxGain = 4.0;
+  static const maxGain = 2.5;
 
   /// Release speed (px/s) that counts as a fling. Tune on a real phone.
   static const flingSpeed = 300.0;
@@ -49,12 +51,28 @@ class TempoRuler extends StatefulWidget {
   /// How far a fling coasts: lower stops sooner (see [FrictionSimulation]).
   static const flingFriction = 0.05;
 
+  /// Most a single swipe (drag plus coast) moves the tempo: half of
+  /// 30–300, so the full range takes two swipes.
+  static const maxSwipeBpm = 135.0;
+
   /// Where a fling released at [value] with [bpmPerSecond] comes to rest:
-  /// the multiple of 5 nearest to where friction would stop it, at least
-  /// one multiple ahead in the fling's direction, within 30–300.
-  static double flingTarget(double value, double bpmPerSecond) {
+  /// the multiple of 5 nearest to where friction would stop it, no more
+  /// than [maxSwipeBpm] from where the swipe began ([start], default
+  /// [value]), at least one multiple ahead in the fling's direction, within
+  /// 30–300.
+  static double flingTarget(
+    double value,
+    double bpmPerSecond, {
+    double? start,
+  }) {
     final coast = FrictionSimulation(flingFriction, value, bpmPerSecond).finalX;
+    final from = start ?? value;
     var target = (coast / 5).round() * 5.0;
+    if (bpmPerSecond > 0) {
+      target = min(target, ((from + maxSwipeBpm) / 5).floor() * 5.0);
+    } else {
+      target = max(target, ((from - maxSwipeBpm) / 5).ceil() * 5.0);
+    }
     if (bpmPerSecond > 0 && target <= value) {
       target = (value / 5).floor() * 5 + 5;
     }
@@ -101,6 +119,8 @@ class _TempoRulerState extends State<TempoRuler>
   double? _recentSpeed;
   // Bpm direction of the last move: +1 up, −1 down.
   int _direction = 0;
+  // Where this drag began, to cap how far one swipe goes.
+  double _swipeStart = 0;
   late final AnimationController _glide = AnimationController.unbounded(
     vsync: this,
   )..addListener(() => _moveTo(_glide.value));
@@ -130,6 +150,7 @@ class _TempoRulerState extends State<TempoRuler>
   void _start(DragStartDetails details) {
     _glide.stop(); // touching the ruler stops a glide
     _value ??= _controller.bpm.toDouble();
+    _swipeStart = _value!;
     _lastMoveTime = details.sourceTimeStamp;
     _recentSpeed = null;
     _direction = 0;
@@ -149,8 +170,7 @@ class _TempoRulerState extends State<TempoRuler>
       gain = TempoRuler.gainFor(speed);
       final previous = _recentSpeed ?? speed;
       final weight =
-          1 -
-          exp(-seconds * 1e6 / TempoRuler.recentSpeedWindow.inMicroseconds);
+          1 - exp(-seconds * 1e6 / TempoRuler.recentSpeedWindow.inMicroseconds);
       _recentSpeed = previous + (speed - previous) * weight;
     }
     if (dx != 0) _direction = dx < 0 ? 1 : -1; // dragging left raises it
@@ -168,7 +188,11 @@ class _TempoRulerState extends State<TempoRuler>
     }
     final bpmPerSecond =
         -speed * TempoRuler.gainFor(speed.abs()) / TempoRuler.pxPerBpm;
-    final target = TempoRuler.flingTarget(from, bpmPerSecond);
+    final target = TempoRuler.flingTarget(
+      from,
+      bpmPerSecond,
+      start: _swipeStart,
+    );
     // Decelerate starts at twice its average speed: match the release.
     _glideTo(target, 2 * (target - from).abs() / bpmPerSecond.abs());
   }

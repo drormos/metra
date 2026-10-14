@@ -460,6 +460,21 @@ void main() {
       expect(TempoRuler.flingTarget(32, -500), 30);
     });
 
+    test('one swipe covers at most half the range', () {
+      expect(TempoRuler.flingTarget(150, 5000, start: 100), 235);
+      expect(TempoRuler.flingTarget(150, -5000, start: 200), 65);
+      expect(TempoRuler.flingTarget(30, 5000), 165);
+    });
+
+    testWidgets('a hard flick from 30 stops halfway', (tester) async {
+      controller.setBpm(30);
+      await pumpScreen(tester);
+      await tester.fling(ruler(), const Offset(-300, 0), 8000);
+      await tester.pumpAndSettle();
+      expect(controller.bpm, lessThanOrEqualTo(165));
+      expect(controller.bpm % 5, 0);
+    });
+
     testWidgets('a slow drag stays exactly where released', (tester) async {
       controller.setBpm(121);
       await pumpScreen(tester);
@@ -472,9 +487,7 @@ void main() {
       expect(controller.bpm, 126, reason: 'not snapped to 125');
     });
 
-    testWidgets('a normal drag snaps ahead to a multiple of 5', (
-      tester,
-    ) async {
+    testWidgets('a normal drag snaps ahead to a multiple of 5', (tester) async {
       await pumpScreen(tester);
       // 98 px in half a second: faster than fine-tuning, not a fling.
       await tester.timedDrag(
@@ -568,7 +581,7 @@ void main() {
 
     test('gain grows with finger speed, capped', () {
       expect(TempoRuler.gainFor(100), 1);
-      expect(TempoRuler.gainFor(900), closeTo(2.5, 0.01));
+      expect(TempoRuler.gainFor(900), closeTo(1.75, 0.01));
       expect(TempoRuler.gainFor(5000), TempoRuler.maxGain);
     });
 
