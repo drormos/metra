@@ -32,7 +32,8 @@ abstract interface class ClickOutput {
   /// Per-level volumes for clicks scheduled from now on.
   set volumes(ClickVolumes value);
 
-  /// Play one accent click right away (feedback when picking a sound).
+  /// Play one accent click right away (feedback when picking a sound),
+  /// cutting off a previous one still ringing.
   void preview();
 
   /// Fires when the output device failed to start on its own.

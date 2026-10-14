@@ -79,12 +79,17 @@ class MetronomeController extends ChangeNotifier {
   }
 
   /// Applies to clicks scheduled from now on (within ~one lookahead). While
-  /// stopped, plays a sample so the choice is heard.
+  /// stopped, every call with [preview] plays the sample, even for the
+  /// sound already chosen (listen again); while playing, the clicks are
+  /// the sample.
   void setClickSound(ClickSound sound, {bool preview = true}) {
+    if (preview && !_playing) {
+      _output.sound = sound;
+      _output.preview();
+    }
     if (sound == _clickSound) return;
     _clickSound = sound;
     _output.sound = sound;
-    if (preview && !_playing) _output.preview();
     notifyListeners();
   }
 

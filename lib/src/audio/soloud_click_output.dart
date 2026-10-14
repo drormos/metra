@@ -82,11 +82,18 @@ class SoloudClickOutput implements ClickOutput {
   @override
   set volumes(ClickVolumes value) => _volumes = value;
 
+  SoundHandle? _preview;
+
+  /// A new sample cuts off the one still ringing, so taps restart it.
   @override
-  void preview() => SoLoud.instance.play(
-    _sources[_sound]!.accent,
-    volume: _gain(StepLevel.accent),
-  );
+  void preview() {
+    final previous = _preview;
+    if (previous != null) unawaited(SoLoud.instance.stop(previous));
+    _preview = SoLoud.instance.play(
+      _sources[_sound]!.accent,
+      volume: _gain(StepLevel.accent),
+    );
+  }
 
   @override
   void cancel(ClickHandle handle) =>
