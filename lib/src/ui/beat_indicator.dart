@@ -80,8 +80,8 @@ class _BeatIndicatorState extends State<BeatIndicator>
     );
   }
 
-  /// One dot per beat. Tapping cycles the beat normal → accent → silent;
-  /// while playing the change lands on the next bar line.
+  /// One dot per beat. Tapping cycles the beat normal → accent → silent,
+  /// heard from the next click.
   Widget _dot({
     required int index,
     required StepLevel level,
@@ -99,8 +99,7 @@ class _BeatIndicatorState extends State<BeatIndicator>
       label: 'Beat ${index + 1}: ${level.name}. Tap to change.',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () =>
-            _controller.setPattern(_controller.pattern.cycleBeat(index)),
+        onTap: () => _controller.cycleBeat(index),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
           child: Container(

@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
-import '../model/metronome_pattern.dart';
 import 'beat_indicator.dart';
 import 'library_panel.dart';
 
@@ -237,7 +236,7 @@ class MetronomeScreen extends StatelessWidget {
 
   /// Time signature and subdivision. Changing the time signature resets
   /// custom accents; changing the subdivision keeps them. While playing,
-  /// either lands on the next bar line.
+  /// either takes effect on the next beat.
   Widget _rhythmControls() {
     final pattern = controller.pattern;
     final meters = {
@@ -258,13 +257,7 @@ class MetronomeScreen extends StatelessWidget {
           ],
           onChanged: (label) {
             final (beats, unit) = meters[label]!;
-            controller.setPattern(
-              MetronomePattern.simple(
-                beatsPerBar: beats,
-                stepsPerBeat: pattern.stepsPerBeat,
-                beatUnit: unit,
-              ),
-            );
+            controller.setMeter(beats, unit);
           },
         ),
         DropdownButton<int>(
@@ -274,8 +267,7 @@ class MetronomeScreen extends StatelessWidget {
             for (final MapEntry(:key, :value) in _subdivisions.entries)
               DropdownMenuItem(value: key, child: Text(value)),
           ],
-          onChanged: (steps) =>
-              controller.setPattern(pattern.withSubdivision(steps!)),
+          onChanged: (steps) => controller.setSubdivision(steps!),
         ),
       ],
     );

@@ -344,4 +344,101 @@ void main() {
       expect(scheduler.stepAt(_ms * 2700)!.barPosition, 3);
     });
   });
+
+  group('faster pattern changes', () {
+    List<StepLevel> levels() => output.live.map((c) => c.level).toList();
+
+    test('replaceLevels applies from the next open step', () async {
+      await start(bpm: 120); // 1120, 1620, 2120, 2620
+      runFor(_ms * 1000); // now 2000: 2120 scheduled but beyond the guard
+      expect(output.liveTimes.last, _ms * 2120);
+      scheduler.replaceLevels(
+        MetronomePattern.fromBeats(const [
+          StepLevel.accent,
+          StepLevel.normal,
+          StepLevel.accent, // beat 3 now accented
+          StepLevel.normal,
+        ], stepsPerBeat: 1),
+      );
+      runFor(_ms * 1000);
+      expect(output.liveTimes.take(4), [
+        _ms * 1120,
+        _ms * 1620,
+        _ms * 2120,
+        _ms * 2620,
+      ]);
+      expect(levels().take(4), [
+        StepLevel.accent,
+        StepLevel.normal,
+        StepLevel.accent,
+        StepLevel.normal,
+      ]);
+    });
+
+    test(
+      'a subdivision change starts on the next beat, bar continues',
+      () async {
+        await start(bpm: 120);
+        runFor(_ms * 650); // now 1650: beats 1, 2 committed
+        scheduler.switchAtNextBeat(
+          bpm: 120,
+          pattern: MetronomePattern.simple(beatsPerBar: 4, stepsPerBeat: 2),
+          restartBar: false,
+        );
+        runFor(_ms * 2000);
+        expect(output.liveTimes.take(7), [
+          _ms * 1120, _ms * 1620, // quarters
+          _ms * 2120, _ms * 2370, _ms * 2620, _ms * 2870, // eighths, beats 3-4
+          _ms * 3120, // next bar
+        ]);
+        expect(levels().take(7), [
+          StepLevel.accent, StepLevel.normal,
+          StepLevel.normal, StepLevel.soft, StepLevel.normal, StepLevel.soft,
+          StepLevel.accent, // bar position kept: downbeat on time
+        ]);
+      },
+    );
+
+    test('a meter change starts a new bar on the next beat', () async {
+      await start(bpm: 120);
+      runFor(_ms * 650);
+      scheduler.switchAtNextBeat(
+        bpm: 120,
+        pattern: MetronomePattern.simple(beatsPerBar: 3, stepsPerBeat: 1),
+        restartBar: true,
+      );
+      runFor(_ms * 2500);
+      expect(output.liveTimes.take(6), [
+        _ms * 1120,
+        _ms * 1620,
+        _ms * 2120,
+        _ms * 2620,
+        _ms * 3120,
+        _ms * 3620,
+      ]);
+      expect(levels().take(6), [
+        StepLevel.accent, StepLevel.normal,
+        StepLevel.accent, StepLevel.normal, StepLevel.normal, // 3/4 bar
+        StepLevel.accent,
+      ]);
+    });
+
+    test('next beat from inside a subdivided beat', () async {
+      await start(
+        bpm: 120,
+        pattern: MetronomePattern.simple(beatsPerBar: 4, stepsPerBeat: 2),
+      ); // 1120, 1370, 1620 ...
+      runFor(_ms * 300); // now 1300: 1120 committed, 1370 open
+      scheduler.switchAtNextBeat(
+        bpm: 120,
+        pattern: const MetronomePattern.standard(),
+        restartBar: false,
+      );
+      runFor(_ms * 1500);
+      expect(output.liveTimes.take(4), [
+        _ms * 1120, _ms * 1370, // beat 1 finishes its eighths
+        _ms * 1620, _ms * 2120, // quarters from beat 2
+      ]);
+    });
+  });
 }

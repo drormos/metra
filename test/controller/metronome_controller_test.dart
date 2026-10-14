@@ -218,4 +218,41 @@ void main() {
       expect(controller.visualStepAt(_ms * 30)?.index, 0);
     });
   });
+
+  group('quick rhythm edits', () {
+    test('cycleBeat changes the pattern at once', () {
+      controller.cycleBeat(1);
+      expect(controller.pattern.beatLevels[1], StepLevel.accent);
+      expect(notifications, 1);
+    });
+
+    test('setSubdivision keeps accents; same value is a no-op', () {
+      controller.cycleBeat(2);
+      controller.setSubdivision(3);
+      expect(controller.pattern.stepsPerBeat, 3);
+      expect(controller.pattern.beatLevels[2], StepLevel.accent);
+      final before = notifications;
+      controller.setSubdivision(3);
+      expect(notifications, before);
+    });
+
+    test('setMeter resets accents and keeps the subdivision', () {
+      controller.setSubdivision(2);
+      controller.cycleBeat(1);
+      controller.setMeter(7, 8);
+      expect(controller.pattern.timeSignature, '7/8');
+      expect(controller.pattern.stepsPerBeat, 2);
+      expect(
+        controller.pattern.beatLevels.where((l) => l == StepLevel.accent),
+        hasLength(1),
+      );
+    });
+
+    test('while playing, a beat tap is heard from the next click', () async {
+      await controller.play(); // first click at 1120, still open
+      controller.cycleBeat(0); // accent -> silent
+      expect(output.clicks.first.cancelled, isTrue);
+      expect(output.live, isEmpty, reason: 'beat 1 is now silent');
+    });
+  });
 }

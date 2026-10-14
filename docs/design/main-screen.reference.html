@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Metra – Ruler with setlist</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Extra+Condensed:wght@600;700&amp;family=Saira:wght@500;600&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#FFFFFF}a:hover{color:#FF3B30}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; padding: 52px 24px 28px; display: flex; flex-direction: column; gap: 12px; background: #000000; color: #FFFFFF; font-family: 'Saira', system-ui, sans-serif">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px">
+<div style="font-family: 'Saira Extra Condensed', sans-serif; font-size: 38px; font-weight: 700; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0">Dead Weight</div>
+<div style="display: flex; gap: 8px">
+<button style="height: 44px; padding: 0 12px; border: 2px solid #2E2E2E; border-radius: 4px; background: transparent; color: #FFFFFF; font-family: 'Saira Extra Condensed', sans-serif; font-size: 22px; font-weight: 700">4/4</button>
+<button aria-label="Settings" style="width: 44px; height: 44px; border: 2px solid #2E2E2E; border-radius: 4px; background: transparent; color: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="3" y1="5" x2="17" y2="5"></line><line x1="3" y1="10" x2="17" y2="10"></line><line x1="3" y1="15" x2="17" y2="15"></line><circle cx="7" cy="5" r="2" fill="#000000"></circle><circle cx="13" cy="10" r="2" fill="#000000"></circle><circle cx="9" cy="15" r="2" fill="#000000"></circle></svg></button>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding-top: 4px">
+<div style="height: 36px; border-radius: 4px; background: #FF3B30"></div>
+<div style="height: 36px; border-radius: 4px; background: #FFFFFF"></div>
+<div style="height: 36px; border-radius: 4px; background: #1F1F1F"></div>
+<div style="height: 36px; border-radius: 4px; background: #1F1F1F"></div>
+</div>
+<div style="flex-grow: 1"></div>
+<div style="display: flex; align-items: baseline; justify-content: center; gap: 8px">
+<div style="font-family: 'Saira Extra Condensed', sans-serif; font-size: 172px; font-weight: 700; line-height: 0.85; font-variant-numeric: tabular-nums">120</div>
+<div style="font-size: 18px; color: #8C8C8C">bpm</div>
+</div>
+<div style="text-align: center; font-size: 16px; color: #8C8C8C">Allegro</div>
+<div style="position: relative; height: 46px; margin-top: 4px; border-top: 2px solid #1F1F1F; border-bottom: 2px solid #1F1F1F; overflow: hidden">
+<div style="position: absolute; left: 0; top: 0; width: 342px; height: 12px; background-image: repeating-linear-gradient(to right, #4A4A4A 0 2px, transparent 2px 14px); background-position: 2px 0"></div>
+<div style="position: absolute; left: 0; top: 0; width: 342px; height: 20px; background-image: repeating-linear-gradient(to right, #8C8C8C 0 2px, transparent 2px 70px); background-position: 30px 0"></div>
+<div style="position: absolute; left: 11px; top: 23px; width: 40px; text-align: center; font-size: 13px; line-height: 18px; color: #8C8C8C">110</div>
+<div style="position: absolute; left: 81px; top: 23px; width: 40px; text-align: center; font-size: 13px; line-height: 18px; color: #8C8C8C">115</div>
+<div style="position: absolute; left: 151px; top: 23px; width: 40px; text-align: center; font-size: 13px; line-height: 18px; font-weight: 600; color: #FFFFFF">120</div>
+<div style="position: absolute; left: 221px; top: 23px; width: 40px; text-align: center; font-size: 13px; line-height: 18px; color: #8C8C8C">125</div>
+<div style="position: absolute; left: 291px; top: 23px; width: 40px; text-align: center; font-size: 13px; line-height: 18px; color: #8C8C8C">130</div>
+<div style="position: absolute; left: 169px; top: 0; width: 4px; height: 22px; background: #FF3B30"></div>
+</div>
+<div style="flex-grow: 1"></div>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+<button style="height: 60px; border: 0; border-radius: 4px; background: #1A1A1A; color: #FFFFFF; font-family: 'Saira Extra Condensed', sans-serif; font-size: 28px; font-weight: 600">−10</button>
+<button style="height: 60px; border: 0; border-radius: 4px; background: #1A1A1A; color: #FFFFFF; font-family: 'Saira Extra Condensed', sans-serif; font-size: 28px; font-weight: 600">−1</button>
+<button style="height: 60px; border: 0; border-radius: 4px; background: #1A1A1A; color: #FFFFFF; font-family: 'Saira Extra Condensed', sans-serif; font-size: 28px; font-weight: 600">+1</button>
+<button style="height: 60px; border: 0; border-radius: 4px; background: #1A1A1A; color: #FFFFFF; font-family: 'Saira Extra Condensed', sans-serif; font-size: 28px; font-weight: 600">+10</button>
+</div>
+<div style="display: flex; gap: 8px">
+<button style="flex: 2 1 0; height: 72px; border: 0; border-radius: 4px; background: #FF3B30; color: #000000; font-family: inherit; font-size: 22px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 12px"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="2" y="2" width="14" height="14" fill="currentColor"></rect></svg>Stop</button>
+<button style="flex: 1 1 0; height: 72px; border: 2px solid #2E2E2E; border-radius: 4px; background: transparent; color: #FFFFFF; font-family: inherit; font-size: 22px; font-weight: 600">Tap</button>
+</div>
+<div style="border: 2px solid #1F1F1F; border-radius: 4px; padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 6px">
+<button style="height: 44px; padding: 0 6px; border: 0; background: transparent; color: #FFFFFF; font-family: inherit; font-size: 16px; font-weight: 500; display: flex; align-items: center; justify-content: space-between"><span style="display: flex; align-items: center; gap: 10px"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="2" y1="4" x2="16" y2="4"></line><line x1="2" y1="9" x2="16" y2="9"></line><line x1="2" y1="14" x2="11" y2="14"></line></svg>Friday set</span><span style="display: flex; align-items: center; gap: 8px; color: #8C8C8C">4 of 12<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3,5 7,9 11,5"></polyline></svg></span></button>
+<div style="display: flex; gap: 8px">
+<button aria-label="Previous song: Iron Lung" style="flex: 1 1 0; min-width: 0; height: 68px; padding: 0 10px; border: 0; border-radius: 4px; background: #1A1A1A; color: #FFFFFF; font-family: inherit; text-align: left; display: flex; align-items: center; gap: 8px"><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><polyline points="10,3 5,8 10,13"></polyline></svg><span style="display: flex; flex-direction: column; min-width: 0"><span style="font-size: 19px; font-weight: 600; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Iron Lung</span><span style="font-size: 13px; color: #8C8C8C">98 bpm</span></span></button>
+<button aria-label="Next song: Last Rites" style="flex: 1 1 0; min-width: 0; height: 68px; padding: 0 10px; border: 0; border-radius: 4px; background: #1A1A1A; color: #FFFFFF; font-family: inherit; text-align: right; display: flex; align-items: center; justify-content: flex-end; gap: 8px"><span style="display: flex; flex-direction: column; align-items: flex-end; min-width: 0"><span style="font-size: 19px; font-weight: 600; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Last Rites</span><span style="font-size: 13px; color: #8C8C8C">168 bpm</span></span><svg width="22" height="22" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><polyline points="6,3 11,8 6,13"></polyline></svg></button>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

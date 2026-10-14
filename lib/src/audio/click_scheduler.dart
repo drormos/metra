@@ -75,6 +75,7 @@ class ClickScheduler {
   int? _switchAt;
   BeatGrid? _nextGrid;
   MetronomePattern? _nextPattern;
+  int _nextBarStart = 0;
   int _nextStep = 0;
   Timer? _timer;
   bool _prepared = false;
@@ -178,9 +179,8 @@ class ClickScheduler {
   }
 
   /// Finish the current bar, then continue with [bpm] and [pattern] from
-  /// the next bar line (a song or time-signature change). Steps of the next
-  /// bar that were already scheduled are cancelled and re-placed.
-  /// No-op while stopped.
+  /// the next bar line (a song change). Steps of the next bar that were
+  /// already scheduled are cancelled and re-placed. No-op while stopped.
   void switchAtNextBar({
     required double bpm,
     required MetronomePattern pattern,
@@ -190,24 +190,87 @@ class ClickScheduler {
 
     var at = _switchAt;
     if (at == null) {
-      final cutoff = _output.now() + guard;
-      final firstOpen = min(_nextStep - 1, grid.lastStepAtOrBefore(cutoff)) + 1;
+      final firstOpen = _firstOpenStep(grid);
       final intoBar = (firstOpen - _barStart) % _pattern.stepsPerBar;
       at = intoBar == 0
           ? firstOpen
           : firstOpen + _pattern.stepsPerBar - intoBar;
     }
-    final switchAt = at;
-    _steps.removeWhere((step) {
-      if (step.index < switchAt) return false;
-      _cancel(step);
-      return true;
-    });
-    _nextStep = min(_nextStep, switchAt);
-    _switchAt = switchAt;
+    _scheduleSwitch(grid, at, bpm: bpm, pattern: pattern, barStart: at);
+  }
+
+  /// Continue with [pattern] from the next beat (a subdivision or
+  /// time-signature change): at most one beat away, and on the pulse. With
+  /// [restartBar] that beat becomes beat 1; otherwise the bar position
+  /// carries over. Replaces any pending switch. No-op while stopped.
+  void switchAtNextBeat({
+    required double bpm,
+    required MetronomePattern pattern,
+    required bool restartBar,
+  }) {
+    final grid = _grid;
+    if (grid == null) return;
+
+    final firstOpen = _firstOpenStep(grid);
+    final perBeat = _pattern.stepsPerBeat;
+    final intoBeat = (firstOpen - _barStart) % perBeat;
+    final at = intoBeat == 0 ? firstOpen : firstOpen + perBeat - intoBeat;
+    final beat = ((at - _barStart) ~/ perBeat) % _pattern.beatsPerBar;
+    _scheduleSwitch(
+      grid,
+      at,
+      bpm: bpm,
+      pattern: pattern,
+      barStart: restartBar ? at : at - beat * pattern.stepsPerBeat,
+    );
+  }
+
+  /// Same shape, new levels (accents): applies from the next step that is
+  /// not committed yet. With a switch pending, it updates the pending
+  /// pattern instead. No-op while stopped.
+  void replaceLevels(MetronomePattern pattern) {
+    final grid = _grid;
+    if (grid == null) return;
+    if (_switchAt != null) {
+      _nextPattern = pattern;
+      return;
+    }
+    assert(
+      pattern.stepsPerBar == _pattern.stepsPerBar &&
+          pattern.stepsPerBeat == _pattern.stepsPerBeat,
+      'replaceLevels keeps the pattern shape',
+    );
+    final firstOpen = _firstOpenStep(grid);
+    _cancelFrom(firstOpen);
+    _pattern = pattern;
+    _nextStep = firstOpen;
+    refill();
+  }
+
+  /// The first step that can still be changed: not yet within the guard.
+  int _firstOpenStep(BeatGrid grid) =>
+      min(_nextStep - 1, grid.lastStepAtOrBefore(_output.now() + guard)) + 1;
+
+  void _cancelFrom(int step) => _steps.removeWhere((s) {
+    if (s.index < step) return false;
+    _cancel(s);
+    return true;
+  });
+
+  void _scheduleSwitch(
+    BeatGrid grid,
+    int at, {
+    required double bpm,
+    required MetronomePattern pattern,
+    required int barStart,
+  }) {
+    _cancelFrom(at);
+    _nextStep = min(_nextStep, at);
+    _switchAt = at;
     _nextPattern = pattern;
+    _nextBarStart = barStart;
     _nextGrid = grid.retempo(
-      pivotStep: switchAt,
+      pivotStep: at,
       bpm: bpm,
       stepsPerBeat: pattern.stepsPerBeat,
     );
@@ -217,7 +280,7 @@ class ClickScheduler {
   void _applySwitch() {
     _grid = _nextGrid;
     _pattern = _nextPattern!;
-    _barStart = _switchAt!;
+    _barStart = _nextBarStart;
     _switchAt = null;
     _nextGrid = null;
     _nextPattern = null;

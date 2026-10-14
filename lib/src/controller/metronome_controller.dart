@@ -103,6 +103,48 @@ class MetronomeController extends ChangeNotifier {
   void setPattern(MetronomePattern pattern) =>
       switchTo(bpm: _bpm, pattern: pattern);
 
+  /// Beat dot tap: normal → accent → silent. Heard from the next click.
+  void cycleBeat(int beat) {
+    _pattern = _pattern.cycleBeat(beat);
+    _scheduler.replaceLevels(_pattern);
+    notifyListeners();
+  }
+
+  /// Clicks per beat; while playing, from the next beat, bar kept.
+  void setSubdivision(int stepsPerBeat) {
+    if (stepsPerBeat == _pattern.stepsPerBeat) return;
+    _switchAtNextBeat(
+      _pattern.withSubdivision(stepsPerBeat),
+      restartBar: false,
+    );
+  }
+
+  /// Time signature (resets custom accents); while playing, the next beat
+  /// starts a bar in the new meter.
+  void setMeter(int beatsPerBar, int beatUnit) {
+    if (beatsPerBar == _pattern.beatsPerBar && beatUnit == _pattern.beatUnit) {
+      return;
+    }
+    _switchAtNextBeat(
+      MetronomePattern.simple(
+        beatsPerBar: beatsPerBar,
+        stepsPerBeat: _pattern.stepsPerBeat,
+        beatUnit: beatUnit,
+      ),
+      restartBar: true,
+    );
+  }
+
+  void _switchAtNextBeat(MetronomePattern pattern, {required bool restartBar}) {
+    _pattern = pattern;
+    _scheduler.switchAtNextBeat(
+      bpm: _bpm.toDouble(),
+      pattern: pattern,
+      restartBar: restartBar,
+    );
+    notifyListeners();
+  }
+
   /// Load a song's tempo and pattern. While playing, the current bar
   /// finishes first, then both change on the next bar line.
   void switchTo({required int bpm, required MetronomePattern pattern}) {

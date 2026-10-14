@@ -36,7 +36,12 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
 - Render-ahead ring off (`renderAheadFrames` unset). Scheduled clicks don't need low reactive latency; the visual offset is user-calibrated.
 - `bufferSize` stays at the default 2048: scheduling is sample-accurate regardless, larger buffers avoid dropouts, and visual jitter is handled by extrapolation (Phase 1 step 5).
 - Max active voices raised to 32 for headroom at fast subdivisions.
-- A pattern or song change while playing finishes the current bar, then switches tempo and pattern on the next bar line (`ClickScheduler.switchAtNextBar`). Plain ±BPM changes still apply at the next step.
+- Timing of changes while playing, chosen for responsiveness while staying on the pulse:
+  - Beat accent taps: from the next click (`replaceLevels`).
+  - Subdivision: from the next beat, bar position kept (`switchAtNextBeat`).
+  - Time signature: the next beat starts a bar in the new meter (`switchAtNextBeat(restartBar: true)`).
+  - Song switch: at the next bar line (`switchAtNextBar`), so a new song starts on beat 1.
+  - ±BPM: at the next step.
 - Visual offset defaults to 0 ms (measured by eye on macOS: 0 ms on built-in speakers, 20 ms on a USB-dongle wireless headset), adjustable in the settings sheet from −200 to +500 ms in 10 ms steps to cover Bluetooth output. Not persisted until Phase 2.
 - The drift check captures the mixer output rather than recording the speakers. The engine clock is paced by the output device, so the mix timeline is what plays; capture must use the engine's channel count (it does not convert channels).
 - No audio focus on Android: focus would pause the user's music, and playing along with a track is a core use. Instead the click stops when a personal output (headphones, Bluetooth, USB audio) disappears, so it never jumps to the speaker. (audio_session's "becoming noisy" event only fires with focus, so this watches device removal.)
@@ -60,7 +65,7 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
 4. **Expanded Patterns:** UI for 3/4, 6/8, 7/8 and subdivisions (eighths, triplets, sixteenths), mapped to the Phase 1 `MetronomePattern` model.
    - Time signatures 2/4, 3/4, 4/4, 5/4, 6/8, 7/8, 9/8, 12/8. In x/8 every eighth clicks and the BPM counts eighths; `beatUnit` is display-only.
    - Subdivisions 1–4 per beat, played as a new `soft` level (normal click at 40% volume) so the beat stays clear.
-   - One dot per beat; tapping cycles normal → accent → silent, for groupings like 7/8 as 2+2+3. Changing the subdivision keeps custom accents; changing the time signature resets them.
+   - One dot per beat; tapping cycles normal → accent → silent, for groupings like 7/8 as 2+2+3. Changing the subdivision keeps custom accents; changing the time signature resets them. See the change-timing decision below.
    - Drift test covers triplets on the real engine.
 
 ## Phase 3: Audio Assets & Polish
