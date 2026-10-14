@@ -55,13 +55,13 @@ void main() {
   ) async {
     await pumpScreen(tester, wide: true);
     expect(find.text('Save current as song'), findsOneWidget);
-    expect(find.byTooltip('Songs'), findsNothing);
+    expect(find.text('Songs & setlists'), findsNothing);
   });
 
   testWidgets('narrow screens open the panel in a sheet', (tester) async {
     await pumpScreen(tester, wide: false);
     expect(find.text('Save current as song'), findsNothing);
-    await tester.tap(find.byTooltip('Songs'));
+    await tester.tap(find.text('Songs & setlists'));
     await tester.pumpAndSettle();
     expect(find.text('Save current as song'), findsOneWidget);
   });
@@ -73,7 +73,11 @@ void main() {
     await tester.pumpAndSettle();
     await enterName(tester, 'Ballad');
 
-    expect(find.text('Ballad'), findsNWidgets(2)); // list + main screen
+    expect(find.widgetWithText(ListTile, 'Ballad'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(MetronomeScreen.titleKey)).data,
+      'Ballad',
+    );
     expect(find.text('87 BPM · 4/4'), findsOneWidget);
 
     metronome.setBpm(140);
@@ -216,4 +220,22 @@ void main() {
       expect(library.currentSong?.name, 'One');
     });
   });
+
+  for (final size in [const Size(360, 640), const Size(320, 568)]) {
+    testWidgets('fits a ${size.width.toInt()}x${size.height.toInt()} phone '
+        'with songs', (tester) async {
+      await pumpScreen(tester, wide: false);
+      tester.view.physicalSize = size;
+      library.addSong(
+        name: 'A rather long song title that has to ellipsize',
+        bpm: 100,
+        pattern: const MetronomePattern.standard(),
+      );
+      library.nextSong(metronome);
+      await tester.pumpAndSettle();
+      // Layout overflow would have thrown during pump.
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(MetronomeScreen.bpmKey), findsOneWidget);
+    });
+  }
 }

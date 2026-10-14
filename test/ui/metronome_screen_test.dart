@@ -43,11 +43,11 @@ void main() {
     await tester.tap(find.text('+10'));
     await tester.pump();
     expect(bpmText(tester).data, '130');
-    await tester.tap(find.text('-1'));
+    await tester.tap(find.text('−1'));
     await tester.pump();
     expect(bpmText(tester).data, '129');
     await tester.tap(find.text('+1'));
-    await tester.tap(find.text('-10'));
+    await tester.tap(find.text('−10'));
     await tester.pump();
     expect(controller.bpm, 120);
   });
@@ -56,20 +56,20 @@ void main() {
     controller.setBpm(MetronomeController.maxBpm);
     await pumpScreen(tester);
     bool enabled(String label) => tester
-        .widget<OutlinedButton>(
+        .widget<FilledButton>(
           find.ancestor(
             of: find.text(label),
-            matching: find.byType(OutlinedButton),
+            matching: find.byType(FilledButton),
           ),
         )
         .enabled;
     expect(enabled('+1'), isFalse);
     expect(enabled('+10'), isFalse);
-    expect(enabled('-1'), isTrue);
+    expect(enabled('−1'), isTrue);
 
     controller.setBpm(MetronomeController.minBpm);
     await tester.pump();
-    expect(enabled('-1'), isFalse);
+    expect(enabled('−1'), isFalse);
     expect(enabled('+1'), isTrue);
   });
 
@@ -188,10 +188,15 @@ void main() {
       expect(find.byKey(const ValueKey('beat-7-off')), findsNothing);
     });
 
-    testWidgets('subdivision picker keeps one dot per beat', (tester) async {
+    testWidgets('subdivision button cycles 1-4, one dot per beat', (
+      tester,
+    ) async {
       await pumpScreen(tester);
-      await pick(tester, MetronomeScreen.subdivisionKey, 'Triplets');
-      expect(controller.pattern.stepsPerBeat, 3);
+      for (final expected in [2, 3]) {
+        await tester.tap(find.byKey(MetronomeScreen.subdivisionKey));
+        await tester.pump();
+        expect(controller.pattern.stepsPerBeat, expected);
+      }
       expect(controller.pattern.timeSignature, '4/4');
       expect(find.byKey(const ValueKey('beat-3-off')), findsOneWidget);
       expect(find.byKey(const ValueKey('beat-4-off')), findsNothing);
@@ -237,5 +242,25 @@ void main() {
       find.widgetWithText(ChoiceChip, 'Cowbell'),
     );
     expect(chip.selected, isTrue);
+  });
+
+  testWidgets('subdivision wraps from 4 back to 1', (tester) async {
+    await pumpScreen(tester);
+    for (var i = 0; i < 4; i++) {
+      await tester.tap(find.byKey(MetronomeScreen.subdivisionKey));
+      await tester.pump();
+    }
+    expect(controller.pattern.stepsPerBeat, 1);
+    expect(find.byTooltip('Subdivision: quarter notes'), findsOneWidget);
+  });
+
+  testWidgets('tempo name follows the bpm', (tester) async {
+    await pumpScreen(tester);
+    String name() =>
+        tester.widget<Text>(find.byKey(MetronomeScreen.tempoNameKey)).data!;
+    expect(name(), 'Allegro');
+    controller.setBpm(60);
+    await tester.pump();
+    expect(name(), 'Largo');
   });
 }

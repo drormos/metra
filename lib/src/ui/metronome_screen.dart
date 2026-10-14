@@ -4,8 +4,10 @@ import 'package:flutter/services.dart';
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/click_sound.dart';
+import '../model/tempo_name.dart';
 import 'beat_indicator.dart';
 import 'library_panel.dart';
+import 'subdivision_icon.dart';
 import 'theme.dart';
 
 /// Main screen: tempo readout, tempo steps and transport, plus the song
@@ -27,6 +29,8 @@ class MetronomeScreen extends StatelessWidget {
   static const offsetKey = Key('offset');
   static const tapKey = Key('tap');
   static const songNameKey = Key('song-name');
+  static const titleKey = Key('title');
+  static const tempoNameKey = Key('tempo-name');
   static const meterKey = Key('meter');
   static const subdivisionKey = Key('subdivision');
 
@@ -39,7 +43,7 @@ class MetronomeScreen extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
             child: ListenableBuilder(
               listenable: Listenable.merge([controller, ?library]),
               builder: (context, _) => _content(context),
@@ -75,25 +79,6 @@ class MetronomeScreen extends StatelessWidget {
       child: Focus(
         autofocus: true,
         child: Scaffold(
-          appBar: AppBar(
-            actions: [
-              if (library != null && !wide)
-                Builder(
-                  builder: (context) => IconButton(
-                    tooltip: 'Songs',
-                    icon: const Icon(Icons.queue_music),
-                    onPressed: () => _showSongs(context, library),
-                  ),
-                ),
-              Builder(
-                builder: (context) => IconButton(
-                  tooltip: 'Settings',
-                  icon: const Icon(Icons.tune),
-                  onPressed: () => _showSettings(context),
-                ),
-              ),
-            ],
-          ),
           body: library != null && wide
               ? Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -118,56 +103,92 @@ class MetronomeScreen extends StatelessWidget {
   }
 
   Widget _content(BuildContext context) {
-    final theme = Theme.of(context);
+    final colors = context.colors;
     final bpm = controller.bpm;
     final error = controller.audioError;
     return Column(
-      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (library != null && library!.visibleSongs.isNotEmpty)
-          _songSwitcher(theme, library!),
+        _topRow(context),
+        const SizedBox(height: 16),
         BeatIndicator(controller: controller),
-        const SizedBox(height: 24),
-        // Shrinks to fit short windows (landscape phones, small desktops).
-        Flexible(
-          child: FittedBox(
-            child: Text(
-              '$bpm',
-              key: bpmKey,
-              style: theme.textTheme.displayLarge?.copyWith(
-                fontFamily: MetraFonts.condensed,
-                fontSize: 172,
-                fontWeight: FontWeight.w700,
-                // Fixed-width digits so the readout doesn't shift as it changes.
-                fontFeatures: const [FontFeature.tabularFigures()],
-                height: 1,
+        // The BPM area takes all the free height and shrinks first on
+        // small phones.
+        Expanded(
+          child: Center(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        '$bpm',
+                        key: bpmKey,
+                        style: const TextStyle(
+                          fontFamily: MetraFonts.condensed,
+                          fontSize: 172,
+                          fontWeight: FontWeight.w700,
+                          height: 0.85,
+                          // Fixed-width digits: the readout doesn't shift.
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'bpm',
+                        style: TextStyle(fontSize: 18, color: colors.muted),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    tempoName(bpm),
+                    key: tempoNameKey,
+                    style: TextStyle(fontSize: 16, color: colors.muted),
+                  ),
+                ],
               ),
             ),
           ),
         ),
-        Text(
-          'bpm',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.titleLarge?.copyWith(letterSpacing: 4),
-        ),
-        const SizedBox(height: 16),
-        _rhythmControls(),
-        const SizedBox(height: 16),
         Row(
           children: [
-            _step('-10', -10, bpm > MetronomeController.minBpm),
-            _step('-1', -1, bpm > MetronomeController.minBpm),
+            _step('−10', -10, bpm > MetronomeController.minBpm),
+            const SizedBox(width: 8),
+            _step('−1', -1, bpm > MetronomeController.minBpm),
+            const SizedBox(width: 8),
             _step('+1', 1, bpm < MetronomeController.maxBpm),
+            const SizedBox(width: 8),
             _step('+10', 10, bpm < MetronomeController.maxBpm),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 12),
         SizedBox(
           height: 72,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Expanded(
+                flex: 2,
+                child: FilledButton.icon(
+                  key: playKey,
+                  onPressed: controller.toggle,
+                  icon: Icon(
+                    controller.isPlaying ? Icons.stop : Icons.play_arrow,
+                    size: 24,
+                  ),
+                  label: Text(
+                    controller.isPlaying ? 'Stop' : 'Start',
+                    style: const TextStyle(fontSize: 22),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
               Expanded(
                 // Tap registers on pointer down: tap-up timing varies with
                 // how long the finger rests, which skews the tempo.
@@ -176,45 +197,124 @@ class MetronomeScreen extends StatelessWidget {
                   child: OutlinedButton(
                     key: tapKey,
                     onPressed: () {},
-                    child: const Text(
-                      'Tap',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 2,
-                child: FilledButton(
-                  key: playKey,
-                  onPressed: controller.toggle,
-                  child: Text(
-                    controller.isPlaying ? 'Stop' : 'Start',
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    child: const Text('Tap', style: TextStyle(fontSize: 22)),
                   ),
                 ),
               ),
             ],
           ),
         ),
+        // Stand-in until the setlist group (Phase 4 step 5).
+        if (library case final library?) ...[
+          const SizedBox(height: 12),
+          if (library.visibleSongs.isNotEmpty) _songSwitcher(context, library),
+          if (MediaQuery.sizeOf(context).width < sidePanelWidth)
+            TextButton(
+              onPressed: () => _showSongs(context, library),
+              child: const Text('Songs & setlists'),
+            ),
+        ],
         if (error != null) ...[
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
           Text(
             'Audio problem: $error',
             textAlign: TextAlign.center,
-            style: TextStyle(color: context.colors.accentSounding),
+            style: TextStyle(color: colors.accentSounding),
           ),
         ],
       ],
     );
   }
+
+  /// Song title, then subdivision, time signature and settings buttons.
+  Widget _topRow(BuildContext context) {
+    final pattern = controller.pattern;
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            library?.currentSong?.name ?? '',
+            key: titleKey,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontFamily: MetraFonts.condensed,
+              fontSize: 34,
+              fontWeight: FontWeight.w700,
+              height: 1,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        _squareButton(
+          key: subdivisionKey,
+          tooltip: 'Subdivision: ${_subdivisionNames[pattern.stepsPerBeat]}',
+          // Cycles 1 → 2 → 3 → 4 → 1; while playing, from the next beat.
+          onPressed: () =>
+              controller.setSubdivision(pattern.stepsPerBeat % 4 + 1),
+          child: SubdivisionIcon(pattern.stepsPerBeat),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          height: 44,
+          child: Builder(
+            builder: (context) => OutlinedButton(
+              key: meterKey,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                minimumSize: const Size(44, 44),
+              ),
+              onPressed: () => _showMeterPicker(context),
+              child: Text(
+                pattern.timeSignature,
+                style: const TextStyle(
+                  fontFamily: MetraFonts.condensed,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Builder(
+          builder: (context) => _squareButton(
+            tooltip: 'Settings',
+            onPressed: () => _showSettings(context),
+            child: const Icon(Icons.tune, size: 20),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _squareButton({
+    Key? key,
+    required String tooltip,
+    required VoidCallback onPressed,
+    required Widget child,
+  }) => Tooltip(
+    message: tooltip,
+    child: SizedBox.square(
+      dimension: 44,
+      child: OutlinedButton(
+        key: key,
+        style: OutlinedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          minimumSize: const Size.square(44),
+        ),
+        onPressed: onPressed,
+        child: child,
+      ),
+    ),
+  );
+
+  static const _subdivisionNames = {
+    1: 'quarter notes',
+    2: 'eighth notes',
+    3: 'triplets',
+    4: 'sixteenth notes',
+  };
 
   static const _meters = [
     (2, 4),
@@ -226,86 +326,74 @@ class MetronomeScreen extends StatelessWidget {
     (9, 8),
     (12, 8),
   ];
-  static const _subdivisions = {
-    1: 'No subdivision',
-    2: '2 per beat',
-    3: 'Triplets',
-    4: '4 per beat',
-  };
 
-  /// Time signature and subdivision. Changing the time signature resets
-  /// custom accents; changing the subdivision keeps them. While playing,
-  /// either takes effect on the next beat.
-  Widget _rhythmControls() {
-    final pattern = controller.pattern;
-    final meters = {
-      for (final (beats, unit) in _meters) '$beats/$unit': (beats, unit),
-      // A saved song may use a meter outside the presets.
-      pattern.timeSignature: (pattern.beatsPerBar, pattern.beatUnit),
-    };
-    return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: 24,
-      children: [
-        DropdownButton<String>(
-          key: meterKey,
-          value: pattern.timeSignature,
-          items: [
-            for (final label in meters.keys)
-              DropdownMenuItem(value: label, child: Text(label)),
-          ],
-          onChanged: (label) {
-            final (beats, unit) = meters[label]!;
-            controller.setMeter(beats, unit);
-          },
-        ),
-        DropdownButton<int>(
-          key: subdivisionKey,
-          value: pattern.stepsPerBeat,
-          items: [
-            for (final MapEntry(:key, :value) in _subdivisions.entries)
-              DropdownMenuItem(value: key, child: Text(value)),
-          ],
-          onChanged: (steps) => controller.setSubdivision(steps!),
-        ),
-      ],
-    );
-  }
-
-  /// ◀ song name ▶ — steps through the selected setlist (or all songs).
-  Widget _songSwitcher(ThemeData theme, LibraryController library) => Padding(
-    padding: const EdgeInsets.only(bottom: 16),
-    child: Row(
-      children: [
-        IconButton(
-          tooltip: 'Previous song',
-          iconSize: 32,
-          onPressed: library.hasPrevious
-              ? () => library.previousSong(controller)
-              : null,
-          icon: const Icon(Icons.skip_previous),
-        ),
-        Expanded(
-          child: Text(
-            library.currentSong?.name ?? 'No song loaded',
-            key: songNameKey,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleMedium,
+  /// Plain picker (the spec leaves it undesigned). Changing the time
+  /// signature resets custom accents; while playing, the next beat starts a
+  /// bar in the new meter.
+  void _showMeterPicker(BuildContext context) => showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        child: ListenableBuilder(
+          listenable: controller,
+          builder: (context, _) => Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final (beats, unit) in _meters)
+                ChoiceChip(
+                  label: Text('$beats/$unit'),
+                  selected: controller.pattern.timeSignature == '$beats/$unit',
+                  onSelected: (_) {
+                    controller.setMeter(beats, unit);
+                    Navigator.pop(context);
+                  },
+                ),
+            ],
           ),
         ),
-        IconButton(
-          tooltip: 'Next song',
-          iconSize: 32,
-          onPressed: library.hasNext
-              ? () => library.nextSong(controller)
-              : null,
-          icon: const Icon(Icons.skip_next),
-        ),
-      ],
+      ),
     ),
   );
+
+  /// ◀ song name ▶ — steps through the selected setlist (or all songs).
+  Widget _songSwitcher(BuildContext context, LibraryController library) =>
+      Padding(
+        padding: EdgeInsets.zero,
+        child: Row(
+          children: [
+            IconButton(
+              tooltip: 'Previous song',
+              iconSize: 32,
+              onPressed: library.hasPrevious
+                  ? () => library.previousSong(controller)
+                  : null,
+              icon: const Icon(Icons.skip_previous),
+            ),
+            Expanded(
+              child: Text(
+                library.currentSong?.name ?? 'No song loaded',
+                key: songNameKey,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            IconButton(
+              tooltip: 'Next song',
+              iconSize: 32,
+              onPressed: library.hasNext
+                  ? () => library.nextSong(controller)
+                  : null,
+              icon: const Icon(Icons.skip_next),
+            ),
+          ],
+        ),
+      );
 
   void _showSongs(BuildContext context, LibraryController library) =>
       showModalBottomSheet<void>(
@@ -431,11 +519,15 @@ class MetronomeScreen extends StatelessWidget {
   }
 
   Widget _step(String label, int delta, bool enabled) => Expanded(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: SizedBox(
-        height: 64,
-        child: OutlinedButton(
+    child: SizedBox(
+      height: 60,
+      child: Builder(
+        builder: (context) => FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: context.colors.surface,
+            foregroundColor: context.colors.text,
+            padding: EdgeInsets.zero,
+          ),
           onPressed: enabled ? () => controller.nudge(delta) : null,
           // Shrinks instead of wrapping on narrow phones.
           child: FittedBox(
