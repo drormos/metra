@@ -4,6 +4,7 @@ import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/library.dart';
 import 'haptics.dart';
+import 'play_marker.dart';
 import 'song_editor.dart';
 import 'theme.dart';
 
@@ -248,15 +249,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
         ),
         child: Row(
           children: [
-            SizedBox(
-              width: 22,
-              child: current
-                  ? Icon(Icons.play_arrow, size: 18, color: colors.accent)
-                  : Text(
-                      '${index + 1}',
-                      style: TextStyle(fontSize: 15, color: colors.muted),
-                    ),
-            ),
+            PlayMarker(current: current),
             const SizedBox(width: 14),
             Expanded(
               child: Text(

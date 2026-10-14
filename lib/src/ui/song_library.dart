@@ -5,6 +5,7 @@ import '../controller/metronome_controller.dart';
 import '../model/library.dart';
 import 'editor_scaffold.dart';
 import 'haptics.dart';
+import 'play_marker.dart';
 import 'song_editor.dart';
 import 'theme.dart';
 
@@ -191,6 +192,8 @@ class _SongLibraryState extends State<SongLibrary> {
       ),
       child: Row(
         children: [
+          PlayMarker(current: song.id == _library.currentSong?.id),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,

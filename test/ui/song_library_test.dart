@@ -8,6 +8,7 @@ import 'package:metra/src/model/library.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/editor_scaffold.dart';
+import 'package:metra/src/ui/play_marker.dart';
 import 'package:metra/src/ui/song_editor.dart';
 import 'package:metra/src/ui/song_library.dart';
 
@@ -99,6 +100,29 @@ void main() {
     expect(find.text('Friday set, Rehearsal'), findsOneWidget);
     expect(find.text('Gig'), findsOneWidget);
     expect(find.text('Not in a setlist'), findsOneWidget);
+  });
+
+  testWidgets('a play marker on every row, filled for the loaded song', (
+    tester,
+  ) async {
+    await pumpLibrary(tester);
+    final markers = find.byType(PlayMarker);
+    expect(markers, findsNWidgets(4));
+    expect(
+      tester.widgetList<PlayMarker>(markers).where((m) => m.current),
+      isEmpty,
+    );
+    library.playSong(library.songsAZ.last, metronome); // Delta
+    await tester.pump();
+    final current = find.byWidgetPredicate((w) => w is PlayMarker && w.current);
+    expect(current, findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(ValueKey('library-${library.songsAZ.last.id}')),
+        matching: current,
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('search filters by name, ignoring case', (tester) async {
