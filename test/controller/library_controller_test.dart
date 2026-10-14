@@ -93,7 +93,7 @@ void main() {
     test('restores and saves the last session', () async {
       library.attach(metronome);
       metronome.setBpm(87);
-      await metronome.setPattern(waltz);
+      metronome.setPattern(waltz);
       metronome.setVisualOffset(const Duration(milliseconds: 30));
 
       final loaded = await reload();

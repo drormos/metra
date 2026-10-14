@@ -10,10 +10,21 @@ import 'click_output.dart';
 /// One step that has been handed to the engine.
 @immutable
 class ScheduledStep {
-  const ScheduledStep(this.index, this.time, this.level, this.handle);
+  const ScheduledStep(
+    this.index,
+    this.time,
+    this.level,
+    this.handle, {
+    required this.pattern,
+    required this.barPosition,
+  });
 
-  /// Absolute step index (bar position is `index % stepsPerBar`).
+  /// Absolute step index.
   final int index;
+
+  /// The pattern this step belongs to, and its position in that bar.
+  final MetronomePattern pattern;
+  final int barPosition;
 
   /// Engine time the step plays at.
   final Duration time;
@@ -58,6 +69,12 @@ class ClickScheduler {
   final List<ScheduledStep> _steps = [];
   MetronomePattern _pattern = const MetronomePattern.standard();
   BeatGrid? _grid;
+  // Step where the current pattern's bar 1 starts.
+  int _barStart = 0;
+  // A pending switch: from step [_switchAt], use [_nextGrid]/[_nextPattern].
+  int? _switchAt;
+  BeatGrid? _nextGrid;
+  MetronomePattern? _nextPattern;
   int _nextStep = 0;
   Timer? _timer;
   bool _prepared = false;
@@ -94,6 +111,8 @@ class ClickScheduler {
       stepsPerBeat: pattern.stepsPerBeat,
     );
     _nextStep = 0;
+    _barStart = 0;
+    _switchAt = null;
     _timer = Timer.periodic(refillInterval, (_) => refill());
     refill();
   }
@@ -125,6 +144,16 @@ class ClickScheduler {
   void setTempo(double bpm) {
     final grid = _grid;
     if (grid == null) return;
+    final switchAt = _switchAt;
+    if (switchAt != null) {
+      // The current bar keeps its tempo; the pending one takes the change.
+      _nextGrid = grid.retempo(
+        pivotStep: switchAt,
+        bpm: bpm,
+        stepsPerBeat: _nextPattern!.stepsPerBeat,
+      );
+      return;
+    }
 
     final cutoff = _output.now() + guard;
     final lastCommitted = min(_nextStep - 1, grid.lastStepAtOrBefore(cutoff));
@@ -148,28 +177,90 @@ class ClickScheduler {
     refill();
   }
 
+  /// Finish the current bar, then continue with [bpm] and [pattern] from
+  /// the next bar line (a song or time-signature change). Steps of the next
+  /// bar that were already scheduled are cancelled and re-placed.
+  /// No-op while stopped.
+  void switchAtNextBar({
+    required double bpm,
+    required MetronomePattern pattern,
+  }) {
+    final grid = _grid;
+    if (grid == null) return;
+
+    var at = _switchAt;
+    if (at == null) {
+      final cutoff = _output.now() + guard;
+      final firstOpen = min(_nextStep - 1, grid.lastStepAtOrBefore(cutoff)) + 1;
+      final intoBar = (firstOpen - _barStart) % _pattern.stepsPerBar;
+      at = intoBar == 0
+          ? firstOpen
+          : firstOpen + _pattern.stepsPerBar - intoBar;
+    }
+    final switchAt = at;
+    _steps.removeWhere((step) {
+      if (step.index < switchAt) return false;
+      _cancel(step);
+      return true;
+    });
+    _nextStep = min(_nextStep, switchAt);
+    _switchAt = switchAt;
+    _nextPattern = pattern;
+    _nextGrid = grid.retempo(
+      pivotStep: switchAt,
+      bpm: bpm,
+      stepsPerBeat: pattern.stepsPerBeat,
+    );
+    refill();
+  }
+
+  void _applySwitch() {
+    _grid = _nextGrid;
+    _pattern = _nextPattern!;
+    _barStart = _switchAt!;
+    _switchAt = null;
+    _nextGrid = null;
+    _nextPattern = null;
+  }
+
   /// Hand every step up to now + [lookahead] to the engine. Runs on the
   /// timer; call directly to apply a larger [lookahead] right away.
   void refill() {
-    final grid = _grid;
-    if (grid == null) return;
+    if (_grid == null) return;
 
     final now = _output.now();
     _steps.removeWhere((step) => step.time <= now - retention);
 
     // A stalled timer must not play steps late (they would be off-grid):
     // skip to the first step that can still be placed exactly.
-    _nextStep = max(_nextStep, grid.firstStepAtOrAfter(now + guard));
+    final cutoff = now + guard;
+    final switchAt = _switchAt;
+    if (switchAt != null && _grid!.stepTime(switchAt) <= cutoff) {
+      _nextStep = max(_nextStep, switchAt);
+      _applySwitch();
+    }
+    _nextStep = max(_nextStep, _grid!.firstStepAtOrAfter(cutoff));
 
     final horizon = now + lookahead;
     while (true) {
-      final time = grid.stepTime(_nextStep);
+      if (_nextStep == _switchAt) _applySwitch();
+      final time = _grid!.stepTime(_nextStep);
       if (time > horizon) break;
-      final level = _pattern.levelAt(_nextStep);
+      final barPosition = (_nextStep - _barStart) % _pattern.stepsPerBar;
+      final level = _pattern.steps[barPosition];
       final handle = level == StepLevel.silent
           ? null
           : _output.schedule(level, time);
-      _steps.add(ScheduledStep(_nextStep, time, level, handle));
+      _steps.add(
+        ScheduledStep(
+          _nextStep,
+          time,
+          level,
+          handle,
+          pattern: _pattern,
+          barPosition: barPosition,
+        ),
+      );
       _nextStep++;
     }
   }

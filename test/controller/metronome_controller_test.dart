@@ -118,13 +118,22 @@ void main() {
       expect(notifications, 1);
     });
 
-    test('setPattern while playing restarts with the new pattern', () async {
-      await controller.play();
-      output.time = _ms * 1050;
-      await controller.setPattern(waltz);
+    test('setPattern while playing switches at the next bar', () async {
+      await controller.play(); // 1120, 1620, 2120, 2620 | 3120
+      output.time = _ms * 1300;
+      controller.setPattern(waltz);
       expect(controller.isPlaying, isTrue);
-      expect(output.clicks.first.cancelled, isTrue);
-      expect(output.live.single.at, _ms * 1170);
+      expect(controller.pattern, waltz);
+      expect(output.clicks.first.cancelled, isFalse);
+    });
+
+    test('switchTo loads tempo and pattern', () async {
+      controller.switchTo(bpm: 90, pattern: waltz);
+      expect(controller.bpm, 90);
+      expect(controller.pattern, waltz);
+      expect(notifications, 1);
+      controller.switchTo(bpm: 999, pattern: waltz);
+      expect(controller.bpm, MetronomeController.maxBpm);
     });
   });
 

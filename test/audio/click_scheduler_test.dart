@@ -251,4 +251,97 @@ void main() {
       expect(scheduler.stepAt(_ms * 99999), isNull);
     });
   });
+
+  group('switchAtNextBar', () {
+    final waltz = MetronomePattern.simple(beatsPerBar: 3, stepsPerBeat: 1);
+
+    test('finishes the bar, then switches tempo and pattern', () async {
+      await start(bpm: 120); // 4/4: 1120, 1620, 2120, 2620 | 3120 ...
+      runFor(_ms * 650); // now 1650: steps 0, 1 committed
+      scheduler.switchAtNextBar(bpm: 60, pattern: waltz);
+      runFor(_ms * 5000);
+      expect(output.liveTimes.take(7), [
+        _ms * 1120, _ms * 1620, _ms * 2120, _ms * 2620, // old bar, 120 BPM
+        _ms * 3120, _ms * 4120, _ms * 5120, // new bar, 60 BPM
+      ]);
+      expect(output.live.map((c) => c.level).take(8), [
+        StepLevel.accent, StepLevel.normal, StepLevel.normal, StepLevel.normal,
+        StepLevel.accent, StepLevel.normal, StepLevel.normal, // 3/4
+        StepLevel.accent,
+      ]);
+    });
+
+    test('cancels already scheduled steps of the next bar', () async {
+      await start(bpm: 120);
+      runFor(_ms * 650);
+      scheduler.lookahead = _ms * 3000; // next bar already handed over
+      scheduler.refill();
+      scheduler.switchAtNextBar(bpm: 60, pattern: waltz);
+      scheduler.lookahead = _ms * 150;
+      runFor(_ms * 3000);
+      final times = output.liveTimes;
+      expect(times.take(5), [
+        _ms * 1120,
+        _ms * 1620,
+        _ms * 2120,
+        _ms * 2620,
+        _ms * 3120,
+      ]);
+      expect(times[5], _ms * 4120);
+    });
+
+    test('before the first click switches from the start', () async {
+      await start(bpm: 120);
+      scheduler.switchAtNextBar(bpm: 60, pattern: waltz);
+      runFor(_ms * 2500);
+      expect(output.liveTimes.take(3), [_ms * 1120, _ms * 2120, _ms * 3120]);
+    });
+
+    test(
+      'a tempo change while a switch is pending applies to the new bar',
+      () async {
+        await start(bpm: 120);
+        runFor(_ms * 650);
+        scheduler.switchAtNextBar(bpm: 60, pattern: waltz);
+        scheduler.setTempo(30);
+        runFor(_ms * 5000);
+        final times = output.liveTimes;
+        expect(times.take(5), [
+          _ms * 1120,
+          _ms * 1620,
+          _ms * 2120,
+          _ms * 2620,
+          _ms * 3120,
+        ]);
+        expect(times[5], _ms * 5120); // 30 BPM = 2 s
+      },
+    );
+
+    test('a second switch before the bar replaces the first', () async {
+      await start(bpm: 120);
+      runFor(_ms * 650);
+      scheduler.switchAtNextBar(bpm: 60, pattern: waltz);
+      scheduler.switchAtNextBar(
+        bpm: 240,
+        pattern: const MetronomePattern.standard(),
+      );
+      runFor(_ms * 3000);
+      expect(output.liveTimes.skip(4).take(3), [
+        _ms * 3120,
+        _ms * 3370,
+        _ms * 3620,
+      ]);
+    });
+
+    test('steps report their pattern and bar position', () async {
+      await start(bpm: 120);
+      runFor(_ms * 650);
+      scheduler.switchAtNextBar(bpm: 60, pattern: waltz);
+      runFor(_ms * 1500); // now 3150
+      final step = scheduler.stepAt(_ms * 3500)!; // first step of new bar
+      expect(step.barPosition, 0);
+      expect(step.pattern, waltz);
+      expect(scheduler.stepAt(_ms * 2700)!.barPosition, 3);
+    });
+  });
 }

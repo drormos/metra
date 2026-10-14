@@ -36,7 +36,7 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
 - Render-ahead ring off (`renderAheadFrames` unset). Scheduled clicks don't need low reactive latency; the visual offset is user-calibrated.
 - `bufferSize` stays at the default 2048: scheduling is sample-accurate regardless, larger buffers avoid dropouts, and visual jitter is handled by extrapolation (Phase 1 step 5).
 - Max active voices raised to 32 for headroom at fast subdivisions.
-- A pattern change while playing restarts from the downbeat. Switching at the bar boundary comes with setlists (Phase 2 step 3).
+- A pattern or song change while playing finishes the current bar, then switches tempo and pattern on the next bar line (`ClickScheduler.switchAtNextBar`). Plain ±BPM changes still apply at the next step.
 - Visual offset defaults to 0 ms (measured by eye on macOS: 0 ms on built-in speakers, 20 ms on a USB-dongle wireless headset), adjustable in the settings sheet from −200 to +500 ms in 10 ms steps to cover Bluetooth output. Not persisted until Phase 2.
 - The drift check captures the mixer output rather than recording the speakers. The engine clock is paced by the output device, so the mix timeline is what plays; capture must use the engine's channel count (it does not convert channels).
 - No audio focus on Android: focus would pause the user's music, and playing along with a track is a core use. Instead the click stops when a personal output (headphones, Bluetooth, USB audio) disappears, so it never jumps to the speaker. (audio_session's "becoming noisy" event only fires with focus, so this watches device removal.)

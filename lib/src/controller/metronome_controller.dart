@@ -99,12 +99,19 @@ class MetronomeController extends ChangeNotifier {
     if (bpm != null) setBpm(bpm);
   }
 
-  /// While playing, restarts from the downbeat with [pattern].
-  Future<void> setPattern(MetronomePattern pattern) async {
-    if (pattern == _pattern) return;
+  /// While playing, the new pattern starts at the next bar line.
+  void setPattern(MetronomePattern pattern) =>
+      switchTo(bpm: _bpm, pattern: pattern);
+
+  /// Load a song's tempo and pattern. While playing, the current bar
+  /// finishes first, then both change on the next bar line.
+  void switchTo({required int bpm, required MetronomePattern pattern}) {
+    final clamped = bpm.clamp(minBpm, maxBpm);
+    if (clamped == _bpm && pattern == _pattern) return;
+    _bpm = clamped;
     _pattern = pattern;
+    _scheduler.switchAtNextBar(bpm: clamped.toDouble(), pattern: pattern);
     notifyListeners();
-    if (_playing) await _start();
   }
 
   Future<void> play() async {

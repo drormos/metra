@@ -59,15 +59,18 @@ class _BeatIndicatorState extends State<BeatIndicator>
 
   @override
   Widget build(BuildContext context) {
-    final pattern = _controller.pattern;
+    // While playing, draw the pattern of the step being heard: after a song
+    // switch the controller already holds the next pattern until the bar
+    // line.
+    final step = _step;
+    final pattern = step?.pattern ?? _controller.pattern;
     final colors = Theme.of(context).colorScheme;
-    final current = _step == null ? null : _step!.index % pattern.stepsPerBar;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         for (var i = 0; i < pattern.stepsPerBar; i++)
           _dot(
-            lit: i == current,
+            lit: i == step?.barPosition,
             accent: pattern.steps[i] == StepLevel.accent,
             index: i,
             colors: colors,
