@@ -72,6 +72,16 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
 1. **Click Sounds:** Selectable click profiles (e.g. woodblock, digital beep, cowbell), all with zero leading silence.
    - Classic, Woodblock, Beep, Cowbell: synthesized by `tool/generate_clicks.dart` (no licensing), peak-normalized (accent 0.9, normal 0.7), first sample at full level; a test checks every file.
    - Picked in the settings sheet (plays a sample while stopped), saved with the library, applies to clicks scheduled from then on.
-2. **UI Polish:** Final high-contrast theme, animations, and responsive layouts for desktop and mobile.
-   - The UI design is being worked out separately (Claude on the web); apply it here.
-   - Show the active setlist on the main screen (name and position, e.g. "Friday gig · 2/5"), so it's clear which list next/previous steps through.
+2. **UI Polish:** Superseded by Phase 4.
+
+## Phase 4: UI Redesign
+**Goal:** Apply the main-screen design in `docs/design/ui-spec.md` (target: `docs/design/main-screen.png`; exact sizes and colors: `docs/design/main-screen.reference.html`, a design-tool file used as reference only, not ported). Screens the spec lists as "not designed yet" are built plainly with the new theme and fonts. One commit per step.
+
+1. **Theme + fonts:** Color tokens for Stage Black (dark) and Daylight (light) in one theme file (`ThemeExtension`), no hardcoded colors in widgets (including the current sheet color). Bundle Saira Extra Condensed 600/700 and Saira 500/600 as assets with their OFL license. Theme setting System (default) / Dark / Light, saved with the library. Sentence-case labels ("Start", "Stop", "Tap", "bpm").
+2. **Main screen layout:** Top row (song title; subdivision button with vector note icons cycling 1→2→3→4; time-signature button opening a plain picker; settings), BPM with "bpm" and the Italian tempo name, filled ±10/±1 row, Start/Stop (2/3) + Tap (1/3), flexible space above and below the BPM. Fits small phones (the BPM shrinks first). Removes the old dropdowns and the ◀ song ▶ row.
+3. **Beat blocks:** One block per beat, one cell per subdivision; cells light as each step plays and stay lit until the bar ends (downbeat / beat / subdivision / inactive colors), driven by the existing engine-clock ticker and flash offset. Works from 2 to 12+ beats. Keeps tap-to-cycle accents (see open questions).
+4. **Tempo ruler:** 14 px per bpm, minor tick per bpm, labeled major tick every 5, fixed red needle, highlighted current label. Horizontal drag in 1-bpm steps, clamped to 30–300. Saving to disk is debounced so a drag doesn't write a file per bpm.
+5. **Setlist group:** Framed group with header (setlist name, "4 of 12", chevron → setlist picker sheet built from the current song panel) and previous/next buttons showing the neighbouring song's name and bpm, disabled at the ends. Hidden when no setlist is loaded. The loaded setlist and position are saved, so reopening the app returns to them.
+6. **Behaviors:** Next/previous while playing restarts immediately on beat 1 at the new song's tempo (engine change, below); while stopped it only loads. Keep the screen awake while playing. Keyboard and pedal shortcuts keep working.
+7. **Daylight check + wide layout:** Check every Daylight color on a real screen. macOS wide layout built plainly (not designed yet).
+
