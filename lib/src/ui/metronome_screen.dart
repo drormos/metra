@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
+import '../model/click_sound.dart';
 import 'beat_indicator.dart';
 import 'library_panel.dart';
 
@@ -331,10 +332,37 @@ class MetronomeScreen extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: ListenableBuilder(
           listenable: controller,
-          builder: (context, _) => _offsetControl(Theme.of(context)),
+          builder: (context, _) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _soundPicker(Theme.of(context)),
+              const SizedBox(height: 16),
+              _offsetControl(Theme.of(context)),
+            ],
+          ),
         ),
       ),
     ),
+  );
+
+  Widget _soundPicker(ThemeData theme) => Column(
+    children: [
+      Text('Click sound', style: theme.textTheme.bodyMedium),
+      const SizedBox(height: 8),
+      Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final sound in ClickSound.values)
+            ChoiceChip(
+              label: Text(sound.label),
+              selected: controller.clickSound == sound,
+              onSelected: (_) => controller.setClickSound(sound),
+            ),
+        ],
+      ),
+    ],
   );
 
   // Calibrates the flash against what you hear (output latency varies by

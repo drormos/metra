@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:metra/src/model/click_sound.dart';
 import 'package:metra/src/model/library.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 
@@ -81,5 +82,14 @@ void main() {
   test('newer file versions are rejected rather than misread', () {
     final json = Library.empty.toJson()..['version'] = 99;
     expect(() => Library.fromJson(json), throwsFormatException);
+  });
+
+  test('click sound survives JSON; missing or unknown falls back', () {
+    final cowbell = Library.empty.copyWith(clickSound: ClickSound.cowbell);
+    expect(roundTrip(cowbell).clickSound, ClickSound.cowbell);
+    final old = Library.empty.toJson()..remove('clickSound');
+    expect(Library.fromJson(old).clickSound, ClickSound.classic);
+    final odd = Library.empty.toJson()..['clickSound'] = 'kazoo';
+    expect(Library.fromJson(odd).clickSound, ClickSound.classic);
   });
 }

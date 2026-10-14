@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
+import 'package:metra/src/model/click_sound.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 
@@ -218,5 +219,19 @@ void main() {
       await tester.tap(find.byKey(MetronomeScreen.playKey));
       await tester.pump();
     });
+  });
+
+  testWidgets('settings: pick a click sound', (tester) async {
+    await pumpScreen(tester);
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Cowbell'));
+    await tester.pump();
+    expect(controller.clickSound, ClickSound.cowbell);
+    expect(output.previewCount, 1);
+    final chip = tester.widget<ChoiceChip>(
+      find.widgetWithText(ChoiceChip, 'Cowbell'),
+    );
+    expect(chip.selected, isTrue);
   });
 }

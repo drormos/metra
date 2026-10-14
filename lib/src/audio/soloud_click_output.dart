@@ -2,12 +2,13 @@ import 'dart:async';
 
 import 'package:flutter_soloud/flutter_soloud.dart';
 
+import '../model/click_sound.dart';
 import '../model/metronome_pattern.dart';
 import 'click_output.dart';
 
 /// [ClickOutput] backed by the flutter_soloud engine clock.
 class SoloudClickOutput implements ClickOutput {
-  SoloudClickOutput._(this._accent, this._normal);
+  SoloudClickOutput._(this._sources);
 
   /// Initializes the engine and loads the click samples. Call once, from
   /// `main()`: `init()` on a running engine unloads every sound.
@@ -16,15 +17,20 @@ class SoloudClickOutput implements ClickOutput {
     await soloud.init();
     // Headroom for fast subdivisions (default is 16).
     soloud.setMaxActiveVoiceCount(32);
-    final accent = await soloud.loadAsset('assets/clicks/accent.wav');
-    final normal = await soloud.loadAsset('assets/clicks/normal.wav');
-    return SoloudClickOutput._(accent, normal);
+    // All sounds up front (a few KB each), so switching never waits.
+    return SoloudClickOutput._({
+      for (final sound in ClickSound.values)
+        sound: (
+          accent: await soloud.loadAsset(sound.assetFor(StepLevel.accent)),
+          normal: await soloud.loadAsset(sound.assetFor(StepLevel.normal)),
+        ),
+    });
   }
 
   static const _defaultIdleTimeout = Duration(milliseconds: 500);
 
-  final AudioSource _accent;
-  final AudioSource _normal;
+  final Map<ClickSound, ({AudioSource accent, AudioSource normal})> _sources;
+  var _sound = ClickSound.classic;
 
   @override
   Stream<void> get deviceFailures =>
@@ -52,12 +58,20 @@ class SoloudClickOutput implements ClickOutput {
   @override
   ClickHandle schedule(StepLevel level, Duration at) => _Click(
     SoLoud.instance.playScheduled(
-      level == StepLevel.accent ? _accent : _normal,
+      level == StepLevel.accent
+          ? _sources[_sound]!.accent
+          : _sources[_sound]!.normal,
       at,
       // Subdivisions sit under the beat so the pulse stays clear.
       volume: level == StepLevel.soft ? 0.4 : 1,
     ),
   );
+
+  @override
+  set sound(ClickSound value) => _sound = value;
+
+  @override
+  void preview() => SoLoud.instance.play(_sources[_sound]!.accent);
 
   @override
   void cancel(ClickHandle handle) =>

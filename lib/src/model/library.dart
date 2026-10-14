@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'click_sound.dart';
 import 'metronome_pattern.dart';
 
 @immutable
@@ -72,6 +73,7 @@ class Library {
     required this.lastBpm,
     required this.lastPattern,
     required this.visualOffset,
+    this.clickSound = ClickSound.classic,
   });
 
   static const empty = Library(
@@ -90,6 +92,7 @@ class Library {
   final int lastBpm;
   final MetronomePattern lastPattern;
   final Duration visualOffset;
+  final ClickSound clickSound;
 
   Library copyWith({
     List<Song>? songs,
@@ -97,12 +100,14 @@ class Library {
     int? lastBpm,
     MetronomePattern? lastPattern,
     Duration? visualOffset,
+    ClickSound? clickSound,
   }) => Library(
     songs: songs ?? this.songs,
     setlists: setlists ?? this.setlists,
     lastBpm: lastBpm ?? this.lastBpm,
     lastPattern: lastPattern ?? this.lastPattern,
     visualOffset: visualOffset ?? this.visualOffset,
+    clickSound: clickSound ?? this.clickSound,
   );
 
   Map<String, Object?> toJson() => {
@@ -110,6 +115,7 @@ class Library {
     'lastBpm': lastBpm,
     'lastPattern': lastPattern.toJson(),
     'visualOffsetMs': visualOffset.inMilliseconds,
+    'clickSound': clickSound.name,
     'songs': [for (final song in songs) song.toJson()],
     'setlists': [for (final setlist in setlists) setlist.toJson()],
   };
@@ -128,6 +134,11 @@ class Library {
         json['lastPattern'] as Map<String, Object?>,
       ),
       visualOffset: Duration(milliseconds: json['visualOffsetMs'] as int),
+      // Optional (older files lack it); an unknown name falls back rather
+      // than discarding the whole library.
+      clickSound:
+          ClickSound.values.asNameMap()[json['clickSound']] ??
+          ClickSound.classic,
       songs: [
         for (final song in json['songs'] as List)
           Song.fromJson(song as Map<String, Object?>),

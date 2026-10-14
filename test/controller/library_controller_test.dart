@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/library_controller.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
+import 'package:metra/src/model/click_sound.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/storage/library_store.dart';
 
@@ -95,6 +96,7 @@ void main() {
       metronome.setBpm(87);
       metronome.setPattern(waltz);
       metronome.setVisualOffset(const Duration(milliseconds: 30));
+      metronome.setClickSound(ClickSound.cowbell);
 
       final loaded = await reload();
       final next = MetronomeController(FakeClickOutput());
@@ -103,6 +105,7 @@ void main() {
       expect(next.bpm, 87);
       expect(next.pattern, waltz);
       expect(next.visualOffset, const Duration(milliseconds: 30));
+      expect(next.clickSound, ClickSound.cowbell);
     });
 
     test('a fresh install keeps the defaults', () {

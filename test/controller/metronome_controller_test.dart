@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
+import 'package:metra/src/model/click_sound.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 
 import '../audio/fake_click_output.dart';
@@ -253,6 +254,25 @@ void main() {
       controller.cycleBeat(0); // accent -> silent
       expect(output.clicks.first.cancelled, isTrue);
       expect(output.live, isEmpty, reason: 'beat 1 is now silent');
+    });
+  });
+
+  group('click sound', () {
+    test('switching while stopped plays a preview', () {
+      controller.setClickSound(ClickSound.woodblock);
+      expect(controller.clickSound, ClickSound.woodblock);
+      expect(output.currentSound, ClickSound.woodblock);
+      expect(output.previewCount, 1);
+      expect(notifications, 1);
+      controller.setClickSound(ClickSound.woodblock);
+      expect(output.previewCount, 1, reason: 'unchanged: no preview');
+    });
+
+    test('no preview while playing (the clicks are the preview)', () async {
+      await controller.play();
+      controller.setClickSound(ClickSound.beep);
+      expect(output.currentSound, ClickSound.beep);
+      expect(output.previewCount, 0);
     });
   });
 }

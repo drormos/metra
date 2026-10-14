@@ -1,39 +1,95 @@
-// Generates the click samples in assets/clicks/.
+// Generates the click samples in assets/clicks/:
+// <sound>_accent.wav and <sound>_normal.wav for every ClickSound.
 //
 // Run with: dart run tool/generate_clicks.dart
 //
-// Each click is a decaying cosine burst. Cosine phase puts the peak on
-// sample 0, so the files have zero leading silence.
+// Every sound starts at its loudest on sample 0 (cosine phase, squares at
+// +1), so the files have zero leading silence. Peaks are normalized so all
+// sounds play at the same level: accent 0.9, normal 0.7 of full scale.
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
 const _sampleRate = 44100;
 
+typedef _Voice = double Function(double t);
+
 void main() {
-  _write('assets/clicks/accent.wav', freq: 1800, peak: 0.9, decayMs: 6);
-  _write('assets/clicks/normal.wav', freq: 1200, peak: 0.7, decayMs: 5);
+  _pair('classic', (accent) {
+    final f = accent ? 1800.0 : 1200.0;
+    final decay = accent ? 0.006 : 0.005;
+    return (
+      _ms(30),
+      (t) => exp(-t / decay) * (cos(_w(f) * t) + 0.3 * cos(_w(2 * f) * t)),
+    );
+  });
+
+  // Inharmonic partials (wood bars ring near 1 : 2.76) plus a short noise
+  // tick for the strike.
+  _pair('woodblock', (accent) {
+    final f = accent ? 1250.0 : 950.0;
+    final noise = Random(1);
+    return (
+      _ms(60),
+      (t) =>
+          exp(-t / 0.012) * cos(_w(f) * t) +
+          0.5 * exp(-t / 0.006) * cos(_w(2.76 * f) * t) +
+          0.6 * exp(-t / 0.001) * (noise.nextDouble() * 2 - 1),
+    );
+  });
+
+  // Plain tone with a flat body and a 3 ms release to avoid a tail click.
+  _pair('beep', (accent) {
+    final f = accent ? 1760.0 : 1320.0;
+    const length = 0.035, release = 0.003;
+    return (_ms(35), (t) => cos(_w(f) * t) * min(1.0, (length - t) / release));
+  });
+
+  // Two detuned squares (the classic drum-machine cowbell), quick drop then
+  // a ringing tail, softened by a low-pass.
+  _pair('cowbell', (accent) {
+    final f = accent ? 680.0 : 540.0;
+    return (
+      _ms(250),
+      (t) =>
+          (0.7 * exp(-t / 0.015) + 0.3 * exp(-t / 0.12)) *
+          (_square(f, t) + _square(f * 1.48, t)),
+    );
+  }, lowPassHz: 4000);
 }
 
-void _write(
-  String path, {
-  required double freq,
-  required double peak,
-  required double decayMs,
+/// Writes `<name>_accent.wav` and `<name>_normal.wav`.
+void _pair(
+  String name,
+  (int, _Voice) Function(bool accent) voice, {
+  double? lowPassHz,
 }) {
-  const lengthMs = 30;
-  const frames = _sampleRate * lengthMs ~/ 1000;
-  final samples = Int16List(frames);
-  for (var i = 0; i < frames; i++) {
-    final t = i / _sampleRate;
-    final envelope = exp(-t * 1000 / decayMs);
-    final tone = cos(2 * pi * freq * t) + 0.3 * cos(2 * pi * 2 * freq * t);
-    samples[i] = (peak / 1.3 * envelope * tone * 32767).round();
+  for (final accent in [true, false]) {
+    final (frames, fn) = voice(accent);
+    final raw = [for (var i = 0; i < frames; i++) fn(i / _sampleRate)];
+    final shaped = lowPassHz == null ? raw : _lowPass(raw, lowPassHz);
+    final peak = shaped.map((x) => x.abs()).reduce(max);
+    final target = accent ? 0.9 : 0.7;
+    final samples = Int16List.fromList([
+      for (final x in shaped) (x / peak * target * 32767).round(),
+    ]);
+    File('assets/clicks/${name}_${accent ? 'accent' : 'normal'}.wav')
+      ..createSync(recursive: true)
+      ..writeAsBytesSync(_wav(samples));
   }
-  File(path)
-    ..createSync(recursive: true)
-    ..writeAsBytesSync(_wav(samples));
 }
+
+/// One-pole low-pass, primed with the first sample so the attack (and the
+/// zero-leading-silence guarantee) survives.
+List<double> _lowPass(List<double> x, double hz) {
+  final a = exp(-2 * pi * hz / _sampleRate);
+  var y = x.first;
+  return [for (final v in x) y = (1 - a) * v + a * y];
+}
+
+double _w(double hz) => 2 * pi * hz;
+int _ms(int ms) => _sampleRate * ms ~/ 1000;
+double _square(double hz, double t) => (t * hz) % 1 < 0.5 ? 1 : -1;
 
 Uint8List _wav(Int16List samples) {
   final dataBytes = samples.lengthInBytes;

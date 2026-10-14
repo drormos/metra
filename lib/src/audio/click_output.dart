@@ -1,3 +1,4 @@
+import '../model/click_sound.dart';
 import '../model/metronome_pattern.dart';
 
 /// Opaque handle to one scheduled click.
@@ -23,6 +24,12 @@ abstract interface class ClickOutput {
 
   /// Cancel a click that has not started yet.
   void cancel(ClickHandle handle);
+
+  /// Sound for clicks scheduled from now on.
+  set sound(ClickSound value);
+
+  /// Play one accent click right away (feedback when picking a sound).
+  void preview();
 
   /// Fires when the output device failed to start on its own.
   Stream<void> get deviceFailures;

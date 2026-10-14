@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart' show AppLifecycleState;
 
 import '../audio/click_output.dart';
 import '../audio/click_scheduler.dart';
+import '../model/click_sound.dart';
 import '../model/metronome_pattern.dart';
 import '../timing/engine_clock_smoother.dart';
 import '../timing/tap_tempo.dart';
@@ -46,6 +47,7 @@ class MetronomeController extends ChangeNotifier {
   Object? _audioError;
   bool _disposed = false;
   Duration _visualOffset = defaultVisualOffset;
+  ClickSound _clickSound = ClickSound.classic;
   EngineClockSmoother _smoother = EngineClockSmoother();
   final _tapClock = Stopwatch()..start();
   final _tapTempo = TapTempo(minBpm: minBpm, maxBpm: maxBpm);
@@ -58,6 +60,18 @@ class MetronomeController extends ChangeNotifier {
   Object? get audioError => _audioError;
 
   Duration get visualOffset => _visualOffset;
+
+  ClickSound get clickSound => _clickSound;
+
+  /// Applies to clicks scheduled from now on (within ~one lookahead). While
+  /// stopped, plays a sample so the choice is heard.
+  void setClickSound(ClickSound sound, {bool preview = true}) {
+    if (sound == _clickSound) return;
+    _clickSound = sound;
+    _output.sound = sound;
+    if (preview && !_playing) _output.preview();
+    notifyListeners();
+  }
 
   void setVisualOffset(Duration offset) {
     final clamped = offset < minVisualOffset

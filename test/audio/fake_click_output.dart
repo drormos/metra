@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:metra/src/audio/click_output.dart';
+import 'package:metra/src/model/click_sound.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 
 class FakeClick {
@@ -22,6 +23,8 @@ class FakeClickOutput implements ClickOutput {
   Object? deviceError;
   int recoverCount = 0;
   final failures = StreamController<void>.broadcast();
+  ClickSound currentSound = ClickSound.classic;
+  int previewCount = 0;
 
   List<FakeClick> get live => clicks.where((c) => !c.cancelled).toList();
   List<Duration> get liveTimes => live.map((c) => c.at).toList();
@@ -50,6 +53,12 @@ class FakeClickOutput implements ClickOutput {
 
   @override
   void cancel(ClickHandle handle) => (handle as FakeClick).cancelled = true;
+
+  @override
+  set sound(ClickSound value) => currentSound = value;
+
+  @override
+  void preview() => previewCount++;
 
   @override
   Stream<void> get deviceFailures => failures.stream;
