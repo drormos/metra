@@ -42,6 +42,7 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
   - Time signature: the next beat starts a bar in the new meter (`switchAtNextBeat(restartBar: true)`).
   - Song switch: at the next bar line (`switchAtNextBar`), so a new song starts on beat 1.
   - ±BPM: at the next step.
+- Decisions for the completed design: volume defaults Accent 100%, Beat 80%, Subdivision 45% (revisit if needed); the visual-offset test uses the playing click if there is one and only stops what it started; on-stage changes to a loaded song survive closing the app.
 - Visual offset defaults to 0 ms (measured by eye on macOS: 0 ms on built-in speakers, 20 ms on a USB-dongle wireless headset), adjustable in the settings sheet from −200 to +500 ms in 10 ms steps to cover Bluetooth output. Not persisted until Phase 2.
 - The drift check captures the mixer output rather than recording the speakers. The engine clock is paced by the output device, so the mix timeline is what plays; capture must use the engine's channel count (it does not convert channels).
 - No audio focus on Android: focus would pause the user's music, and playing along with a track is a core use. Instead the click stops when a personal output (headphones, Bluetooth, USB audio) disappears, so it never jumps to the speaker. (audio_session's "becoming noisy" event only fires with focus, so this watches device removal.)
@@ -98,8 +99,11 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
 8. **Setlist editor + library pick mode (done)** (`setlist-editor.reference.html`, `library-pick.reference.html`):
    - Setlist editor, a full screen opened from "Edit" in the picker, "+" (New setlist) and "New setlist" in What to play. Top bar Cancel / "Setlist" / Save. Name field, song count and a muted "Drag to reorder". 60px rows: ✕ (removes from this set only; no confirmation, a short "Removed" message with Undo), position, name, tempo, time signature, drag handle. The same song may appear more than once. Bottom: "Add songs" (filled, opens pick mode) and red "Delete setlist" (confirms; never deletes songs). "Start with all songs" when creating a set stays as a shortcut.
    - Library pick mode, a full screen: Cancel and "Add to <set>", search field, the song list with a checkbox per row ("Already in this set" shown but still addable). Bottom: "New song" (outlined; creates a song and adds it; until the song editor exists, it saves the current settings under a name) and "Add N songs" (filled primary, disabled until something is checked).
-9. **Behaviors (done):** BPM centring fix: the number alone is centred on the screen and "bpm" hangs off its right side near the baseline, not counted in the centring (today the pair is centred). Next/previous or choosing a song while playing restarts immediately on beat 1 at the new tempo (`ClickScheduler.restartNow`: the new bar starts one guard, ~60 ms, after the tap); while stopped it only loads. Covered by the engine drift test. Keep the screen awake while playing (`wakelock_plus`, Android/iOS/macOS). Opening sheets/editors never changes the click.
+9. **Behaviors (done):** BPM centring fix: the number alone is centred on the screen and "bpm" hangs off its right side near the baseline, not counted in the centring (today the pair is centred). Next/previous or choosing a song while playing restarts immediately on beat 1 at the new tempo (`ClickScheduler.restartNow`: the new bar starts one guard, ~60 ms, after the tap); while stopped it only loads. Covered by the engine drift test. Keep the screen awake while playing (`wakelock_plus`, Android/iOS/macOS; verified on a real phone). Opening sheets/editors never changes the click.
 10. **Daylight check:** Check every Daylight color on a real screen.
+
+## Phase 4b: Main-screen tweaks
+1. **Tempo buttons:** −5, −1, +1, +5 (was ±10; ±5 matches the ruler's labeled ticks). Holding a button repeats. Keyboard Shift+↑/↓ follows (±5).
 
 ## Phase 5: Songs — Editor, Library, Unsaved Changes
 **Goal:** The design's song screens and the "changes to a loaded song" behavior (`docs/design/ui-spec.md`). One commit per step.
