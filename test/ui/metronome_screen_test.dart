@@ -413,6 +413,46 @@ void main() {
       expect(controller.bpm, 120);
     });
 
+    testWidgets('a slow drag is precise: 1 bpm per 14 px, no glide', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      // 70 px over a second: well under the acceleration threshold.
+      await tester.timedDrag(
+        ruler(),
+        const Offset(-70, 0),
+        const Duration(seconds: 1),
+      );
+      await tester.pumpAndSettle();
+      expect(controller.bpm, 125);
+    });
+
+    testWidgets('a fast swipe goes further and glides on', (tester) async {
+      await pumpScreen(tester);
+      await tester.fling(ruler(), const Offset(-140, 0), 2000);
+      final atRelease = controller.bpm;
+      expect(atRelease, greaterThan(130), reason: 'accelerated');
+      await tester.pumpAndSettle();
+      expect(controller.bpm, greaterThan(atRelease), reason: 'glided');
+      expect(controller.bpm, lessThanOrEqualTo(MetronomeController.maxBpm));
+    });
+
+    testWidgets('touching the ruler stops a glide', (tester) async {
+      await pumpScreen(tester);
+      await tester.fling(ruler(), const Offset(-100, 0), 1500);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(ruler());
+      final stoppedAt = controller.bpm;
+      await tester.pumpAndSettle();
+      expect(controller.bpm, stoppedAt);
+    });
+
+    test('gain grows with finger speed, capped', () {
+      expect(TempoRuler.gainFor(100), 1);
+      expect(TempoRuler.gainFor(900), closeTo(2.5, 0.01));
+      expect(TempoRuler.gainFor(5000), TempoRuler.maxGain);
+    });
+
     testWidgets('screen readers can adjust it', (tester) async {
       final semantics = tester.ensureSemantics();
       await pumpScreen(tester);

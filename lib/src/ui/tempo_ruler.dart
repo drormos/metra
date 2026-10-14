@@ -1,12 +1,19 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 
 import '../controller/metronome_controller.dart';
 import 'theme.dart';
 
 /// Horizontal tempo ruler (ui-spec.md): a tick per bpm, a labeled tick
 /// every 5, a fixed needle at the centre. Dragging moves the ruler and sets
-/// the tempo in 1-bpm steps, clamped to the metronome's range. No momentum:
-/// it stops where the finger lifts.
+/// the tempo in 1-bpm steps, clamped to the metronome's range.
+///
+/// Speed-sensitive: slow, small moves are 1 bpm per 14 px for precise
+/// picking; faster moves cover more bpm per pixel (up to [maxGain]×). A
+/// fast swipe glides on after release and slows to a stop; a slow drag
+/// stops where the finger lifts. Touching the ruler stops a glide.
 class TempoRuler extends StatefulWidget {
   const TempoRuler({super.key, required this.controller});
 
@@ -16,26 +23,95 @@ class TempoRuler extends StatefulWidget {
   static const pxPerBpm = 14.0;
   static const height = 46.0;
 
+  /// Finger speeds (px/s) where acceleration starts and tops out.
+  static const slowSpeed = 300.0;
+  static const fastSpeed = 1500.0;
+  static const maxGain = 4.0;
+
+  /// Below this release speed (px/s) there is no glide.
+  static const minGlideSpeed = 600.0;
+
+  /// Bpm-per-pixel multiplier for a finger speed in px/s.
+  static double gainFor(double speed) =>
+      1 +
+      (maxGain - 1) *
+          ((speed - slowSpeed) / (fastSpeed - slowSpeed)).clamp(0.0, 1.0);
+
   @override
   State<TempoRuler> createState() => _TempoRulerState();
 }
 
-class _TempoRulerState extends State<TempoRuler> {
-  // While dragging, the ruler follows the finger between whole bpm values.
-  double? _dragValue;
+class _TempoRulerState extends State<TempoRuler>
+    with SingleTickerProviderStateMixin {
+  // Fractional bpm under the needle while dragging or gliding; null at rest.
+  double? _value;
+  Duration? _lastMoveTime;
+  late final AnimationController _glide = AnimationController.unbounded(
+    vsync: this,
+  )..addListener(() => _moveTo(_glide.value));
 
   MetronomeController get _controller => widget.controller;
 
-  void _drag(double dx) {
-    final value = (_dragValue! - dx / TempoRuler.pxPerBpm).clamp(
-      MetronomeController.minBpm.toDouble(),
-      MetronomeController.maxBpm.toDouble(),
-    );
-    setState(() => _dragValue = value);
-    _controller.setBpm(value.round()); // no-op unless the whole value changed
+  static const _min = MetronomeController.minBpm * 1.0;
+  static const _max = MetronomeController.maxBpm * 1.0;
+
+  @override
+  void dispose() {
+    _glide.dispose();
+    super.dispose();
   }
 
-  void _endDrag() => setState(() => _dragValue = null);
+  void _moveTo(double value) {
+    final clamped = value.clamp(_min, _max);
+    setState(() => _value = clamped);
+    _controller.setBpm(clamped.round()); // no-op unless the whole value changed
+    if (_glide.isAnimating && clamped != value) _glide.stop(); // hit an end
+  }
+
+  void _start(DragStartDetails details) {
+    _glide.stop(); // touching the ruler stops a glide
+    _value ??= _controller.bpm.toDouble();
+    _lastMoveTime = details.sourceTimeStamp;
+  }
+
+  void _update(DragUpdateDetails details) {
+    final dx = details.delta.dx;
+    // Finger speed from event timestamps (absent in some synthetic events:
+    // then no acceleration).
+    final now = details.sourceTimeStamp;
+    final last = _lastMoveTime;
+    _lastMoveTime = now;
+    var gain = 1.0;
+    if (now != null && last != null && now > last) {
+      final seconds = (now - last).inMicroseconds / 1e6;
+      gain = TempoRuler.gainFor(dx.abs() / seconds);
+    }
+    _moveTo(_value! - dx * gain / TempoRuler.pxPerBpm);
+  }
+
+  void _end(DragEndDetails details) {
+    final speed = details.velocity.pixelsPerSecond.dx;
+    if (speed.abs() < TempoRuler.minGlideSpeed) return _settle();
+    final bpmPerSecond =
+        -speed * TempoRuler.gainFor(speed.abs()) / TempoRuler.pxPerBpm;
+    _glide
+      ..value = _value!
+      ..animateWith(
+        // Stops once slower than 1 bpm/s, instead of creeping for seconds.
+        FrictionSimulation(
+          0.05,
+          _value!,
+          bpmPerSecond,
+          tolerance: const Tolerance(velocity: 1),
+        ),
+      ).then((_) => _settle());
+  }
+
+  /// Back to rest: the ruler shows the whole tempo again.
+  void _settle() {
+    if (!mounted) return;
+    setState(() => _value = null);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,25 +120,34 @@ class _TempoRulerState extends State<TempoRuler> {
       slider: true,
       label: 'Tempo',
       value: '$bpm bpm',
-      increasedValue: '${bpm + 1} bpm',
-      decreasedValue: '${bpm - 1} bpm',
+      increasedValue: '${min(bpm + 1, MetronomeController.maxBpm)} bpm',
+      decreasedValue: '${max(bpm - 1, MetronomeController.minBpm)} bpm',
       onIncrease: () => _controller.nudge(1),
       onDecrease: () => _controller.nudge(-1),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onHorizontalDragStart: (_) =>
-            setState(() => _dragValue = bpm.toDouble()),
-        onHorizontalDragUpdate: (details) => _drag(details.delta.dx),
-        onHorizontalDragEnd: (_) => _endDrag(),
-        onHorizontalDragCancel: _endDrag,
-        child: SizedBox(
-          height: TempoRuler.height,
-          width: double.infinity,
-          child: CustomPaint(
-            painter: _RulerPainter(
-              value: _dragValue ?? bpm.toDouble(),
-              bpm: bpm,
-              colors: context.colors,
+      // Touch-down stops a glide. A raw listener, not a tap recognizer: a
+      // competing tap would make the drag wait out the touch slop first.
+      child: Listener(
+        onPointerDown: (_) {
+          if (_glide.isAnimating) {
+            _glide.stop();
+            _settle();
+          }
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragStart: _start,
+          onHorizontalDragUpdate: _update,
+          onHorizontalDragEnd: _end,
+          onHorizontalDragCancel: _settle,
+          child: SizedBox(
+            height: TempoRuler.height,
+            width: double.infinity,
+            child: CustomPaint(
+              painter: _RulerPainter(
+                value: _value ?? bpm.toDouble(),
+                bpm: bpm,
+                colors: context.colors,
+              ),
             ),
           ),
         ),
