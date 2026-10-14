@@ -13,9 +13,11 @@ import 'theme.dart';
 ///
 /// Speed-sensitive: slow, small moves are 1 bpm per 14 px for precise
 /// picking; faster moves cover more bpm per pixel (up to [maxGain]×).
-/// Snapping depends on release speed: below [flingSpeed] the ruler stays
-/// exactly where it's released (so 123 is reachable); a faster fling coasts
-/// and always comes to rest on a multiple of 5. A light haptic tick marks
+/// Snapping: only a very slow, careful drag (recent finger speed below
+/// [fineSpeed]) stays exactly where it's released, so 123 is reachable. Any
+/// other drag slides to the next multiple of 5 in the direction it was
+/// moving; a fling (release faster than [flingSpeed]) coasts and also comes
+/// to rest on a multiple of 5. A light haptic tick marks
 /// every multiple of 5 crossed, while dragging and coasting. Touching the
 /// ruler stops a coast.
 class TempoRuler extends StatefulWidget {
@@ -34,6 +36,15 @@ class TempoRuler extends StatefulWidget {
 
   /// Release speed (px/s) that counts as a fling. Tune on a real phone.
   static const flingSpeed = 300.0;
+
+  /// Recent finger speed (px/s) below which a drag counts as fine-tuning
+  /// and isn't snapped (~8 bpm/s). Tune on a real phone.
+  static const fineSpeed = 120.0;
+
+  /// How quickly "recent finger speed" forgets older movement: speed
+  /// before roughly this long ago barely counts, so a fast drag that slows
+  /// down to creep onto 123 is judged by the creep.
+  static const recentSpeedWindow = Duration(milliseconds: 200);
 
   /// How far a fling coasts: lower stops sooner (see [FrictionSimulation]).
   static const flingFriction = 0.05;
@@ -56,6 +67,20 @@ class TempoRuler extends StatefulWidget {
     );
   }
 
+  /// Where a non-fine drag released at [value] rests: the next multiple
+  /// of 5 in its [direction] (+1 up, −1 down), unless it's already within
+  /// half a bpm of one. Within 30–300.
+  static double snapTarget(double value, int direction) {
+    final nearest = (value / 5).round() * 5.0;
+    final target = (value - nearest).abs() < 0.5
+        ? nearest
+        : (direction > 0 ? (value / 5).ceil() : (value / 5).floor()) * 5.0;
+    return target.clamp(
+      MetronomeController.minBpm.toDouble(),
+      MetronomeController.maxBpm.toDouble(),
+    );
+  }
+
   /// Bpm-per-pixel multiplier for a finger speed in px/s.
   static double gainFor(double speed) =>
       1 +
@@ -71,6 +96,11 @@ class _TempoRulerState extends State<TempoRuler>
   // Fractional bpm under the needle while dragging or gliding; null at rest.
   double? _value;
   Duration? _lastMoveTime;
+  // Smoothed finger speed (px/s) over roughly the last recentSpeedWindow of
+  // movement; pauses don't lower it. Null when event times are missing.
+  double? _recentSpeed;
+  // Bpm direction of the last move: +1 up, −1 down.
+  int _direction = 0;
   late final AnimationController _glide = AnimationController.unbounded(
     vsync: this,
   )..addListener(() => _moveTo(_glide.value));
@@ -101,6 +131,8 @@ class _TempoRulerState extends State<TempoRuler>
     _glide.stop(); // touching the ruler stops a glide
     _value ??= _controller.bpm.toDouble();
     _lastMoveTime = details.sourceTimeStamp;
+    _recentSpeed = null;
+    _direction = 0;
   }
 
   void _update(DragUpdateDetails details) {
@@ -113,24 +145,38 @@ class _TempoRulerState extends State<TempoRuler>
     var gain = 1.0;
     if (now != null && last != null && now > last) {
       final seconds = (now - last).inMicroseconds / 1e6;
-      gain = TempoRuler.gainFor(dx.abs() / seconds);
+      final speed = dx.abs() / seconds;
+      gain = TempoRuler.gainFor(speed);
+      final previous = _recentSpeed ?? speed;
+      final weight =
+          1 -
+          exp(-seconds * 1e6 / TempoRuler.recentSpeedWindow.inMicroseconds);
+      _recentSpeed = previous + (speed - previous) * weight;
     }
+    if (dx != 0) _direction = dx < 0 ? 1 : -1; // dragging left raises it
     _moveTo(_value! - dx * gain / TempoRuler.pxPerBpm);
   }
 
   void _end(DragEndDetails details) {
     final speed = details.velocity.pixelsPerSecond.dx;
-    // Slow release: stays exactly where it is.
-    if (speed.abs() < TempoRuler.flingSpeed) return _settle();
     final from = _value!;
+    if (speed.abs() < TempoRuler.flingSpeed) {
+      // Fine-tuning (or no timing to judge by): stays exactly where it is.
+      final recent = _recentSpeed;
+      if (recent == null || recent < TempoRuler.fineSpeed) return _settle();
+      return _glideTo(TempoRuler.snapTarget(from, _direction), 0.15);
+    }
     final bpmPerSecond =
         -speed * TempoRuler.gainFor(speed.abs()) / TempoRuler.pxPerBpm;
     final target = TempoRuler.flingTarget(from, bpmPerSecond);
     // Decelerate starts at twice its average speed: match the release.
-    final seconds = (2 * (target - from).abs() / bpmPerSecond.abs()).clamp(
-      0.15,
-      1.5,
-    );
+    _glideTo(target, 2 * (target - from).abs() / bpmPerSecond.abs());
+  }
+
+  void _glideTo(double target, double seconds) {
+    final from = _value!;
+    if (from == target) return _settle();
+    seconds = seconds.clamp(0.15, 1.5);
     _glide
       ..value = from
       ..animateTo(

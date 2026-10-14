@@ -472,6 +472,59 @@ void main() {
       expect(controller.bpm, 126, reason: 'not snapped to 125');
     });
 
+    testWidgets('a normal drag snaps ahead to a multiple of 5', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      // 98 px in half a second: faster than fine-tuning, not a fling.
+      await tester.timedDrag(
+        ruler(),
+        const Offset(-98, 0),
+        const Duration(milliseconds: 500),
+      );
+      await tester.pumpAndSettle();
+      expect(controller.bpm, 130, reason: '127 moving up');
+      await tester.timedDrag(
+        ruler(),
+        const Offset(98, 0),
+        const Duration(milliseconds: 500),
+      );
+      await tester.pumpAndSettle();
+      expect(controller.bpm, 120, reason: '123 moving down');
+    });
+
+    testWidgets('fast, then a slow creep: stays where released', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      final gesture = await tester.startGesture(tester.getCenter(ruler()));
+      var t = Duration.zero;
+      Future<void> move(double dx, int ms) async {
+        t += Duration(milliseconds: ms);
+        await gesture.moveBy(Offset(dx, 0), timeStamp: t);
+        await tester.pump();
+      }
+
+      for (var i = 0; i < 5; i++) {
+        await move(-12, 16); // 750 px/s
+      }
+      for (var i = 0; i < 20; i++) {
+        await move(-2, 50); // 40 px/s
+      }
+      final released = controller.bpm;
+      await gesture.up(timeStamp: t + const Duration(milliseconds: 50));
+      await tester.pumpAndSettle();
+      expect(controller.bpm, released);
+    });
+
+    test('a drag snaps to the next multiple of 5 in its direction', () {
+      expect(TempoRuler.snapTarget(121, 1), 125);
+      expect(TempoRuler.snapTarget(124, -1), 120);
+      expect(TempoRuler.snapTarget(120.3, 1), 120, reason: 'already on it');
+      expect(TempoRuler.snapTarget(124.6, -1), 125, reason: 'already on it');
+      expect(TempoRuler.snapTarget(298, 1), 300);
+    });
+
     testWidgets('a fling from 123 settles on a multiple of 5 above it', (
       tester,
     ) async {
