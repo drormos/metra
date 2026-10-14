@@ -163,7 +163,7 @@ class LibraryPanel extends StatelessWidget {
   }
 
   Future<void> _saveCurrent(BuildContext context) async {
-    final name = await _askName(
+    final name = await askName(
       context,
       title: 'Save as song',
       initial: '${metronome.bpm} BPM',
@@ -172,7 +172,7 @@ class LibraryPanel extends StatelessWidget {
   }
 
   Future<void> _renameSong(BuildContext context, Song song) async {
-    final name = await _askName(context, title: 'Rename', initial: song.name);
+    final name = await askName(context, title: 'Rename', initial: song.name);
     if (name != null) library.updateSong(song.copyWith(name: name));
   }
 
@@ -200,12 +200,12 @@ class LibraryPanel extends StatelessWidget {
   }
 
   Future<void> _newSetlist(BuildContext context) async {
-    final name = await _askName(context, title: 'New setlist', initial: '');
+    final name = await askName(context, title: 'New setlist', initial: '');
     if (name != null) library.setActiveSetlist(library.addSetlist(name).id);
   }
 
   Future<void> _renameSetlist(BuildContext context, Setlist list) async {
-    final name = await _askName(context, title: 'Rename', initial: list.name);
+    final name = await askName(context, title: 'Rename', initial: list.name);
     if (name != null) library.updateSetlist(list.copyWith(name: name));
   }
 
@@ -219,7 +219,7 @@ class LibraryPanel extends StatelessWidget {
 }
 
 /// A trimmed, non-empty name, or null if cancelled.
-Future<String?> _askName(
+Future<String?> askName(
   BuildContext context, {
   required String title,
   required String initial,

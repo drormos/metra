@@ -7,6 +7,7 @@ import '../model/click_sound.dart';
 import '../model/tempo_name.dart';
 import 'beat_indicator.dart';
 import 'library_panel.dart';
+import 'setlist_group.dart';
 import 'subdivision_icon.dart';
 import 'tempo_ruler.dart';
 import 'theme.dart';
@@ -25,7 +26,6 @@ class MetronomeScreen extends StatelessWidget {
   static const playKey = Key('play');
   static const offsetKey = Key('offset');
   static const tapKey = Key('tap');
-  static const songNameKey = Key('song-name');
   static const titleKey = Key('title');
   static const tempoNameKey = Key('tempo-name');
   static const meterKey = Key('meter');
@@ -185,13 +185,14 @@ class MetronomeScreen extends StatelessWidget {
             ],
           ),
         ),
-        // Stand-in until the setlist group (Phase 4 step 5).
         if (library case final library?) ...[
           const SizedBox(height: 12),
-          if (library.visibleSongs.isNotEmpty) _songSwitcher(context, library),
-          TextButton(
-            onPressed: () => _showSongs(context, library),
-            child: const Text('Songs & setlists'),
+          SetlistGroup(
+            library: library,
+            metronome: controller,
+            // Stand-in picker until the designed one (Phase 4 step 7).
+            onOpenPicker: () => _showSongs(context, library),
+            onNewSetlist: () => _newSetlist(context, library),
           ),
         ],
         if (error != null) ...[
@@ -339,41 +340,14 @@ class MetronomeScreen extends StatelessWidget {
     ),
   );
 
-  /// ◀ song name ▶ — steps through the selected setlist (or all songs).
-  Widget _songSwitcher(BuildContext context, LibraryController library) =>
-      Padding(
-        padding: EdgeInsets.zero,
-        child: Row(
-          children: [
-            IconButton(
-              tooltip: 'Previous song',
-              iconSize: 32,
-              onPressed: library.hasPrevious
-                  ? () => library.previousSong(controller)
-                  : null,
-              icon: const Icon(Icons.skip_previous),
-            ),
-            Expanded(
-              child: Text(
-                library.currentSong?.name ?? 'No song loaded',
-                key: songNameKey,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ),
-            IconButton(
-              tooltip: 'Next song',
-              iconSize: 32,
-              onPressed: library.hasNext
-                  ? () => library.nextSong(controller)
-                  : null,
-              icon: const Icon(Icons.skip_next),
-            ),
-          ],
-        ),
-      );
+  // Plain until the setlist editor (Phase 4 step 8): name it and load it.
+  Future<void> _newSetlist(
+    BuildContext context,
+    LibraryController library,
+  ) async {
+    final name = await askName(context, title: 'New setlist', initial: '');
+    if (name != null) library.setActiveSetlist(library.addSetlist(name).id);
+  }
 
   void _showSongs(BuildContext context, LibraryController library) =>
       showModalBottomSheet<void>(
