@@ -157,10 +157,26 @@ class _SetlistPickerState extends State<SetlistPicker> {
                     ),
                   ),
                 )
-              : ListView.builder(
+              // Long-press and drag reorders the set, saved at once;
+              // playback is unaffected.
+              : ReorderableListView.builder(
+                  buildDefaultDragHandles: false,
                   itemCount: songs.length,
+                  onReorderStart: (_) => Haptics.medium(),
+                  onReorderItem: (from, to) =>
+                      _library.reorderSetlist(setlist.id, from, to),
                   itemBuilder: (context, i) =>
-                      _songRow(colors, songs[i], i, current: i == current),
+                      ReorderableDelayedDragStartListener(
+                        // Keyed by position: the same song may appear twice.
+                        key: ValueKey('picker-row-$i-${songs[i].id}'),
+                        index: i,
+                        child: _songRow(
+                          colors,
+                          songs[i],
+                          i,
+                          current: i == current,
+                        ),
+                      ),
                 ),
         ),
         _bottomBar(colors, [Expanded(child: _songLibraryButton())]),

@@ -192,6 +192,25 @@ void main() {
     });
   });
 
+  test('reordering the loaded set keeps the current song current', () {
+    final metronome = MetronomeController(FakeClickOutput());
+    addTearDown(metronome.dispose);
+    final a = library.addSong(name: 'A', bpm: 100, pattern: waltz);
+    final b = library.addSong(name: 'B', bpm: 110, pattern: waltz);
+    final gig = library.addSetlist('Gig');
+    for (final s in [a, b, a]) {
+      library.addToSetlist(gig.id, s.id);
+    }
+    library.setActiveSetlist(gig.id);
+    library.playSong(a, metronome, index: 2); // the second A
+    library.reorderSetlist(gig.id, 1, 0); // B to the front: B, A, A
+    expect(library.currentIndex, 2);
+    library.reorderSetlist(gig.id, 2, 0); // the current A to the front
+    expect(library.currentIndex, 0);
+    expect(library.hasNext, isTrue);
+    expect(library.hasPrevious, isFalse);
+  });
+
   group('next / previous', () {
     late MetronomeController metronome;
 

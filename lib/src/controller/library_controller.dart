@@ -179,12 +179,27 @@ class LibraryController extends ChangeNotifier {
     updateSetlist(list.copyWith(songIds: [...list.songIds]..removeAt(index)));
   }
 
-  /// Moves the entry at [oldIndex] so it ends up at [newIndex].
+  /// Moves the entry at [oldIndex] so it ends up at [newIndex]. In the
+  /// active set, the current song keeps being current (its position
+  /// follows), so next/previous continue from it.
   void reorderSetlist(String setlistId, int oldIndex, int newIndex) {
+    final current = currentIndex; // before the move
     final list = setlists.firstWhere((s) => s.id == setlistId);
     final ids = [...list.songIds];
     ids.insert(newIndex, ids.removeAt(oldIndex));
     updateSetlist(list.copyWith(songIds: ids));
+    if (setlistId != _library.activeSetlistId || current < 0) return;
+    var moved = current == oldIndex
+        ? newIndex
+        : current - (oldIndex < current ? 1 : 0);
+    if (current != oldIndex && newIndex <= moved) moved++;
+    _update(
+      _library.withSession(
+        setlistId: setlistId,
+        songId: _library.currentSongId,
+        position: moved,
+      ),
+    );
   }
 
   Song? songById(String id) {

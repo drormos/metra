@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/gestures.dart' show kLongPressTimeout;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/library_controller.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
@@ -153,6 +155,47 @@ void main() {
     await tester.pump();
     expect(metronome.bpm, 101);
     expect(find.byKey(MetronomeScreen.tempoNameKey), findsOneWidget);
+  });
+
+  testWidgets('long-press and drag reorders the set; a tap still loads', (
+    tester,
+  ) async {
+    final haptics = <Object?>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'HapticFeedback.vibrate') {
+          haptics.add(call.arguments);
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await pumpWithSets(tester);
+    await openFromHeader(tester);
+    final ids = [...library.activeSetlist!.songIds];
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byKey(const ValueKey('picker-song-0'))),
+    );
+    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+    expect(haptics, ['HapticFeedbackType.mediumImpact'], reason: 'lifted');
+    for (var i = 0; i < 3; i++) {
+      await gesture.moveBy(const Offset(0, 25)); // one 60px row down
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await gesture.up();
+    await settle(tester);
+    expect(library.activeSetlist!.songIds, [ids[1], ids[0], ids[2]]);
+    expect(library.currentSong, isNull, reason: 'a drag loads nothing');
+    expect(find.byType(SetlistPicker), findsOneWidget, reason: 'still open');
+    await tester.tap(find.byKey(const ValueKey('picker-song-0')));
+    await settle(tester);
+    expect(library.currentSong!.id, ids[1]);
   });
 
   testWidgets('the pencil on a picker row edits that song', (tester) async {
