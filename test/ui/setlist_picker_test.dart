@@ -105,6 +105,34 @@ void main() {
     expect(find.widgetWithText(TextField, 'Two'), findsOneWidget);
   });
 
+  for (final stopFirst in [false, true]) {
+    testWidgets('leaving a preview resumes the main click (stop: $stopFirst)', (
+      tester,
+    ) async {
+      await pumpWithSets(tester);
+      library.playSong(library.visibleSongs[0], metronome, index: 0);
+      await metronome.play();
+      await tester.pump();
+      await tester.tap(find.byKey(MetronomeScreen.titleKey));
+      await settle(tester);
+      await tester.tap(find.byKey(SongEditor.previewKey));
+      await tester.pump();
+      if (stopFirst) {
+        await tester.tap(find.byKey(SongEditor.previewKey));
+        await tester.pump();
+        expect(metronome.isPlaying, isTrue, reason: 'Stop brings it back');
+        expect(metronome.bpm, 100);
+        expect(find.text('Preview'), findsOneWidget);
+      }
+      await tester.tap(find.text('Cancel'));
+      await settle(tester);
+      expect(find.byType(SongEditor), findsNothing);
+      expect(metronome.isPlaying, isTrue);
+      metronome.stop();
+      await tester.pump();
+    });
+  }
+
   testWidgets('the pencil on a picker row edits that song', (tester) async {
     await pumpWithSets(tester);
     await openFromHeader(tester);

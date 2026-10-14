@@ -126,10 +126,12 @@ class _SongEditorState extends State<SongEditor> {
     if (_previewPlaying) _metronome.applyEdit(bpm: _bpm, pattern: _pattern);
   }
 
+  /// Stop ends the preview: the main screen's click comes back at once
+  /// (or stays silent if it was stopped).
   void _togglePreview() {
     Haptics.medium(); // like Start/Stop
     _previewPlaying
-        ? _metronome.stop()
+        ? _metronome.endPreview()
         : _metronome.preview(bpm: _bpm, pattern: _pattern);
   }
 

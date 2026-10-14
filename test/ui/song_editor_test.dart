@@ -205,7 +205,7 @@ void main() {
     expect(metronome.bpm, 120);
   });
 
-  testWidgets('Stop ends the preview sound; edits stay silent', (tester) async {
+  testWidgets('Stop ends the preview; edits stay silent', (tester) async {
     await pumpEditor(tester);
     await tester.tap(find.byKey(SongEditor.previewKey));
     await tester.pump();
@@ -213,8 +213,9 @@ void main() {
     await tester.pump();
     expect(metronome.isPlaying, isFalse);
     expect(find.text('Preview'), findsOneWidget);
+    expect(metronome.bpm, 120, reason: 'main screen restored');
     await tapText(tester, '+');
-    expect(metronome.bpm, 100, reason: 'not previewing');
+    expect(metronome.bpm, 120, reason: 'not previewing');
   });
 
   testWidgets('saving the loaded song after a preview keeps it playing', (
@@ -230,7 +231,7 @@ void main() {
     expect(metronome.isPlaying, isTrue);
     expect(metronome.bpm, 101);
     expect(metronome.previewing, isFalse);
-     metronome.stop();
+    metronome.stop();
   });
 
   testWidgets('pattern section: collapsed, summary, subdivision and cells', (
