@@ -319,18 +319,51 @@ void main() {
       expect(library.activeSetlist, isNull);
     });
 
-    test('switching to Free play only changes the mode', () async {
+    test(
+      'switching to Free play detaches the song; the click carries on',
+      () async {
+        final a = library.addSong(name: 'A', bpm: 100, pattern: waltz);
+        final gig = library.addSetlist('Gig');
+        library
+          ..addToSetlist(gig.id, a.id)
+          ..setActiveSetlist(gig.id)
+          ..nextSong(metronome);
+        await metronome.play();
+        metronome.nudge(5); // an unsaved change
+        library.setActiveSetlist(null);
+        expect(metronome.isPlaying, isTrue);
+        expect(metronome.bpm, 105, reason: 'unsaved change kept');
+        expect(metronome.pattern, waltz);
+        expect(library.activeSetlist, isNull);
+        expect(library.currentSong, isNull);
+        expect(library.singleSong, isFalse);
+        expect(library.songChanged(metronome), isFalse);
+        expect(library.songById(a.id)!.bpm, 100, reason: 'song untouched');
+      },
+    );
+
+    test(
+      'a library song outside a set is Single song; Go free detaches',
+      () async {
+        final a = library.addSong(name: 'A', bpm: 100, pattern: waltz);
+        library.playSong(a, metronome);
+        expect(library.singleSong, isTrue);
+        metronome.cycleBeat(1);
+        final changed = metronome.pattern;
+        library.detachSong();
+        expect(library.singleSong, isFalse);
+        expect(library.currentSong, isNull);
+        expect(metronome.pattern, changed);
+        expect(library.songById(a.id)!.pattern, waltz);
+      },
+    );
+
+    test('reopens in Single song', () async {
       final a = library.addSong(name: 'A', bpm: 100, pattern: waltz);
-      final gig = library.addSetlist('Gig');
-      library
-        ..addToSetlist(gig.id, a.id)
-        ..setActiveSetlist(gig.id)
-        ..nextSong(metronome);
-      await metronome.play();
-      library.setActiveSetlist(null);
-      expect(metronome.isPlaying, isTrue);
-      expect(metronome.bpm, 100);
-      expect(library.activeSetlist, isNull);
+      library.playSong(a, metronome);
+      final reopened = await reload();
+      expect(reopened.singleSong, isTrue);
+      expect(reopened.currentSong?.id, a.id);
     });
 
     test('a song outside the loaded set: position -1, next re-enters', () {

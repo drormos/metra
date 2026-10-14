@@ -346,8 +346,9 @@ class _SetlistPickerState extends State<SetlistPicker> {
                 alignment: Alignment.centerLeft,
               ),
               onPressed: () {
-                // Only the mode changes; the click keeps going as it is.
-                _library.setActiveSetlist(null);
+                // Detaches any song; the click keeps going as it is.
+                Haptics.medium();
+                _library.detachSong();
                 Navigator.pop(context);
               },
               child: Row(

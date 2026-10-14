@@ -45,17 +45,27 @@ class LibraryController extends ChangeNotifier {
     return null;
   }
 
-  /// Loads a setlist, or Free play with null. Only the mode changes: the
-  /// click keeps going as it is.
+  /// Single song mode: a library song loaded without a setlist.
+  bool get singleSong => activeSetlist == null && currentSong != null;
+
+  /// Free play: unloads the song (and any setlist). The click keeps
+  /// exactly what it sounds like, unsaved changes included; the song in
+  /// the library is untouched.
+  void detachSong() => _update(
+    _library.withSession(setlistId: null, songId: null, position: -1),
+  );
+
+  /// Loads a setlist, or Free play with null (which detaches the song).
+  /// Only the mode changes: the click keeps going as it is.
   void setActiveSetlist(String? id) {
-    final position = id == null
-        ? -1
-        : (setlists
-                  .where((l) => l.id == id)
-                  .firstOrNull
-                  ?.songIds
-                  .indexOf(_library.currentSongId ?? '') ??
-              -1);
+    if (id == null) return detachSong();
+    final position =
+        setlists
+            .where((l) => l.id == id)
+            .firstOrNull
+            ?.songIds
+            .indexOf(_library.currentSongId ?? '') ??
+        -1;
     _update(
       _library.withSession(
         setlistId: id,

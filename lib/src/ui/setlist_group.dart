@@ -33,6 +33,7 @@ class SetlistGroup extends StatelessWidget {
   static const nextKey = Key('next-song');
   static const setlistsKey = Key('free-play-setlists');
   static const songsKey = Key('free-play-songs');
+  static const goFreeKey = Key('go-free');
 
   @override
   Widget build(BuildContext context) {
@@ -49,9 +50,11 @@ class SetlistGroup extends StatelessWidget {
         children: [
           SizedBox(
             height: 44,
-            child: setlist == null
-                ? _freePlayHeader(colors)
-                : _setlistHeader(colors, setlist),
+            child: setlist != null
+                ? _setlistHeader(colors, setlist)
+                : library.singleSong
+                ? _singleSongHeader(colors)
+                : _freePlayHeader(colors),
           ),
           // Keeps a thumb aiming for previous/next off the header.
           const SizedBox(height: 14),
@@ -71,6 +74,39 @@ class SetlistGroup extends StatelessWidget {
         Icon(Icons.notes, size: 18),
         SizedBox(width: 10),
         Text('Free play', style: TextStyle(fontSize: 16)),
+      ],
+    ),
+  );
+
+  /// Plain text naming the source (the song's name is the top title), and
+  /// "Go free" to detach it: no confirmation, nothing is deleted.
+  Widget _singleSongHeader(MetraColors colors) => Padding(
+    padding: const EdgeInsets.only(left: 6),
+    child: Row(
+      children: [
+        const SubdivisionIcon(1, size: 18),
+        const SizedBox(width: 10),
+        const Expanded(
+          child: Text('Single song', style: TextStyle(fontSize: 16)),
+        ),
+        SizedBox(
+          height: 40,
+          child: OutlinedButton(
+            key: goFreeKey,
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              minimumSize: const Size(0, 40),
+            ),
+            onPressed: () {
+              Haptics.medium(); // the song detached
+              library.detachSong();
+            },
+            child: const Text(
+              'Go free',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ),
       ],
     ),
   );

@@ -100,6 +100,58 @@ void main() {
       expect(find.text('What to play'), findsOneWidget);
     });
 
+    testWidgets('Single song: header and Go free', (tester) async {
+      final haptics = <Object?>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'HapticFeedback.vibrate') {
+            haptics.add(call.arguments);
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      await pumpScreen(tester);
+      final rect = groupRect(tester);
+      final song = library.addSong(
+        name: 'Solo',
+        bpm: 90,
+        pattern: const MetronomePattern.standard(),
+      );
+      library.playSong(song, metronome);
+      await metronome.play();
+      await tester.pump();
+      expect(find.text('Single song'), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(MetronomeScreen.titleKey)).data,
+        'Solo',
+      );
+      expect(find.byKey(SetlistGroup.songsKey), findsOneWidget);
+      expect(groupRect(tester), rect, reason: 'no control moves');
+      metronome.nudge(1); // unsaved change: Revert / Save to song showing
+      await tester.pump();
+      expect(find.byKey(MetronomeScreen.revertKey), findsOneWidget);
+      await tester.tap(find.byKey(SetlistGroup.goFreeKey));
+      await tester.pump();
+      expect(find.text('Free play'), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(MetronomeScreen.titleKey)).data,
+        '',
+      );
+      expect(find.byKey(MetronomeScreen.revertKey), findsNothing);
+      expect(metronome.isPlaying, isTrue);
+      expect(metronome.bpm, 91, reason: 'the click is unchanged');
+      expect(haptics.last, 'HapticFeedbackType.mediumImpact');
+      metronome.stop();
+      await tester.pump();
+    });
+
     testWidgets('Songs opens the song library', (tester) async {
       await pumpScreen(tester);
       await tester.tap(find.byKey(SetlistGroup.songsKey));

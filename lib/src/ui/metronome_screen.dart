@@ -302,38 +302,18 @@ class MetronomeScreen extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          // Tapping the title edits the current song.
-          child: Semantics(
-            button: song != null,
-            hint: song == null ? null : 'Edit song',
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: song == null
-                  ? null
-                  : () => openSongEditor(
-                      context,
-                      library!,
-                      controller,
-                      song: song,
-                    ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 44),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    song?.name ?? '',
-                    key: titleKey,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontFamily: MetraFonts.condensed,
-                      fontSize: 34,
-                      fontWeight: FontWeight.w700,
-                      height: 1,
-                    ),
-                  ),
-                ),
-              ),
+          // Never a control (ui-spec.md); songs are edited with the pencil
+          // in the picker or the song library.
+          child: Text(
+            song?.name ?? '',
+            key: titleKey,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontFamily: MetraFonts.condensed,
+              fontSize: 34,
+              fontWeight: FontWeight.w700,
+              height: 1,
             ),
           ),
         ),

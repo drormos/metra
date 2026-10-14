@@ -84,14 +84,13 @@ void main() {
     await settle(tester);
   }
 
-  testWidgets('tapping the title edits the current song', (tester) async {
+  testWidgets('the title is not a control', (tester) async {
     await pumpWithSets(tester);
     library.playSong(library.visibleSongs[1], metronome, index: 1);
     await tester.pump();
     await tester.tap(find.byKey(MetronomeScreen.titleKey));
     await tester.pumpAndSettle();
-    expect(find.byType(SongEditor), findsOneWidget);
-    expect(find.widgetWithText(TextField, 'Two'), findsOneWidget);
+    expect(find.byType(SongEditor), findsNothing);
   });
 
   for (final stopFirst in [false, true]) {
@@ -102,7 +101,9 @@ void main() {
       library.playSong(library.visibleSongs[0], metronome, index: 0);
       await metronome.play();
       await tester.pump();
-      await tester.tap(find.byKey(MetronomeScreen.titleKey));
+      await tester.tap(find.byKey(SetlistGroup.headerKey));
+      await settle(tester);
+      await tester.tap(find.byKey(const ValueKey('picker-edit-0')));
       await settle(tester);
       await tester.tap(find.byKey(SongEditor.previewKey));
       await tester.pump();
@@ -215,12 +216,14 @@ void main() {
     expect(find.byType(SetlistPicker), findsNothing, reason: 'back to main');
   }
 
-  testWidgets('from the library in Free play: stays Free play, titled', (
+  testWidgets('from the library in Free play: Single song, titled', (
     tester,
   ) async {
     await pumpWithSets(tester, loaded: false);
     await loadFromLibrary(tester, 'Two', freePlay: true);
     expect(library.activeSetlist, isNull);
+    expect(library.singleSong, isTrue);
+    expect(find.text('Single song'), findsOneWidget);
     expect(
       tester.widget<Text>(find.byKey(MetronomeScreen.titleKey)).data,
       'Two',
