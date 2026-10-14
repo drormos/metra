@@ -91,6 +91,7 @@ class Library {
     required this.visualOffset,
     this.clickSound = ClickSound.classic,
     this.themeMode = ThemeMode.system,
+    this.vibrate = true,
     this.activeSetlistId,
     this.currentSongId,
     this.currentPosition = -1,
@@ -117,6 +118,10 @@ class Library {
   /// System (follow the OS), dark or light.
   final ThemeMode themeMode;
 
+  /// "Vibrate on touch": can only turn haptics off; the phone's own
+  /// vibration setting still applies.
+  final bool vibrate;
+
   /// The loaded setlist; null is Free play (the first-launch default).
   final String? activeSetlistId;
 
@@ -133,6 +138,7 @@ class Library {
     Duration? visualOffset,
     ClickSound? clickSound,
     ThemeMode? themeMode,
+    bool? vibrate,
   }) => Library(
     songs: songs ?? this.songs,
     setlists: setlists ?? this.setlists,
@@ -141,6 +147,7 @@ class Library {
     visualOffset: visualOffset ?? this.visualOffset,
     clickSound: clickSound ?? this.clickSound,
     themeMode: themeMode ?? this.themeMode,
+    vibrate: vibrate ?? this.vibrate,
     activeSetlistId: activeSetlistId,
     currentSongId: currentSongId,
     currentPosition: currentPosition,
@@ -160,6 +167,7 @@ class Library {
     visualOffset: visualOffset,
     clickSound: clickSound,
     themeMode: themeMode,
+    vibrate: vibrate,
     activeSetlistId: setlistId,
     currentSongId: songId,
     currentPosition: position,
@@ -172,6 +180,7 @@ class Library {
     'visualOffsetMs': visualOffset.inMilliseconds,
     'clickSound': clickSound.name,
     'themeMode': themeMode.name,
+    'vibrate': vibrate,
     'activeSetlistId': activeSetlistId,
     'currentSongId': currentSongId,
     'currentPosition': currentPosition,
@@ -200,6 +209,7 @@ class Library {
           ClickSound.classic,
       themeMode:
           ThemeMode.values.asNameMap()[json['themeMode']] ?? ThemeMode.system,
+      vibrate: json['vibrate'] as bool? ?? true, // older files: on
       // Optional: older files open in Free play.
       activeSetlistId: json['activeSetlistId'] as String?,
       currentSongId: json['currentSongId'] as String?,

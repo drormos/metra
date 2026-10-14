@@ -738,6 +738,20 @@ void main() {
       expect(haptics.where((h) => h == 'mediumImpact'), hasLength(1));
     });
 
+    testWidgets('"Vibrate on touch" off silences every haptic', (tester) async {
+      await pumpScreen(tester);
+      final haptics = recordHaptics(tester);
+      Haptics.enabled = false;
+      addTearDown(() => Haptics.enabled = true);
+      await tester.tap(find.byKey(MetronomeScreen.playKey));
+      await tester.tap(find.text('+1'));
+      await tester.pump();
+      Haptics.firm();
+      expect(haptics, isEmpty);
+      await tester.tap(find.byKey(MetronomeScreen.playKey));
+      await tester.pump();
+    });
+
     test('reaching a multiple of 5, either direction', () {
       expect(Haptics.reachesFive(124, 125), isTrue);
       expect(Haptics.reachesFive(125, 126), isFalse);

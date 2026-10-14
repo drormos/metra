@@ -26,6 +26,13 @@ class LibraryController extends ChangeNotifier {
     if (mode != themeMode) _update(_library.copyWith(themeMode: mode));
   }
 
+  /// "Vibrate on touch" (default on).
+  bool get vibrate => _library.vibrate;
+
+  void setVibrate(bool on) {
+    if (on != vibrate) _update(_library.copyWith(vibrate: on));
+  }
+
   List<Song> get songs => _library.songs;
   List<Setlist> get setlists => _library.setlists;
 

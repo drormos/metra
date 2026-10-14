@@ -101,6 +101,18 @@ void main() {
     expect(Library.fromJson(old).themeMode, ThemeMode.system);
   });
 
+  test('"Vibrate on touch" survives JSON; missing means on', () {
+    expect(Library.empty.vibrate, isTrue);
+    final off = Library.empty.copyWith(vibrate: false);
+    expect(roundTrip(off).vibrate, isFalse);
+    expect(
+      off.withSession(setlistId: null, songId: null, position: -1).vibrate,
+      isFalse,
+    );
+    final old = Library.empty.toJson()..remove('vibrate');
+    expect(Library.fromJson(old).vibrate, isTrue);
+  });
+
   test('session (setlist, song, position) survives JSON; old files are '
       'Free play', () {
     final session = Library.empty.withSession(

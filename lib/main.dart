@@ -13,6 +13,7 @@ import 'src/controller/keep_awake.dart';
 import 'src/controller/library_controller.dart';
 import 'src/controller/metronome_controller.dart';
 import 'src/storage/library_store.dart';
+import 'src/ui/haptics.dart';
 import 'src/ui/metronome_screen.dart';
 import 'src/ui/theme.dart';
 
@@ -37,6 +38,12 @@ Future<void> main() async {
   if (controller != null) {
     library = await _loadLibrary();
     library?.attach(controller);
+    if (library case final library?) {
+      // "Vibrate on touch" gates every haptic.
+      void syncHaptics() => Haptics.enabled = library.vibrate;
+      syncHaptics();
+      library.addListener(syncHaptics);
+    }
     if (Platform.isAndroid) await _initAndroidBackground(controller, library);
   }
   runApp(

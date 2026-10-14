@@ -3,7 +3,6 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
-import 'package:flutter/services.dart';
 
 import '../controller/metronome_controller.dart';
 import 'haptics.dart';
@@ -249,7 +248,7 @@ class _TempoRulerState extends State<TempoRuler>
     _lockTimer?.cancel();
     _lockTimer = Timer(TempoRuler.lockDelay, () {
       _locked = true;
-      HapticFeedback.heavyImpact(); // distinct from the multiple-of-5 tick
+      Haptics.firm(); // distinct from the multiple-of-5 tick
     });
   }
 

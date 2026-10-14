@@ -34,6 +34,7 @@ class MetronomeScreen extends StatelessWidget {
   static const tempoNameKey = Key('tempo-name');
   static const meterKey = Key('meter');
   static const subdivisionKey = Key('subdivision');
+  static const vibrateKey = Key('vibrate');
 
   @override
   Widget build(BuildContext context) {
@@ -433,6 +434,18 @@ class MetronomeScreen extends StatelessWidget {
               ],
               _soundPicker(Theme.of(context)),
               const SizedBox(height: 16),
+              if (library case final library?) ...[
+                SwitchListTile(
+                  key: vibrateKey,
+                  title: const Text('Vibrate on touch'),
+                  subtitle: const Text(
+                    "Only when vibration is on in your phone's settings",
+                  ),
+                  value: library.vibrate,
+                  onChanged: library.setVibrate,
+                ),
+                const SizedBox(height: 16),
+              ],
               _offsetControl(Theme.of(context)),
             ],
           ),
