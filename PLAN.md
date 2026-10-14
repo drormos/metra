@@ -13,8 +13,6 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
 Decisions made with the user that the spec doesn't state (or states differently). Keep them unless the spec is updated to say otherwise.
 - **Conflict — Free play title:** the spec says the title is empty in Free play; agreed: loading a single song from the library in Free play shows its name as the title (mode stays Free play).
 - **Song outside the loaded set:** position shows "– of 12"; next/previous goes back into the set.
-- **Switching to Free play while playing** changes only the mode, never the click.
-- **Editing the loaded song** in the song editor applies to the click immediately on Save, without restarting on beat 1 (`MetronomeController.applyEdit`): nothing changed does nothing; tempo from the next step; accents/cells from the next click; subdivision from the next beat; a new time signature starts a bar on the next beat (all as on the main screen).
 - **On-stage changes to a loaded song survive closing the app** (Revert / Save to song still shown after reopening).
 - **Beat accent taps** are heard from the very next click (no waiting for a beat or bar).
 - **Volume defaults:** Accent 100%, Beat 80%, Subdivision 45% (revisit if needed).
