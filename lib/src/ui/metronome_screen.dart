@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
+import '../model/metronome_pattern.dart';
 import 'beat_indicator.dart';
 import 'library_panel.dart';
 
@@ -28,6 +29,8 @@ class MetronomeScreen extends StatelessWidget {
   static const offsetKey = Key('offset');
   static const tapKey = Key('tap');
   static const songNameKey = Key('song-name');
+  static const meterKey = Key('meter');
+  static const subdivisionKey = Key('subdivision');
 
   @override
   Widget build(BuildContext context) {
@@ -150,7 +153,9 @@ class MetronomeScreen extends StatelessWidget {
           textAlign: TextAlign.center,
           style: theme.textTheme.titleLarge?.copyWith(letterSpacing: 4),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 16),
+        _rhythmControls(),
+        const SizedBox(height: 16),
         Row(
           children: [
             _step('-10', -10, bpm > MetronomeController.minBpm),
@@ -209,6 +214,69 @@ class MetronomeScreen extends StatelessWidget {
             style: TextStyle(color: theme.colorScheme.error),
           ),
         ],
+      ],
+    );
+  }
+
+  static const _meters = [
+    (2, 4),
+    (3, 4),
+    (4, 4),
+    (5, 4),
+    (6, 8),
+    (7, 8),
+    (9, 8),
+    (12, 8),
+  ];
+  static const _subdivisions = {
+    1: 'No subdivision',
+    2: '2 per beat',
+    3: 'Triplets',
+    4: '4 per beat',
+  };
+
+  /// Time signature and subdivision. Changing the time signature resets
+  /// custom accents; changing the subdivision keeps them. While playing,
+  /// either lands on the next bar line.
+  Widget _rhythmControls() {
+    final pattern = controller.pattern;
+    final meters = {
+      for (final (beats, unit) in _meters) '$beats/$unit': (beats, unit),
+      // A saved song may use a meter outside the presets.
+      pattern.timeSignature: (pattern.beatsPerBar, pattern.beatUnit),
+    };
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 24,
+      children: [
+        DropdownButton<String>(
+          key: meterKey,
+          value: pattern.timeSignature,
+          items: [
+            for (final label in meters.keys)
+              DropdownMenuItem(value: label, child: Text(label)),
+          ],
+          onChanged: (label) {
+            final (beats, unit) = meters[label]!;
+            controller.setPattern(
+              MetronomePattern.simple(
+                beatsPerBar: beats,
+                stepsPerBeat: pattern.stepsPerBeat,
+                beatUnit: unit,
+              ),
+            );
+          },
+        ),
+        DropdownButton<int>(
+          key: subdivisionKey,
+          value: pattern.stepsPerBeat,
+          items: [
+            for (final MapEntry(:key, :value) in _subdivisions.entries)
+              DropdownMenuItem(value: key, child: Text(value)),
+          ],
+          onChanged: (steps) =>
+              controller.setPattern(pattern.withSubdivision(steps!)),
+        ),
       ],
     );
   }

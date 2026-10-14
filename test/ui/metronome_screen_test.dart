@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
+import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 
 import '../audio/fake_click_output.dart';
@@ -164,5 +165,58 @@ void main() {
     controller.setBpm(120);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
     expect(controller.bpm, MetronomeController.maxBpm);
+  });
+
+  group('rhythm', () {
+    Future<void> pick(WidgetTester tester, Key dropdown, String item) async {
+      await tester.tap(find.byKey(dropdown));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(item).last);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('time signature picker sets the meter', (tester) async {
+      await pumpScreen(tester);
+      await pick(tester, MetronomeScreen.meterKey, '7/8');
+      expect(controller.pattern.timeSignature, '7/8');
+      expect(find.byKey(const ValueKey('beat-6-off')), findsOneWidget);
+      expect(find.byKey(const ValueKey('beat-7-off')), findsNothing);
+    });
+
+    testWidgets('subdivision picker keeps one dot per beat', (tester) async {
+      await pumpScreen(tester);
+      await pick(tester, MetronomeScreen.subdivisionKey, 'Triplets');
+      expect(controller.pattern.stepsPerBeat, 3);
+      expect(controller.pattern.timeSignature, '4/4');
+      expect(find.byKey(const ValueKey('beat-3-off')), findsOneWidget);
+      expect(find.byKey(const ValueKey('beat-4-off')), findsNothing);
+    });
+
+    testWidgets('tapping a beat dot cycles its accent', (tester) async {
+      await pumpScreen(tester);
+      await tester.tap(find.byKey(const ValueKey('beat-2-off')));
+      await tester.pump();
+      expect(controller.pattern.beatLevels[2], StepLevel.accent);
+      await tester.tap(find.byKey(const ValueKey('beat-2-off')));
+      await tester.pump();
+      expect(controller.pattern.beatLevels[2], StepLevel.silent);
+    });
+
+    testWidgets('with subdivisions the beat dot stays lit', (tester) async {
+      controller.setPattern(
+        MetronomePattern.simple(beatsPerBar: 4, stepsPerBeat: 2),
+      );
+      controller.setVisualOffset(Duration.zero);
+      await pumpScreen(tester);
+      await tester.tap(find.byKey(MetronomeScreen.playKey));
+      await tester.pump();
+      // 120 BPM, 2 per beat: steps at 120, 370, 620 ms. 400 ms is the
+      // second half of beat 1.
+      output.time = const Duration(milliseconds: 400);
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(find.byKey(const ValueKey('beat-0-on')), findsOneWidget);
+      await tester.tap(find.byKey(MetronomeScreen.playKey));
+      await tester.pump();
+    });
   });
 }

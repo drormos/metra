@@ -54,6 +54,8 @@ class SoloudClickOutput implements ClickOutput {
     SoLoud.instance.playScheduled(
       level == StepLevel.accent ? _accent : _normal,
       at,
+      // Subdivisions sit under the beat so the pulse stays clear.
+      volume: level == StepLevel.soft ? 0.4 : 1,
     ),
   );
 

@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:metra/src/audio/soloud_click_output.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
+import 'package:metra/src/model/metronome_pattern.dart';
 
 const _seconds = int.fromEnvironment('DRIFT_SECONDS', defaultValue: 20);
 const _sampleRate = 44100; // engine default
@@ -46,6 +47,22 @@ void main() {
       _expectAccentsEvery(4, recorder);
     }, timeout: Timeout(Duration(seconds: _seconds + 60)));
   }
+
+  test('triplet subdivisions stay on the grid', () async {
+    final recorder = _OnsetRecorder()..start();
+    controller.setBpm(120);
+    controller.setPattern(
+      MetronomePattern.simple(beatsPerBar: 4, stepsPerBeat: 3),
+    );
+    await controller.play();
+    await _wait(const Duration(seconds: 5));
+    controller.stop();
+    await recorder.stop();
+
+    // 3 per beat at 120 BPM: 7350 frames apart, every one present.
+    _expectOnGrid(recorder.onsets, framesPerBeat(120) ~/ 3, allowGaps: false);
+    expect(recorder.onsets.length, inInclusiveRange(29, 31)); // 6 per second
+  });
 
   test('tempo change mid-bar switches interval and keeps the bar', () async {
     final recorder = _OnsetRecorder()..start();
@@ -166,7 +183,9 @@ void _expectAccentsEvery(int n, _OnsetRecorder recorder) {
 /// amplitude on their first sample, so an onset is the first sample above a
 /// threshold after a quiet gap.
 class _OnsetRecorder {
-  static const _threshold = 0.2;
+  // Soft subdivision clicks peak near 0.2; a click's tail is far below this
+  // within the 50 ms gap.
+  static const _threshold = 0.1;
   static const _minGapFrames = _sampleRate ~/ 20; // 50 ms > click length
 
   final onsets = <int>[];

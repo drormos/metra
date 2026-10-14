@@ -64,37 +64,62 @@ class _BeatIndicatorState extends State<BeatIndicator>
     // line.
     final step = _step;
     final pattern = step?.pattern ?? _controller.pattern;
+    final litBeat = step == null
+        ? null
+        : step.barPosition ~/ pattern.stepsPerBeat;
     final colors = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        for (var i = 0; i < pattern.stepsPerBar; i++)
-          _dot(
-            lit: i == step?.barPosition,
-            accent: pattern.steps[i] == StepLevel.accent,
-            index: i,
-            colors: colors,
-          ),
-      ],
+    // Scales down for long bars (12/8) on narrow phones.
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        children: [
+          for (final (i, level) in pattern.beatLevels.indexed)
+            _dot(index: i, level: level, lit: i == litBeat, colors: colors),
+        ],
+      ),
     );
   }
 
+  /// One dot per beat. Tapping cycles the beat normal → accent → silent;
+  /// while playing the change lands on the next bar line.
   Widget _dot({
-    required bool lit,
-    required bool accent,
     required int index,
+    required StepLevel level,
+    required bool lit,
     required ColorScheme colors,
   }) {
+    final accent = level == StepLevel.accent;
+    final silent = level == StepLevel.silent;
     final size = accent ? 32.0 : 24.0;
-    return Container(
-      key: ValueKey('beat-$index-${lit ? 'on' : 'off'}'),
-      width: size,
-      height: size,
-      margin: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: lit ? (accent ? colors.primary : colors.onSurface) : null,
-        border: Border.all(color: colors.onSurface, width: 2),
+    final edge = silent
+        ? colors.onSurface.withValues(alpha: 0.3)
+        : colors.onSurface;
+    return Semantics(
+      button: true,
+      label: 'Beat ${index + 1}: ${level.name}. Tap to change.',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () =>
+            _controller.setPattern(_controller.pattern.cycleBeat(index)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          child: Container(
+            key: ValueKey('beat-$index-${lit ? 'on' : 'off'}'),
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: !lit
+                  ? null
+                  : silent
+                  ? edge
+                  : accent
+                  ? colors.primary
+                  : colors.onSurface,
+              border: Border.all(color: edge, width: 2),
+            ),
+          ),
+        ),
       ),
     );
   }

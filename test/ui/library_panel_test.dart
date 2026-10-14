@@ -72,7 +72,7 @@ void main() {
     await enterName(tester, 'Ballad');
 
     expect(find.text('Ballad'), findsNWidgets(2)); // list + main screen
-    expect(find.text('87 BPM · 4 beats'), findsOneWidget);
+    expect(find.text('87 BPM · 4/4'), findsOneWidget);
 
     metronome.setBpm(140);
     await tester.tap(find.widgetWithText(ListTile, 'Ballad'));

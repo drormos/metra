@@ -57,7 +57,11 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
    - `LibraryPanel`: setlist picker (or all songs), tap a song to load it, save current settings as a song (added to the selected setlist), reorder by drag, rename, add/remove from setlists, delete with confirmation. The loaded song's name shows above the beat dots.
    - Next/previous song through the selected setlist (or all songs), stopping at the ends rather than wrapping: ◀ ▶ around the song name, Page Up/Down and ←/→ keys (Bluetooth page-turner pedals), and previous/next in the Android notification and lock screen.
    - Layout by width, not platform: from 800 px wide the panel sits beside the metronome; narrower windows open it as a sheet from the app bar.
-4. **Expanded Patterns:** UI for 3/4, 6/8, 7/8 and subdivisions (eighths, triplets, sixteenths), mapped to the Phase 1 `MetronomePattern` model (UI only; the model already supports these).
+4. **Expanded Patterns:** UI for 3/4, 6/8, 7/8 and subdivisions (eighths, triplets, sixteenths), mapped to the Phase 1 `MetronomePattern` model.
+   - Time signatures 2/4, 3/4, 4/4, 5/4, 6/8, 7/8, 9/8, 12/8. In x/8 every eighth clicks and the BPM counts eighths; `beatUnit` is display-only.
+   - Subdivisions 1–4 per beat, played as a new `soft` level (normal click at 40% volume) so the beat stays clear.
+   - One dot per beat; tapping cycles normal → accent → silent, for groupings like 7/8 as 2+2+3. Changing the subdivision keeps custom accents; changing the time signature resets them.
+   - Drift test covers triplets on the real engine.
 
 ## Phase 3: Audio Assets & Polish
 1. **Click Sounds:** Selectable click profiles (e.g. woodblock, digital beep, cowbell), all with zero leading silence.
