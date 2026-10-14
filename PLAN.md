@@ -6,14 +6,14 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
 ## Status (2026-10-14)
 - Done: Phases 1–3, Phase 4 steps 1–9, Phase 4b (±5 hold-repeat buttons), Phase 5 (songs: editor, library, unsaved changes).
 - All planned phases are built. Open: the checks below; iOS lock-screen controls and headphone-unplug stop (not planned yet).
-- Waiting on the user: Phase 4 step 10 (Daylight colors on a real screen); the Phase 1 manual checks (headphones unplugged while playing, macOS app hidden for 60 s).
+- Waiting on the user: the Phase 1 manual checks (headphones unplugged while playing, macOS app hidden for 60 s).
 - Working rules: one step per commit; stage specific paths (never `git add -A`: the user edits `docs/design/` in parallel); `flutter test` + `flutter analyze` before each commit; the engine drift suite (`flutter test integration_test/drift_test.dart -d macos`) after engine changes.
 
 ## Agreed behavior not in `docs/design/ui-spec.md`
 Decisions made with the user that the spec doesn't state (or states differently). Keep them unless the spec is updated to say otherwise.
 - **On-stage changes to a loaded song survive closing the app** (Revert / Save to song still shown after reopening).
 - **Beat accent taps** are heard from the very next click (no waiting for a beat or bar).
-- **Volume defaults:** Accent 100%, Beat 80%, Subdivision 45% (revisit if needed).
+- **Volume defaults:** Accent 100%, Beat 80%, Subdivision 45% (confirmed on the phone, 2026-10-15).
 - **Visual offset:** default 0 ms (measured by eye on MacBook speakers; a USB-dongle headset needed ~20 ms); range −200 to +500 ms in 10 ms steps. The settings test uses the click if it's already playing and only stops what it started.
 - **Tempo ruler acceleration:** besides the fling snapping, faster drags cover more bpm per pixel (up to 2.5×) while slow drags stay 1 bpm per 14 px. One swipe (drag plus coast) moves at most 135 bpm, so 30 → 300 takes two swipes.
 - **Tempo ruler snapping:** short drags (under 5 bpm) and slow drags keep their exact value. A long, quick drag keeps it only if the finger rests on the value for 0.3 s first (a firmer haptic tick); otherwise lifting slides to the next multiple of 5 in the direction of movement. The tempo moves by 1 during the drag. A tap leaves the value alone.
@@ -67,7 +67,7 @@ Decisions made with the user that the spec doesn't state (or states differently)
   - Time signature: the next beat starts a bar in the new meter (`switchAtNextBeat(restartBar: true)`).
   - Song switch: at the next bar line (`switchAtNextBar`), so a new song starts on beat 1.
   - ±BPM: at the next step.
-- Decisions for the completed design: volume defaults Accent 100%, Beat 80%, Subdivision 45% (revisit if needed); the visual-offset test uses the playing click if there is one and only stops what it started; on-stage changes to a loaded song survive closing the app.
+- Decisions for the completed design: volume defaults Accent 100%, Beat 80%, Subdivision 45% (confirmed); the visual-offset test uses the playing click if there is one and only stops what it started; on-stage changes to a loaded song survive closing the app.
 - Visual offset defaults to 0 ms (measured by eye on macOS: 0 ms on built-in speakers, 20 ms on a USB-dongle wireless headset), adjustable in the settings sheet from −200 to +500 ms in 10 ms steps to cover Bluetooth output. Not persisted until Phase 2.
 - The drift check captures the mixer output rather than recording the speakers. The engine clock is paced by the output device, so the mix timeline is what plays; capture must use the engine's channel count (it does not convert channels).
 - No audio focus on Android: focus would pause the user's music, and playing along with a track is a core use. Instead the click stops when a personal output (headphones, Bluetooth, USB audio) disappears, so it never jumps to the speaker. (audio_session's "becoming noisy" event only fires with focus, so this watches device removal.)
@@ -125,7 +125,7 @@ Decisions made with the user that the spec doesn't state (or states differently)
    - Setlist editor, a full screen opened from "Edit" in the picker, "+" (New setlist) and "New setlist" in What to play. Top bar Cancel / "Setlist" / Save. Name field, song count and a muted "Drag to reorder". 60px rows: ✕ (removes from this set only; no confirmation, a short "Removed" message with Undo), position, name, tempo, time signature, drag handle. The same song may appear more than once. Bottom: "Add songs" (filled, opens pick mode) and red "Delete setlist" (confirms; never deletes songs). "Start with all songs" when creating a set stays as a shortcut.
    - Library pick mode, a full screen: Cancel and "Add to <set>", search field, the song list with a checkbox per row ("Already in this set" shown but still addable). Bottom: "New song" (outlined; creates a song and adds it; until the song editor exists, it saves the current settings under a name) and "Add N songs" (filled primary, disabled until something is checked).
 9. **Behaviors (done):** BPM centring fix: the number alone is centred on the screen and "bpm" hangs off its right side near the baseline, not counted in the centring (today the pair is centred). Next/previous or choosing a song while playing restarts immediately on beat 1 at the new tempo (`ClickScheduler.restartNow`: the new bar starts one guard, ~60 ms, after the tap); while stopped it only loads. Covered by the engine drift test. Keep the screen awake while playing (`wakelock_plus`, Android/iOS/macOS; verified on a real phone). Opening sheets/editors never changes the click.
-10. **Daylight check:** Check every Daylight color on a real screen.
+10. **Daylight check (done):** checked on the phone by the user (2026-10-15).
 
 ## Phase 4b: Main-screen tweaks
 1. **Tempo buttons (done):** −5, −1, +1, +5 (was ±10; ±5 matches the ruler's labeled ticks). Holding a button repeats (`RepeatButton`, spec "Hold to repeat"): a tap is one step; holding waits 0.4 s, then repeats at 6 steps/s, ramping linearly to 15/s by 1.5 s of holding, using the button's own step. Release stops at once; reaching 30 or 300 stops with a medium haptic bump. Numbers are the spec's starting values; tune on the phone. Keyboard Shift+↑/↓ follows (±5).
