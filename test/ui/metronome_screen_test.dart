@@ -530,6 +530,30 @@ void main() {
       expect(controller.bpm, released);
     });
 
+    testWidgets('holding still before lifting still snaps ahead', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      final gesture = await tester.startGesture(tester.getCenter(ruler()));
+      var t = Duration.zero;
+      Future<void> move(double dx, int ms) async {
+        t += Duration(milliseconds: ms);
+        await gesture.moveBy(Offset(dx, 0), timeStamp: t);
+        await tester.pump();
+      }
+
+      for (var i = 0; i < 10; i++) {
+        await move(-10, 30); // ~330 px/s up to about 127
+      }
+      // Half a second resting, with the jitter of a real finger.
+      for (var i = 0; i < 30; i++) {
+        await move(i.isEven ? 1 : -1, 16);
+      }
+      await gesture.up(timeStamp: t);
+      await tester.pumpAndSettle();
+      expect(controller.bpm, 130);
+    });
+
     test('a drag snaps to the next multiple of 5 in its direction', () {
       expect(TempoRuler.snapTarget(121, 1), 125);
       expect(TempoRuler.snapTarget(124, -1), 120);

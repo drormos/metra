@@ -43,10 +43,14 @@ class TempoRuler extends StatefulWidget {
   /// and isn't snapped (~8 bpm/s). Tune on a real phone.
   static const fineSpeed = 120.0;
 
-  /// How quickly "recent finger speed" forgets older movement: speed
-  /// before roughly this long ago barely counts, so a fast drag that slows
-  /// down to creep onto 123 is judged by the creep.
-  static const recentSpeedWindow = Duration(milliseconds: 200);
+  /// "Recent finger speed" is measured over this much of the latest
+  /// movement, so a fast drag that slows down to creep onto 123 is judged
+  /// by the creep. Holding still before lifting doesn't count as movement.
+  static const recentSpeedWindow = Duration(milliseconds: 300);
+
+  /// Finger moves smaller than this (px) are jitter from a resting finger,
+  /// not movement: they don't make a drag look slow or flip its direction.
+  static const jitterPx = 3.0;
 
   /// How far a fling coasts: lower stops sooner (see [FrictionSimulation]).
   static const flingFriction = 0.05;
@@ -114,9 +118,10 @@ class _TempoRulerState extends State<TempoRuler>
   // Fractional bpm under the needle while dragging or gliding; null at rest.
   double? _value;
   Duration? _lastMoveTime;
-  // Smoothed finger speed (px/s) over roughly the last recentSpeedWindow of
-  // movement; pauses don't lower it. Null when event times are missing.
-  double? _recentSpeed;
+  // The finger's path: (time, x) points at least jitterPx apart, so a
+  // resting finger adds none. Empty when event times are missing.
+  final _path = <(Duration, double)>[];
+  double _fingerX = 0;
   // Bpm direction of the last move: +1 up, −1 down.
   int _direction = 0;
   // Where this drag began, to cap how far one swipe goes.
@@ -152,7 +157,10 @@ class _TempoRulerState extends State<TempoRuler>
     _value ??= _controller.bpm.toDouble();
     _swipeStart = _value!;
     _lastMoveTime = details.sourceTimeStamp;
-    _recentSpeed = null;
+    _fingerX = 0;
+    _path
+      ..clear()
+      ..addAll([?_pathPoint(details.sourceTimeStamp)]);
     _direction = 0;
   }
 
@@ -168,12 +176,9 @@ class _TempoRulerState extends State<TempoRuler>
       final seconds = (now - last).inMicroseconds / 1e6;
       final speed = dx.abs() / seconds;
       gain = TempoRuler.gainFor(speed);
-      final previous = _recentSpeed ?? speed;
-      final weight =
-          1 - exp(-seconds * 1e6 / TempoRuler.recentSpeedWindow.inMicroseconds);
-      _recentSpeed = previous + (speed - previous) * weight;
     }
-    if (dx != 0) _direction = dx < 0 ? 1 : -1; // dragging left raises it
+    _fingerX += dx;
+    _track(now);
     _moveTo(_value! - dx * gain / TempoRuler.pxPerBpm);
   }
 
@@ -182,7 +187,7 @@ class _TempoRulerState extends State<TempoRuler>
     final from = _value!;
     if (speed.abs() < TempoRuler.flingSpeed) {
       // Fine-tuning (or no timing to judge by): stays exactly where it is.
-      final recent = _recentSpeed;
+      final recent = _recentSpeed();
       if (recent == null || recent < TempoRuler.fineSpeed) return _settle();
       return _glideTo(TempoRuler.snapTarget(from, _direction), 0.15);
     }
@@ -195,6 +200,35 @@ class _TempoRulerState extends State<TempoRuler>
     );
     // Decelerate starts at twice its average speed: match the release.
     _glideTo(target, 2 * (target - from).abs() / bpmPerSecond.abs());
+  }
+
+  (Duration, double)? _pathPoint(Duration? time) =>
+      time == null ? null : (time, _fingerX);
+
+  /// Adds a path point once the finger has really moved, and keeps the
+  /// direction of that movement.
+  void _track(Duration? now) {
+    final point = _pathPoint(now);
+    if (point == null) return;
+    if (_path.isEmpty) return _path.add(point);
+    final moved = _fingerX - _path.last.$2;
+    if (moved.abs() < TempoRuler.jitterPx) return;
+    _direction = moved < 0 ? 1 : -1; // dragging left raises the tempo
+    _path.add(point);
+    // Keep one point from before the window, so the span covers it.
+    while (_path.length > 2 &&
+        _path[1].$1 <= point.$1 - TempoRuler.recentSpeedWindow) {
+      _path.removeAt(0);
+    }
+  }
+
+  /// Finger speed (px/s) over the latest movement, or null if unknown.
+  double? _recentSpeed() {
+    if (_path.length < 2) return null;
+    final (t0, x0) = _path.first;
+    final (t1, x1) = _path.last;
+    final seconds = (t1 - t0).inMicroseconds / 1e6;
+    return seconds > 0 ? (x1 - x0).abs() / seconds : null;
   }
 
   void _glideTo(double target, double seconds) {
