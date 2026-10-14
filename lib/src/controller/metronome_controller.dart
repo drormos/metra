@@ -145,6 +145,26 @@ class MetronomeController extends ChangeNotifier {
     );
   }
 
+  /// An edited song applied while it may be playing: each change takes
+  /// effect as it would on the main screen, without restarting the bar.
+  /// Tempo from the next step; accents and cells from the next click;
+  /// subdivision from the next beat; a new time signature starts a bar on
+  /// the next beat. Nothing changed: nothing happens.
+  void applyEdit({required int bpm, required MetronomePattern pattern}) {
+    setBpm(bpm);
+    if (pattern == _pattern) return;
+    if (pattern.beatsPerBar != _pattern.beatsPerBar ||
+        pattern.beatUnit != _pattern.beatUnit) {
+      _switchAtNextBeat(pattern, restartBar: true);
+    } else if (pattern.stepsPerBeat != _pattern.stepsPerBeat) {
+      _switchAtNextBeat(pattern, restartBar: false);
+    } else {
+      _pattern = pattern;
+      _scheduler.replaceLevels(pattern);
+      notifyListeners();
+    }
+  }
+
   void _switchAtNextBeat(MetronomePattern pattern, {required bool restartBar}) {
     _pattern = pattern;
     _scheduler.switchAtNextBeat(

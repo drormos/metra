@@ -283,6 +283,68 @@ void main() {
     });
   });
 
+  group('applyEdit (a saved song, while playing)', () {
+    // Playing from 1120 at 120 bpm; at 1500 beat 2 is next, at 1620.
+    Future<void> playUntil1500() async {
+      await controller.play();
+      output.time = _ms * 1500;
+    }
+
+    FakeClick? clickAt(int ms) =>
+        output.live.where((c) => c.at == _ms * ms).firstOrNull;
+
+    test('nothing changed: nothing happens', () async {
+      await playUntil1500();
+      final before = output.clicks.length;
+      notifications = 0;
+      controller.applyEdit(
+        bpm: 120,
+        pattern: const MetronomePattern.standard(),
+      );
+      expect(output.clicks, hasLength(before));
+      expect(notifications, 0);
+    });
+
+    test('tempo: no restart on beat 1', () async {
+      await playUntil1500();
+      controller.applyEdit(
+        bpm: 100,
+        pattern: const MetronomePattern.standard(),
+      );
+      expect(controller.bpm, 100);
+      expect(clickAt(1560), isNull, reason: 'no restart one guard later');
+    });
+
+    test('accents: from the next click, bar kept', () async {
+      await playUntil1500();
+      controller.applyEdit(
+        bpm: 120,
+        pattern: const MetronomePattern.standard().cycleBeat(1),
+      );
+      expect(clickAt(1620)?.level, StepLevel.accent, reason: 'beat 2');
+    });
+
+    test('subdivision: from the next beat, bar kept', () async {
+      await playUntil1500();
+      controller.applyEdit(
+        bpm: 120,
+        pattern: const MetronomePattern.standard().withSubdivision(2),
+      );
+      expect(controller.pattern.stepsPerBeat, 2);
+      expect(clickAt(1620)?.level, StepLevel.normal, reason: 'still beat 2');
+    });
+
+    test('time signature: the next beat starts a bar', () async {
+      await playUntil1500();
+      controller.applyEdit(
+        bpm: 120,
+        pattern: const MetronomePattern.standard().withBeats(3),
+      );
+      expect(controller.pattern.timeSignature, '3/4');
+      expect(clickAt(1620)?.level, StepLevel.accent, reason: 'beat 1');
+    });
+  });
+
   group('loadSong', () {
     final waltz = MetronomePattern.simple(beatsPerBar: 3, stepsPerBeat: 1);
 

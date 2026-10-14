@@ -15,7 +15,7 @@ import 'theme.dart';
 /// Opens the song editor (ui-spec.md "Song editor") for [song], or a new
 /// song when null. Completes with the saved song, or null if cancelled or
 /// deleted. Editing doesn't touch the click; saving the loaded song applies
-/// it to [metronome] at once (restarting on beat 1 if playing).
+/// its changes to [metronome] at once, without restarting the bar.
 Future<Song?> openSongEditor(
   BuildContext context,
   LibraryController library,
@@ -29,7 +29,7 @@ Future<Song?> openSongEditor(
     ),
   );
   if (saved != null && saved.id == library.currentSong?.id) {
-    metronome.loadSong(bpm: saved.bpm, pattern: saved.pattern);
+    metronome.applyEdit(bpm: saved.bpm, pattern: saved.pattern);
   }
   return saved;
 }
