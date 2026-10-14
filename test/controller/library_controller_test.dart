@@ -348,6 +348,71 @@ void main() {
     });
   });
 
+  group('changes to a loaded song', () {
+    late MetronomeController metronome;
+    late Song song;
+
+    setUp(() {
+      metronome = MetronomeController(FakeClickOutput());
+      library.attach(metronome);
+      song = library.addSong(name: 'A', bpm: 100, pattern: waltz);
+      library.playSong(song, metronome);
+    });
+    tearDown(() => metronome.dispose());
+
+    test('nothing loaded, or just loaded: no changes', () {
+      expect(library.songChanged(metronome), isFalse);
+      library.deleteSong(song.id);
+      metronome.nudge(1);
+      expect(library.songChanged(metronome), isFalse, reason: 'no song');
+    });
+
+    test('a main-screen change shows; the song is not touched', () {
+      metronome.cycleBeat(1);
+      expect(library.songChanged(metronome), isTrue);
+      expect(library.songById(song.id)!.pattern, waltz);
+    });
+
+    test('Save to song stores the changes', () {
+      metronome
+        ..nudge(5)
+        ..setSubdivision(2);
+      library.saveToSong(metronome);
+      expect(library.songChanged(metronome), isFalse);
+      final saved = library.songById(song.id)!;
+      expect(saved.bpm, 105);
+      expect(saved.pattern.stepsPerBeat, 2);
+    });
+
+    test('Revert restores the stored values', () {
+      metronome
+        ..nudge(5)
+        ..setMeter(4, 4);
+      library.revertSong(metronome);
+      expect(library.songChanged(metronome), isFalse);
+      expect(metronome.bpm, 100);
+      expect(metronome.pattern, waltz);
+    });
+
+    test('loading another song discards them', () {
+      final other = library.addSong(name: 'B', bpm: 80, pattern: waltz);
+      metronome.nudge(5);
+      library.playSong(other, metronome);
+      expect(library.songChanged(metronome), isFalse);
+      expect(library.songById(song.id)!.bpm, 100);
+    });
+
+    test('they survive closing the app', () async {
+      metronome.nudge(5);
+      final reopened = await reload();
+      final fresh = MetronomeController(FakeClickOutput());
+      addTearDown(fresh.dispose);
+      reopened.attach(fresh);
+      expect(fresh.bpm, 105);
+      expect(reopened.songChanged(fresh), isTrue);
+    });
+  });
+
   group('setlist editing', () {
     test('saveSetlist creates, then updates in place', () async {
       final a = library.addSong(name: 'a', bpm: 100, pattern: waltz);

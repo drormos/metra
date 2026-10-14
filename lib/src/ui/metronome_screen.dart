@@ -36,6 +36,8 @@ class MetronomeScreen extends StatelessWidget {
   static const meterKey = Key('meter');
   static const subdivisionKey = Key('subdivision');
   static const vibrateKey = Key('vibrate');
+  static const revertKey = Key('revert');
+  static const saveToSongKey = Key('save-to-song');
 
   @override
   Widget build(BuildContext context) {
@@ -141,17 +143,13 @@ class MetronomeScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        tempoName(bpm),
-                        key: tempoNameKey,
-                        style: TextStyle(fontSize: 16, color: colors.muted),
-                      ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              // Fixed height: the tempo name, or Revert / Save to song.
+              SizedBox(height: 44, child: _tempoLine(colors, bpm)),
+              const SizedBox(height: 4),
               TempoRuler(controller: controller),
             ],
           ),
@@ -246,6 +244,58 @@ class MetronomeScreen extends StatelessWidget {
   }
 
   /// Song title, then subdivision, time signature and settings buttons.
+  /// The tempo name; while the loaded song has unsaved main-screen
+  /// changes, Revert and Save to song instead (ui-spec.md "Changes to a
+  /// loaded song").
+  Widget _tempoLine(MetraColors colors, int bpm) {
+    final library = this.library;
+    if (library == null || !library.songChanged(controller)) {
+      return Center(
+        child: Text(
+          tempoName(bpm),
+          key: tempoNameKey,
+          style: TextStyle(fontSize: 16, color: colors.muted),
+        ),
+      );
+    }
+    const label = TextStyle(fontSize: 15, fontWeight: FontWeight.w600);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        TextButton(
+          key: revertKey,
+          style: TextButton.styleFrom(
+            foregroundColor: colors.muted,
+            minimumSize: const Size(0, 44),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+          ),
+          onPressed: () {
+            Haptics.tick();
+            library.revertSong(controller);
+          },
+          child: const Text('Revert', style: label),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          height: 40,
+          child: OutlinedButton(
+            key: saveToSongKey,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: colors.text,
+              side: BorderSide(color: colors.text, width: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+            ),
+            onPressed: () {
+              Haptics.tick();
+              library.saveToSong(controller);
+            },
+            child: const Text('Save to song', style: label),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _topRow(BuildContext context) {
     final pattern = controller.pattern;
     final song = library?.currentSong;

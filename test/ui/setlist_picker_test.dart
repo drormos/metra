@@ -133,6 +133,28 @@ void main() {
     });
   }
 
+  testWidgets('main-screen changes show Revert and Save to song', (
+    tester,
+  ) async {
+    await pumpWithSets(tester);
+    library.playSong(library.visibleSongs[0], metronome, index: 0);
+    await tester.pump();
+    expect(find.byKey(MetronomeScreen.tempoNameKey), findsOneWidget);
+    await tester.tap(find.text('+1'));
+    await tester.pump();
+    expect(find.byKey(MetronomeScreen.tempoNameKey), findsNothing);
+    await tester.tap(find.byKey(MetronomeScreen.saveToSongKey));
+    await tester.pump();
+    expect(library.currentSong!.bpm, 101);
+    expect(find.byKey(MetronomeScreen.tempoNameKey), findsOneWidget);
+    await tester.tap(find.text('+5'));
+    await tester.pump();
+    await tester.tap(find.byKey(MetronomeScreen.revertKey));
+    await tester.pump();
+    expect(metronome.bpm, 101);
+    expect(find.byKey(MetronomeScreen.tempoNameKey), findsOneWidget);
+  });
+
   testWidgets('the pencil on a picker row edits that song', (tester) async {
     await pumpWithSets(tester);
     await openFromHeader(tester);

@@ -142,6 +142,28 @@ class LibraryController extends ChangeNotifier {
     return song;
   }
 
+  /// Whether main-screen changes (tempo, time signature, subdivision, beat
+  /// states) make [metronome] differ from the loaded song. They play but
+  /// aren't stored until [saveToSong]; loading a song discards them.
+  bool songChanged(MetronomeController metronome) {
+    final song = currentSong;
+    return song != null &&
+        (song.bpm != metronome.bpm || song.pattern != metronome.pattern);
+  }
+
+  /// Stores the main-screen changes in the loaded song (every set gets them).
+  void saveToSong(MetronomeController metronome) {
+    if (currentSong case final song?) updateSongFromMetronome(song, metronome);
+  }
+
+  /// Back to the loaded song's stored values; while playing, each change
+  /// applies as on the main screen (no restart on beat 1).
+  void revertSong(MetronomeController metronome) {
+    if (currentSong case final song?) {
+      metronome.applyEdit(bpm: song.bpm, pattern: song.pattern);
+    }
+  }
+
   /// Overwrites [song]'s tempo and pattern with the metronome's.
   void updateSongFromMetronome(Song song, MetronomeController metronome) =>
       updateSong(song.copyWith(bpm: metronome.bpm, pattern: metronome.pattern));
