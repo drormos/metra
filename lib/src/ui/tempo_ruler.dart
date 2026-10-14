@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -15,13 +16,13 @@ import 'theme.dart';
 /// picking; faster moves cover more bpm per pixel (up to [maxGain]×). One
 /// swipe, drag and coast together, covers at most [maxSwipeBpm], so the
 /// whole range takes two.
-/// Snapping: only a very slow, careful drag (recent finger speed below
-/// [fineSpeed]) stays exactly where it's released, so 123 is reachable. Any
-/// other drag slides to the next multiple of 5 in the direction it was
-/// moving; a fling (release faster than [flingSpeed]) coasts and also comes
-/// to rest on a multiple of 5. A light haptic tick marks
-/// every multiple of 5 crossed, while dragging and coasting. Touching the
-/// ruler stops a coast.
+/// Snapping: resting the finger for [lockDelay] locks the exact value (a
+/// firmer haptic tick says so), so lifting keeps e.g. 123. Lifting without
+/// that pause slides to the next multiple of 5 in the direction the drag
+/// was moving; a fling (release faster than [flingSpeed]) coasts and also
+/// comes to rest on a multiple of 5. A light haptic tick marks every
+/// multiple of 5 crossed, while dragging and coasting. Touching the ruler
+/// stops a coast.
 class TempoRuler extends StatefulWidget {
   const TempoRuler({super.key, required this.controller});
 
@@ -39,17 +40,12 @@ class TempoRuler extends StatefulWidget {
   /// Release speed (px/s) that counts as a fling. Tune on a real phone.
   static const flingSpeed = 300.0;
 
-  /// Recent finger speed (px/s) below which a drag counts as fine-tuning
-  /// and isn't snapped (~13 bpm/s). Tune on a real phone.
-  static const fineSpeed = 180.0;
-
-  /// "Recent finger speed" is measured over this much of the latest
-  /// movement, so a fast drag that slows down to creep onto 123 is judged
-  /// by the creep. Holding still before lifting doesn't count as movement.
-  static const recentSpeedWindow = Duration(milliseconds: 300);
+  /// How long the finger rests on a value before lifting keeps it exactly.
+  /// Shorter catches the brief pause many drags end with. Tune on a phone.
+  static const lockDelay = Duration(milliseconds: 300);
 
   /// Finger moves smaller than this (px) are jitter from a resting finger,
-  /// not movement: they don't make a drag look slow or flip its direction.
+  /// not movement: they don't undo a lock or flip the direction.
   static const jitterPx = 3.0;
 
   /// How far a fling coasts: lower stops sooner (see [FrictionSimulation]).
@@ -89,7 +85,7 @@ class TempoRuler extends StatefulWidget {
     );
   }
 
-  /// Where a non-fine drag released at [value] rests: the next multiple
+  /// Where an unlocked drag released at [value] rests: the next multiple
   /// of 5 in its [direction] (+1 up, −1 down), unless it's already within
   /// half a bpm of one. Within 30–300.
   static double snapTarget(double value, int direction) {
@@ -118,10 +114,13 @@ class _TempoRulerState extends State<TempoRuler>
   // Fractional bpm under the needle while dragging or gliding; null at rest.
   double? _value;
   Duration? _lastMoveTime;
-  // The finger's path: (time, x) points at least jitterPx apart, so a
-  // resting finger adds none. Empty when event times are missing.
-  final _path = <(Duration, double)>[];
+  // Finger position (px from the drag start) and where it last really
+  // moved, beyond jitter.
   double _fingerX = 0;
+  double _restX = 0;
+  // Restarted by every real move; fires once the finger has rested.
+  Timer? _lockTimer;
+  bool _locked = false;
   // Bpm direction of the last move: +1 up, −1 down.
   int _direction = 0;
   // Where this drag began, to cap how far one swipe goes.
@@ -137,6 +136,7 @@ class _TempoRulerState extends State<TempoRuler>
 
   @override
   void dispose() {
+    _lockTimer?.cancel();
     _glide.dispose();
     super.dispose();
   }
@@ -145,7 +145,9 @@ class _TempoRulerState extends State<TempoRuler>
     final clamped = value.clamp(_min, _max);
     final previous = _value ?? _controller.bpm.toDouble();
     if ((previous / 5).floor() != (clamped / 5).floor()) {
-      HapticFeedback.selectionClick(); // crossed a multiple of 5
+      // Crossed a multiple of 5. Not selectionClick: Android's CLOCK_TICK is
+      // too faint to feel on many phones.
+      HapticFeedback.lightImpact();
     }
     setState(() => _value = clamped);
     _controller.setBpm(clamped.round()); // no-op unless the whole value changed
@@ -158,10 +160,8 @@ class _TempoRulerState extends State<TempoRuler>
     _swipeStart = _value!;
     _lastMoveTime = details.sourceTimeStamp;
     _fingerX = 0;
-    _path
-      ..clear()
-      ..addAll([?_pathPoint(details.sourceTimeStamp)]);
     _direction = 0;
+    _rest();
   }
 
   void _update(DragUpdateDetails details) {
@@ -178,17 +178,21 @@ class _TempoRulerState extends State<TempoRuler>
       gain = TempoRuler.gainFor(speed);
     }
     _fingerX += dx;
-    _track(now);
+    final moved = _fingerX - _restX;
+    if (moved.abs() >= TempoRuler.jitterPx) {
+      _direction = moved < 0 ? 1 : -1; // dragging left raises the tempo
+      _rest();
+    }
     _moveTo(_value! - dx * gain / TempoRuler.pxPerBpm);
   }
 
   void _end(DragEndDetails details) {
     final speed = details.velocity.pixelsPerSecond.dx;
+    _lockTimer?.cancel();
     final from = _value!;
+    // Rested on it, or never really moved (a tap): keep it exactly.
+    if (_locked || _direction == 0) return _settle();
     if (speed.abs() < TempoRuler.flingSpeed) {
-      // Fine-tuning (or no timing to judge by): stays exactly where it is.
-      final recent = _recentSpeed();
-      if (recent == null || recent < TempoRuler.fineSpeed) return _settle();
       return _glideTo(TempoRuler.snapTarget(from, _direction), 0.15);
     }
     final bpmPerSecond =
@@ -202,33 +206,20 @@ class _TempoRulerState extends State<TempoRuler>
     _glideTo(target, 2 * (target - from).abs() / bpmPerSecond.abs());
   }
 
-  (Duration, double)? _pathPoint(Duration? time) =>
-      time == null ? null : (time, _fingerX);
-
-  /// Adds a path point once the finger has really moved, and keeps the
-  /// direction of that movement.
-  void _track(Duration? now) {
-    final point = _pathPoint(now);
-    if (point == null) return;
-    if (_path.isEmpty) return _path.add(point);
-    final moved = _fingerX - _path.last.$2;
-    if (moved.abs() < TempoRuler.jitterPx) return;
-    _direction = moved < 0 ? 1 : -1; // dragging left raises the tempo
-    _path.add(point);
-    // Keep one point from before the window, so the span covers it.
-    while (_path.length > 2 &&
-        _path[1].$1 <= point.$1 - TempoRuler.recentSpeedWindow) {
-      _path.removeAt(0);
-    }
+  /// The finger is here now: unlock, and lock again if it stays.
+  void _rest() {
+    _restX = _fingerX;
+    _locked = false;
+    _lockTimer?.cancel();
+    _lockTimer = Timer(TempoRuler.lockDelay, () {
+      _locked = true;
+      HapticFeedback.heavyImpact(); // distinct from the multiple-of-5 tick
+    });
   }
 
-  /// Finger speed (px/s) over the latest movement, or null if unknown.
-  double? _recentSpeed() {
-    if (_path.length < 2) return null;
-    final (t0, x0) = _path.first;
-    final (t1, x1) = _path.last;
-    final seconds = (t1 - t0).inMicroseconds / 1e6;
-    return seconds > 0 ? (x1 - x0).abs() / seconds : null;
+  void _cancel() {
+    _lockTimer?.cancel();
+    _settle();
   }
 
   void _glideTo(double target, double seconds) {
@@ -279,7 +270,7 @@ class _TempoRulerState extends State<TempoRuler>
           onHorizontalDragStart: _start,
           onHorizontalDragUpdate: _update,
           onHorizontalDragEnd: _end,
-          onHorizontalDragCancel: _settle,
+          onHorizontalDragCancel: _cancel,
           child: SizedBox(
             height: TempoRuler.height,
             width: double.infinity,

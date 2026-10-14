@@ -475,16 +475,20 @@ void main() {
       expect(controller.bpm % 5, 0);
     });
 
-    testWidgets('a slow drag stays exactly where released', (tester) async {
+    testWidgets('a slow drag then a rest stays exactly where released', (
+      tester,
+    ) async {
       controller.setBpm(121);
       await pumpScreen(tester);
-      await tester.timedDrag(
-        ruler(),
-        const Offset(-70, 0),
-        const Duration(seconds: 1),
-      );
+      final gesture = await tester.startGesture(tester.getCenter(ruler()));
+      for (var i = 0; i < 10; i++) {
+        await gesture.moveBy(const Offset(-7, 0));
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tester.pump(TempoRuler.lockDelay);
+      await gesture.up();
       await tester.pumpAndSettle();
-      expect(controller.bpm, 126, reason: 'not snapped to 125');
+      expect(controller.bpm, 126, reason: 'not snapped to 130');
     });
 
     testWidgets('a normal drag snaps ahead to a multiple of 5', (tester) async {
@@ -506,51 +510,41 @@ void main() {
       expect(controller.bpm, 120, reason: '123 moving down');
     });
 
-    testWidgets('fast, then a slow creep: stays where released', (
-      tester,
-    ) async {
-      await pumpScreen(tester);
+    /// Drags up to about 127 at a normal pace, then rests [restMs] with the
+    /// jitter of a real finger, then lifts.
+    Future<void> dragThenRest(WidgetTester tester, int restMs) async {
       final gesture = await tester.startGesture(tester.getCenter(ruler()));
       var t = Duration.zero;
       Future<void> move(double dx, int ms) async {
         t += Duration(milliseconds: ms);
         await gesture.moveBy(Offset(dx, 0), timeStamp: t);
-        await tester.pump();
-      }
-
-      for (var i = 0; i < 5; i++) {
-        await move(-12, 16); // 750 px/s
-      }
-      for (var i = 0; i < 20; i++) {
-        await move(-2, 50); // 40 px/s
-      }
-      final released = controller.bpm;
-      await gesture.up(timeStamp: t + const Duration(milliseconds: 50));
-      await tester.pumpAndSettle();
-      expect(controller.bpm, released);
-    });
-
-    testWidgets('holding still before lifting still snaps ahead', (
-      tester,
-    ) async {
-      await pumpScreen(tester);
-      final gesture = await tester.startGesture(tester.getCenter(ruler()));
-      var t = Duration.zero;
-      Future<void> move(double dx, int ms) async {
-        t += Duration(milliseconds: ms);
-        await gesture.moveBy(Offset(dx, 0), timeStamp: t);
-        await tester.pump();
+        await tester.pump(Duration(milliseconds: ms));
       }
 
       for (var i = 0; i < 10; i++) {
-        await move(-10, 30); // ~330 px/s up to about 127
+        await move(-10, 30); // ~330 px/s
       }
-      // Half a second resting, with the jitter of a real finger.
-      for (var i = 0; i < 30; i++) {
+      for (var i = 0; i < restMs ~/ 16; i++) {
         await move(i.isEven ? 1 : -1, 16);
       }
       await gesture.up(timeStamp: t);
       await tester.pumpAndSettle();
+    }
+
+    testWidgets('resting on a value before lifting keeps it exactly', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      await dragThenRest(tester, 400);
+      expect(controller.bpm, isNot(anyOf(125, 130)));
+      expect(controller.bpm, inInclusiveRange(126, 129));
+    });
+
+    testWidgets('a brief pause before lifting still snaps ahead', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      await dragThenRest(tester, 160);
       expect(controller.bpm, 130);
     });
 
@@ -573,35 +567,43 @@ void main() {
       expect(controller.bpm, greaterThan(123));
     });
 
-    testWidgets('a haptic tick on every multiple of 5 crossed', (tester) async {
-      final clicks = <Object?>[];
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        SystemChannels.platform,
-        (call) async {
-          if (call.method == 'HapticFeedback.vibrate') {
-            clicks.add(call.arguments);
-          }
-          return null;
-        },
-      );
-      addTearDown(
-        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+    testWidgets(
+      'a haptic tick on every multiple of 5 crossed, a firmer one on lock',
+      (tester) async {
+        final clicks = <Object?>[];
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
           SystemChannels.platform,
-          null,
-        ),
-      );
-      await pumpScreen(tester);
-      // 120 -> 132 slowly: crosses 125 and 130.
-      await tester.timedDrag(
-        ruler(),
-        const Offset(-168, 0),
-        const Duration(seconds: 2),
-      );
-      await tester.pumpAndSettle();
-      expect(controller.bpm, 132);
-      expect(clicks, hasLength(2));
-      expect(clicks.first, 'HapticFeedbackType.selectionClick');
-    });
+          (call) async {
+            if (call.method == 'HapticFeedback.vibrate') {
+              clicks.add(call.arguments);
+            }
+            return null;
+          },
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            SystemChannels.platform,
+            null,
+          ),
+        );
+        await pumpScreen(tester);
+        // 120 -> 132 slowly: crosses 125 and 130, then rests to lock 132.
+        final gesture = await tester.startGesture(tester.getCenter(ruler()));
+        for (var i = 0; i < 12; i++) {
+          await gesture.moveBy(const Offset(-14, 0));
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+        await tester.pump(TempoRuler.lockDelay);
+        await gesture.up();
+        await tester.pumpAndSettle();
+        expect(controller.bpm, 132);
+        expect(clicks, [
+          'HapticFeedbackType.lightImpact',
+          'HapticFeedbackType.lightImpact',
+          'HapticFeedbackType.heavyImpact', // locked
+        ]);
+      },
+    );
 
     test('gain grows with finger speed, capped', () {
       expect(TempoRuler.gainFor(100), 1);
