@@ -5,8 +5,8 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
 
 ## Status (2026-10-14)
 - Done: Phases 1–3, Phase 4 steps 1–9, Phase 4b (±5 hold-repeat buttons), Phase 5 (songs: editor, library, unsaved changes).
-- Next: phone checks (settings screen, app icon at small sizes, Daylight colors). All planned phases are built.
-- Waiting on the user: Phase 4 step 10 (Daylight colors on a real screen); feel of the ruler's fling threshold and haptic tick on the phone.
+- All planned phases are built. Open: the checks below; iOS lock-screen controls and headphone-unplug stop (not planned yet).
+- Waiting on the user: Phase 4 step 10 (Daylight colors on a real screen); the Phase 1 manual checks (headphones unplugged while playing, macOS app hidden for 60 s).
 - Working rules: one step per commit; stage specific paths (never `git add -A`: the user edits `docs/design/` in parallel); `flutter test` + `flutter analyze` before each commit; the engine drift suite (`flutter test integration_test/drift_test.dart -d macos`) after engine changes.
 
 ## Agreed behavior not in `docs/design/ui-spec.md`
