@@ -341,4 +341,21 @@ void main() {
       await stop(tester);
     });
   });
+
+  testWidgets('every beat block, muted included, fills its width', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+    controller
+      ..cycleBeat(3) // regular -> accent
+      ..cycleBeat(3); // accent -> muted
+    await tester.pump();
+    expect(controller.pattern.beatLevels[3], StepLevel.silent);
+    final widths = [
+      for (var i = 0; i < 4; i++)
+        tester.getSize(find.byKey(ValueKey('beat-$i-off'))).width,
+    ];
+    expect(widths[3], greaterThan(40));
+    expect(widths.toSet(), hasLength(1), reason: 'equal widths');
+  });
 }

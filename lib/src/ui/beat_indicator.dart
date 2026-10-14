@@ -84,6 +84,9 @@ class _BeatIndicatorState extends State<BeatIndicator>
               level,
               sounding: beat == soundingBeat && level != StepLevel.silent,
               child: Column(
+                // Blocks fill the beat's width (a muted block has no colored
+                // fill to size it otherwise).
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _block(
                     beat,
