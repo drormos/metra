@@ -47,7 +47,7 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
 **Goal:** Quick-access songs and setlists, reliable mobile playback.
 1. **Background Audio:** Integrate `audio_service` so playback continues with the Android screen off or the app in the background. The refill loop must keep running in the background; use a long lookahead while backgrounded.
    - `MetronomeAudioHandler` mirrors the controller into audio_service: playing starts a `mediaPlayback` foreground service with Play/Stop in the notification and lock screen; swiping the app away stops.
-   - Verified on a real Android phone (speaker): keeps playing on the lock screen, when minimized, and alongside other music; stops when the app is swiped away. Headphone-removal stop not yet tried on hardware.
+   - Verified on a real Android phone (speaker): keeps playing on the lock screen, when minimized, and alongside other music; stops when the app is swiped away. Unplugging headphones stops the click.
    - `MainActivity` must extend `AudioServiceActivity`. A plain `FlutterActivity` makes audio_service start a second engine that runs `main()` again and re-initializes SoLoud.
 2. **Persistence:** Simple JSON file storage for songs, setlists, and the visual latency offset.
 3. **Setlist UI:** Side panel (macOS) or sheet (Android) for switching songs without stopping playback. A song switch applies tempo and pattern at the next bar boundary.
