@@ -9,6 +9,7 @@ import 'package:metra/src/model/library.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/editor_scaffold.dart';
+import 'package:metra/src/ui/meter_control.dart';
 import 'package:metra/src/ui/song_editor.dart';
 
 import '../audio/fake_click_output.dart';
@@ -161,7 +162,7 @@ void main() {
     // The beats + is the second "+".
     await tester.tap(find.text('+').last);
     await tester.pump();
-    expect(tester.widget<Text>(find.byKey(SongEditor.beatsKey)).data, '5');
+    expect(tester.widget<Text>(find.byKey(MeterControl.beatsKey)).data, '5');
     await tapText(tester, '8');
     expect(library.songById(alpha.id)!.bpm, 100, reason: 'not saved yet');
     await save(tester);

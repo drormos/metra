@@ -15,6 +15,7 @@ import 'song_editor.dart';
 import 'song_library.dart';
 import 'subdivision_icon.dart';
 import 'tempo_ruler.dart';
+import 'time_signature_sheet.dart';
 import 'theme.dart';
 
 /// Main screen (ui-spec.md), the same phone layout on every platform.
@@ -358,7 +359,7 @@ class MetronomeScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 minimumSize: const Size(44, 44),
               ),
-              onPressed: () => _showMeterPicker(context),
+              onPressed: () => showTimeSignatureSheet(context, controller),
               child: Text(
                 pattern.timeSignature,
                 style: const TextStyle(
@@ -410,50 +411,9 @@ class MetronomeScreen extends StatelessWidget {
     4: 'sixteenth notes',
   };
 
-  static const _meters = [
-    (2, 4),
-    (3, 4),
-    (4, 4),
-    (5, 4),
-    (6, 8),
-    (7, 8),
-    (9, 8),
-    (12, 8),
-  ];
-
   /// Plain picker (the spec leaves it undesigned). Changing the time
   /// signature resets custom accents; while playing, the next beat starts a
   /// bar in the new meter.
-  void _showMeterPicker(BuildContext context) => showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    builder: (context) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-        child: ListenableBuilder(
-          listenable: controller,
-          builder: (context, _) => Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final (beats, unit) in _meters)
-                ChoiceChip(
-                  label: Text('$beats/$unit'),
-                  selected: controller.pattern.timeSignature == '$beats/$unit',
-                  onSelected: (_) {
-                    Haptics.tick();
-                    controller.setMeter(beats, unit);
-                    Navigator.pop(context);
-                  },
-                ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-
   Future<void> _newSetlist(BuildContext context, LibraryController library) =>
       openSetlistEditor(
         context,
@@ -461,8 +421,7 @@ class MetronomeScreen extends StatelessWidget {
         newSong: (context) => _newSong(context, library),
       );
 
-  // Until the song editor (Phase 5): saves the current tempo and pattern
-  // under a name. Returns the new song's id.
+  // Pick mode's "New song": the song editor on a new song; returns its id.
   Future<String?> _newSong(
     BuildContext context,
     LibraryController library,

@@ -8,7 +8,7 @@ import '../timing/tap_tempo.dart';
 import 'beat_indicator.dart';
 import 'editor_scaffold.dart';
 import 'haptics.dart';
-import 'repeat_button.dart';
+import 'meter_control.dart';
 import 'subdivision_icon.dart';
 import 'theme.dart';
 
@@ -57,12 +57,9 @@ class SongEditor extends StatefulWidget {
   static const nameKey = Key('song-name');
   static const bpmKey = Key('song-bpm');
   static const tapKey = Key('song-tap');
-  static const beatsKey = Key('song-beats');
   static const patternKey = Key('song-pattern');
   static const deleteKey = Key('delete-song');
   static const previewKey = Key('song-preview');
-
-  static const maxBeats = 16;
 
   /// "Quarter notes, accent on 1" / "Sixteenths, custom pattern".
   static String summary(MetronomePattern pattern) =>
@@ -235,7 +232,13 @@ class _SongEditorState extends State<SongEditor> {
           ),
           const SizedBox(height: 28),
           _label('Time signature'),
-          _meter(colors),
+          MeterControl(
+            beats: _pattern.beatsPerBar,
+            unit: _pattern.beatUnit,
+            onChanged: (beats, unit) => _edit(
+              () => _pattern = _pattern.withBeats(beats, beatUnit: unit),
+            ),
+          ),
           const SizedBox(height: 28),
           _patternHeader(colors),
           if (_expanded) ...[
@@ -310,36 +313,9 @@ class _SongEditorState extends State<SongEditor> {
     ),
   );
 
-  Widget _stepButton(
-    String label, {
-    required double size,
-    required double fontSize,
-    required VoidCallback? onPressed,
-    bool accelerate = true,
-  }) => SizedBox.square(
-    dimension: size,
-    child: RepeatButton(
-      accelerate: accelerate,
-      style: FilledButton.styleFrom(
-        backgroundColor: context.colors.surface,
-        foregroundColor: context.colors.text,
-        padding: EdgeInsets.zero,
-      ),
-      onPressed: onPressed,
-      child: Text(
-        label,
-        style: TextStyle(
-          fontFamily: MetraFonts.condensed,
-          fontSize: fontSize,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    ),
-  );
-
   Widget _tempo(MetraColors colors) => Row(
     children: [
-      _stepButton(
+      StepButton(
         '−',
         size: 56,
         fontSize: 30,
@@ -373,7 +349,7 @@ class _SongEditorState extends State<SongEditor> {
           ),
         ),
       ),
-      _stepButton(
+      StepButton(
         '+',
         size: 56,
         fontSize: 30,
@@ -382,119 +358,6 @@ class _SongEditorState extends State<SongEditor> {
             : null,
       ),
     ],
-  );
-
-  Widget _meter(MetraColors colors) {
-    final beats = _pattern.beatsPerBar;
-    const big = TextStyle(
-      fontFamily: MetraFonts.condensed,
-      fontSize: 40,
-      fontWeight: FontWeight.w700,
-    );
-    return Row(
-      children: [
-        _stepButton(
-          '−',
-          size: 48,
-          fontSize: 26,
-          accelerate: false,
-          onPressed: beats > 1
-              ? () => _edit(() => _pattern = _pattern.withBeats(beats - 1))
-              : null,
-        ),
-        SizedBox(
-          width: 40,
-          child: Text(
-            '$beats',
-            key: SongEditor.beatsKey,
-            textAlign: TextAlign.center,
-            style: big,
-          ),
-        ),
-        _stepButton(
-          '+',
-          size: 48,
-          fontSize: 26,
-          accelerate: false,
-          onPressed: beats < SongEditor.maxBeats
-              ? () => _edit(() => _pattern = _pattern.withBeats(beats + 1))
-              : null,
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          child: Text(
-            '/',
-            style: big.copyWith(
-              fontWeight: FontWeight.w600,
-              color: colors.muted,
-            ),
-          ),
-        ),
-        Expanded(
-          child: _segmented(colors, [
-            for (final unit in const [4, 8])
-              (
-                selected: _pattern.beatUnit == unit,
-                onTap: () => _edit(
-                  () => _pattern = _pattern.withBeats(beats, beatUnit: unit),
-                ),
-                child: Text(
-                  '$unit',
-                  style: const TextStyle(
-                    fontFamily: MetraFonts.condensed,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-          ]),
-        ),
-      ],
-    );
-  }
-
-  /// Options in one 2px frame; the selected one filled with the text color.
-  Widget _segmented(
-    MetraColors colors,
-    List<({bool selected, VoidCallback onTap, Widget child})> options,
-  ) => Container(
-    decoration: BoxDecoration(
-      border: Border.all(color: colors.border, width: 2),
-      borderRadius: BorderRadius.circular(4),
-    ),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(2),
-      child: Row(
-        children: [
-          for (final option in options)
-            Expanded(
-              child: Semantics(
-                button: true,
-                selected: option.selected,
-                child: Material(
-                  color: option.selected ? colors.text : colors.background,
-                  child: InkWell(
-                    onTap: option.onTap,
-                    child: SizedBox(
-                      height: 44,
-                      child: Center(
-                        child: DefaultTextStyle.merge(
-                          style: TextStyle(
-                            color: option.selected
-                                ? colors.background
-                                : colors.text,
-                          ),
-                          child: option.child,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    ),
   );
 
   Widget _patternHeader(MetraColors colors) => SizedBox(

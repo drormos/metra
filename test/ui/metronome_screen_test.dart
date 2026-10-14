@@ -10,6 +10,7 @@ import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/repeat_button.dart';
 import 'package:metra/src/ui/haptics.dart';
 import 'package:metra/src/ui/tempo_ruler.dart';
+import 'package:metra/src/ui/time_signature_sheet.dart';
 
 import '../audio/fake_click_output.dart';
 import 'test_theme.dart';
@@ -191,6 +192,39 @@ void main() {
       expect(controller.pattern.timeSignature, '7/8');
       expect(find.byKey(const ValueKey('beat-6-off')), findsOneWidget);
       expect(find.byKey(const ValueKey('beat-7-off')), findsNothing);
+    });
+
+    testWidgets('a common meter applies and closes the sheet', (tester) async {
+      await pumpScreen(tester);
+      await tester.tap(find.byKey(MetronomeScreen.meterKey));
+      await tester.pumpAndSettle();
+      expect(find.text('Time signature'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('common-12-8')));
+      await tester.pumpAndSettle();
+      expect(controller.pattern.timeSignature, '12/8');
+      expect(find.byType(TimeSignatureSheet), findsNothing);
+    });
+
+    testWidgets('custom applies as it changes and stays open', (tester) async {
+      await pumpScreen(tester);
+      controller.cycleBeat(1); // beat 2 accented
+      await tester.tap(find.byKey(MetronomeScreen.meterKey));
+      await tester.pumpAndSettle();
+      final sheet = find.byType(TimeSignatureSheet);
+      await tester.tap(find.descendant(of: sheet, matching: find.text('+')));
+      await tester.pump();
+      expect(controller.pattern.timeSignature, '5/4');
+      await tester.tap(find.byKey(const ValueKey('meter-unit-8')));
+      await tester.pump();
+      expect(controller.pattern.timeSignature, '5/8');
+      expect(sheet, findsOneWidget);
+      expect(controller.pattern.beatLevels, [
+        StepLevel.accent,
+        StepLevel.accent,
+        StepLevel.normal,
+        StepLevel.normal,
+        StepLevel.normal,
+      ], reason: 'beat states kept, the new beat regular');
     });
 
     testWidgets('subdivision button cycles 1-4, one dot per beat', (
