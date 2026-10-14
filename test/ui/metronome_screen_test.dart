@@ -540,6 +540,36 @@ void main() {
       expect(controller.bpm, inInclusiveRange(126, 129));
     });
 
+    /// Drags [steps] × 14 px (1 bpm each) leftwards, one step per [ms],
+    /// and lifts at once.
+    Future<void> dragSteps(WidgetTester tester, int steps, int ms) async {
+      final gesture = await tester.startGesture(tester.getCenter(ruler()));
+      var t = Duration.zero;
+      for (var i = 0; i < steps; i++) {
+        t += Duration(milliseconds: ms);
+        await gesture.moveBy(const Offset(-14, 0), timeStamp: t);
+        await tester.pump(Duration(milliseconds: ms));
+      }
+      await gesture.up(timeStamp: t);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a short drag keeps its exact value, no pause needed', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      await dragSteps(tester, 3, 60); // 233 px/s: not slow, but short
+      expect(controller.bpm, 123);
+    });
+
+    testWidgets('a slow long drag keeps its exact value, no pause needed', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      await dragSteps(tester, 13, 100); // 140 px/s
+      expect(controller.bpm, 133);
+    });
+
     testWidgets('a brief pause before lifting still snaps ahead', (
       tester,
     ) async {

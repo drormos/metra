@@ -16,10 +16,12 @@ import 'theme.dart';
 /// picking; faster moves cover more bpm per pixel (up to [maxGain]×). One
 /// swipe, drag and coast together, covers at most [maxSwipeBpm], so the
 /// whole range takes two.
-/// Snapping: resting the finger for [lockDelay] locks the exact value (a
-/// firmer haptic tick says so), so lifting keeps e.g. 123. Lifting without
-/// that pause slides to the next multiple of 5 in the direction the drag
-/// was moving; a fling (release faster than [flingSpeed]) coasts and also
+/// Snapping: short drags (under [shortDragBpm]) and slow ones (recent
+/// finger speed under [fineSpeed]) stay exactly where they're released, so
+/// 120 → 123 just works. A long, quick drag can keep an exact value too by
+/// resting the finger for [lockDelay] first (a firmer haptic tick says
+/// so); otherwise it slides to the next multiple of 5 in the direction it
+/// was moving. A fling (release faster than [flingSpeed]) coasts and also
 /// comes to rest on a multiple of 5. A light haptic tick marks every
 /// multiple of 5 crossed, while dragging and coasting. Touching the ruler
 /// stops a coast.
@@ -42,7 +44,17 @@ class TempoRuler extends StatefulWidget {
 
   /// How long the finger rests on a value before lifting keeps it exactly.
   /// Shorter catches the brief pause many drags end with. Tune on a phone.
-  static const lockDelay = Duration(milliseconds: 300);
+  static const lockDelay = Duration(milliseconds: 200);
+
+  /// Drags that change the tempo by less than this (bpm) are fine-tuning:
+  /// never snapped.
+  static const shortDragBpm = 5.0;
+
+  /// Recent finger speed (px/s, ~13 bpm/s) below which a drag is
+  /// fine-tuning: never snapped. Measured over [recentSpeedWindow] of real
+  /// movement; rests don't count.
+  static const fineSpeed = 180.0;
+  static const recentSpeedWindow = Duration(milliseconds: 300);
 
   /// Finger moves smaller than this (px) are jitter from a resting finger,
   /// not movement: they don't undo a lock or flip the direction.
@@ -118,6 +130,9 @@ class _TempoRulerState extends State<TempoRuler>
   // moved, beyond jitter.
   double _fingerX = 0;
   double _restX = 0;
+  // Times and positions of real moves, for the recent finger speed. Empty
+  // when event times are missing.
+  final _path = <(Duration, double)>[];
   // Restarted by every real move; fires once the finger has rested.
   Timer? _lockTimer;
   bool _locked = false;
@@ -161,7 +176,8 @@ class _TempoRulerState extends State<TempoRuler>
     _lastMoveTime = details.sourceTimeStamp;
     _fingerX = 0;
     _direction = 0;
-    _rest();
+    _path.clear();
+    _rest(details.sourceTimeStamp);
   }
 
   void _update(DragUpdateDetails details) {
@@ -181,7 +197,7 @@ class _TempoRulerState extends State<TempoRuler>
     final moved = _fingerX - _restX;
     if (moved.abs() >= TempoRuler.jitterPx) {
       _direction = moved < 0 ? 1 : -1; // dragging left raises the tempo
-      _rest();
+      _rest(now);
     }
     _moveTo(_value! - dx * gain / TempoRuler.pxPerBpm);
   }
@@ -193,6 +209,11 @@ class _TempoRulerState extends State<TempoRuler>
     // Rested on it, or never really moved (a tap): keep it exactly.
     if (_locked || _direction == 0) return _settle();
     if (speed.abs() < TempoRuler.flingSpeed) {
+      final recent = _recentSpeed();
+      if ((from - _swipeStart).abs() < TempoRuler.shortDragBpm ||
+          (recent != null && recent < TempoRuler.fineSpeed)) {
+        return _settle(); // fine-tuning: keep it exactly
+      }
       return _glideTo(TempoRuler.snapTarget(from, _direction), 0.15);
     }
     final bpmPerSecond =
@@ -206,9 +227,27 @@ class _TempoRulerState extends State<TempoRuler>
     _glideTo(target, 2 * (target - from).abs() / bpmPerSecond.abs());
   }
 
-  /// The finger is here now: unlock, and lock again if it stays.
-  void _rest() {
+  /// Finger speed (px/s) over the latest real movement, or null if unknown.
+  double? _recentSpeed() {
+    if (_path.length < 2) return null;
+    final (t0, x0) = _path.first;
+    final (t1, x1) = _path.last;
+    final seconds = (t1 - t0).inMicroseconds / 1e6;
+    return seconds > 0 ? (x1 - x0).abs() / seconds : null;
+  }
+
+  /// The finger is here now (at [time]): unlock, and lock again if it
+  /// stays.
+  void _rest(Duration? time) {
     _restX = _fingerX;
+    if (time != null) {
+      _path.add((time, _fingerX));
+      // Keep one point from before the window, so the span covers it.
+      while (_path.length > 2 &&
+          _path[1].$1 <= time - TempoRuler.recentSpeedWindow) {
+        _path.removeAt(0);
+      }
+    }
     _locked = false;
     _lockTimer?.cancel();
     _lockTimer = Timer(TempoRuler.lockDelay, () {
