@@ -181,6 +181,17 @@ class LibraryController extends ChangeNotifier {
     return song;
   }
 
+  /// A default name for a new song: "Song N", N the next number not
+  /// already used.
+  String newSongName() {
+    final taken = {for (final song in songs) song.name};
+    var n = songs.length + 1;
+    while (taken.contains('Song $n')) {
+      n++;
+    }
+    return 'Song $n';
+  }
+
   void updateSong(Song song) {
     final edited = song.copyWith(editedAt: DateTime.now());
     _update(

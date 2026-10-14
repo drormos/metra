@@ -175,9 +175,7 @@ class _BeatIndicatorState extends State<BeatIndicator>
         key: ValueKey('beat-$beat-${sounding ? 'on' : 'off'}'),
         height: 36,
         color: color,
-        child: muted
-            ? CustomPaint(painter: _MutedLine(colors.mutedLine))
-            : null,
+        child: muted ? CustomPaint(painter: MutedLine(colors.mutedLine)) : null,
       ),
     );
   }
@@ -190,8 +188,8 @@ class _BeatIndicatorState extends State<BeatIndicator>
 }
 
 /// One thin diagonal, bottom-left to top-right: muted, explicit but quiet.
-class _MutedLine extends CustomPainter {
-  _MutedLine(this.color);
+class MutedLine extends CustomPainter {
+  MutedLine(this.color);
 
   final Color color;
 
@@ -205,5 +203,5 @@ class _MutedLine extends CustomPainter {
   );
 
   @override
-  bool shouldRepaint(_MutedLine old) => old.color != color;
+  bool shouldRepaint(MutedLine old) => old.color != color;
 }
