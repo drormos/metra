@@ -8,6 +8,7 @@ import '../model/tempo_name.dart';
 import 'beat_indicator.dart';
 import 'library_panel.dart';
 import 'setlist_group.dart';
+import 'setlist_picker.dart';
 import 'subdivision_icon.dart';
 import 'tempo_ruler.dart';
 import 'theme.dart';
@@ -190,8 +191,17 @@ class MetronomeScreen extends StatelessWidget {
           SetlistGroup(
             library: library,
             metronome: controller,
-            // Stand-in picker until the designed one (Phase 4 step 7).
-            onOpenPicker: () => _showSongs(context, library),
+            onOpenPicker: () => showSetlistPicker(
+              context,
+              library: library,
+              metronome: controller,
+              // The old song panel stands in for the setlist editor and
+              // the song library until they're built (Phase 4 step 8,
+              // Phase 5).
+              onEditSetlist: () => _showSongs(context, library),
+              onSongLibrary: () => _showSongs(context, library),
+              onNewSetlist: () => _newSetlist(context, library),
+            ),
             onNewSetlist: () => _newSetlist(context, library),
           ),
         ],

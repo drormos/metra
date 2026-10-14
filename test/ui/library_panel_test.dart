@@ -9,6 +9,7 @@ import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/setlist_group.dart';
+import 'package:metra/src/ui/setlist_picker.dart';
 
 import '../audio/fake_click_output.dart';
 import 'test_theme.dart';
@@ -47,6 +48,8 @@ void main() {
       library.addSetlist('Setup');
       await tester.pump();
       await tester.tap(find.text('Choose a setlist'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Song library'));
       await tester.pumpAndSettle();
     }
   }
@@ -94,7 +97,7 @@ void main() {
     );
     await tester.tap(find.byTooltip('Setlist actions'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('New setlist'));
+    await tester.tap(find.text('New setlist').last); // the panel's menu
     await tester.pumpAndSettle();
     await enterName(tester, 'Friday');
 
@@ -108,7 +111,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Add to setlist'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Friday'));
+    await tester.tap(find.text('Friday').last); // the dialog's option
     await tester.pumpAndSettle();
     expect(
       library.setlists.firstWhere((l) => l.name == 'Friday').songIds,
@@ -186,7 +189,7 @@ void main() {
       expect(find.byTooltip('New setlist'), findsOneWidget);
       await tester.tap(find.text('Choose a setlist'));
       await tester.pumpAndSettle();
-      expect(find.text('Save current as song'), findsOneWidget);
+      expect(find.text('What to play'), findsOneWidget);
     });
 
     testWidgets('+ names and loads a new setlist', (tester) async {
@@ -232,7 +235,8 @@ void main() {
       await withSet(tester);
       await tester.tap(find.byKey(SetlistGroup.headerKey));
       await tester.pumpAndSettle();
-      expect(find.text('Save current as song'), findsOneWidget);
+      expect(find.byKey(SetlistPicker.setNameKey), findsOneWidget);
+      expect(find.text('3 songs'), findsOneWidget);
     });
 
     testWidgets('same size and position in both modes', (tester) async {

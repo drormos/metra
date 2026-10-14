@@ -192,7 +192,8 @@ ThemeData metraTheme(MetraColors c, Brightness brightness) {
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: c.sheet,
       modalBackgroundColor: c.sheet,
-      dragHandleColor: c.muted,
+      dragHandleColor: c.beatResting,
+      dragHandleSize: const Size(40, 4),
     ),
     dialogTheme: DialogThemeData(backgroundColor: c.sheet),
     popupMenuTheme: PopupMenuThemeData(color: c.sheet),
