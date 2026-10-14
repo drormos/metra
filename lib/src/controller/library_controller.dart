@@ -15,7 +15,9 @@ class LibraryController extends ChangeNotifier {
 
   final LibraryStore _store;
   Library _library;
-  Future<void> _lastSave = Future.value();
+  // Coalesced saving: one write at a time, always of the latest library.
+  Library? _unsaved;
+  Future<void>? _writing;
   int _idCounter = 0;
   String? _selectedSetlistId;
   String? _currentSongId;
@@ -195,8 +197,7 @@ class LibraryController extends ChangeNotifier {
   );
 
   /// Restores the last session's tempo, pattern, flash offset and click
-  /// sound into
-  /// [metronome], then saves them whenever they change.
+  /// sound into [metronome], then saves them whenever they change.
   void attach(MetronomeController metronome) {
     metronome
       ..setBpm(_library.lastBpm)
@@ -223,16 +224,28 @@ class LibraryController extends ChangeNotifier {
 
   /// Completes when every save so far has been written.
   @visibleForTesting
-  Future<void> flush() => _lastSave;
+  Future<void> flush() => _writing ?? Future.value();
 
   void _update(Library library) {
     _library = library;
     notifyListeners();
-    // A failed write leaves the previous file intact; the next change
-    // retries with the full library.
-    _lastSave = _store
-        .save(library)
-        .catchError((Object e) => debugPrint('Saving library failed: $e'));
+    _unsaved = library;
+    _writing ??= _writeAll();
+  }
+
+  /// Rapid changes (a tempo drag) collapse into one write of the latest
+  /// state per file write, not one per change. A failed write leaves the
+  /// previous file intact; the next change retries with the full library.
+  Future<void> _writeAll() async {
+    for (var library = _unsaved; library != null; library = _unsaved) {
+      _unsaved = null;
+      try {
+        await _store.save(library);
+      } catch (e) {
+        debugPrint('Saving library failed: $e');
+      }
+    }
+    _writing = null;
   }
 
   String _newId() =>

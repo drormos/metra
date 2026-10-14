@@ -1,3 +1,5 @@
+import 'dart:ui' show SemanticsAction;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +7,7 @@ import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/click_sound.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
+import 'package:metra/src/ui/tempo_ruler.dart';
 
 import '../audio/fake_click_output.dart';
 import 'test_theme.dart';
@@ -376,5 +379,49 @@ void main() {
 
     await tester.tap(find.byKey(MetronomeScreen.playKey));
     await tester.pump();
+  });
+
+  group('tempo ruler', () {
+    Finder ruler() => find.byType(TempoRuler);
+
+    testWidgets('dragging left raises the tempo, 14 px per bpm', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      await tester.drag(ruler(), const Offset(-140, 0), touchSlopX: 0);
+      await tester.pump();
+      expect(controller.bpm, 130);
+      await tester.drag(ruler(), const Offset(70, 0), touchSlopX: 0);
+      await tester.pump();
+      expect(controller.bpm, 125);
+    });
+
+    testWidgets('clamps to 30-300', (tester) async {
+      await pumpScreen(tester);
+      await tester.drag(ruler(), const Offset(-5000, 0), touchSlopX: 0);
+      await tester.pump();
+      expect(controller.bpm, MetronomeController.maxBpm);
+      await tester.drag(ruler(), const Offset(5000, 0), touchSlopX: 0);
+      await tester.pump();
+      expect(controller.bpm, MetronomeController.minBpm);
+    });
+
+    testWidgets('a tap does nothing', (tester) async {
+      await pumpScreen(tester);
+      await tester.tapAt(tester.getCenter(ruler()) + const Offset(100, 0));
+      await tester.pump();
+      expect(controller.bpm, 120);
+    });
+
+    testWidgets('screen readers can adjust it', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pumpScreen(tester);
+      final node = tester.getSemantics(ruler());
+      expect(node.value, '120 bpm');
+      node.owner!.performAction(node.id, SemanticsAction.increase);
+      await tester.pump();
+      expect(controller.bpm, 121);
+      semantics.dispose();
+    });
   });
 }

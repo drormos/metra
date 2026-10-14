@@ -8,6 +8,7 @@ import '../model/tempo_name.dart';
 import 'beat_indicator.dart';
 import 'library_panel.dart';
 import 'subdivision_icon.dart';
+import 'tempo_ruler.dart';
 import 'theme.dart';
 
 /// Main screen: tempo readout, tempo steps and transport, plus the song
@@ -115,45 +116,52 @@ class MetronomeScreen extends StatelessWidget {
         // The BPM area takes all the free height and shrinks first on
         // small phones.
         Expanded(
-          child: Center(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
                     children: [
-                      Text(
-                        '$bpm',
-                        key: bpmKey,
-                        style: const TextStyle(
-                          fontFamily: MetraFonts.condensed,
-                          fontSize: 172,
-                          fontWeight: FontWeight.w700,
-                          height: 0.85,
-                          // Fixed-width digits: the readout doesn't shift.
-                          fontFeatures: [FontFeature.tabularFigures()],
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            '$bpm',
+                            key: bpmKey,
+                            style: const TextStyle(
+                              fontFamily: MetraFonts.condensed,
+                              fontSize: 172,
+                              fontWeight: FontWeight.w700,
+                              height: 0.85,
+                              // Fixed-width digits: the readout doesn't shift.
+                              fontFeatures: [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'bpm',
+                            style: TextStyle(fontSize: 18, color: colors.muted),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(height: 8),
                       Text(
-                        'bpm',
-                        style: TextStyle(fontSize: 18, color: colors.muted),
+                        tempoName(bpm),
+                        key: tempoNameKey,
+                        style: TextStyle(fontSize: 16, color: colors.muted),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    tempoName(bpm),
-                    key: tempoNameKey,
-                    style: TextStyle(fontSize: 16, color: colors.muted),
-                  ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(height: 8),
+              TempoRuler(controller: controller),
+            ],
           ),
         ),
         Row(

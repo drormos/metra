@@ -6,6 +6,7 @@ import 'package:metra/src/controller/library_controller.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/click_sound.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
+import 'package:metra/src/model/library.dart';
 import 'package:metra/src/storage/library_store.dart';
 
 import '../audio/fake_click_output.dart';
@@ -246,4 +247,38 @@ void main() {
     library.setThemeMode(ThemeMode.light);
     expect((await reload()).themeMode, ThemeMode.light);
   });
+
+  test(
+    'a burst of changes is written as few saves of the latest state',
+    () async {
+      final metronome = MetronomeController(FakeClickOutput());
+      addTearDown(metronome.dispose);
+      var saves = 0;
+      final counted = await LibraryController.load(
+        _CountingStore(store.file, () => saves++),
+      );
+      counted.attach(metronome);
+      for (var bpm = 60; bpm <= 160; bpm++) {
+        metronome.setBpm(bpm); // like a tempo drag
+      }
+      await counted.flush();
+      expect(saves, lessThanOrEqualTo(2), reason: '101 changes, coalesced');
+
+      final check = MetronomeController(FakeClickOutput());
+      addTearDown(check.dispose);
+      (await LibraryController.load(LibraryStore(store.file))).attach(check);
+      expect(check.bpm, 160, reason: 'the latest state was saved');
+    },
+  );
+}
+
+class _CountingStore extends LibraryStore {
+  _CountingStore(super.file, this.onSave);
+  final void Function() onSave;
+
+  @override
+  Future<void> save(Library library) {
+    onSave();
+    return super.save(library);
+  }
 }
