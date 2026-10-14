@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
+import 'package:flutter/services.dart';
 
 import '../controller/metronome_controller.dart';
 import 'theme.dart';
@@ -11,9 +12,12 @@ import 'theme.dart';
 /// the tempo in 1-bpm steps, clamped to the metronome's range.
 ///
 /// Speed-sensitive: slow, small moves are 1 bpm per 14 px for precise
-/// picking; faster moves cover more bpm per pixel (up to [maxGain]×). A
-/// fast swipe glides on after release and slows to a stop; a slow drag
-/// stops where the finger lifts. Touching the ruler stops a glide.
+/// picking; faster moves cover more bpm per pixel (up to [maxGain]×).
+/// Snapping depends on release speed: below [flingSpeed] the ruler stays
+/// exactly where it's released (so 123 is reachable); a faster fling coasts
+/// and always comes to rest on a multiple of 5. A light haptic tick marks
+/// every multiple of 5 crossed, while dragging and coasting. Touching the
+/// ruler stops a coast.
 class TempoRuler extends StatefulWidget {
   const TempoRuler({super.key, required this.controller});
 
@@ -28,8 +32,29 @@ class TempoRuler extends StatefulWidget {
   static const fastSpeed = 1500.0;
   static const maxGain = 4.0;
 
-  /// Below this release speed (px/s) there is no glide.
-  static const minGlideSpeed = 600.0;
+  /// Release speed (px/s) that counts as a fling. Tune on a real phone.
+  static const flingSpeed = 300.0;
+
+  /// How far a fling coasts: lower stops sooner (see [FrictionSimulation]).
+  static const flingFriction = 0.05;
+
+  /// Where a fling released at [value] with [bpmPerSecond] comes to rest:
+  /// the multiple of 5 nearest to where friction would stop it, at least
+  /// one multiple ahead in the fling's direction, within 30–300.
+  static double flingTarget(double value, double bpmPerSecond) {
+    final coast = FrictionSimulation(flingFriction, value, bpmPerSecond).finalX;
+    var target = (coast / 5).round() * 5.0;
+    if (bpmPerSecond > 0 && target <= value) {
+      target = (value / 5).floor() * 5 + 5;
+    }
+    if (bpmPerSecond < 0 && target >= value) {
+      target = (value / 5).ceil() * 5 - 5;
+    }
+    return target.clamp(
+      MetronomeController.minBpm.toDouble(),
+      MetronomeController.maxBpm.toDouble(),
+    );
+  }
 
   /// Bpm-per-pixel multiplier for a finger speed in px/s.
   static double gainFor(double speed) =>
@@ -63,6 +88,10 @@ class _TempoRulerState extends State<TempoRuler>
 
   void _moveTo(double value) {
     final clamped = value.clamp(_min, _max);
+    final previous = _value ?? _controller.bpm.toDouble();
+    if ((previous / 5).floor() != (clamped / 5).floor()) {
+      HapticFeedback.selectionClick(); // crossed a multiple of 5
+    }
     setState(() => _value = clamped);
     _controller.setBpm(clamped.round()); // no-op unless the whole value changed
     if (_glide.isAnimating && clamped != value) _glide.stop(); // hit an end
@@ -91,20 +120,28 @@ class _TempoRulerState extends State<TempoRuler>
 
   void _end(DragEndDetails details) {
     final speed = details.velocity.pixelsPerSecond.dx;
-    if (speed.abs() < TempoRuler.minGlideSpeed) return _settle();
+    // Slow release: stays exactly where it is.
+    if (speed.abs() < TempoRuler.flingSpeed) return _settle();
+    final from = _value!;
     final bpmPerSecond =
         -speed * TempoRuler.gainFor(speed.abs()) / TempoRuler.pxPerBpm;
+    final target = TempoRuler.flingTarget(from, bpmPerSecond);
+    // Decelerate starts at twice its average speed: match the release.
+    final seconds = (2 * (target - from).abs() / bpmPerSecond.abs()).clamp(
+      0.15,
+      1.5,
+    );
     _glide
-      ..value = _value!
-      ..animateWith(
-        // Stops once slower than 1 bpm/s, instead of creeping for seconds.
-        FrictionSimulation(
-          0.05,
-          _value!,
-          bpmPerSecond,
-          tolerance: const Tolerance(velocity: 1),
-        ),
-      ).then((_) => _settle());
+      ..value = from
+      ..animateTo(
+        target,
+        duration: Duration(microseconds: (seconds * 1e6).round()),
+        curve: Curves.decelerate,
+      ).then((_) {
+        // Coasted all the way (not interrupted): exactly on the multiple.
+        if (_glide.value == target) _controller.setBpm(target.round());
+        _settle();
+      });
   }
 
   /// Back to rest: the ruler shows the whole tempo again.

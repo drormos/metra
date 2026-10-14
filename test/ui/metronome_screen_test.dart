@@ -448,6 +448,71 @@ void main() {
       expect(controller.bpm, stoppedAt);
     });
 
+    test('a fling always rests on a multiple of 5, ahead of where it was', () {
+      expect(TempoRuler.flingTarget(123, 5), 125);
+      expect(TempoRuler.flingTarget(123, -5), 120);
+      expect(TempoRuler.flingTarget(125, 1), 130, reason: 'at least one ahead');
+      expect(TempoRuler.flingTarget(125, -1), 120);
+      final far = TempoRuler.flingTarget(123, 200);
+      expect(far % 5, 0);
+      expect(far, greaterThan(150));
+      expect(TempoRuler.flingTarget(297, 500), 300, reason: 'clamped');
+      expect(TempoRuler.flingTarget(32, -500), 30);
+    });
+
+    testWidgets('a slow drag stays exactly where released', (tester) async {
+      controller.setBpm(121);
+      await pumpScreen(tester);
+      await tester.timedDrag(
+        ruler(),
+        const Offset(-70, 0),
+        const Duration(seconds: 1),
+      );
+      await tester.pumpAndSettle();
+      expect(controller.bpm, 126, reason: 'not snapped to 125');
+    });
+
+    testWidgets('a fling from 123 settles on a multiple of 5 above it', (
+      tester,
+    ) async {
+      controller.setBpm(123);
+      await pumpScreen(tester);
+      await tester.fling(ruler(), const Offset(-60, 0), 800);
+      await tester.pumpAndSettle();
+      expect(controller.bpm % 5, 0);
+      expect(controller.bpm, greaterThan(123));
+    });
+
+    testWidgets('a haptic tick on every multiple of 5 crossed', (tester) async {
+      final clicks = <Object?>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'HapticFeedback.vibrate') {
+            clicks.add(call.arguments);
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      await pumpScreen(tester);
+      // 120 -> 132 slowly: crosses 125 and 130.
+      await tester.timedDrag(
+        ruler(),
+        const Offset(-168, 0),
+        const Duration(seconds: 2),
+      );
+      await tester.pumpAndSettle();
+      expect(controller.bpm, 132);
+      expect(clicks, hasLength(2));
+      expect(clicks.first, 'HapticFeedbackType.selectionClick');
+    });
+
     test('gain grows with finger speed, capped', () {
       expect(TempoRuler.gainFor(100), 1);
       expect(TempoRuler.gainFor(900), closeTo(2.5, 0.01));
