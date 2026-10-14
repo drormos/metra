@@ -6,8 +6,11 @@ import '../controller/metronome_controller.dart';
 import '../model/metronome_pattern.dart';
 import 'theme.dart';
 
-/// One dot per step of the bar; the current step lights up when the engine
-/// clock (plus the visual offset) reaches it. Checked once per frame.
+/// Beat blocks (ui-spec.md): one block per beat with a subdivision strip
+/// under it. Blocks show their type at rest (accent, regular, muted) and
+/// light only while sounding: a block for its whole beat, a tick for its own
+/// click. Driven by the engine clock (plus the visual offset), checked once
+/// per frame. Tapping a block cycles regular → accent → muted.
 class BeatIndicator extends StatefulWidget {
   const BeatIndicator({super.key, required this.controller});
 
@@ -61,64 +64,131 @@ class _BeatIndicatorState extends State<BeatIndicator>
   @override
   Widget build(BuildContext context) {
     // While playing, draw the pattern of the step being heard: after a song
-    // switch the controller already holds the next pattern until the bar
-    // line.
+    // switch the controller already holds the next pattern until it starts.
     final step = _step;
     final pattern = step?.pattern ?? _controller.pattern;
-    final litBeat = step == null
+    final perBeat = pattern.stepsPerBeat;
+    final soundingBeat = step == null ? null : step.barPosition ~/ perBeat;
+    // Silent steps (a muted beat's own click) don't light anything.
+    final soundingStep = step == null || step.level == StepLevel.silent
         ? null
-        : step.barPosition ~/ pattern.stepsPerBeat;
-    final colors = context.colors;
-    // Scales down for long bars (12/8) on narrow phones.
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Row(
-        children: [
-          for (final (i, level) in pattern.beatLevels.indexed)
-            _dot(index: i, level: level, lit: i == litBeat, colors: colors),
+        : step.barPosition;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final (beat, level) in pattern.beatLevels.indexed) ...[
+          if (beat > 0) const SizedBox(width: 6),
+          Expanded(
+            child: _tapTarget(
+              beat,
+              level,
+              sounding: beat == soundingBeat && level != StepLevel.silent,
+              child: Column(
+                children: [
+                  _block(
+                    beat,
+                    level,
+                    sounding: beat == soundingBeat && level != StepLevel.silent,
+                  ),
+                  if (perBeat > 1) ...[
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        for (var tick = 0; tick < perBeat; tick++) ...[
+                          if (tick > 0) const SizedBox(width: 3),
+                          Expanded(
+                            child: _tick(
+                              beat,
+                              tick,
+                              sounding: beat * perBeat + tick == soundingStep,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
 
-  /// One dot per beat. Tapping cycles the beat normal → accent → silent,
-  /// heard from the next click.
-  Widget _dot({
-    required int index,
-    required StepLevel level,
-    required bool lit,
-    required MetraColors colors,
+  /// The whole beat column (block and strip) is the tap target, padded to
+  /// at least 44 px tall.
+  Widget _tapTarget(
+    int beat,
+    StepLevel level, {
+    required bool sounding,
+    required Widget child,
   }) {
-    final accent = level == StepLevel.accent;
-    final silent = level == StepLevel.silent;
-    final size = accent ? 32.0 : 24.0;
-    final edge = silent ? colors.mutedLine : colors.muted;
+    final kind = switch (level) {
+      StepLevel.silent => 'muted',
+      StepLevel.accent => 'accented',
+      _ => 'regular',
+    };
     return Semantics(
       button: true,
-      label: 'Beat ${index + 1}: ${level.name}. Tap to change.',
+      label:
+          'Beat ${beat + 1}, $kind${sounding ? ', playing' : ''}. '
+          'Tap to change.',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => _controller.cycleBeat(index),
+        onTap: () => _controller.cycleBeat(beat),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-          child: Container(
-            key: ValueKey('beat-$index-${lit ? 'on' : 'off'}'),
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: !lit
-                  ? null
-                  : silent
-                  ? edge
-                  : accent
-                  ? colors.accentSounding
-                  : colors.beatSounding,
-              border: Border.all(color: edge, width: 2),
-            ),
-          ),
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: child,
         ),
       ),
     );
   }
+
+  Widget _block(int beat, StepLevel level, {required bool sounding}) {
+    final colors = context.colors;
+    final muted = level == StepLevel.silent;
+    final accent = level == StepLevel.accent;
+    final color = muted
+        ? colors.mutedFill
+        : accent
+        ? (sounding ? colors.accentSounding : colors.accentResting)
+        : (sounding ? colors.beatSounding : colors.beatResting);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        key: ValueKey('beat-$beat-${sounding ? 'on' : 'off'}'),
+        height: 36,
+        color: color,
+        child: muted
+            ? CustomPaint(painter: _MutedLine(colors.mutedLine))
+            : null,
+      ),
+    );
+  }
+
+  Widget _tick(int beat, int tick, {required bool sounding}) => Container(
+    key: ValueKey('tick-$beat-$tick-${sounding ? 'on' : 'off'}'),
+    height: 5,
+    color: sounding ? context.colors.tickSounding : context.colors.tickResting,
+  );
+}
+
+/// One thin diagonal, bottom-left to top-right: muted, explicit but quiet.
+class _MutedLine extends CustomPainter {
+  _MutedLine(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) => canvas.drawLine(
+    Offset(0, size.height),
+    Offset(size.width, 0),
+    Paint()
+      ..color = color
+      ..strokeWidth = 2,
+  );
+
+  @override
+  bool shouldRepaint(_MutedLine old) => old.color != color;
 }

@@ -263,4 +263,82 @@ void main() {
     await tester.pump();
     expect(name(), 'Largo');
   });
+
+  group('beat blocks', () {
+    Finder key(String k) => find.byKey(ValueKey(k));
+
+    /// Advances the engine clock like a real one, in small steps, so the
+    /// scheduler's refill timer keeps up instead of skipping late clicks.
+    Future<void> playAt(WidgetTester tester, int ms) async {
+      final target = Duration(milliseconds: ms);
+      while (output.time < target) {
+        final next = output.time + const Duration(milliseconds: 20);
+        output.time = next < target ? next : target;
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+    }
+
+    Future<void> startTwoPerBeat(WidgetTester tester) async {
+      controller
+        ..setPattern(MetronomePattern.simple(beatsPerBar: 4, stepsPerBeat: 2))
+        ..setVisualOffset(Duration.zero);
+      await pumpScreen(tester);
+      await tester.tap(find.byKey(MetronomeScreen.playKey));
+      await tester.pump();
+      // 120 BPM, 2 per beat: steps at 120, 370, 620, 870 ms ...
+    }
+
+    Future<void> stop(WidgetTester tester) async {
+      await tester.tap(find.byKey(MetronomeScreen.playKey));
+      await tester.pump();
+    }
+
+    testWidgets('no strip without subdivision', (tester) async {
+      await pumpScreen(tester);
+      expect(key('tick-0-0-off'), findsNothing);
+      controller.setSubdivision(3);
+      await tester.pump();
+      expect(key('tick-3-2-off'), findsOneWidget);
+    });
+
+    testWidgets('a tick lights only for its own click; the block for the '
+        'whole beat', (tester) async {
+      await startTwoPerBeat(tester);
+      await playAt(tester, 150);
+      expect(key('beat-0-on'), findsOneWidget);
+      expect(key('tick-0-0-on'), findsOneWidget);
+      expect(key('tick-0-1-off'), findsOneWidget);
+
+      await playAt(tester, 400);
+      expect(key('beat-0-on'), findsOneWidget, reason: 'still beat 1');
+      expect(key('tick-0-0-off'), findsOneWidget);
+      expect(key('tick-0-1-on'), findsOneWidget);
+
+      await playAt(tester, 650);
+      expect(key('beat-0-off'), findsOneWidget, reason: 'nothing stays lit');
+      expect(key('beat-1-on'), findsOneWidget);
+      await stop(tester);
+      expect(key('beat-1-off'), findsOneWidget);
+    });
+
+    testWidgets('a muted beat never lights; its subdivisions still do', (
+      tester,
+    ) async {
+      controller.cycleBeat(0); // accent -> muted
+      expect(controller.pattern.beatLevels[0], StepLevel.silent);
+      await startTwoPerBeat(tester);
+      controller.cycleBeat(0); // accent -> muted (setPattern reset it)
+      await tester.pump();
+      expect(controller.pattern.beatLevels[0], StepLevel.silent);
+
+      await playAt(tester, 150); // muted beat's own (silent) click
+      expect(key('beat-0-off'), findsOneWidget);
+      expect(key('tick-0-0-off'), findsOneWidget);
+
+      await playAt(tester, 400); // its eighth sounds
+      expect(key('beat-0-off'), findsOneWidget);
+      expect(key('tick-0-1-on'), findsOneWidget);
+      await stop(tester);
+    });
+  });
 }
