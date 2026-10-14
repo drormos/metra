@@ -4,17 +4,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/library_controller.dart';
+import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/library.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/editor_scaffold.dart';
 import 'package:metra/src/ui/song_editor.dart';
 
+import '../audio/fake_click_output.dart';
 import 'test_theme.dart';
 
 void main() {
   late Directory dir;
   late LibraryController library;
+  late MetronomeController metronome;
   late Song alpha;
   Song? result;
   var closed = false;
@@ -39,6 +42,8 @@ void main() {
       ..physicalSize = const Size(400, 1400)
       ..devicePixelRatio = 1;
     addTearDown(tester.view.reset);
+    metronome = MetronomeController(FakeClickOutput());
+    addTearDown(metronome.dispose);
     library = (await tester.runAsync(
       () => LibraryController.load(
         LibraryStore(File('${dir.path}/library.json')),
@@ -68,6 +73,7 @@ void main() {
                   result = await openSongEditor(
                     context,
                     library,
+                    metronome,
                     song: edit ? alpha : null,
                   );
                   closed = true;
@@ -162,6 +168,23 @@ void main() {
     expect(saved.pattern.timeSignature, '5/8');
     expect(saved.pattern.beatLevels.first, StepLevel.accent, reason: 'kept');
     expect(result!.bpm, 102);
+  });
+
+  testWidgets('saving the loaded song applies it to the click', (tester) async {
+    await pumpEditor(tester);
+    library.playSong(alpha, metronome);
+    await tapText(tester, '+');
+    expect(metronome.bpm, 100, reason: 'editing alone changes nothing');
+    await save(tester);
+    expect(metronome.bpm, 101);
+  });
+
+  testWidgets('saving another song leaves the click alone', (tester) async {
+    await pumpEditor(tester);
+    metronome.setBpm(80);
+    await tapText(tester, '+');
+    await save(tester);
+    expect(metronome.bpm, 80);
   });
 
   testWidgets('pattern section: collapsed, summary, subdivision and cells', (

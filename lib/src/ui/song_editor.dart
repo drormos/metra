@@ -14,17 +14,25 @@ import 'theme.dart';
 
 /// Opens the song editor (ui-spec.md "Song editor") for [song], or a new
 /// song when null. Completes with the saved song, or null if cancelled or
-/// deleted. Editing never touches the click.
+/// deleted. Editing doesn't touch the click; saving the loaded song applies
+/// it to [metronome] at once (restarting on beat 1 if playing).
 Future<Song?> openSongEditor(
   BuildContext context,
-  LibraryController library, {
+  LibraryController library,
+  MetronomeController metronome, {
   Song? song,
-}) => Navigator.push(
-  context,
-  MaterialPageRoute<Song>(
-    builder: (_) => SongEditor(library: library, song: song),
-  ),
-);
+}) async {
+  final saved = await Navigator.push(
+    context,
+    MaterialPageRoute<Song>(
+      builder: (_) => SongEditor(library: library, song: song),
+    ),
+  );
+  if (saved != null && saved.id == library.currentSong?.id) {
+    metronome.loadSong(bpm: saved.bpm, pattern: saved.pattern);
+  }
+  return saved;
+}
 
 class SongEditor extends StatefulWidget {
   const SongEditor({super.key, required this.library, this.song});

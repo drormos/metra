@@ -4,6 +4,7 @@ import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/library.dart';
 import 'haptics.dart';
+import 'song_editor.dart';
 import 'theme.dart';
 
 /// The setlist picker sheet (ui-spec.md, `setlist-picker` and
@@ -184,7 +185,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
       },
       child: Ink(
         height: 60,
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+        padding: const EdgeInsets.only(left: 24),
         decoration: BoxDecoration(
           color: current ? colors.selectedRow : null,
           border: Border(bottom: BorderSide(color: colors.divider)),
@@ -228,6 +229,22 @@ class _SetlistPickerState extends State<SetlistPicker> {
                 song.pattern.timeSignature,
                 textAlign: TextAlign.right,
                 style: TextStyle(fontSize: 14, color: colors.muted),
+              ),
+            ),
+            SizedBox(
+              width: 52,
+              height: 60,
+              child: IconButton(
+                key: ValueKey('picker-edit-$index'),
+                tooltip: 'Edit ${song.name}',
+                color: colors.muted,
+                onPressed: () => openSongEditor(
+                  context,
+                  _library,
+                  widget.metronome,
+                  song: song,
+                ),
+                icon: const Icon(Icons.edit_outlined, size: 20),
               ),
             ),
           ],

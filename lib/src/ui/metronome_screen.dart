@@ -12,6 +12,7 @@ import 'repeat_button.dart';
 import 'setlist_editor.dart';
 import 'setlist_group.dart';
 import 'setlist_picker.dart';
+import 'song_editor.dart';
 import 'subdivision_icon.dart';
 import 'tempo_ruler.dart';
 import 'theme.dart';
@@ -247,19 +248,42 @@ class MetronomeScreen extends StatelessWidget {
   /// Song title, then subdivision, time signature and settings buttons.
   Widget _topRow(BuildContext context) {
     final pattern = controller.pattern;
+    final song = library?.currentSong;
     return Row(
       children: [
         Expanded(
-          child: Text(
-            library?.currentSong?.name ?? '',
-            key: titleKey,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: MetraFonts.condensed,
-              fontSize: 34,
-              fontWeight: FontWeight.w700,
-              height: 1,
+          // Tapping the title edits the current song.
+          child: Semantics(
+            button: song != null,
+            hint: song == null ? null : 'Edit song',
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: song == null
+                  ? null
+                  : () => openSongEditor(
+                      context,
+                      library!,
+                      controller,
+                      song: song,
+                    ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    song?.name ?? '',
+                    key: titleKey,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: MetraFonts.condensed,
+                      fontSize: 34,
+                      fontWeight: FontWeight.w700,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -392,17 +416,7 @@ class MetronomeScreen extends StatelessWidget {
   Future<String?> _newSong(
     BuildContext context,
     LibraryController library,
-  ) async {
-    final name = await askName(
-      context,
-      title: 'New song',
-      initial: '${controller.bpm} BPM',
-    );
-    if (name == null) return null;
-    return library
-        .addSong(name: name, bpm: controller.bpm, pattern: controller.pattern)
-        .id;
-  }
+  ) async => (await openSongEditor(context, library, controller))?.id;
 
   void _showSongs(BuildContext context, LibraryController library) =>
       showModalBottomSheet<void>(

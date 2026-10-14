@@ -9,6 +9,7 @@ import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/setlist_group.dart';
 import 'package:metra/src/ui/setlist_picker.dart';
+import 'package:metra/src/ui/song_editor.dart';
 
 import '../audio/fake_click_output.dart';
 import 'test_theme.dart';
@@ -93,6 +94,25 @@ void main() {
     await tester.tap(find.byKey(SetlistGroup.headerKey));
     await settle(tester);
   }
+
+  testWidgets('tapping the title edits the current song', (tester) async {
+    await pumpWithSets(tester);
+    library.playSong(library.visibleSongs[1], metronome, index: 1);
+    await tester.pump();
+    await tester.tap(find.byKey(MetronomeScreen.titleKey));
+    await tester.pumpAndSettle();
+    expect(find.byType(SongEditor), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Two'), findsOneWidget);
+  });
+
+  testWidgets('the pencil on a picker row edits that song', (tester) async {
+    await pumpWithSets(tester);
+    await openFromHeader(tester);
+    await tester.tap(find.byKey(const ValueKey('picker-edit-2')));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, 'Three'), findsOneWidget);
+    expect(library.currentSong, isNull, reason: 'opening loads nothing');
+  });
 
   testWidgets('songs view lists the set; tapping a row loads it and closes', (
     tester,
