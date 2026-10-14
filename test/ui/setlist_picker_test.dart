@@ -19,7 +19,14 @@ void main() {
   late LibraryController library;
 
   setUp(() => dir = Directory.systemTemp.createTempSync('metra_picker_test'));
-  tearDown(() => dir.deleteSync(recursive: true));
+  tearDown(() {
+    try {
+      dir.deleteSync(recursive: true);
+    } on FileSystemException {
+      // A save started on the widget test's fake clock may still be
+      // writing; a leftover temp folder is harmless.
+    }
+  });
 
   /// Main screen with "Friday set" (One 100, Two 110, Three 120 in 6/8)
   /// and an empty "Saturday set".

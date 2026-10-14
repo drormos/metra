@@ -200,6 +200,33 @@ class LibraryController extends ChangeNotifier {
     ),
   );
 
+  /// Every song, A–Z by name (case-insensitive): the library's order.
+  List<Song> get songsAZ =>
+      [...songs]
+        ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+  /// Setlists that contain [songId].
+  List<Setlist> setlistsUsing(String songId) => [
+    for (final list in setlists)
+      if (list.songIds.contains(songId)) list,
+  ];
+
+  /// Saves an edited setlist ([id] null creates one) in one change.
+  Setlist saveSetlist({
+    String? id,
+    required String name,
+    required List<String> songIds,
+  }) {
+    if (id == null) {
+      final setlist = Setlist(id: _newId(), name: name, songIds: songIds);
+      _update(_library.copyWith(setlists: [...setlists, setlist]));
+      return setlist;
+    }
+    final setlist = Setlist(id: id, name: name, songIds: songIds);
+    updateSetlist(setlist);
+    return setlist;
+  }
+
   Setlist addSetlist(String name) {
     final setlist = Setlist(id: _newId(), name: name, songIds: const []);
     _update(_library.copyWith(setlists: [...setlists, setlist]));

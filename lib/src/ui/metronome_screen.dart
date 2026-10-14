@@ -7,6 +7,7 @@ import '../model/click_sound.dart';
 import '../model/tempo_name.dart';
 import 'beat_indicator.dart';
 import 'library_panel.dart';
+import 'setlist_editor.dart';
 import 'setlist_group.dart';
 import 'setlist_picker.dart';
 import 'subdivision_icon.dart';
@@ -195,10 +196,14 @@ class MetronomeScreen extends StatelessWidget {
               context,
               library: library,
               metronome: controller,
-              // The old song panel stands in for the setlist editor and
-              // the song library until they're built (Phase 4 step 8,
-              // Phase 5).
-              onEditSetlist: () => _showSongs(context, library),
+              onEditSetlist: () => openSetlistEditor(
+                context,
+                library,
+                setlist: library.activeSetlist,
+                newSong: (context) => _newSong(context, library),
+              ),
+              // The old song panel stands in for the song library until
+              // Phase 5.
               onSongLibrary: () => _showSongs(context, library),
               onNewSetlist: () => _newSetlist(context, library),
             ),
@@ -350,13 +355,28 @@ class MetronomeScreen extends StatelessWidget {
     ),
   );
 
-  // Plain until the setlist editor (Phase 4 step 8): name it and load it.
-  Future<void> _newSetlist(
+  Future<void> _newSetlist(BuildContext context, LibraryController library) =>
+      openSetlistEditor(
+        context,
+        library,
+        newSong: (context) => _newSong(context, library),
+      );
+
+  // Until the song editor (Phase 5): saves the current tempo and pattern
+  // under a name. Returns the new song's id.
+  Future<String?> _newSong(
     BuildContext context,
     LibraryController library,
   ) async {
-    final name = await askName(context, title: 'New setlist', initial: '');
-    if (name != null) library.setActiveSetlist(library.addSetlist(name).id);
+    final name = await askName(
+      context,
+      title: 'New song',
+      initial: '${controller.bpm} BPM',
+    );
+    if (name == null) return null;
+    return library
+        .addSong(name: name, bpm: controller.bpm, pattern: controller.pattern)
+        .id;
   }
 
   void _showSongs(BuildContext context, LibraryController library) =>

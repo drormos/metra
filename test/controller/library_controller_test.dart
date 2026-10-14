@@ -347,6 +347,33 @@ void main() {
       expect((await reload()).activeSetlist, isNull);
     });
   });
+
+  group('setlist editing', () {
+    test('saveSetlist creates, then updates in place', () async {
+      final a = library.addSong(name: 'a', bpm: 100, pattern: waltz);
+      final b = library.addSong(name: 'B', bpm: 110, pattern: waltz);
+      final created = library.saveSetlist(
+        name: 'Gig',
+        songIds: [b.id, a.id, b.id],
+      );
+      expect(library.setlists.single.songIds, [b.id, a.id, b.id]);
+      library.saveSetlist(id: created.id, name: 'Gig 2', songIds: [a.id]);
+      final loaded = await reload();
+      expect(loaded.setlists.single.name, 'Gig 2');
+      expect(loaded.setlists.single.songIds, [a.id]);
+    });
+
+    test('songsAZ ignores case; setlistsUsing finds every set', () {
+      final c = library.addSong(name: 'charlie', bpm: 1 * 100, pattern: waltz);
+      final a = library.addSong(name: 'Alpha', bpm: 100, pattern: waltz);
+      library.addSong(name: 'bravo', bpm: 100, pattern: waltz);
+      expect(library.songsAZ.map((s) => s.name), ['Alpha', 'bravo', 'charlie']);
+      library.saveSetlist(name: 'One', songIds: [a.id]);
+      library.saveSetlist(name: 'Two', songIds: [c.id, a.id]);
+      expect(library.setlistsUsing(a.id).map((l) => l.name), ['One', 'Two']);
+      expect(library.setlistsUsing(c.id).map((l) => l.name), ['Two']);
+    });
+  });
 }
 
 class _CountingStore extends LibraryStore {

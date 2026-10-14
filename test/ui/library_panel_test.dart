@@ -7,6 +7,7 @@ import 'package:metra/src/controller/library_controller.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/storage/library_store.dart';
+import 'package:metra/src/ui/editor_scaffold.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/setlist_group.dart';
 import 'package:metra/src/ui/setlist_picker.dart';
@@ -23,7 +24,14 @@ void main() {
     dir = Directory.systemTemp.createTempSync('metra_panel_test');
   });
 
-  tearDown(() => dir.deleteSync(recursive: true));
+  tearDown(() {
+    try {
+      dir.deleteSync(recursive: true);
+    } on FileSystemException {
+      // A save started on the widget test's fake clock may still be
+      // writing; a leftover temp folder is harmless.
+    }
+  });
 
   /// [panel]: also open the songs sheet (the stand-in for the picker),
   /// through "Choose a setlist", so one setlist ("Setup") exists.
@@ -192,15 +200,19 @@ void main() {
       expect(find.text('What to play'), findsOneWidget);
     });
 
-    testWidgets('+ names and loads a new setlist', (tester) async {
+    testWidgets('+ opens the setlist editor; saving loads the new set', (
+      tester,
+    ) async {
       await pumpScreen(tester);
       library.addSetlist('Old');
       await tester.pump();
       await tester.tap(find.byTooltip('New setlist'));
       await tester.pumpAndSettle();
-      await enterName(tester, 'Saturday');
+      await tester.enterText(find.byType(TextField), 'Saturday');
+      await tester.pump();
+      await tester.tap(find.byKey(EditorScaffold.actionKey));
+      await tester.pumpAndSettle();
       expect(library.activeSetlist?.name, 'Saturday');
-      expect(find.text('0 of 0'), findsNothing);
       expect(find.text('– of 0'), findsOneWidget);
     });
 
