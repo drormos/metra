@@ -291,6 +291,26 @@ void main() {
     expect(haptics, List.filled(4, 'HapticFeedbackType.lightImpact'));
   });
 
+  testWidgets('two songs can\'t share a name', (tester) async {
+    await pumpEditor(tester);
+    await tester.enterText(find.byType(TextField), 'bravo ');
+    await tester.pump();
+    expect(find.text('Another song already has this name'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(EditorScaffold.actionKey))
+          .onPressed,
+      isNull,
+    );
+    await tester.enterText(find.byType(TextField), 'ALPHA');
+    await tester.pump();
+    expect(
+      find.text('Another song already has this name'),
+      findsNothing,
+      reason: 'its own name',
+    );
+  });
+
   testWidgets('shows which setlists use the song', (tester) async {
     await pumpEditor(tester);
     expect(

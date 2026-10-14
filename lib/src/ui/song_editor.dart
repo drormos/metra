@@ -171,11 +171,13 @@ class _SongEditorState extends State<SongEditor> {
     final sets = song == null
         ? const <Setlist>[]
         : _library.setlistsUsing(song.id);
+    // One name per song keeps lists unambiguous.
+    final taken = _library.songNameTaken(_name.text, exceptId: song?.id);
     return EditorScaffold(
       title: 'Song',
       actionLabel: 'Save',
       dirty: _dirty,
-      onAction: _name.text.trim().isEmpty ? null : _save,
+      onAction: _name.text.trim().isEmpty || taken ? null : _save,
       bottom: SizedBox(
         height: 60,
         child: ListenableBuilder(
@@ -204,6 +206,7 @@ class _SongEditorState extends State<SongEditor> {
             controller: _name,
             autofocus: _isNew,
             onChanged: (_) => setState(() {}),
+            error: taken ? 'Another song already has this name' : null,
             style: const TextStyle(
               fontFamily: MetraFonts.condensed,
               fontSize: 26,

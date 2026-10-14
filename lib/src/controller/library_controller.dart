@@ -246,6 +246,11 @@ class LibraryController extends ChangeNotifier {
   /// Names compare without case or surrounding spaces.
   static String _nameKey(String name) => name.trim().toLowerCase();
 
+  /// Whether another song (not [exceptId]) already has [name].
+  bool songNameTaken(String name, {String? exceptId}) => songs.any(
+    (song) => song.id != exceptId && _nameKey(song.name) == _nameKey(name),
+  );
+
   /// Whether another setlist (not [exceptId]) already has [name].
   bool setlistNameTaken(String name, {String? exceptId}) => setlists.any(
     (list) => list.id != exceptId && _nameKey(list.name) == _nameKey(name),
