@@ -299,7 +299,6 @@ class SettingsScreen extends StatelessWidget {
         Slider(
           value: value,
           divisions: 100,
-          label: '${(value * 100).round()}%',
           semanticFormatterCallback: (v) => '${(v * 100).round()}%',
           onChanged: (v) => metronome.setVolumes(update(v)),
         ),

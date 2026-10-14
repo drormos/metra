@@ -144,6 +144,17 @@ ThemeData metraTheme(MetraColors c, Brightness brightness) {
     brightness: brightness,
     fontFamily: MetraFonts.body,
     scaffoldBackgroundColor: c.background,
+    // Settings' volume sliders (settings.reference.html): a 4px rail in
+    // the border color, the filled part and a 24px thumb in the text color.
+    sliderTheme: SliderThemeData(
+      trackHeight: 4,
+      activeTrackColor: c.text,
+      inactiveTrackColor: c.border,
+      thumbColor: c.text,
+      overlayColor: c.text.withValues(alpha: 0.12),
+      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 12),
+      showValueIndicator: ShowValueIndicator.never,
+    ),
     // A new song's or set's default name is shown selected in the accent.
     textSelectionTheme: TextSelectionThemeData(
       selectionColor: c.accent,
