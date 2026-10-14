@@ -79,20 +79,6 @@ void main() {
     }
   }
 
-  testWidgets('the settings sheet fits a small phone; vibrate toggles', (
-    tester,
-  ) async {
-    await pumpWithSets(tester);
-    tester.view.physicalSize = const Size(360, 640);
-    await tester.pump();
-    await tester.tap(find.byIcon(Icons.tune));
-    await settle(tester);
-    await tester.ensureVisible(find.byKey(MetronomeScreen.vibrateKey));
-    await tester.tap(find.byKey(MetronomeScreen.vibrateKey));
-    await tester.pump();
-    expect(library.vibrate, isFalse);
-  });
-
   Future<void> openFromHeader(WidgetTester tester) async {
     await tester.tap(find.byKey(SetlistGroup.headerKey));
     await settle(tester);

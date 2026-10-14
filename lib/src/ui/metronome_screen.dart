@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
-import '../model/click_sound.dart';
 import '../model/tempo_name.dart';
 import 'beat_indicator.dart';
 import 'haptics.dart';
@@ -11,6 +10,7 @@ import 'repeat_button.dart';
 import 'setlist_editor.dart';
 import 'setlist_group.dart';
 import 'setlist_picker.dart';
+import 'settings_screen.dart';
 import 'song_editor.dart';
 import 'song_library.dart';
 import 'subdivision_icon.dart';
@@ -30,13 +30,11 @@ class MetronomeScreen extends StatelessWidget {
 
   static const bpmKey = Key('bpm');
   static const playKey = Key('play');
-  static const offsetKey = Key('offset');
   static const tapKey = Key('tap');
   static const titleKey = Key('title');
   static const tempoNameKey = Key('tempo-name');
   static const meterKey = Key('meter');
   static const subdivisionKey = Key('subdivision');
-  static const vibrateKey = Key('vibrate');
   static const revertKey = Key('revert');
   static const saveToSongKey = Key('save-to-song');
 
@@ -299,6 +297,7 @@ class MetronomeScreen extends StatelessWidget {
 
   Widget _topRow(BuildContext context) {
     final pattern = controller.pattern;
+    final library = this.library;
     final song = library?.currentSong;
     return Row(
       children: [
@@ -375,7 +374,30 @@ class MetronomeScreen extends StatelessWidget {
         Builder(
           builder: (context) => _squareButton(
             tooltip: 'Settings',
-            onPressed: () => _showSettings(context),
+            onPressed: () => openSettings(
+              context,
+              metronome: controller,
+              library: library,
+              onSetlists: library == null
+                  ? null
+                  : () => openSetlistsScreen(
+                      context,
+                      library: library,
+                      metronome: controller,
+                      onEditSetlist: () => openSetlistEditor(
+                        context,
+                        library,
+                        setlist: library.activeSetlist,
+                        newSong: (context) => _newSong(context, library),
+                      ),
+                      onSongLibrary: () =>
+                          openSongLibrary(context, library, controller),
+                      onNewSetlist: () => _newSetlist(context, library),
+                    ),
+              onSongLibrary: library == null
+                  ? null
+                  : () => openSongLibrary(context, library, controller),
+            ),
             child: const Icon(Icons.tune, size: 20),
           ),
         ),
@@ -426,136 +448,6 @@ class MetronomeScreen extends StatelessWidget {
     BuildContext context,
     LibraryController library,
   ) async => (await openSongEditor(context, library, controller))?.id;
-
-  void _showSettings(BuildContext context) => showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    isScrollControlled: true, // as tall as its content needs
-    builder: (context) => SafeArea(
-      // Scrolls when the content is taller than the screen.
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: ListenableBuilder(
-          listenable: Listenable.merge([controller, ?library]),
-          builder: (context, _) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (library case final library?) ...[
-                _themePicker(Theme.of(context), library),
-                const SizedBox(height: 16),
-              ],
-              _soundPicker(Theme.of(context)),
-              const SizedBox(height: 16),
-              if (library case final library?) ...[
-                SwitchListTile(
-                  key: vibrateKey,
-                  title: const Text('Vibrate on touch'),
-                  subtitle: const Text(
-                    "Only when vibration is on in your phone's settings",
-                  ),
-                  value: library.vibrate,
-                  onChanged: library.setVibrate,
-                ),
-                const SizedBox(height: 16),
-              ],
-              _offsetControl(Theme.of(context)),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-
-  static const _themeModes = {
-    ThemeMode.system: 'System',
-    ThemeMode.dark: 'Dark',
-    ThemeMode.light: 'Light',
-  };
-
-  Widget _themePicker(ThemeData theme, LibraryController library) => Column(
-    children: [
-      Text('Theme', style: theme.textTheme.bodyMedium),
-      const SizedBox(height: 8),
-      Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 8,
-        children: [
-          for (final MapEntry(key: mode, value: label) in _themeModes.entries)
-            ChoiceChip(
-              label: Text(label),
-              selected: library.themeMode == mode,
-              onSelected: (_) => library.setThemeMode(mode),
-            ),
-        ],
-      ),
-    ],
-  );
-
-  Widget _soundPicker(ThemeData theme) => Column(
-    children: [
-      Text('Click sound', style: theme.textTheme.bodyMedium),
-      const SizedBox(height: 8),
-      Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final sound in ClickSound.values)
-            ChoiceChip(
-              label: Text(sound.label),
-              selected: controller.clickSound == sound,
-              onSelected: (_) => controller.setClickSound(sound),
-            ),
-        ],
-      ),
-    ],
-  );
-
-  // Calibrates the flash against what you hear (output latency varies by
-  // device, e.g. Bluetooth headphones).
-  Widget _offsetControl(ThemeData theme) {
-    final ms = controller.visualOffset.inMilliseconds;
-    const step = Duration(milliseconds: 10);
-    // Shrinks rather than overflowing on narrow phones.
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('Flash offset', style: theme.textTheme.bodyMedium),
-          IconButton(
-            tooltip: 'Flash earlier',
-            onPressed:
-                controller.visualOffset > MetronomeController.minVisualOffset
-                ? () =>
-                      controller.setVisualOffset(controller.visualOffset - step)
-                : null,
-            icon: const Icon(Icons.remove),
-          ),
-          SizedBox(
-            width: 72,
-            child: Text(
-              '${ms > 0 ? '+' : ''}$ms ms',
-              key: offsetKey,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontFeatures: [FontFeature.tabularFigures()],
-              ),
-            ),
-          ),
-          IconButton(
-            tooltip: 'Flash later',
-            onPressed:
-                controller.visualOffset < MetronomeController.maxVisualOffset
-                ? () =>
-                      controller.setVisualOffset(controller.visualOffset + step)
-                : null,
-            icon: const Icon(Icons.add),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _step(String label, int delta, bool enabled) => Expanded(
     child: SizedBox(

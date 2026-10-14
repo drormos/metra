@@ -55,6 +55,7 @@ class MetronomeController extends ChangeNotifier {
   final _tapTempo = TapTempo(minBpm: minBpm, maxBpm: maxBpm);
   // What the main screen was doing before a song editor preview took over.
   ({int bpm, MetronomePattern pattern, bool playing})? _beforePreview;
+  bool _offsetTestStarted = false;
 
   int get bpm => _bpm;
   MetronomePattern get pattern => _pattern;
@@ -177,6 +178,21 @@ class MetronomeController extends ChangeNotifier {
       _scheduler.replaceLevels(pattern);
       notifyListeners();
     }
+  }
+
+  /// Settings' visual offset test: uses the click if it's already
+  /// playing, otherwise starts it; [endOffsetTest] stops only a click the
+  /// test started.
+  Future<void> startOffsetTest() async {
+    if (_playing) return;
+    _offsetTestStarted = true;
+    await play();
+  }
+
+  /// Leaving settings: stops the click if the offset test started it.
+  void endOffsetTest() {
+    if (_offsetTestStarted) stop();
+    _offsetTestStarted = false;
   }
 
   /// Whether a song editor preview has taken over the click (it may have

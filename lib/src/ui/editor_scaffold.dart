@@ -238,3 +238,41 @@ class SearchField extends StatelessWidget {
     );
   }
 }
+
+/// Top bar of full screens that apply changes at once (song library,
+/// settings): a back chevron, a title, an optional [trailing] action.
+class BackBar extends StatelessWidget {
+  const BackBar({super.key, required this.title, this.trailing});
+
+  final String title;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(4, 8, 16, 12),
+    decoration: BoxDecoration(
+      border: Border(bottom: BorderSide(color: context.colors.divider)),
+    ),
+    child: SizedBox(
+      height: 44,
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: 'Back',
+            onPressed: () => Navigator.maybePop(context),
+            icon: const Icon(Icons.chevron_left, size: 28),
+          ),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+            ),
+          ),
+          ?trailing,
+        ],
+      ),
+    ),
+  );
+}

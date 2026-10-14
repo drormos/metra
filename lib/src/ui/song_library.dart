@@ -141,36 +141,16 @@ class _SongLibraryState extends State<SongLibrary> {
     );
   }
 
-  Widget _topBar(MetraColors colors) => Container(
-    padding: const EdgeInsets.fromLTRB(4, 8, 16, 12),
-    decoration: BoxDecoration(
-      border: Border(bottom: BorderSide(color: colors.divider)),
-    ),
-    child: Row(
-      children: [
-        IconButton(
-          tooltip: 'Back',
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.chevron_left, size: 28),
-        ),
-        const Expanded(
-          child: Text(
-            'Song library',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
-          ),
-        ),
-        SizedBox(
-          height: 44,
-          child: OutlinedButton.icon(
-            key: SongLibrary.newSongKey,
-            onPressed: _edit,
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('New song', style: TextStyle(fontSize: 15)),
-          ),
-        ),
-      ],
+  Widget _topBar(MetraColors colors) => BackBar(
+    title: 'Song library',
+    trailing: SizedBox(
+      height: 44,
+      child: OutlinedButton.icon(
+        key: SongLibrary.newSongKey,
+        onPressed: _edit,
+        icon: const Icon(Icons.add, size: 18),
+        label: const Text('New song', style: TextStyle(fontSize: 15)),
+      ),
     ),
   );
 

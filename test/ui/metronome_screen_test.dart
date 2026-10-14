@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
-import 'package:metra/src/model/click_sound.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/repeat_button.dart';
@@ -144,27 +143,6 @@ void main() {
     expect(find.byKey(const ValueKey('beat-0-off')), findsOneWidget);
   });
 
-  testWidgets('flash offset buttons adjust the offset', (tester) async {
-    await pumpScreen(tester);
-    expect(find.byTooltip('Flash later'), findsNothing);
-    await tester.tap(find.byTooltip('Settings'));
-    await tester.pumpAndSettle();
-    final start = controller.visualOffset;
-    await tester.tap(find.byTooltip('Flash later'));
-    await tester.pump();
-    expect(controller.visualOffset, start + const Duration(milliseconds: 10));
-    await tester.tap(find.byTooltip('Flash earlier'));
-    await tester.tap(find.byTooltip('Flash earlier'));
-    await tester.tap(find.byTooltip('Flash earlier'));
-    await tester.pump();
-    final expected = start - const Duration(milliseconds: 20);
-    expect(controller.visualOffset, expected);
-    expect(
-      tester.widget<Text>(find.byKey(MetronomeScreen.offsetKey)).data,
-      '${expected.inMilliseconds} ms',
-    );
-  });
-
   testWidgets('tap button and T key set the tempo', (tester) async {
     await pumpScreen(tester);
     await tester.tap(find.byKey(MetronomeScreen.tapKey));
@@ -214,7 +192,7 @@ void main() {
       await tester.tap(find.descendant(of: sheet, matching: find.text('+')));
       await tester.pump();
       expect(controller.pattern.timeSignature, '5/4');
-      await tester.tap(find.byKey(const ValueKey('meter-unit-8')));
+      await tester.tap(find.byKey(const ValueKey('segment-8')));
       await tester.pump();
       expect(controller.pattern.timeSignature, '5/8');
       expect(sheet, findsOneWidget);
@@ -267,20 +245,6 @@ void main() {
       await tester.tap(find.byKey(MetronomeScreen.playKey));
       await tester.pump();
     });
-  });
-
-  testWidgets('settings: pick a click sound', (tester) async {
-    await pumpScreen(tester);
-    await tester.tap(find.byTooltip('Settings'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Cowbell'));
-    await tester.pump();
-    expect(controller.clickSound, ClickSound.cowbell);
-    expect(output.previewCount, 1);
-    final chip = tester.widget<ChoiceChip>(
-      find.widgetWithText(ChoiceChip, 'Cowbell'),
-    );
-    expect(chip.selected, isTrue);
   });
 
   testWidgets('subdivision wraps from 4 back to 1', (tester) async {

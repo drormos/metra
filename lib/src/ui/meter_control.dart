@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'repeat_button.dart';
+import 'segmented.dart';
 import 'theme.dart';
 
 /// A filled square −/+ that repeats while held (song editor, time
@@ -111,53 +112,20 @@ class MeterControl extends StatelessWidget {
             ),
           ),
         ),
-        Expanded(child: _units(colors)),
+        Expanded(
+          child: Segmented(
+            options: const {4: '4', 8: '8'},
+            selected: unit,
+            onSelected: (option) => onChanged(beats, option),
+            height: size - 4,
+            style: const TextStyle(
+              fontFamily: MetraFonts.condensed,
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
       ],
     );
   }
-
-  /// 4 | 8 in one 2px frame; the selected one filled with the text color.
-  Widget _units(MetraColors colors) => Container(
-    decoration: BoxDecoration(
-      border: Border.all(color: colors.border, width: 2),
-      borderRadius: BorderRadius.circular(4),
-    ),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(2),
-      child: Row(
-        children: [
-          for (final option in const [4, 8])
-            Expanded(
-              child: Semantics(
-                button: true,
-                selected: unit == option,
-                child: Material(
-                  color: unit == option ? colors.text : colors.background,
-                  child: InkWell(
-                    key: ValueKey('meter-unit-$option'),
-                    onTap: () => onChanged(beats, option),
-                    child: SizedBox(
-                      height: size - 4,
-                      child: Center(
-                        child: Text(
-                          '$option',
-                          style: TextStyle(
-                            fontFamily: MetraFonts.condensed,
-                            fontSize: 26,
-                            fontWeight: FontWeight.w700,
-                            color: unit == option
-                                ? colors.background
-                                : colors.text,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    ),
-  );
 }

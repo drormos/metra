@@ -43,6 +43,37 @@ Future<void> showSetlistPicker(
   );
 }
 
+/// The picker's What to play view as a full screen (from Settings > Your
+/// music > Setlists). Back leaves it; playing something closes it too.
+Future<void> openSetlistsScreen(
+  BuildContext context, {
+  required LibraryController library,
+  required MetronomeController metronome,
+  required VoidCallback onEditSetlist,
+  required VoidCallback onSongLibrary,
+  required VoidCallback onNewSetlist,
+}) => Navigator.push(
+  context,
+  MaterialPageRoute<void>(
+    builder: (_) => Scaffold(
+      backgroundColor: context.colors.sheet,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: SetlistPicker(
+            library: library,
+            metronome: metronome,
+            onEditSetlist: onEditSetlist,
+            onSongLibrary: onSongLibrary,
+            onNewSetlist: onNewSetlist,
+            fullScreen: true,
+          ),
+        ),
+      ),
+    ),
+  ),
+);
+
 class SetlistPicker extends StatefulWidget {
   const SetlistPicker({
     super.key,
@@ -51,7 +82,12 @@ class SetlistPicker extends StatefulWidget {
     required this.onEditSetlist,
     required this.onSongLibrary,
     required this.onNewSetlist,
+    this.fullScreen = false,
   });
+
+  /// A full screen rather than a sheet: opens on What to play, whose back
+  /// chevron leaves the screen.
+  final bool fullScreen;
 
   final LibraryController library;
   final MetronomeController metronome;
@@ -68,7 +104,8 @@ class SetlistPicker extends StatefulWidget {
 
 class _SetlistPickerState extends State<SetlistPicker> {
   // Which view is showing; navigation inside the sheet only.
-  late bool _whatToPlay = widget.library.activeSetlist == null;
+  late bool _whatToPlay =
+      widget.fullScreen || widget.library.activeSetlist == null;
 
   LibraryController get _library => widget.library;
 
@@ -78,7 +115,10 @@ class _SetlistPickerState extends State<SetlistPicker> {
     builder: (context, _) {
       final setlist = _library.activeSetlist;
       return _whatToPlay || setlist == null
-          ? _whatToPlayView(context, canGoBack: setlist != null)
+          ? _whatToPlayView(
+              context,
+              canGoBack: widget.fullScreen || setlist != null,
+            )
           : _songsView(context, setlist);
     },
   );
@@ -286,7 +326,9 @@ class _SetlistPickerState extends State<SetlistPicker> {
                 if (canGoBack)
                   IconButton(
                     tooltip: 'Back',
-                    onPressed: () => setState(() => _whatToPlay = false),
+                    onPressed: widget.fullScreen
+                        ? () => Navigator.pop(context)
+                        : () => setState(() => _whatToPlay = false),
                     icon: const Icon(Icons.chevron_left, size: 28),
                   )
                 else
