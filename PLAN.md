@@ -54,6 +54,8 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
    - `LibraryController` owns songs and setlists (deleting a song removes it from setlists) and saves on every change.
    - Also restores the last session: tempo, pattern and flash offset.
 3. **Setlist UI:** Side panel (macOS) or sheet (Android) for switching songs without stopping playback. A song switch applies tempo and pattern at the next bar boundary.
+   - `LibraryPanel`: setlist picker (or all songs), tap a song to load it, save current settings as a song (added to the selected setlist), reorder by drag, rename, add/remove from setlists, delete with confirmation. The loaded song's name shows above the beat dots.
+   - Layout by width, not platform: from 800 px wide the panel sits beside the metronome; narrower windows open it as a sheet from the app bar.
 4. **Expanded Patterns:** UI for 3/4, 6/8, 7/8 and subdivisions (eighths, triplets, sixteenths), mapped to the Phase 1 `MetronomePattern` model (UI only; the model already supports these).
 
 ## Phase 3: Audio Assets & Polish

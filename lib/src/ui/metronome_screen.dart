@@ -1,23 +1,52 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import 'beat_indicator.dart';
+import 'library_panel.dart';
 
-/// Main screen: tempo readout, tempo steps and transport. Stateless; all
+/// Main screen: tempo readout, tempo steps and transport, plus the song
+/// panel (beside it on wide screens, in a sheet on phones). Stateless; all
 /// metronome state lives in [controller].
 class MetronomeScreen extends StatelessWidget {
-  const MetronomeScreen({super.key, required this.controller});
+  const MetronomeScreen({super.key, required this.controller, this.library});
 
   final MetronomeController controller;
+
+  /// Null when storage is unavailable: no song panel then.
+  final LibraryController? library;
+
+  // Lifted off the black screen so a sheet's edge is visible.
+  static const _sheetColor = Color(0xFF1C1C1C);
+
+  /// From this width the song panel sits beside the metronome.
+  static const sidePanelWidth = 800.0;
 
   static const bpmKey = Key('bpm');
   static const playKey = Key('play');
   static const offsetKey = Key('offset');
   static const tapKey = Key('tap');
+  static const songNameKey = Key('song-name');
 
   @override
   Widget build(BuildContext context) {
+    final library = this.library;
+    final wide = MediaQuery.sizeOf(context).width >= sidePanelWidth;
+    final metronome = SafeArea(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: ListenableBuilder(
+              listenable: Listenable.merge([controller, ?library]),
+              builder: (context, _) => _content(context),
+            ),
+          ),
+        ),
+      ),
+    );
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.space): controller.toggle,
@@ -37,6 +66,14 @@ class MetronomeScreen extends StatelessWidget {
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             actions: [
+              if (library != null && !wide)
+                Builder(
+                  builder: (context) => IconButton(
+                    tooltip: 'Songs',
+                    icon: const Icon(Icons.queue_music),
+                    onPressed: () => _showSongs(context, library),
+                  ),
+                ),
               Builder(
                 builder: (context) => IconButton(
                   tooltip: 'Settings',
@@ -46,20 +83,24 @@ class MetronomeScreen extends StatelessWidget {
               ),
             ],
           ),
-          body: SafeArea(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: ListenableBuilder(
-                    listenable: controller,
-                    builder: (context, _) => _content(context),
-                  ),
-                ),
-              ),
-            ),
-          ),
+          body: library != null && wide
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: metronome),
+                    const VerticalDivider(width: 1),
+                    SizedBox(
+                      width: 340,
+                      child: SafeArea(
+                        child: LibraryPanel(
+                          library: library,
+                          metronome: controller,
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : metronome,
         ),
       ),
     );
@@ -73,6 +114,18 @@ class MetronomeScreen extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (library?.currentSong case final song?)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(
+              song.name,
+              key: songNameKey,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium,
+            ),
+          ),
         BeatIndicator(controller: controller),
         const SizedBox(height: 24),
         // Shrinks to fit short windows (landscape phones, small desktops).
@@ -159,8 +212,24 @@ class MetronomeScreen extends StatelessWidget {
     );
   }
 
+  void _showSongs(BuildContext context, LibraryController library) =>
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        backgroundColor: _sheetColor,
+        builder: (context) => FractionallySizedBox(
+          heightFactor: 0.8,
+          child: SafeArea(
+            child: LibraryPanel(library: library, metronome: controller),
+          ),
+        ),
+      );
+
   void _showSettings(BuildContext context) => showModalBottomSheet<void>(
     context: context,
+    showDragHandle: true,
+    backgroundColor: _sheetColor,
     builder: (context) => SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(24),

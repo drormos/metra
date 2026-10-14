@@ -16,9 +16,79 @@ class LibraryController extends ChangeNotifier {
   Library _library;
   Future<void> _lastSave = Future.value();
   int _idCounter = 0;
+  String? _selectedSetlistId;
+  String? _currentSongId;
 
   List<Song> get songs => _library.songs;
   List<Setlist> get setlists => _library.setlists;
+
+  /// The setlist shown in the song panel; null shows all songs.
+  Setlist? get selectedSetlist {
+    for (final list in setlists) {
+      if (list.id == _selectedSetlistId) return list;
+    }
+    return null;
+  }
+
+  void selectSetlist(String? id) {
+    _selectedSetlistId = id;
+    notifyListeners();
+  }
+
+  /// Songs of the selected setlist in order, or all songs.
+  List<Song> get visibleSongs {
+    final list = selectedSetlist;
+    if (list == null) return songs;
+    return [for (final id in list.songIds) ?songById(id)];
+  }
+
+  /// The song last loaded into the metronome.
+  Song? get currentSong =>
+      _currentSongId == null ? null : songById(_currentSongId!);
+
+  /// Load [song]; while playing it takes over at the next bar line.
+  void playSong(Song song, MetronomeController metronome) {
+    metronome.switchTo(bpm: song.bpm, pattern: song.pattern);
+    _currentSongId = song.id;
+    notifyListeners();
+  }
+
+  /// Saves the metronome's tempo and pattern as a new song, added to the
+  /// selected setlist if there is one.
+  Song saveCurrentAsSong(String name, MetronomeController metronome) {
+    final song = addSong(
+      name: name,
+      bpm: metronome.bpm,
+      pattern: metronome.pattern,
+    );
+    final list = selectedSetlist;
+    if (list != null) addToSetlist(list.id, song.id);
+    _currentSongId = song.id;
+    return song;
+  }
+
+  /// Overwrites [song]'s tempo and pattern with the metronome's.
+  void updateSongFromMetronome(Song song, MetronomeController metronome) =>
+      updateSong(song.copyWith(bpm: metronome.bpm, pattern: metronome.pattern));
+
+  void addToSetlist(String setlistId, String songId) {
+    final list = setlists.firstWhere((s) => s.id == setlistId);
+    updateSetlist(list.copyWith(songIds: [...list.songIds, songId]));
+  }
+
+  /// Removes the entry at [index] (a song may appear more than once).
+  void removeFromSetlist(String setlistId, int index) {
+    final list = setlists.firstWhere((s) => s.id == setlistId);
+    updateSetlist(list.copyWith(songIds: [...list.songIds]..removeAt(index)));
+  }
+
+  /// Moves the entry at [oldIndex] so it ends up at [newIndex].
+  void reorderSetlist(String setlistId, int oldIndex, int newIndex) {
+    final list = setlists.firstWhere((s) => s.id == setlistId);
+    final ids = [...list.songIds];
+    ids.insert(newIndex, ids.removeAt(oldIndex));
+    updateSetlist(list.copyWith(songIds: ids));
+  }
 
   Song? songById(String id) {
     for (final song in songs) {

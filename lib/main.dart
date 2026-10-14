@@ -15,6 +15,7 @@ import 'src/ui/metronome_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MetronomeController? controller;
+  LibraryController? library;
   Object? engineError;
   try {
     controller = MetronomeController(await SoloudClickOutput.create());
@@ -23,10 +24,17 @@ Future<void> main() async {
     engineError = e;
   }
   if (controller != null) {
-    (await _loadLibrary())?.attach(controller);
+    library = await _loadLibrary();
+    library?.attach(controller);
     if (Platform.isAndroid) await _initAndroidBackground(controller);
   }
-  runApp(MetraApp(controller: controller, engineError: engineError));
+  runApp(
+    MetraApp(
+      controller: controller,
+      library: library,
+      engineError: engineError,
+    ),
+  );
 }
 
 /// Saved songs, setlists and last-session settings. Without storage the
@@ -63,10 +71,11 @@ Future<void> _initAndroidBackground(MetronomeController controller) async {
 }
 
 class MetraApp extends StatelessWidget {
-  const MetraApp({super.key, this.controller, this.engineError});
+  const MetraApp({super.key, this.controller, this.library, this.engineError});
 
   /// Null when the engine failed to start (see [engineError]).
   final MetronomeController? controller;
+  final LibraryController? library;
   final Object? engineError;
 
   @override
@@ -77,7 +86,7 @@ class MetraApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: _highContrastTheme,
       home: controller != null
-          ? MetronomeScreen(controller: controller)
+          ? MetronomeScreen(controller: controller, library: library)
           : Scaffold(
               body: Center(
                 child: Padding(

@@ -111,4 +111,79 @@ void main() {
       expect(metronome.visualOffset, Duration.zero);
     });
   });
+
+  group('song panel', () {
+    late MetronomeController metronome;
+
+    setUp(() => metronome = MetronomeController(FakeClickOutput()));
+    tearDown(() => metronome.dispose());
+
+    test('visible songs follow the selected setlist order', () {
+      final a = library.addSong(name: 'A', bpm: 100, pattern: waltz);
+      final b = library.addSong(name: 'B', bpm: 110, pattern: waltz);
+      final gig = library.addSetlist('Gig');
+      library.addToSetlist(gig.id, b.id);
+      library.addToSetlist(gig.id, a.id);
+
+      expect(library.visibleSongs.map((s) => s.name), ['A', 'B']);
+      library.selectSetlist(gig.id);
+      expect(library.visibleSongs.map((s) => s.name), ['B', 'A']);
+      library.selectSetlist(null);
+      expect(library.selectedSetlist, isNull);
+    });
+
+    test('a deleted selected setlist falls back to all songs', () {
+      final gig = library.addSetlist('Gig');
+      library.selectSetlist(gig.id);
+      library.deleteSetlist(gig.id);
+      expect(library.selectedSetlist, isNull);
+    });
+
+    test('playSong loads tempo and pattern and marks it current', () {
+      final a = library.addSong(name: 'A', bpm: 95, pattern: waltz);
+      library.playSong(a, metronome);
+      expect(metronome.bpm, 95);
+      expect(metronome.pattern, waltz);
+      expect(library.currentSong?.id, a.id);
+    });
+
+    test('saveCurrentAsSong adds to the selected setlist', () {
+      final gig = library.addSetlist('Gig');
+      library.selectSetlist(gig.id);
+      metronome.setBpm(133);
+      final song = library.saveCurrentAsSong('New', metronome);
+      expect(song.bpm, 133);
+      expect(library.selectedSetlist!.songIds, [song.id]);
+      expect(library.currentSong?.id, song.id);
+    });
+
+    test('updateSongFromMetronome overwrites tempo and pattern', () {
+      final a = library.addSong(
+        name: 'A',
+        bpm: 95,
+        pattern: const MetronomePattern.standard(),
+      );
+      metronome.switchTo(bpm: 101, pattern: waltz);
+      library.updateSongFromMetronome(a, metronome);
+      expect(library.songById(a.id)!.bpm, 101);
+      expect(library.songById(a.id)!.pattern, waltz);
+    });
+
+    test('reorder and remove setlist entries', () {
+      final a = library.addSong(name: 'A', bpm: 100, pattern: waltz);
+      final b = library.addSong(name: 'B', bpm: 110, pattern: waltz);
+      final c = library.addSong(name: 'C', bpm: 120, pattern: waltz);
+      final gig = library.addSetlist('Gig');
+      for (final s in [a, b, c]) {
+        library.addToSetlist(gig.id, s.id);
+      }
+      library.reorderSetlist(gig.id, 0, 2); // A to the end
+      expect(library.setlists.single.songIds, [b.id, c.id, a.id]);
+      library.reorderSetlist(gig.id, 2, 0); // A back to the front
+      expect(library.setlists.single.songIds, [a.id, b.id, c.id]);
+      library.removeFromSetlist(gig.id, 1);
+      expect(library.setlists.single.songIds, [a.id, c.id]);
+      expect(library.songs, hasLength(3), reason: 'song itself stays');
+    });
+  });
 }
