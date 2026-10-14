@@ -15,6 +15,7 @@ analyzer:
     - android/**
     - macos/**
     - reference_soloud/**
+    - ios/**
 
 linter:
   # The lint rules applied to this project can be customized in the

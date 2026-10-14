@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -18,6 +19,9 @@ Future<void> main() async {
   MetronomeController? controller;
   LibraryController? library;
   Object? engineError;
+  // Before the engine starts its output: flutter_soloud leaves the iOS
+  // audio session to the app.
+  if (Platform.isIOS) await _initIosAudioSession();
   try {
     controller = MetronomeController(await SoloudClickOutput.create());
     AppLifecycleListener(onStateChange: controller.didChangeAppLifecycleState);
@@ -36,6 +40,25 @@ Future<void> main() async {
       engineError: engineError,
     ),
   );
+}
+
+/// Playback category: plays with the silent switch on and with the screen
+/// locked (with the `audio` background mode in Info.plist). Mixes with other
+/// audio, like Android, so the user's music keeps playing alongside.
+Future<void> _initIosAudioSession() async {
+  try {
+    final session = await AudioSession.instance;
+    await session.configure(
+      const AudioSessionConfiguration(
+        avAudioSessionCategory: AVAudioSessionCategory.playback,
+        avAudioSessionCategoryOptions:
+            AVAudioSessionCategoryOptions.mixWithOthers,
+      ),
+    );
+    await session.setActive(true);
+  } catch (e) {
+    debugPrint('iOS audio session setup failed: $e');
+  }
 }
 
 /// Saved songs, setlists and last-session settings. Without storage the
