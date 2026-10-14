@@ -345,6 +345,41 @@ void main() {
     });
   });
 
+  group('song editor preview', () {
+    final waltz = MetronomePattern.simple(beatsPerBar: 3, stepsPerBeat: 1);
+
+    test('from stopped: plays the draft; ending stops and restores', () async {
+      await controller.preview(bpm: 90, pattern: waltz);
+      expect(controller.isPlaying, isTrue);
+      expect(controller.bpm, 90);
+      expect(controller.previewing, isTrue);
+      controller.endPreview();
+      expect(controller.isPlaying, isFalse);
+      expect(controller.bpm, 120);
+      expect(controller.pattern, const MetronomePattern.standard());
+      expect(controller.previewing, isFalse);
+    });
+
+    test('from playing: ending resumes the main click', () async {
+      await controller.play();
+      await controller.preview(bpm: 90, pattern: waltz);
+      controller.stop(); // the editor's Stop
+      await controller.preview(bpm: 95, pattern: waltz); // again
+      controller.endPreview();
+      expect(controller.isPlaying, isTrue);
+      expect(controller.bpm, 120, reason: 'the first snapshot is kept');
+      expect(controller.pattern, const MetronomePattern.standard());
+    });
+
+    test('no preview: ending does nothing', () async {
+      await controller.play();
+      notifications = 0;
+      controller.endPreview();
+      expect(controller.isPlaying, isTrue);
+      expect(notifications, 0);
+    });
+  });
+
   group('loadSong', () {
     final waltz = MetronomePattern.simple(beatsPerBar: 3, stepsPerBeat: 1);
 

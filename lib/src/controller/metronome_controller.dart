@@ -51,6 +51,8 @@ class MetronomeController extends ChangeNotifier {
   EngineClockSmoother _smoother = EngineClockSmoother();
   final _tapClock = Stopwatch()..start();
   final _tapTempo = TapTempo(minBpm: minBpm, maxBpm: maxBpm);
+  // What the main screen was doing before a song editor preview took over.
+  ({int bpm, MetronomePattern pattern, bool playing})? _beforePreview;
 
   int get bpm => _bpm;
   MetronomePattern get pattern => _pattern;
@@ -163,6 +165,30 @@ class MetronomeController extends ChangeNotifier {
       _scheduler.replaceLevels(pattern);
       notifyListeners();
     }
+  }
+
+  /// Whether a song editor preview has taken over the click (it may have
+  /// been stopped since; [endPreview] still restores).
+  bool get previewing => _beforePreview != null;
+
+  /// Song editor preview: plays [bpm] and [pattern] from beat 1, taking
+  /// over the click. The first call remembers the main screen's state for
+  /// [endPreview]. Edits while previewing go through [applyEdit].
+  Future<void> preview({required int bpm, required MetronomePattern pattern}) {
+    _beforePreview ??= (bpm: _bpm, pattern: _pattern, playing: _playing);
+    loadSong(bpm: bpm, pattern: pattern);
+    return play();
+  }
+
+  /// Leaving the song editor: restores what the main screen was doing
+  /// (playing restarts it on beat 1). No preview: nothing happens.
+  void endPreview() {
+    final before = _beforePreview;
+    if (before == null) return;
+    _beforePreview = null;
+    if (!before.playing) stop();
+    loadSong(bpm: before.bpm, pattern: before.pattern);
+    if (before.playing) play();
   }
 
   void _switchAtNextBeat(MetronomePattern pattern, {required bool restartBar}) {

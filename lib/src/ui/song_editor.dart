@@ -14,8 +14,10 @@ import 'theme.dart';
 
 /// Opens the song editor (ui-spec.md "Song editor") for [song], or a new
 /// song when null. Completes with the saved song, or null if cancelled or
-/// deleted. Editing doesn't touch the click; saving the loaded song applies
-/// its changes to [metronome] at once, without restarting the bar.
+/// deleted. Editing doesn't touch the click unless Preview is on; leaving
+/// ends the preview, restoring what the main screen was doing. Saving the
+/// loaded song then applies its changes to [metronome] without restarting
+/// the bar.
 Future<Song?> openSongEditor(
   BuildContext context,
   LibraryController library,
@@ -25,9 +27,11 @@ Future<Song?> openSongEditor(
   final saved = await Navigator.push(
     context,
     MaterialPageRoute<Song>(
-      builder: (_) => SongEditor(library: library, song: song),
+      builder: (_) =>
+          SongEditor(library: library, metronome: metronome, song: song),
     ),
   );
+  metronome.endPreview();
   if (saved != null && saved.id == library.currentSong?.id) {
     metronome.applyEdit(bpm: saved.bpm, pattern: saved.pattern);
   }
@@ -35,9 +39,17 @@ Future<Song?> openSongEditor(
 }
 
 class SongEditor extends StatefulWidget {
-  const SongEditor({super.key, required this.library, this.song});
+  const SongEditor({
+    super.key,
+    required this.library,
+    required this.metronome,
+    this.song,
+  });
 
   final LibraryController library;
+
+  /// Only for Preview; [openSongEditor] restores it on leaving.
+  final MetronomeController metronome;
 
   /// Null: a new song.
   final Song? song;
@@ -48,6 +60,7 @@ class SongEditor extends StatefulWidget {
   static const beatsKey = Key('song-beats');
   static const patternKey = Key('song-pattern');
   static const deleteKey = Key('delete-song');
+  static const previewKey = Key('song-preview');
 
   static const maxBeats = 16;
 
@@ -101,10 +114,23 @@ class _SongEditorState extends State<SongEditor> {
     super.dispose();
   }
 
-  /// Every touch that edits the draft ticks (ui-spec.md "Haptics").
+  MetronomeController get _metronome => widget.metronome;
+
+  bool get _previewPlaying => _metronome.previewing && _metronome.isPlaying;
+
+  /// Every touch that edits the draft ticks (ui-spec.md "Haptics"), and a
+  /// running preview hears it at once.
   void _edit(VoidCallback change) {
     Haptics.tick();
     setState(change);
+    if (_previewPlaying) _metronome.applyEdit(bpm: _bpm, pattern: _pattern);
+  }
+
+  void _togglePreview() {
+    Haptics.medium(); // like Start/Stop
+    _previewPlaying
+        ? _metronome.stop()
+        : _metronome.preview(bpm: _bpm, pattern: _pattern);
   }
 
   void _save() {
@@ -148,6 +174,25 @@ class _SongEditorState extends State<SongEditor> {
       actionLabel: 'Save',
       dirty: _dirty,
       onAction: _name.text.trim().isEmpty ? null : _save,
+      bottom: SizedBox(
+        height: 60,
+        child: ListenableBuilder(
+          listenable: _metronome,
+          builder: (context, _) => OutlinedButton.icon(
+            key: SongEditor.previewKey,
+            style: OutlinedButton.styleFrom(foregroundColor: colors.text),
+            onPressed: _togglePreview,
+            icon: Icon(
+              _previewPlaying ? Icons.stop : Icons.play_arrow,
+              size: 20,
+            ),
+            label: Text(
+              _previewPlaying ? 'Stop' : 'Preview',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
         children: [

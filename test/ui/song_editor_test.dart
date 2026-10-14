@@ -187,6 +187,52 @@ void main() {
     expect(metronome.bpm, 80);
   });
 
+  testWidgets('Preview plays the draft live; leaving restores', (tester) async {
+    await pumpEditor(tester);
+    expect(find.text('Preview'), findsOneWidget);
+    await tester.tap(find.byKey(SongEditor.previewKey));
+    await tester.pump();
+    expect(metronome.isPlaying, isTrue);
+    expect(metronome.bpm, 100);
+    expect(find.text('Stop'), findsOneWidget);
+    await tapText(tester, '+');
+    expect(metronome.bpm, 101, reason: 'edits are heard at once');
+    await tester.tap(find.byKey(EditorScaffold.cancelKey));
+    await tester.pumpAndSettle();
+    await tapText(tester, 'Discard');
+    await tester.pumpAndSettle();
+    expect(metronome.isPlaying, isFalse, reason: 'was stopped before');
+    expect(metronome.bpm, 120);
+  });
+
+  testWidgets('Stop ends the preview sound; edits stay silent', (tester) async {
+    await pumpEditor(tester);
+    await tester.tap(find.byKey(SongEditor.previewKey));
+    await tester.pump();
+    await tester.tap(find.byKey(SongEditor.previewKey));
+    await tester.pump();
+    expect(metronome.isPlaying, isFalse);
+    expect(find.text('Preview'), findsOneWidget);
+    await tapText(tester, '+');
+    expect(metronome.bpm, 100, reason: 'not previewing');
+  });
+
+  testWidgets('saving the loaded song after a preview keeps it playing', (
+    tester,
+  ) async {
+    await pumpEditor(tester);
+    library.playSong(alpha, metronome);
+    await metronome.play();
+    await tester.tap(find.byKey(SongEditor.previewKey));
+    await tester.pump();
+    await tapText(tester, '+');
+    await save(tester);
+    expect(metronome.isPlaying, isTrue);
+    expect(metronome.bpm, 101);
+    expect(metronome.previewing, isFalse);
+     metronome.stop();
+  });
+
   testWidgets('pattern section: collapsed, summary, subdivision and cells', (
     tester,
   ) async {
