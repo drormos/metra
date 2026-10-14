@@ -9,6 +9,25 @@ A sample-accurate metronome for Android and macOS, built with Flutter and `flutt
 - Waiting on the user: Phase 4 step 10 (Daylight colors on a real screen); feel of the ruler's fling threshold and haptic tick on the phone.
 - Working rules: one step per commit; stage specific paths (never `git add -A`: the user edits `docs/design/` in parallel); `flutter test` + `flutter analyze` before each commit; the engine drift suite (`flutter test integration_test/drift_test.dart -d macos`) after engine changes.
 
+## Agreed behavior not in `docs/design/ui-spec.md`
+Decisions made with the user that the spec doesn't state (or states differently). Keep them unless the spec is updated to say otherwise.
+- **Conflict — Free play title:** the spec says the title is empty in Free play; agreed: loading a single song from the library in Free play shows its name as the title (mode stays Free play).
+- **Song outside the loaded set:** position shows "– of 12"; next/previous goes back into the set.
+- **Switching to Free play while playing** changes only the mode, never the click.
+- **Editing the loaded song** in the song editor applies to the click immediately on Save.
+- **On-stage changes to a loaded song survive closing the app** (Revert / Save to song still shown after reopening).
+- **Beat accent taps** are heard from the very next click (no waiting for a beat or bar).
+- **Volume defaults:** Accent 100%, Beat 80%, Subdivision 45% (revisit if needed).
+- **Visual offset:** default 0 ms (measured by eye on MacBook speakers; a USB-dongle headset needed ~20 ms); range −200 to +500 ms in 10 ms steps. The settings test uses the click if it's already playing and only stops what it started.
+- **Tempo ruler acceleration:** besides the fling snapping, faster drags cover more bpm per pixel (up to 4×) while slow drags stay 1 bpm per 14 px.
+- **Tap tempo:** registers on finger-down; averages the last 4 taps; ignores intervals more than 30% off the median; resets after 2 s; clamps to 30–300.
+- **Setlist editor:** "Start with all songs" when creating a set (fills it A–Z).
+- **Keyboard / foot pedals:** Space start/stop, T tap, ↑/↓ ±1, Shift+↑/↓ ±5, Page Down/→ next song, Page Up/← previous song (Bluetooth page-turner pedals; inside a setlist only).
+- **Android:** plays alongside other music (no audio focus); stops when headphones are unplugged; Start/Stop and previous/next in the notification and lock screen; swiping the app away stops it.
+- **iOS:** plays with the silent switch on and with the screen locked; mixes with other music. Lock-screen controls and headphone-unplug stop not built for iOS yet.
+- **macOS:** opens as a phone-shaped, resizable window (~440×900).
+- **Ideas parked:** a "gap trainer" (play N bars, mute N bars) if wanted later.
+
 ## Phase 1: Core Engine & MVP Controls
 **Goal:** Sample-accurate playback, decoupled architecture, verified timing. Each step ships with its own unit tests.
 
