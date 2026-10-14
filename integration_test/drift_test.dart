@@ -88,6 +88,29 @@ void main() {
     _expectAccentsEvery(4, recorder);
   });
 
+  test('a song switch restarts on beat 1 at the new tempo', () async {
+    final recorder = _OnsetRecorder()..start();
+    controller.setBpm(120);
+    await controller.play();
+    await _waitForOnsets(recorder, 3);
+    final before = recorder.onsets.length;
+    controller.loadSong(bpm: 90, pattern: const MetronomePattern.standard());
+    await _waitForOnsets(recorder, before + 6);
+    controller.stop();
+    await recorder.stop();
+
+    // Find the first click of the new song: everything after it is on a
+    // 90 BPM grid starting with an accent.
+    final switchAt = recorder.intervals.indexWhere(
+      (d) => (d - framesPerBeat(120)).abs() > _toleranceFrames,
+    );
+    expect(switchAt, greaterThan(0));
+    final after = recorder.onsets.sublist(switchAt + 1);
+    _expectOnGrid(after, framesPerBeat(90), allowGaps: false);
+    final peaks = recorder.peaks.sublist(switchAt + 1);
+    expect(peaks[0], greaterThan(peaks[1]), reason: 'beat 1 accented');
+  });
+
   test('a 1 s stall skips beats but never plays off the grid', () async {
     final recorder = _OnsetRecorder()..start();
     controller.setBpm(120);

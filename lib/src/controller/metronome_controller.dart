@@ -159,6 +159,16 @@ class MetronomeController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Load a song (next/previous, or picked from a list). While playing it
+  /// restarts immediately on beat 1 at the new tempo; while stopped it only
+  /// loads.
+  void loadSong({required int bpm, required MetronomePattern pattern}) {
+    _bpm = bpm.clamp(minBpm, maxBpm);
+    _pattern = pattern;
+    _scheduler.restartNow(bpm: _bpm.toDouble(), pattern: pattern);
+    notifyListeners();
+  }
+
   /// Load a song's tempo and pattern. While playing, the current bar
   /// finishes first, then both change on the next bar line.
   void switchTo({required int bpm, required MetronomePattern pattern}) {

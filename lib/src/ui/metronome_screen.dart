@@ -105,6 +105,19 @@ class MetronomeScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.baseline,
                         textBaseline: TextBaseline.alphabetic,
                         children: [
+                          // An invisible twin of "bpm" balances the visible
+                          // one, so the number alone is centred and "bpm"
+                          // hangs off its right side.
+                          ExcludeSemantics(
+                            child: Visibility.maintain(
+                              visible: false,
+                              child: Text(
+                                'bpm',
+                                style: TextStyle(fontSize: 18),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
                           Text(
                             '$bpm',
                             key: bpmKey,

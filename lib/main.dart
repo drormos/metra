@@ -4,10 +4,12 @@ import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'src/audio/headphone_guard.dart';
 import 'src/audio/metronome_audio_handler.dart';
 import 'src/audio/soloud_click_output.dart';
+import 'src/controller/keep_awake.dart';
 import 'src/controller/library_controller.dart';
 import 'src/controller/metronome_controller.dart';
 import 'src/storage/library_store.dart';
@@ -25,6 +27,10 @@ Future<void> main() async {
   try {
     controller = MetronomeController(await SoloudClickOutput.create());
     AppLifecycleListener(onStateChange: controller.didChangeAppLifecycleState);
+    keepAwakeWhilePlaying(
+      controller,
+      (awake) => WakelockPlus.toggle(enable: awake),
+    );
   } catch (e) {
     engineError = e;
   }

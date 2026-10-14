@@ -38,7 +38,7 @@ void main() {
   testWidgets('shows the current bpm', (tester) async {
     await pumpScreen(tester);
     expect(bpmText(tester).data, '120');
-    expect(find.text('bpm'), findsOneWidget);
+    expect(find.text('bpm'), findsWidgets); // plus its invisible twin
   });
 
   testWidgets('step buttons change the tempo', (tester) async {
@@ -463,5 +463,16 @@ void main() {
       expect(controller.bpm, 121);
       semantics.dispose();
     });
+  });
+
+  testWidgets('the BPM number alone is centred; "bpm" hangs off its right', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+    final screen = tester.getRect(find.byType(MetronomeScreen));
+    final number = tester.getRect(find.byKey(MetronomeScreen.bpmKey));
+    expect(number.center.dx, closeTo(screen.center.dx, 0.5));
+    final label = tester.getRect(find.text('bpm').last);
+    expect(label.left, greaterThan(number.right));
   });
 }

@@ -441,4 +441,57 @@ void main() {
       ]);
     });
   });
+
+  group('restartNow', () {
+    final waltz = MetronomePattern.simple(beatsPerBar: 3, stepsPerBeat: 1);
+
+    test('starts beat 1 of the new song one guard after now', () async {
+      await start(bpm: 60); // 1120, 2120, ...
+      runFor(_ms * 1500); // now 2500: mid-beat 2
+      scheduler.restartNow(bpm: 120, pattern: waltz);
+      runFor(_ms * 1600);
+      final times = output.liveTimes;
+      expect(times.take(2), [_ms * 1120, _ms * 2120], reason: 'already heard');
+      // New bar at 2500 + 60, then 500 ms apart.
+      expect(times.skip(2).take(4), [
+        _ms * 2560,
+        _ms * 3060,
+        _ms * 3560,
+        _ms * 4060,
+      ]);
+      expect(output.live.map((c) => c.level).skip(2).take(4), [
+        StepLevel.accent,
+        StepLevel.normal,
+        StepLevel.normal,
+        StepLevel.accent,
+      ]);
+    });
+
+    test('cancels clicks already handed over, keeps committed ones', () async {
+      await start(bpm: 120);
+      scheduler.lookahead = _ms * 2000;
+      scheduler.refill(); // 1120 .. 2620 scheduled
+      output.time = _ms * 1100; // 1120 is inside the guard: committed
+      scheduler.restartNow(bpm: 60, pattern: waltz);
+      expect(output.clicks.first.cancelled, isFalse);
+      expect(output.clicks.skip(1).take(3).every((c) => c.cancelled), isTrue);
+      expect(output.live.map((c) => c.at).skip(1).first, _ms * 1160);
+    });
+
+    test('replaces a pending bar switch', () async {
+      await start(bpm: 120);
+      runFor(_ms * 650);
+      scheduler.switchAtNextBar(bpm: 30, pattern: waltz);
+      scheduler.restartNow(bpm: 60, pattern: const MetronomePattern.standard());
+      runFor(_ms * 3000);
+      final times = output.liveTimes;
+      expect(times[2], _ms * 1710, reason: 'restart, not the bar switch');
+      expect(times[3], _ms * 2710);
+    });
+
+    test('no-op while stopped', () {
+      scheduler.restartNow(bpm: 60, pattern: waltz);
+      expect(output.clicks, isEmpty);
+    });
+  });
 }

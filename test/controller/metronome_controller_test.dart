@@ -275,4 +275,26 @@ void main() {
       expect(output.previewCount, 0);
     });
   });
+
+  group('loadSong', () {
+    final waltz = MetronomePattern.simple(beatsPerBar: 3, stepsPerBeat: 1);
+
+    test('while stopped only loads', () {
+      controller.loadSong(bpm: 90, pattern: waltz);
+      expect(controller.bpm, 90);
+      expect(controller.pattern, waltz);
+      expect(controller.isPlaying, isFalse);
+      expect(output.clicks, isEmpty);
+    });
+
+    test('while playing restarts on beat 1 straight away', () async {
+      await controller.play(); // first click at 1120
+      output.time = _ms * 1500;
+      controller.loadSong(bpm: 60, pattern: waltz);
+      expect(controller.isPlaying, isTrue);
+      final restart = output.live.last;
+      expect(restart.at, _ms * 1560);
+      expect(restart.level, StepLevel.accent);
+    });
+  });
 }

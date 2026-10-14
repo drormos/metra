@@ -89,9 +89,9 @@ class LibraryController extends ChangeNotifier {
   bool get hasPrevious => activeSetlist != null && currentIndex > 0;
 
   /// Load [song] ([index] = its position in [visibleSongs], if known);
-  /// while playing it takes over at the next bar line.
+  /// while playing it restarts on beat 1 at the song's tempo.
   void playSong(Song song, MetronomeController metronome, {int? index}) {
-    metronome.switchTo(bpm: song.bpm, pattern: song.pattern);
+    metronome.loadSong(bpm: song.bpm, pattern: song.pattern);
     _update(
       _library.withSession(
         setlistId: _library.activeSetlistId,

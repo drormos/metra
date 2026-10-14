@@ -225,6 +225,30 @@ class ClickScheduler {
     );
   }
 
+  /// Restart on beat 1 with [bpm] and [pattern] as soon as safely possible
+  /// (a song switch): every step not yet committed is cancelled and the new
+  /// bar starts [guard] from now. Replaces any pending switch. No-op while
+  /// stopped.
+  void restartNow({required double bpm, required MetronomePattern pattern}) {
+    final grid = _grid;
+    if (grid == null) return;
+    final firstOpen = _firstOpenStep(grid);
+    _cancelFrom(firstOpen);
+    _switchAt = null;
+    _nextGrid = null;
+    _nextPattern = null;
+    _pattern = pattern;
+    _barStart = firstOpen;
+    _nextStep = firstOpen;
+    _grid = BeatGrid(
+      anchor: _output.now() + guard,
+      anchorStep: firstOpen,
+      bpm: bpm,
+      stepsPerBeat: pattern.stepsPerBeat,
+    );
+    refill();
+  }
+
   /// Same shape, new levels (accents): applies from the next step that is
   /// not committed yet. With a switch pending, it updates the pending
   /// pattern instead. No-op while stopped.
