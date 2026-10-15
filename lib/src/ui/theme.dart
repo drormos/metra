@@ -127,6 +127,17 @@ extension MetraColorsContext on BuildContext {
 /// Saira 500/600 for body text; Saira Extra Condensed 600/700 for the BPM
 /// number, song title, time signature and ±buttons. Bundled in
 /// `assets/fonts/`.
+/// The media card's cover (ui-spec.md "Media controls"): always dark, in
+/// both themes.
+abstract final class CoverColors {
+  static const background = Color(0xFF000000);
+  static const bpm = Color(0xFFFFFFFF);
+  static const rule = Color(0xFF1F1F1F);
+  static const minorTick = Color(0xFF4A4A4A);
+  static const majorTick = Color(0xFF8C8C8C);
+  static const needle = Color(0xFFFF3B30);
+}
+
 abstract final class MetraFonts {
   static const body = 'Saira';
   static const condensed = 'SairaExtraCondensed';

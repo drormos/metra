@@ -14,6 +14,7 @@ import 'src/controller/library_controller.dart';
 import 'src/controller/metronome_controller.dart';
 import 'src/storage/library_store.dart';
 import 'src/ui/haptics.dart';
+import 'src/ui/media_cover.dart';
 import 'src/ui/metronome_screen.dart';
 import 'src/ui/theme.dart';
 
@@ -97,7 +98,12 @@ Future<void> _initAndroidBackground(
 ) async {
   try {
     await AudioService.init(
-      builder: () => MetronomeAudioHandler(controller, library: library),
+      builder: () => MetronomeAudioHandler(
+        controller,
+        library: library,
+        cover: (bpm) async =>
+            mediaCoverFile(await getTemporaryDirectory(), bpm),
+      ),
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.example.metra.playback',
         androidNotificationChannelName: 'Metronome playback',

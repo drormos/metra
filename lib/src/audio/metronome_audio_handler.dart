@@ -6,16 +6,23 @@ import '../controller/metronome_controller.dart';
 
 /// Bridges [MetronomeController] to audio_service: while playing, Android
 /// keeps the app alive as a media foreground service (screen off or app in
-/// background) and shows the transport in the notification and lock
-/// screen, with previous/next song when a setlist is loaded.
+/// background) and shows the media card in the notification and lock
+/// screen (ui-spec.md "Media controls"): title, subtitle and a cover that
+/// follow the main screen, Start/Stop, and previous/next song only in
+/// setlist mode. No duration, so no seek bar.
 class MetronomeAudioHandler extends BaseAudioHandler {
-  MetronomeAudioHandler(this._controller, {this._library}) {
+  MetronomeAudioHandler(this._controller, {this._library, this._cover}) {
     Listenable.merge([_controller, ?_library]).addListener(_publish);
     _publish();
   }
 
   final MetronomeController _controller;
   final LibraryController? _library;
+
+  /// The cover image for a tempo, as a file URI; null: no artwork.
+  final Future<Uri> Function(int bpm)? _cover;
+  int? _coverBpm;
+  Uri? _coverUri;
 
   @override
   Future<void> play() => _controller.play();
@@ -42,27 +49,56 @@ class MetronomeAudioHandler extends BaseAudioHandler {
     final playing = _controller.isPlaying;
     final transport = playing ? MediaControl.stop : MediaControl.play;
     final library = _library;
-    // Previous/next only inside a setlist (none in Free play).
-    final songs =
-        library?.activeSetlist != null && library!.visibleSongs.isNotEmpty;
+    final set = library?.activeSetlist;
+    // Previous/next only in setlist mode (hidden, not disabled, otherwise).
     playbackState.add(
       PlaybackState(
-        controls: songs
+        controls: set != null
             ? [MediaControl.skipToPrevious, transport, MediaControl.skipToNext]
             : [transport],
-        androidCompactActionIndices: songs ? const [0, 1, 2] : const [0],
+        androidCompactActionIndices: set != null ? const [0, 1, 2] : const [0],
         processingState: playing
             ? AudioProcessingState.ready
             : AudioProcessingState.idle,
         playing: playing,
       ),
     );
-    // MediaItem equality only compares ids, so compare the shown text.
-    final title = library?.currentSong?.name ?? 'Metra';
-    final tempo = '${_controller.bpm} BPM';
-    final current = mediaItem.value;
-    if (current?.title != title || current?.artist != tempo) {
-      mediaItem.add(MediaItem(id: 'metronome', title: title, artist: tempo));
+    final bpm = _controller.bpm;
+    final title = library?.currentSong?.name ?? 'Free play';
+    var subtitle = '$bpm bpm · ${_controller.pattern.timeSignature}';
+    if (set != null) {
+      final index = library!.currentIndex;
+      final position = index < 0 ? '' : ' ${index + 1}/${set.songIds.length}';
+      subtitle += ' · ${set.name}$position';
     }
+    _requestCover(bpm);
+    final current = mediaItem.value;
+    // MediaItem equality only compares ids, so compare what's shown.
+    if (current?.title != title ||
+        current?.artist != subtitle ||
+        current?.artUri != _coverUri) {
+      mediaItem.add(
+        MediaItem(
+          id: 'metronome',
+          title: title,
+          artist: subtitle,
+          artUri: _coverUri,
+          // No duration: a metronome has none, so no empty seek bar.
+        ),
+      );
+    }
+  }
+
+  /// Renders the cover for a new tempo, then shows it if the tempo hasn't
+  /// moved on meanwhile.
+  void _requestCover(int bpm) {
+    final cover = _cover;
+    if (cover == null || bpm == _coverBpm) return;
+    _coverBpm = bpm;
+    cover(bpm).then((uri) {
+      if (_coverBpm != bpm) return;
+      _coverUri = uri;
+      _publish();
+    }, onError: (Object e) => debugPrint('Media cover failed: $e'));
   }
 }

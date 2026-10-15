@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
@@ -49,10 +50,35 @@ void main() {
     expect(handler.playbackState.value.playing, isFalse);
   });
 
-  test('shows the tempo in the media item', () {
-    expect(handler.mediaItem.value?.artist, '120 BPM');
-    controller.setBpm(96);
-    expect(handler.mediaItem.value?.artist, '96 BPM');
+  test('Free play: title, tempo and meter; no duration', () {
+    final item = handler.mediaItem.value!;
+    expect(item.title, 'Free play');
+    expect(item.artist, '120 bpm · 4/4');
+    expect(item.duration, isNull, reason: 'no seek bar');
+    controller
+      ..setBpm(96)
+      ..setMeter(7, 8);
+    expect(handler.mediaItem.value?.artist, '96 bpm · 7/8');
+  });
+
+  test('a cover per tempo, once ready, never a stale one', () async {
+    final requested = <int>[];
+    final pending = <int, Completer<Uri>>{};
+    handler = MetronomeAudioHandler(
+      controller,
+      cover: (bpm) {
+        requested.add(bpm);
+        return (pending[bpm] = Completer<Uri>()).future;
+      },
+    );
+    expect(requested, [120]);
+    controller.setBpm(121);
+    pending[120]!.complete(Uri.file('/c/120.png'));
+    await Future<void>.delayed(Duration.zero);
+    expect(handler.mediaItem.value?.artUri, isNull, reason: 'tempo moved on');
+    pending[121]!.complete(Uri.file('/c/121.png'));
+    await Future<void>.delayed(Duration.zero);
+    expect(handler.mediaItem.value?.artUri, Uri.file('/c/121.png'));
   });
 
   test('removing the task stops playback', () async {
@@ -85,9 +111,11 @@ void main() {
         bpm: 150,
         pattern: const MetronomePattern.standard(),
       );
+      library.playSingleSong(song, controller);
       expect(handler.playbackState.value.controls, [
         MediaControl.play,
-      ], reason: 'Free play');
+      ], reason: 'Single song: hidden, not disabled');
+      expect(handler.mediaItem.value?.title, 'Opener');
       final gig = library.addSetlist('Gig');
       library
         ..addToSetlist(gig.id, song.id)
@@ -116,7 +144,7 @@ void main() {
       expect(handler.mediaItem.value?.title, 'Two');
       await handler.skipToPrevious();
       expect(handler.mediaItem.value?.title, 'One');
-      expect(handler.mediaItem.value?.artist, '100 BPM');
+      expect(handler.mediaItem.value?.artist, '100 bpm · 4/4 · Gig 1/2');
     });
   });
 }
