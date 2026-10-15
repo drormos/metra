@@ -159,7 +159,7 @@ Decisions made with the user that the spec doesn't state (or states differently)
 - New setlist (What to play, or "Create a setlist" on the main screen: created before the sheet opens): focused title field with "Setlist N" selected, empty state with "Start with all songs"; discarded if left empty.
 - What to play: Setlists label + "Recently played", "Search setlists", 64px rows (muted list icon, name, song count, pencil = open the page without loading; no loaded-set mark). Tap = `loadSetlist` (song 1, every row) and close. Bottom: "New setlist" | "Delete setlists" (same marking; "Delete" asks first). `deleteSetlists` switches to Free play when the loaded set goes, keeping the click. Order: `Setlist.playedAt`, stamped on every load.
 - Loading something (a set, a song row, any "Free play") always lands on the main screen: the picker pops to the first route, so from Settings it closes Settings too; only ‹ / back on What to play returns to Settings.
-- Free play's "Setlists" button always opens the picker, even with no sets (What to play has "New setlist"); the old "Create a setlist" label didn't fit (user's call, 2026-10-15; the spec's line still describes it).
+- Free play's "Setlists" button always opens the picker, even with no sets (What to play has "New setlist"); the old "Create a setlist" label didn't fit (user's call, 2026-10-15; now in the spec).
 - The picker has no "Song library" button; the library is reached via "Songs" (Free play) and Settings.
 
 ## Phase 6: Settings, Time Signature, App Icon
