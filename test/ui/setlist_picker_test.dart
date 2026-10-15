@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/gestures.dart' show kLongPressTimeout;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/library_controller.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
@@ -172,7 +171,7 @@ void main() {
     final gesture = await tester.startGesture(
       tester.getCenter(find.byKey(const ValueKey('picker-song-0'))),
     );
-    await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+    await tester.pump(const Duration(milliseconds: 350)); // lifts at 300 ms
     expect(haptics, ['HapticFeedbackType.mediumImpact'], reason: 'lifted');
     for (var i = 0; i < 3; i++) {
       await gesture.moveBy(const Offset(0, 25)); // one 60px row down

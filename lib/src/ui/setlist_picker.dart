@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../controller/library_controller.dart';
@@ -474,7 +475,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
     final marking = _markingSongs;
     final marked = _marked.contains(index);
     final highlighted = marking ? marked : current;
-    return ReorderableDelayedDragStartListener(
+    return _QuickDragStartListener(
       // Keyed by position: the same song may appear twice.
       key: ValueKey('picker-row-$index-${song.id}'),
       index: index,
@@ -1062,4 +1063,20 @@ class FreePlayButton extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Long-press to lift a song row, a little quicker than the platform's
+/// long-press (500 ms) so reordering feels responsive.
+class _QuickDragStartListener extends ReorderableDelayedDragStartListener {
+  const _QuickDragStartListener({
+    super.key,
+    required super.child,
+    required super.index,
+  });
+
+  static const delay = Duration(milliseconds: 300);
+
+  @override
+  MultiDragGestureRecognizer createRecognizer() =>
+      DelayedMultiDragGestureRecognizer(debugOwner: this, delay: delay);
 }
