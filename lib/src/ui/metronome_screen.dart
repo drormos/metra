@@ -9,6 +9,7 @@ import 'haptics.dart';
 import 'repeat_button.dart';
 import 'setlist_group.dart';
 import 'setlist_picker.dart';
+import 'save_as_new_dialog.dart';
 import 'settings_screen.dart';
 import 'song_library.dart';
 import 'subdivision_icon.dart';
@@ -35,6 +36,7 @@ class MetronomeScreen extends StatelessWidget {
   static const subdivisionKey = Key('subdivision');
   static const revertKey = Key('revert');
   static const saveToSongKey = Key('save-to-song');
+  static const saveAsNewKey = Key('save-as-new');
 
   @override
   Widget build(BuildContext context) {
@@ -253,40 +255,61 @@ class MetronomeScreen extends StatelessWidget {
       );
     }
     const label = TextStyle(fontSize: 15, fontWeight: FontWeight.w600);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        TextButton(
-          key: revertKey,
-          style: TextButton.styleFrom(
-            foregroundColor: colors.muted,
-            minimumSize: const Size(0, 44),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-          ),
-          onPressed: () {
-            Haptics.tick();
-            library.revertSong(controller);
-          },
-          child: const Text('Revert', style: label),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          height: 40,
-          child: OutlinedButton(
-            key: saveToSongKey,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: colors.text,
-              side: BorderSide(color: colors.text, width: 2),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+    // Shrinks rather than overflowing on narrow phones.
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextButton(
+            key: revertKey,
+            style: TextButton.styleFrom(
+              foregroundColor: colors.muted,
+              minimumSize: const Size(0, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
             ),
             onPressed: () {
               Haptics.tick();
-              library.saveToSong(controller);
+              library.revertSong(controller);
             },
-            child: const Text('Save to song', style: label),
+            child: const Text('Revert', style: label),
           ),
-        ),
-      ],
+          const SizedBox(width: 4),
+          Builder(
+            builder: (context) => SizedBox(
+              height: 40,
+              child: OutlinedButton(
+                key: saveAsNewKey,
+                // The quiet border: the less common choice.
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: colors.text,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                ),
+                onPressed: () =>
+                    showSaveAsNewSong(context, library, controller),
+                child: const Text('Save as new', style: label),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            height: 40,
+            child: OutlinedButton(
+              key: saveToSongKey,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: colors.text,
+                side: BorderSide(color: colors.text, width: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+              ),
+              onPressed: () {
+                Haptics.tick();
+                library.saveToSong(controller);
+              },
+              child: const Text('Save to song', style: label),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

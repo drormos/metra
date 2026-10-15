@@ -8,6 +8,7 @@ import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
+import 'package:metra/src/ui/save_as_new_dialog.dart';
 import 'package:metra/src/ui/setlist_group.dart';
 import 'package:metra/src/ui/setlist_picker.dart';
 import 'package:metra/src/ui/song_library.dart';
@@ -149,6 +150,44 @@ void main() {
       expect(haptics.last, 'HapticFeedbackType.mediumImpact');
       metronome.stop();
       await tester.pump();
+    });
+
+    testWidgets('Free play: "Save as song" saves the click as a song', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      metronome.setBpm(87);
+      await tester.tap(find.byKey(SetlistGroup.saveAsSongKey));
+      await tester.pumpAndSettle();
+      expect(find.text('Save as new song'), findsOneWidget);
+      final field = tester.widget<TextField>(find.byKey(SaveAsNewKeys.name));
+      expect(field.controller!.text, 'Song 1');
+      expect(find.textContaining('Replace'), findsNothing, reason: 'no set');
+      await tester.tap(find.byKey(SaveAsNewKeys.save));
+      await tester.pumpAndSettle();
+      expect(library.singleSong, isTrue);
+      expect(library.currentSong?.bpm, 87);
+      expect(find.text('Single song'), findsOneWidget);
+    });
+
+    testWidgets('Save as new from a set: Replace by default', (tester) async {
+      await withSet(tester);
+      await tester.tap(find.byKey(SetlistGroup.nextKey)); // One
+      await tester.pump();
+      await tester.tap(find.text('+1'));
+      await tester.pump();
+      await tester.tap(find.byKey(MetronomeScreen.saveAsNewKey));
+      await tester.pumpAndSettle();
+      final field = tester.widget<TextField>(find.byKey(SaveAsNewKeys.name));
+      expect(field.controller!.text, 'One 2');
+      expect(find.text('In Friday set'), findsOneWidget);
+      expect(find.text('Replace One'), findsOneWidget);
+      await tester.tap(find.byKey(SaveAsNewKeys.save));
+      await tester.pumpAndSettle();
+      expect(library.currentSong?.name, 'One 2');
+      expect(library.visibleSongs.first.name, 'One 2');
+      expect(find.byKey(MetronomeScreen.revertKey), findsNothing);
+      expect(find.byKey(MetronomeScreen.tempoNameKey), findsOneWidget);
     });
 
     testWidgets('Songs opens the song library', (tester) async {

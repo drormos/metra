@@ -87,7 +87,10 @@ class _SongEditorState extends State<SongEditor> {
       baseOffset: 0,
       extentOffset: _initialName.length,
     );
-  late int _bpm = widget.song?.bpm ?? 120;
+  // A new song starts at the main screen's tempo, so a tempo just found
+  // becomes the song's; everything else starts from the defaults.
+  late final int _initialBpm = widget.song?.bpm ?? widget.metronome.bpm;
+  late int _bpm = _initialBpm;
   late MetronomePattern _pattern =
       widget.song?.pattern ?? const MetronomePattern.standard();
   bool _expanded = false;
@@ -102,7 +105,7 @@ class _SongEditorState extends State<SongEditor> {
 
   bool get _dirty =>
       _name.text != _initialName ||
-      _bpm != (widget.song?.bpm ?? 120) ||
+      _bpm != _initialBpm ||
       _pattern != (widget.song?.pattern ?? const MetronomePattern.standard());
 
   @override

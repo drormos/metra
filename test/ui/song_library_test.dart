@@ -175,6 +175,7 @@ void main() {
 
   testWidgets('New song opens the editor on a new song', (tester) async {
     await pumpLibrary(tester);
+    metronome.setBpm(87); // a new song starts at the main screen's tempo
     await tester.tap(find.byKey(SongLibrary.newSongKey));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(TextField, 'Song 1'), findsOneWidget);
@@ -182,6 +183,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('5 songs'), findsOneWidget);
     expect(find.text('Song 1'), findsOneWidget);
+    expect(library.songs.firstWhere((s) => s.name == 'Song 1').bpm, 87);
   });
 
   test('usage line', () {

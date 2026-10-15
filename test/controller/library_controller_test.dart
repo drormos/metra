@@ -489,6 +489,93 @@ void main() {
     });
   });
 
+  group('save as new song', () {
+    late MetronomeController metronome;
+    late Song original;
+    late Setlist gig;
+
+    setUp(() {
+      metronome = MetronomeController(FakeClickOutput());
+      original = library.addSong(name: 'Dead Weight', bpm: 100, pattern: waltz);
+      final other = library.addSong(name: 'Other', bpm: 90, pattern: waltz);
+      gig = library.saveSetlist(
+        name: 'Gig',
+        songIds: [other.id, original.id, other.id],
+      );
+      library
+        ..setActiveSetlist(gig.id)
+        ..playSong(original, metronome, index: 1);
+      metronome.nudge(5); // the unsaved change being saved
+    });
+    tearDown(() => metronome.dispose());
+
+    List<String> names() => [
+      for (final id in library.setlists.single.songIds)
+        library.songById(id)!.name,
+    ];
+
+    test('copy names count on from 2', () {
+      expect(library.copyName(original), 'Dead Weight 2');
+      final copy = library.addSong(
+        name: 'Dead Weight 2',
+        bpm: 1,
+        pattern: waltz,
+      );
+      expect(library.copyName(original), 'Dead Weight 3');
+      expect(library.copyName(copy), 'Dead Weight 3', reason: 'no "2 2"');
+    });
+
+    void expectLoaded(Song song) {
+      expect(library.currentSong?.id, song.id);
+      expect(
+        library.songChanged(metronome),
+        isFalse,
+        reason: 'nothing unsaved',
+      );
+      expect(metronome.bpm, 105, reason: 'the click carries on');
+      expect(library.songById(original.id)!.bpm, 100, reason: 'untouched');
+    }
+
+    test('replace: same position in the set', () {
+      final song = library.saveAsNewSong('DW 2', metronome);
+      expect(names(), ['Other', 'DW 2', 'Other']);
+      expect(library.currentIndex, 1);
+      expect(song.bpm, 105);
+      expectLoaded(song);
+    });
+
+    test('add after: both stay', () {
+      final song = library.saveAsNewSong(
+        'DW 2',
+        metronome,
+        placement: SongPlacement.addAfter,
+      );
+      expect(names(), ['Other', 'Dead Weight', 'DW 2', 'Other']);
+      expect(library.currentIndex, 2);
+      expectLoaded(song);
+    });
+
+    test("don't add: leaves the set for Single song", () {
+      final song = library.saveAsNewSong(
+        'DW 2',
+        metronome,
+        placement: SongPlacement.none,
+      );
+      expect(names(), ['Other', 'Dead Weight', 'Other']);
+      expect(library.activeSetlist, isNull);
+      expect(library.singleSong, isTrue);
+      expectLoaded(song);
+    });
+
+    test('from Free play: Single song with the new song', () {
+      library.detachSong();
+      final song = library.saveAsNewSong('Song 1', metronome);
+      expect(library.singleSong, isTrue);
+      expect(library.currentSong?.id, song.id);
+      expect(song.bpm, 105);
+    });
+  });
+
   group('setlist editing', () {
     test('saveSetlist creates, then updates in place', () async {
       final a = library.addSong(name: 'a', bpm: 100, pattern: waltz);

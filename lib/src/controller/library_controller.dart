@@ -208,6 +208,49 @@ class LibraryController extends ChangeNotifier {
     }
   }
 
+  /// "Save as new song": a library song from what the click plays now,
+  /// made the loaded song (the click carries on, no restart). In setlist
+  /// mode [placement] puts it in the set; otherwise, and with
+  /// [SongPlacement.none], the app ends in Single song mode. The original
+  /// song is untouched everywhere.
+  Song saveAsNewSong(
+    String name,
+    MetronomeController metronome, {
+    SongPlacement placement = SongPlacement.replace,
+  }) {
+    final index = currentIndex;
+    final list = activeSetlist;
+    final song = addSong(
+      name: name,
+      bpm: metronome.bpm,
+      pattern: metronome.pattern,
+    );
+    if (list == null || index < 0 || placement == SongPlacement.none) {
+      _update(
+        _library.withSession(setlistId: null, songId: song.id, position: -1),
+      );
+      return song;
+    }
+    final ids = [...list.songIds];
+    final position = placement == SongPlacement.replace ? index : index + 1;
+    if (placement == SongPlacement.replace) {
+      ids[index] = song.id;
+    } else {
+      ids.insert(position, song.id);
+    }
+    _update(
+      _library
+          .copyWith(
+            setlists: [
+              for (final l in setlists)
+                l.id == list.id ? l.copyWith(songIds: ids) : l,
+            ],
+          )
+          .withSession(setlistId: list.id, songId: song.id, position: position),
+    );
+    return song;
+  }
+
   /// Overwrites [song]'s tempo and pattern with the metronome's.
   void updateSongFromMetronome(Song song, MetronomeController metronome) =>
       updateSong(song.copyWith(bpm: metronome.bpm, pattern: metronome.pattern));
@@ -294,9 +337,17 @@ class LibraryController extends ChangeNotifier {
   String newSetlistName() =>
       _newName('Setlist', [for (final list in setlists) list.name]);
 
-  static String _newName(String prefix, List<String> names) {
+  /// A name for a copy of [song]: its name plus the next free number
+  /// ("Dead Weight 2"); a copy of a copy counts on ("Dead Weight 3").
+  String copyName(Song song) => _newName(
+    song.name.replaceFirst(RegExp(r' \d+$'), ''),
+    [for (final s in songs) s.name],
+    start: 2,
+  );
+
+  static String _newName(String prefix, List<String> names, {int start = 1}) {
     final taken = {for (final name in names) _nameKey(name)};
-    var n = 1;
+    var n = start;
     while (taken.contains(_nameKey('$prefix $n'))) {
       n++;
     }
@@ -468,4 +519,16 @@ class LibraryController extends ChangeNotifier {
   String _newId() =>
       '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
       '-${_idCounter++}';
+}
+
+/// Where "Save as new song" puts the new song in the loaded set.
+enum SongPlacement {
+  /// Takes the loaded song's place (same position).
+  replace,
+
+  /// Right after the loaded song; both stay.
+  addAfter,
+
+  /// Not in the set: the app leaves it (Single song mode).
+  none,
 }

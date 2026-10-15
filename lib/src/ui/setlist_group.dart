@@ -4,6 +4,7 @@ import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/library.dart';
 import 'haptics.dart';
+import 'save_as_new_dialog.dart';
 import 'setlist_picker.dart';
 import 'subdivision_icon.dart';
 import 'theme.dart';
@@ -30,6 +31,7 @@ class SetlistGroup extends StatelessWidget {
   static const nextKey = Key('next-song');
   static const setlistsKey = Key('free-play-setlists');
   static const songsKey = Key('free-play-songs');
+  static const saveAsSongKey = Key('free-play-save-as-song');
 
   @override
   Widget build(BuildContext context) {
@@ -63,13 +65,34 @@ class SetlistGroup extends StatelessWidget {
     );
   }
 
-  Widget _freePlayHeader(MetraColors colors) => const Padding(
-    padding: EdgeInsets.symmetric(horizontal: 6),
+  /// "Save as song" sits where Single song has "Free play": an option,
+  /// not pushed.
+  Widget _freePlayHeader(MetraColors colors) => Padding(
+    padding: const EdgeInsets.only(left: 6),
     child: Row(
       children: [
-        Icon(Icons.notes, size: 18),
-        SizedBox(width: 10),
-        Text('Free play', style: TextStyle(fontSize: 16)),
+        const Icon(Icons.notes, size: 18),
+        const SizedBox(width: 10),
+        const Expanded(
+          child: Text('Free play', style: TextStyle(fontSize: 16)),
+        ),
+        Builder(
+          builder: (context) => SizedBox(
+            height: 40,
+            child: OutlinedButton(
+              key: saveAsSongKey,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                minimumSize: const Size(0, 40),
+              ),
+              onPressed: () => showSaveAsNewSong(context, library, metronome),
+              child: const Text(
+                'Save as song',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+              ),
+            ),
+          ),
+        ),
       ],
     ),
   );
