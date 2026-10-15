@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -12,6 +13,7 @@ import 'src/audio/soloud_click_output.dart';
 import 'src/controller/keep_awake.dart';
 import 'src/controller/library_controller.dart';
 import 'src/controller/metronome_controller.dart';
+import 'src/platform/android_bridge.dart';
 import 'src/storage/library_store.dart';
 import 'src/ui/haptics.dart';
 import 'src/ui/media_cover.dart';
@@ -45,8 +47,15 @@ Future<void> main() async {
       syncHaptics();
       library.addListener(syncHaptics);
     }
-    if (Platform.isAndroid) await _initAndroidBackground(controller, library);
+    if (Platform.isAndroid) {
+      await _initAndroidBackground(controller, library);
+      if (library != null) AndroidBridge.syncLaunchTheme(library);
+      // Not awaited: a start from the tile waits for the first frame.
+      AndroidBridge.attachTile(controller);
+    }
   }
+  // Edge to edge: the screens keep clear of the bars with SafeArea.
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   runApp(
     MetraApp(
       controller: controller,
@@ -140,6 +149,15 @@ class MetraApp extends StatelessWidget {
         theme: _light,
         darkTheme: _dark,
         themeMode: library?.themeMode ?? ThemeMode.system,
+        // Bars match the theme (transparent, icons in contrast); English
+        // only, so the layout never mirrors (ui-spec.md "Android basics").
+        builder: (context, child) => AnnotatedRegion(
+          value: systemBarsStyle(Theme.of(context).brightness),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: child!,
+          ),
+        ),
         home: controller != null
             ? MetronomeScreen(controller: controller, library: library)
             : Scaffold(

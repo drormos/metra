@@ -40,6 +40,9 @@ class MetronomeScreen extends StatelessWidget {
   static const saveToSongKey = Key('save-to-song');
   static const saveAsNewKey = Key('save-as-new');
 
+  /// The most the main screen's text grows with the system font size.
+  static const maxTextScale = 1.3;
+
   @override
   Widget build(BuildContext context) {
     final library = this.library;
@@ -49,9 +52,14 @@ class MetronomeScreen extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 480),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-            child: ListenableBuilder(
-              listenable: Listenable.merge([controller, ?library]),
-              builder: (context, _) => _content(context),
+            // Large system fonts grow the text only so far: the stage
+            // layout (fixed-height buttons, the group) must stay intact.
+            child: MediaQuery.withClampedTextScaling(
+              maxScaleFactor: maxTextScale,
+              child: ListenableBuilder(
+                listenable: Listenable.merge([controller, ?library]),
+                builder: (context, _) => _content(context),
+              ),
             ),
           ),
         ),
@@ -361,6 +369,8 @@ class MetronomeScreen extends StatelessWidget {
     required Widget child,
   }) => Tooltip(
     message: tooltip,
+    // Read once, as the button's own label.
+    excludeFromSemantics: true,
     child: SizedBox.square(
       dimension: 44,
       child: OutlinedButton(
@@ -370,7 +380,7 @@ class MetronomeScreen extends StatelessWidget {
           minimumSize: const Size.square(44),
         ),
         onPressed: onPressed,
-        child: child,
+        child: Semantics(label: tooltip, child: child),
       ),
     ),
   );

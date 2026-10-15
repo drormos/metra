@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#000000</color>
+    <!-- Launch screen and the window behind Flutter: Daylight background.
+         values-night has Stage Black, so there's never a white flash. -->
+    <color name="launch_background">#F3F1EC</color>
+    <color name="launch_background_dark">#000000</color>
+    <color name="launch_background_light">#F3F1EC</color>
 </resources>

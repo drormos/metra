@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Design tokens from `docs/design/ui-spec.md`. Every widget color comes
 /// from here (via [MetraColorsContext.colors] or the [ThemeData] built by
@@ -247,5 +248,22 @@ ThemeData metraTheme(MetraColors c, Brightness brightness) {
     dialogTheme: DialogThemeData(backgroundColor: c.sheet),
     popupMenuTheme: PopupMenuThemeData(color: c.sheet),
     dividerTheme: DividerThemeData(color: c.divider),
+  );
+}
+
+/// Status and navigation bars: transparent (the app draws edge to edge)
+/// with icons in contrast to the theme.
+SystemUiOverlayStyle systemBarsStyle(Brightness brightness) {
+  final dark = brightness == Brightness.dark;
+  return SystemUiOverlayStyle(
+    statusBarColor: const Color(0x00000000),
+    systemNavigationBarColor: const Color(0x00000000),
+    systemNavigationBarDividerColor: const Color(0x00000000),
+    systemNavigationBarContrastEnforced: false,
+    statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+    statusBarBrightness: brightness, // iOS
+    systemNavigationBarIconBrightness: dark
+        ? Brightness.light
+        : Brightness.dark,
   );
 }

@@ -97,6 +97,8 @@ class _RepeatButtonState extends State<RepeatButton> {
 
   @override
   Widget build(BuildContext context) => RawGestureDetector(
+    // The button is the screen reader's target; holding is touch only.
+    excludeFromSemantics: true,
     gestures: {
       LongPressGestureRecognizer:
           GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(

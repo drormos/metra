@@ -5,8 +5,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
-        android:label="metra"
+        android:label="Metra"
         android:name="${applicationName}"
+        android:allowBackup="true"
+        android:supportsRtl="false"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
@@ -37,6 +39,18 @@
             <intent-filter>
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
+        </service>
+        <!-- Quick Settings tile: Playing / Stopped, tap to start or stop. -->
+        <service android:name=".PlaybackTile"
+            android:exported="true"
+            android:label="Metra"
+            android:icon="@drawable/ic_tile"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="false" />
         </service>
         <receiver android:name="com.ryanheise.audioservice.MediaButtonReceiver"
             android:exported="true">

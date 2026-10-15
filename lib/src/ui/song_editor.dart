@@ -404,7 +404,10 @@ class _SongEditorState extends State<SongEditor> {
               selected: _pattern.stepsPerBeat == steps,
               onTap: () =>
                   _edit(() => _pattern = _pattern.withSubdivision(steps)),
-              child: SubdivisionIcon(steps),
+              child: Semantics(
+                label: SongEditor._subdivisionNames[steps],
+                child: SubdivisionIcon(steps),
+              ),
             ),
           ),
         ),

@@ -74,11 +74,15 @@ class _QuickPickLayer extends StatelessWidget {
     return Stack(
       children: [
         Positioned.fill(
-          child: GestureDetector(
-            key: QuickPick.outsideKey,
-            behavior: HitTestBehavior.opaque,
-            onTap: () => Navigator.pop(context),
-            child: CustomPaint(painter: _Dim(colors.dim, anchor)),
+          child: Semantics(
+            label: 'Close',
+            button: true,
+            child: GestureDetector(
+              key: QuickPick.outsideKey,
+              behavior: HitTestBehavior.opaque,
+              onTap: () => Navigator.pop(context),
+              child: CustomPaint(painter: _Dim(colors.dim, anchor)),
+            ),
           ),
         ),
         Positioned(
