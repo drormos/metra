@@ -6,7 +6,6 @@ import '../controller/metronome_controller.dart';
 import '../model/tempo_name.dart';
 import 'beat_indicator.dart';
 import 'haptics.dart';
-import 'repeat_button.dart';
 import 'setlist_group.dart';
 import 'setlist_picker.dart';
 import 'save_as_new_dialog.dart';
@@ -15,6 +14,7 @@ import 'settings_screen.dart';
 import 'song_editor.dart';
 import 'song_library.dart';
 import 'subdivision_icon.dart';
+import 'tempo_controls.dart';
 import 'tempo_ruler.dart';
 import 'time_signature_sheet.dart';
 import 'theme.dart';
@@ -114,42 +114,11 @@ class MetronomeScreen extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          // An invisible twin of "bpm" balances the visible
-                          // one, so the number alone is centred and "bpm"
-                          // hangs off its right side.
-                          ExcludeSemantics(
-                            child: Visibility.maintain(
-                              visible: false,
-                              child: Text(
-                                'bpm',
-                                style: TextStyle(fontSize: 18),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '$bpm',
-                            key: bpmKey,
-                            style: const TextStyle(
-                              fontFamily: MetraFonts.condensed,
-                              fontSize: 172,
-                              fontWeight: FontWeight.w700,
-                              height: 0.85,
-                              // Fixed-width digits: the readout doesn't shift.
-                              fontFeatures: [FontFeature.tabularFigures()],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'bpm',
-                            style: TextStyle(fontSize: 18, color: colors.muted),
-                          ),
-                        ],
+                      BpmReadout(
+                        bpm: bpm,
+                        fontSize: 172,
+                        unitSize: 18,
+                        numberKey: bpmKey,
                       ),
                     ],
                   ),
@@ -158,21 +127,11 @@ class MetronomeScreen extends StatelessWidget {
               // Fixed height: the tempo name, or Revert / Save to song.
               SizedBox(height: 44, child: _tempoLine(colors, bpm)),
               const SizedBox(height: 4),
-              TempoRuler(controller: controller),
+              TempoRuler(bpm: bpm, onChanged: controller.setBpm),
             ],
           ),
         ),
-        Row(
-          children: [
-            _step('−5', -5, bpm > MetronomeController.minBpm),
-            const SizedBox(width: 8),
-            _step('−1', -1, bpm > MetronomeController.minBpm),
-            const SizedBox(width: 8),
-            _step('+1', 1, bpm < MetronomeController.maxBpm),
-            const SizedBox(width: 8),
-            _step('+5', 5, bpm < MetronomeController.maxBpm),
-          ],
-        ),
+        TempoSteps(bpm: bpm, onStep: controller.nudge, height: 60),
         const SizedBox(height: 12),
         SizedBox(
           height: 72,
@@ -422,38 +381,4 @@ class MetronomeScreen extends StatelessWidget {
     3: 'triplets',
     4: 'sixteenth notes',
   };
-
-  Widget _step(String label, int delta, bool enabled) => Expanded(
-    child: SizedBox(
-      height: 60,
-      child: Builder(
-        // Holding repeats (ui-spec.md).
-        builder: (context) => RepeatButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: context.colors.surface,
-            foregroundColor: context.colors.text,
-            padding: EdgeInsets.zero,
-          ),
-          onPressed: enabled
-              ? () {
-                  Haptics.tick();
-                  controller.nudge(delta);
-                }
-              : null,
-          // Shrinks instead of wrapping on narrow phones.
-          child: FittedBox(
-            child: Text(
-              label,
-              maxLines: 1,
-              style: const TextStyle(
-                fontFamily: MetraFonts.condensed,
-                fontSize: 28,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
 }

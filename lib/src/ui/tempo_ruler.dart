@@ -26,9 +26,12 @@ import 'theme.dart';
 /// multiple of 5 crossed, while dragging and coasting. Touching the ruler
 /// stops a coast.
 class TempoRuler extends StatefulWidget {
-  const TempoRuler({super.key, required this.controller});
+  const TempoRuler({super.key, required this.bpm, required this.onChanged});
 
-  final MetronomeController controller;
+  /// The whole tempo; [onChanged] gets each new whole value (main screen:
+  /// the click; song editor: the song being edited).
+  final int bpm;
+  final ValueChanged<int> onChanged;
 
   /// Matches main-screen.reference.html: minor ticks 14 px apart.
   static const pxPerBpm = 14.0;
@@ -144,8 +147,6 @@ class _TempoRulerState extends State<TempoRuler>
     vsync: this,
   )..addListener(() => _moveTo(_glide.value));
 
-  MetronomeController get _controller => widget.controller;
-
   static const _min = MetronomeController.minBpm * 1.0;
   static const _max = MetronomeController.maxBpm * 1.0;
 
@@ -158,16 +159,16 @@ class _TempoRulerState extends State<TempoRuler>
 
   void _moveTo(double value) {
     final clamped = value.clamp(_min, _max);
-    final previous = _value ?? _controller.bpm.toDouble();
+    final previous = _value ?? widget.bpm.toDouble();
     if (Haptics.reachesFive(previous, clamped)) Haptics.tick();
     setState(() => _value = clamped);
-    _controller.setBpm(clamped.round()); // no-op unless the whole value changed
+    _set(clamped.round());
     if (_glide.isAnimating && clamped != value) _glide.stop(); // hit an end
   }
 
   void _start(DragStartDetails details) {
     _glide.stop(); // touching the ruler stops a glide
-    _value ??= _controller.bpm.toDouble();
+    _value ??= widget.bpm.toDouble();
     _swipeStart = _value!;
     _lastMoveTime = details.sourceTimeStamp;
     _fingerX = 0;
@@ -269,9 +270,14 @@ class _TempoRulerState extends State<TempoRuler>
         curve: Curves.decelerate,
       ).then((_) {
         // Coasted all the way (not interrupted): exactly on the multiple.
-        if (_glide.value == target) _controller.setBpm(target.round());
+        if (_glide.value == target) _set(target.round());
         _settle();
       });
+  }
+
+  /// Only whole-value changes go out.
+  void _set(int bpm) {
+    if (bpm != widget.bpm) widget.onChanged(bpm);
   }
 
   /// Back to rest: the ruler shows the whole tempo again.
@@ -282,15 +288,15 @@ class _TempoRulerState extends State<TempoRuler>
 
   @override
   Widget build(BuildContext context) {
-    final bpm = _controller.bpm;
+    final bpm = widget.bpm;
     return Semantics(
       slider: true,
       label: 'Tempo',
       value: '$bpm bpm',
       increasedValue: '${min(bpm + 1, MetronomeController.maxBpm)} bpm',
       decreasedValue: '${max(bpm - 1, MetronomeController.minBpm)} bpm',
-      onIncrease: () => _controller.nudge(1),
-      onDecrease: () => _controller.nudge(-1),
+      onIncrease: () => _set(min(bpm + 1, MetronomeController.maxBpm)),
+      onDecrease: () => _set(max(bpm - 1, MetronomeController.minBpm)),
       // Touch-down stops a glide. A raw listener, not a tap recognizer: a
       // competing tap would make the drag wait out the touch slop first.
       child: Listener(

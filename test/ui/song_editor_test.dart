@@ -11,6 +11,7 @@ import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/editor_scaffold.dart';
 import 'package:metra/src/ui/meter_control.dart';
 import 'package:metra/src/ui/song_editor.dart';
+import 'package:metra/src/ui/tempo_ruler.dart';
 
 import '../audio/fake_click_output.dart';
 import 'test_theme.dart';
@@ -156,8 +157,8 @@ void main() {
   ) async {
     await pumpEditor(tester);
     expect(bpm(tester), '100');
-    await tapText(tester, '+');
-    await tapText(tester, '+');
+    await tapText(tester, '+1');
+    await tapText(tester, '+1');
     expect(bpm(tester), '102');
     // The beats + is the second "+".
     await tester.tap(find.text('+').last);
@@ -173,10 +174,25 @@ void main() {
     expect(result!.bpm, 102);
   });
 
+  testWidgets('the main screen\'s tempo controls: ruler and ±5', (
+    tester,
+  ) async {
+    await pumpEditor(tester);
+    expect(find.byType(TempoRuler), findsOneWidget);
+    await tapText(tester, '+5');
+    expect(bpm(tester), '105');
+    await tapText(tester, '−1');
+    expect(bpm(tester), '104');
+    await tester.drag(find.byType(TempoRuler), const Offset(-28, 0));
+    await tester.pumpAndSettle();
+    expect(int.parse(bpm(tester)), greaterThan(104), reason: 'left = faster');
+    expect(metronome.bpm, 120, reason: 'the click is untouched');
+  });
+
   testWidgets('saving the loaded song applies it to the click', (tester) async {
     await pumpEditor(tester);
     library.playSong(alpha, metronome);
-    await tapText(tester, '+');
+    await tapText(tester, '+1');
     expect(metronome.bpm, 100, reason: 'editing alone changes nothing');
     await save(tester);
     expect(metronome.bpm, 101);
@@ -185,7 +201,7 @@ void main() {
   testWidgets('saving another song leaves the click alone', (tester) async {
     await pumpEditor(tester);
     metronome.setBpm(80);
-    await tapText(tester, '+');
+    await tapText(tester, '+1');
     await save(tester);
     expect(metronome.bpm, 80);
   });
@@ -198,7 +214,7 @@ void main() {
     expect(metronome.isPlaying, isTrue);
     expect(metronome.bpm, 100);
     expect(find.text('Stop'), findsOneWidget);
-    await tapText(tester, '+');
+    await tapText(tester, '+1');
     expect(metronome.bpm, 101, reason: 'edits are heard at once');
     await tester.tap(find.byKey(EditorScaffold.cancelKey));
     await tester.pumpAndSettle();
@@ -217,7 +233,7 @@ void main() {
     expect(metronome.isPlaying, isFalse);
     expect(find.text('Preview'), findsOneWidget);
     expect(metronome.bpm, 120, reason: 'main screen restored');
-    await tapText(tester, '+');
+    await tapText(tester, '+1');
     expect(metronome.bpm, 120, reason: 'not previewing');
   });
 
@@ -229,7 +245,7 @@ void main() {
     await metronome.play();
     await tester.tap(find.byKey(SongEditor.previewKey));
     await tester.pump();
-    await tapText(tester, '+');
+    await tapText(tester, '+1');
     await save(tester);
     expect(metronome.isPlaying, isTrue);
     expect(metronome.bpm, 101);
@@ -283,7 +299,7 @@ void main() {
     await tester.tap(find.byKey(SongEditor.patternKey));
     await tester.pump();
     expect(haptics, isEmpty);
-    await tapText(tester, '+');
+    await tapText(tester, '+1');
     await tester.tap(find.byKey(const ValueKey('subdivision-2')));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('pattern-cell-0-1')));
@@ -322,7 +338,7 @@ void main() {
 
   testWidgets('Cancel with changes asks to discard', (tester) async {
     await pumpEditor(tester);
-    await tapText(tester, '+');
+    await tapText(tester, '+1');
     await tester.tap(find.byKey(EditorScaffold.cancelKey));
     await tester.pumpAndSettle();
     expect(find.text('Discard your changes?'), findsOneWidget);

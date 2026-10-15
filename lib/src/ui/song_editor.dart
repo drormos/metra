@@ -11,6 +11,8 @@ import 'haptics.dart';
 import 'meter_control.dart';
 import 'song_library.dart';
 import 'subdivision_icon.dart';
+import 'tempo_controls.dart';
+import 'tempo_ruler.dart';
 import 'theme.dart';
 
 /// Opens the song editor (ui-spec.md "Song editor") for [song], or a new
@@ -120,9 +122,10 @@ class _SongEditorState extends State<SongEditor> {
   bool get _previewPlaying => _metronome.previewing && _metronome.isPlaying;
 
   /// Every touch that edits the draft ticks (ui-spec.md "Haptics"), and a
-  /// running preview hears it at once.
-  void _edit(VoidCallback change) {
-    Haptics.tick();
+  /// running preview hears it at once. The tempo ruler and steps tick
+  /// themselves ([tick] false): the ruler only on fives.
+  void _edit(VoidCallback change, {bool tick = true}) {
+    if (tick) Haptics.tick();
     setState(change);
     if (_previewPlaying) _metronome.applyEdit(bpm: _bpm, pattern: _pattern);
   }
@@ -313,49 +316,39 @@ class _SongEditorState extends State<SongEditor> {
     ),
   );
 
-  Widget _tempo(MetraColors colors) => Row(
+  /// The main screen's tempo controls, smaller: number, ruler, steps.
+  Widget _tempo(MetraColors colors) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      StepButton(
-        '−',
-        size: 56,
-        fontSize: 30,
-        onPressed: _bpm > MetronomeController.minBpm
-            ? () => _edit(() => _bpm--)
-            : null,
-      ),
-      Expanded(
+      Center(
         // Shrinks rather than overflowing on narrow phones.
         child: FittedBox(
           fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                '$_bpm',
-                key: SongEditor.bpmKey,
-                style: const TextStyle(
-                  fontFamily: MetraFonts.condensed,
-                  fontSize: 84,
-                  fontWeight: FontWeight.w700,
-                  height: 0.9,
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text('bpm', style: TextStyle(fontSize: 16, color: colors.muted)),
-            ],
+          child: BpmReadout(
+            bpm: _bpm,
+            fontSize: 84,
+            unitSize: 16,
+            numberKey: SongEditor.bpmKey,
           ),
         ),
       ),
-      StepButton(
-        '+',
-        size: 56,
-        fontSize: 30,
-        onPressed: _bpm < MetronomeController.maxBpm
-            ? () => _edit(() => _bpm++)
-            : null,
+      const SizedBox(height: 10),
+      TempoRuler(
+        bpm: _bpm,
+        onChanged: (bpm) => _edit(() => _bpm = bpm, tick: false),
+      ),
+      const SizedBox(height: 12),
+      TempoSteps(
+        bpm: _bpm,
+        height: 52,
+        fontSize: 24,
+        onStep: (delta) => _edit(
+          () => _bpm = (_bpm + delta).clamp(
+            MetronomeController.minBpm,
+            MetronomeController.maxBpm,
+          ),
+          tick: false,
+        ),
       ),
     ],
   );
