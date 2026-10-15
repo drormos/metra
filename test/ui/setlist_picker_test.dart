@@ -352,8 +352,15 @@ void main() {
     await tester.tap(find.byKey(SetlistPicker.backToSetlistsKey));
     await settle(tester);
     expect(find.text('What to play'), findsOneWidget);
-    await tester.tap(find.byTooltip('Back'));
+    expect(find.byTooltip('Back'), findsNothing, reason: 'the top level');
+    // The loaded set: back to its songs, nothing reloads.
+    await tester.tap(
+      find.byKey(ValueKey('picker-set-${library.activeSetlist!.id}')),
+    );
     await settle(tester);
+    expect(find.byKey(SetlistPicker.backToSetlistsKey), findsOneWidget);
+    expect(library.currentSong?.name, 'Two', reason: 'not reset to song 1');
+    expect(metronome.bpm, 110);
     await tester.tap(find.byKey(FreePlayButton.buttonKey));
     await settle(tester);
     expect(find.byType(SetlistPicker), findsNothing, reason: 'closed');

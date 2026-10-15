@@ -116,10 +116,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
     builder: (context, _) {
       final setlist = _library.activeSetlist;
       return _whatToPlay || setlist == null
-          ? _whatToPlayView(
-              context,
-              canGoBack: widget.fullScreen || setlist != null,
-            )
+          ? _whatToPlayView(context)
           : _songsView(context, setlist);
     },
   );
@@ -308,28 +305,26 @@ class _SetlistPickerState extends State<SetlistPicker> {
 
   // What to play view
 
-  Widget _whatToPlayView(BuildContext context, {required bool canGoBack}) {
+  /// The picker's top level: no back, except full screen from Settings,
+  /// where ‹ returns there.
+  Widget _whatToPlayView(BuildContext context) {
     final colors = context.colors;
     final active = _library.activeSetlist;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 24, 12),
+          padding: EdgeInsets.fromLTRB(widget.fullScreen ? 12 : 24, 0, 24, 12),
           child: SizedBox(
             height: 48,
             child: Row(
               children: [
-                if (canGoBack)
+                if (widget.fullScreen)
                   IconButton(
                     tooltip: 'Back',
-                    onPressed: widget.fullScreen
-                        ? () => Navigator.pop(context)
-                        : () => setState(() => _whatToPlay = false),
+                    onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.chevron_left, size: 28),
-                  )
-                else
-                  const SizedBox(width: 12),
+                  ),
                 const Text(
                   'What to play',
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
@@ -437,7 +432,11 @@ class _SetlistPickerState extends State<SetlistPicker> {
     child: InkWell(
       key: ValueKey('picker-set-${setlist.id}'),
       onTap: () {
-        // Loads the set at its first song, then shows its songs.
+        // The loaded set: just its songs, nothing reloads.
+        if (setlist.id == _library.activeSetlist?.id) {
+          return setState(() => _whatToPlay = false);
+        }
+        // Another set: load it at its first song, then show its songs.
         _library.setActiveSetlist(setlist.id);
         final songs = _library.visibleSongs;
         if (songs.isNotEmpty) {

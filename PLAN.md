@@ -148,6 +148,7 @@ Decisions made with the user that the spec doesn't state (or states differently)
 ## Phase 5c: Single song mode (done)
 - Three modes, derived from the saved session (no new state): setlist (`activeSetlistId`), Single song (no set, a loaded song: `LibraryController.singleSong`), Free play (neither). Reopening restores whichever it was.
 - No "– of N" state: with a set loaded, `currentSong` only counts a song in that set; a current song removed from the set (or deleted) leaves no current song, no position in the header, and next = song 1. Picking a set always starts at song 1.
+- Picker navigation: What to play is the top level, no back (title at a 24px inset); "‹ Setlists" in the songs view is the only back. Tapping the loaded set opens its songs without reloading; another set loads at song 1. Full screen from Settings, What to play gets a ‹ back to Settings. A loaded empty set is fine as is (user, 2026-10-15).
 - `detachSong()` (Free play, Free play in What to play, a setlist switching to Free play) clears the song and set; the metronome keeps what it sounds like, unsaved changes included; medium haptic.
 - The group header in Single song: quarter-note icon, "Single song", outlined 40px "Free play" (`FreePlayButton`, shared with the picker's songs view, whose top bar is "‹ Setlists" (up to What to play) and "Free play" (detach and close); the set name below is a plain title). The top title is no longer a control (the spec's song-editor "Opening it" line still mentions tapping it; songs open from the picker or library pencil).
 
