@@ -1,4 +1,4 @@
-package com.example.metra
+package com.dror.metra
 
 import android.Manifest
 import android.content.Intent

@@ -216,6 +216,7 @@ Decisions made with the user that the spec doesn't state (or states differently)
 - Signing: `android/key.properties` (gitignored) → keystore `~/keys/metra-release.jks` (alias `metra`, PKCS12, RSA 4096, 10000 days). A copy of the properties sits next to the keystore. Losing the keystore means no updates to installed copies: back up `~/keys/`. Without `key.properties`, release builds fall back to the debug key.
 - `keytool` isn't on the PATH (no system Java): use `/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/keytool`.
 - **Every shared build bumps the build number** (`version: 1.0.0+N` in `pubspec.yaml`, the `+N`), so Android accepts it as an update and feedback emails name the exact build. Bump the version name (`1.0.0`) for user-visible releases.
+- App ID `com.dror.metra` (was the template's `com.example.metra`; the Play Store refuses it and it can't change after sharing). Debug builds are `com.dror.metra.debug`, labelled "Metra dev" (`manifestPlaceholders["appLabel"]`), so they install beside the real app instead of over it. iOS/macOS bundle IDs follow.
 - Build: `flutter build apk --release` → `build/app/outputs/flutter-apk/app-release.apk`.
 
 ## Phase 6: Settings, Time Signature, App Icon

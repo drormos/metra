@@ -28,7 +28,7 @@ void main() {
   setUpAll(
     () => PackageInfo.setMockInitialValues(
       appName: 'Metra',
-      packageName: 'com.example.metra',
+      packageName: 'com.dror.metra',
       version: '1.2.3',
       buildNumber: '7',
       buildSignature: '',

@@ -1,4 +1,4 @@
-package com.example.metra
+package com.dror.metra
 
 import android.app.PendingIntent
 import android.content.ComponentName
@@ -72,7 +72,7 @@ class PlaybackTile : TileService() {
 
 /// The tile's link to Dart, on the engine the app and audio_service share.
 object TileBridge {
-    const val ACTION_START = "com.example.metra.START"
+    const val ACTION_START = "com.dror.metra.START"
 
     var channel: MethodChannel? = null
         private set
