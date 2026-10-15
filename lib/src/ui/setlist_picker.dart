@@ -109,6 +109,7 @@ class SetlistPicker extends StatefulWidget {
   static const renameKey = Key('picker-rename');
   static const deleteKey = Key('picker-delete');
   static const removeKey = Key('picker-remove-marked');
+  static const deleteMarkedKey = Key('picker-delete-marked');
   static const cancelMarksKey = Key('picker-cancel-marks');
   static const titleFieldKey = Key('picker-title-field');
 
@@ -132,6 +133,8 @@ class _SetlistPickerState extends State<SetlistPicker> {
   final _search = TextEditingController();
   // Marked rows (positions; a song may appear twice).
   final _marked = <int>{};
+  // Sets marked for deleting in What to play.
+  final _markedSets = <String>{};
   // The picker's own messenger, so the Undo bar shows inside the sheet.
   final _messenger = GlobalKey<ScaffoldMessengerState>();
   // How far the finger moved since the last long-press lift.
@@ -239,9 +242,14 @@ class _SetlistPickerState extends State<SetlistPicker> {
   @override
   Widget build(BuildContext context) => PopScope(
     // The back gesture ends marking before it closes anything.
-    canPop: _marked.isEmpty,
+    canPop: _marked.isEmpty && _markedSets.isEmpty,
     onPopInvokedWithResult: (didPop, _) {
-      if (!didPop) setState(_marked.clear);
+      if (!didPop) {
+        setState(() {
+          _marked.clear();
+          _markedSets.clear();
+        });
+      }
     },
     child: ScaffoldMessenger(
       key: _messenger,
@@ -606,7 +614,25 @@ class _SetlistPickerState extends State<SetlistPicker> {
     });
   }
 
-  Widget _markingBar(MetraColors colors, Setlist setlist) => Container(
+  Widget _markingBar(MetraColors colors, Setlist setlist) => _selectionBar(
+    colors,
+    count: _marked.length,
+    action: 'Remove from set',
+    actionKey: SetlistPicker.removeKey,
+    onAction: () => _remove(setlist, {..._marked}),
+    onCancel: () => setState(_marked.clear),
+  );
+
+  /// "N selected · Cancel" and a red [action], replacing the bottom buttons
+  /// while rows are marked.
+  Widget _selectionBar(
+    MetraColors colors, {
+    required int count,
+    required String action,
+    required Key actionKey,
+    required VoidCallback onAction,
+    required VoidCallback onCancel,
+  }) => Container(
     padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
     decoration: BoxDecoration(
       border: Border(top: BorderSide(color: colors.divider)),
@@ -617,7 +643,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
         children: [
           Expanded(
             child: Text(
-              '${_marked.length} selected',
+              '$count selected',
               style: TextStyle(fontSize: 15, color: colors.muted),
             ),
           ),
@@ -625,24 +651,27 @@ class _SetlistPickerState extends State<SetlistPicker> {
             height: 44,
             child: OutlinedButton(
               key: SetlistPicker.cancelMarksKey,
-              onPressed: () => setState(_marked.clear),
+              onPressed: onCancel,
               child: const Text('Cancel'),
             ),
           ),
           const SizedBox(width: 8),
           Flexible(
             child: TextButton(
-              key: SetlistPicker.removeKey,
+              key: actionKey,
               style: TextButton.styleFrom(
                 foregroundColor: colors.accentSounding,
                 minimumSize: const Size(0, 44),
               ),
-              onPressed: () => _remove(setlist, {..._marked}),
+              onPressed: onAction,
               // Shrinks rather than overflowing on narrow phones.
-              child: const FittedBox(
+              child: FittedBox(
                 child: Text(
-                  'Remove from set',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  action,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
@@ -709,7 +738,6 @@ class _SetlistPickerState extends State<SetlistPicker> {
   /// where ‹ returns there.
   Widget _whatToPlayView(BuildContext context) {
     final colors = context.colors;
-    final active = _library.activeSetlist;
     final query = _search.text.trim().toLowerCase();
     final sets = [
       for (final set in _library.setlistsRecentlyPlayed)
@@ -819,101 +847,168 @@ class _SetlistPickerState extends State<SetlistPicker> {
         Divider(height: 1, color: colors.divider),
         Expanded(
           child: ListView(
-            children: [
-              for (final setlist in sets)
-                _setRow(colors, setlist, current: setlist.id == active?.id),
-            ],
+            children: [for (final setlist in sets) _setRow(colors, setlist)],
           ),
         ),
-        _bottomBar(colors, [
-          Expanded(
-            child: FilledButton.icon(
-              key: SetlistPicker.newSetlistKey,
-              style: FilledButton.styleFrom(
-                backgroundColor: colors.surface,
-                foregroundColor: colors.text,
-              ),
-              onPressed: () => setState(_openNewSet),
-              icon: const Icon(Icons.add, size: 20),
-              label: const FittedBox(
-                child: Text('New setlist', style: TextStyle(fontSize: 17)),
+        if (_markedSets.isNotEmpty)
+          _selectionBar(
+            colors,
+            count: _markedSets.length,
+            action: 'Delete',
+            actionKey: SetlistPicker.deleteMarkedKey,
+            onAction: () => _deleteSets({..._markedSets}),
+            onCancel: () => setState(_markedSets.clear),
+          )
+        else
+          _bottomBar(colors, [
+            Expanded(
+              child: FilledButton.icon(
+                key: SetlistPicker.newSetlistKey,
+                style: FilledButton.styleFrom(
+                  backgroundColor: colors.surface,
+                  foregroundColor: colors.text,
+                ),
+                onPressed: () => setState(_openNewSet),
+                icon: const Icon(Icons.add, size: 20),
+                label: const FittedBox(
+                  child: Text('New setlist', style: TextStyle(fontSize: 17)),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(child: _songLibraryButton()),
-        ]),
+            const SizedBox(width: 8),
+            Expanded(child: _songLibraryButton()),
+          ]),
       ],
     );
   }
 
   /// Tap = load the set at song 1 and close (every row, the loaded one
-  /// too); the pencil opens its page without loading it.
-  Widget _setRow(
-    MetraColors colors,
-    Setlist setlist, {
-    required bool current,
-  }) => Material(
-    color: current ? colors.selectedRow : colors.sheet,
-    child: InkWell(
-      key: ValueKey('picker-set-${setlist.id}'),
-      onTap: () {
-        Haptics.medium(); // the set (and song) changes
-        _library.loadSetlist(setlist.id, widget.metronome);
-        _close();
-      },
-      child: Ink(
-        height: 64,
-        padding: const EdgeInsets.only(left: 24),
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: colors.divider)),
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 22,
-              child: current
-                  ? Icon(Icons.check, size: 20, color: colors.accent)
-                  : null,
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    setlist.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: current ? FontWeight.w600 : FontWeight.w500,
-                    ),
-                  ),
-                  Text(
-                    _count(setlist.songIds.length),
-                    style: TextStyle(fontSize: 13, color: colors.muted),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(
-              width: 52,
-              height: 64,
-              child: IconButton(
-                key: ValueKey('picker-set-edit-${setlist.id}'),
-                tooltip: 'Open ${setlist.name}',
-                color: colors.muted,
-                onPressed: () => _openPage(setlist),
-                icon: const Icon(Icons.edit_outlined, size: 20),
-              ),
-            ),
-          ],
+  /// too); the pencil opens its page without loading it. Long-press marks
+  /// sets for deleting; swipe left deletes one.
+  Widget _setRow(MetraColors colors, Setlist setlist) {
+    final marking = _markedSets.isNotEmpty;
+    final marked = _markedSets.contains(setlist.id);
+    return Dismissible(
+      key: ValueKey('picker-set-row-${setlist.id}'),
+      direction: marking ? DismissDirection.none : DismissDirection.endToStart,
+      background: Container(
+        color: colors.accentSounding,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        child: Text(
+          'Delete',
+          style: TextStyle(
+            color: colors.onPrimary,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
-    ),
-  );
+      // Deleted only once confirmed; the row slides back otherwise.
+      confirmDismiss: (_) => _deleteSets({setlist.id}),
+      child: Material(
+        color: marked ? colors.selectedRow : colors.sheet,
+        child: InkWell(
+          key: ValueKey('picker-set-${setlist.id}'),
+          onTap: marking
+              ? () => _toggleSetMark(setlist.id)
+              : () {
+                  Haptics.medium(); // the set (and song) changes
+                  _library.loadSetlist(setlist.id, widget.metronome);
+                  _close();
+                },
+          onLongPress: marking
+              ? null
+              : () {
+                  Haptics.medium();
+                  setState(() => _markedSets.add(setlist.id));
+                },
+          child: Ink(
+            height: 64,
+            padding: const EdgeInsets.only(left: 24),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: colors.divider)),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 22,
+                  child: marked
+                      ? Icon(Icons.check, size: 20, color: colors.accent)
+                      : Icon(Icons.notes, size: 18, color: colors.muted),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        setlist.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        _count(setlist.songIds.length),
+                        style: TextStyle(fontSize: 13, color: colors.muted),
+                      ),
+                    ],
+                  ),
+                ),
+                // Hidden while marking; the slot keeps the layout.
+                SizedBox(
+                  width: 52,
+                  height: 64,
+                  child: marking
+                      ? null
+                      : IconButton(
+                          key: ValueKey('picker-set-edit-${setlist.id}'),
+                          tooltip: 'Open ${setlist.name}',
+                          color: colors.muted,
+                          onPressed: () => _openPage(setlist),
+                          icon: const Icon(Icons.edit_outlined, size: 20),
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _toggleSetMark(String id) {
+    Haptics.tick();
+    setState(
+      () => _markedSets.contains(id)
+          ? _markedSets.remove(id)
+          : _markedSets.add(id),
+    );
+  }
+
+  /// Asks first; never deletes songs. Deleting the loaded set switches to
+  /// Free play. Returns whether the sets were deleted.
+  Future<bool> _deleteSets(Set<String> ids) async {
+    final names = [
+      for (final set in _library.setlists)
+        if (ids.contains(set.id)) set.name,
+    ];
+    final ok = await confirm(
+      context,
+      names.length == 1
+          ? 'Delete ${names.single}? The songs stay in your library.'
+          : 'Delete ${names.length} setlists? The songs stay in your library.',
+      'Delete',
+    );
+    if (!ok || !mounted) return false;
+    _library.deleteSetlists(ids);
+    setState(_markedSets.clear);
+    return true;
+  }
 
   // Shared pieces
 

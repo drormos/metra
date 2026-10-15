@@ -391,14 +391,23 @@ class LibraryController extends ChangeNotifier {
     ),
   );
 
-  void deleteSetlist(String id) => _update(
-    _library.copyWith(
+  /// Never deletes songs. Deleting the loaded set switches to Free play,
+  /// keeping the click as it sounds.
+  void deleteSetlists(Set<String> ids) {
+    final deleted = _library.copyWith(
       setlists: [
         for (final s in setlists)
-          if (s.id != id) s,
+          if (!ids.contains(s.id)) s,
       ],
-    ),
-  );
+    );
+    _update(
+      ids.contains(_library.activeSetlistId)
+          ? deleted.withSession(setlistId: null, songId: null, position: -1)
+          : deleted,
+    );
+  }
+
+  void deleteSetlist(String id) => deleteSetlists({id});
 
   /// Restores the last session's tempo, pattern, flash offset, click
   /// sound and volumes into [metronome], then saves them whenever they

@@ -300,7 +300,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('What to play'), findsOneWidget);
     expect(find.text('Recently played'), findsOneWidget);
-    expect(find.byIcon(Icons.check), findsOneWidget, reason: 'loaded set');
+    expect(find.byIcon(Icons.check), findsNothing, reason: 'no loaded mark');
 
     final saturday = library.setlists.firstWhere(
       (l) => l.name == 'Saturday set',
@@ -608,6 +608,89 @@ void main() {
       expect(library.activeSetlist?.name, 'Friday set');
       expect(library.currentSong?.name, 'Three');
       expect(find.byType(SetlistPicker), findsNothing);
+    });
+  });
+
+  group('What to play: deleting sets', () {
+    Future<void> openWhatToPlay(WidgetTester tester) async {
+      await openFromHeader(tester);
+      await tester.tap(find.byKey(SetlistPicker.backToSetlistsKey));
+      await settle(tester); // not pumpAndSettle: the click may be playing
+    }
+
+    Finder dialogButton(String label) => find.descendant(
+      of: find.byType(AlertDialog),
+      matching: find.text(label),
+    );
+
+    String idOf(String name) =>
+        library.setlists.firstWhere((l) => l.name == name).id;
+
+    testWidgets('long-press marks; Delete asks, then deletes; the loaded '
+        'set going leaves Free play and the click as it was', (tester) async {
+      await pumpWithSets(tester);
+      library.playSong(library.visibleSongs[1], metronome, index: 1); // Two
+      await metronome.play();
+      await openWhatToPlay(tester);
+      await tester.longPress(
+        find.byKey(ValueKey('picker-set-${idOf('Friday set')}')),
+      );
+      await tester.pump();
+      expect(find.text('1 selected'), findsOneWidget);
+      await tester.tap(
+        find.byKey(ValueKey('picker-set-${idOf('Saturday set')}')),
+      );
+      await tester.pump();
+      expect(find.text('2 selected'), findsOneWidget);
+      expect(library.setlists, hasLength(2), reason: 'a tap marks, not loads');
+      await tester.tap(find.byKey(SetlistPicker.deleteMarkedKey));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(
+        find.text('Delete 2 setlists? The songs stay in your library.'),
+        findsOneWidget,
+      );
+      await tester.tap(dialogButton('Delete'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(library.setlists, isEmpty);
+      expect(library.songs, hasLength(3));
+      expect(library.activeSetlist, isNull);
+      expect(library.singleSong, isFalse, reason: 'Free play');
+      expect(metronome.isPlaying, isTrue);
+      expect(metronome.bpm, 110);
+      metronome.stop();
+      await tester.pump();
+    });
+
+    testWidgets('unmarking the last set ends marking', (tester) async {
+      await pumpWithSets(tester);
+      await openWhatToPlay(tester);
+      final row = find.byKey(ValueKey('picker-set-${idOf('Saturday set')}'));
+      await tester.longPress(row);
+      await tester.pump();
+      await tester.tap(row);
+      await tester.pump();
+      expect(find.textContaining('selected'), findsNothing);
+      expect(find.text('New setlist'), findsOneWidget);
+    });
+
+    testWidgets('swipe left asks before deleting one set', (tester) async {
+      await pumpWithSets(tester);
+      await openWhatToPlay(tester);
+      final row = find.byKey(ValueKey('picker-set-${idOf('Saturday set')}'));
+      await tester.drag(row, const Offset(-600, 0));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Delete Saturday set? The songs stay in your library.'),
+        findsOneWidget,
+      );
+      await tester.tap(dialogButton('Keep'));
+      await tester.pumpAndSettle();
+      expect(library.setlists, hasLength(2), reason: 'kept');
+      await tester.drag(row, const Offset(-600, 0));
+      await tester.pumpAndSettle();
+      await tester.tap(dialogButton('Delete'));
+      await tester.pumpAndSettle();
+      expect(library.setlists.map((l) => l.name), ['Friday set']);
     });
   });
 }
