@@ -10,6 +10,7 @@ import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/library_pick.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/play_marker.dart';
+import 'package:metra/src/ui/quick_pick.dart';
 import 'package:metra/src/ui/setlist_group.dart';
 import 'package:metra/src/ui/setlist_picker.dart';
 import 'package:metra/src/ui/song_editor.dart';
@@ -80,8 +81,23 @@ void main() {
     }
   }
 
+  /// What to play, as from Menu → Setlists or "Manage setlists ›".
+  Future<void> openWhatToPlay(WidgetTester tester) async {
+    openSetlists(
+      tester.element(find.byType(SetlistGroup)),
+      library: library,
+      metronome: metronome,
+    );
+    await settle(tester);
+  }
+
+  /// The loaded set's page (its pencil in What to play), What to play
+  /// behind it.
   Future<void> openFromHeader(WidgetTester tester) async {
-    await tester.tap(find.byKey(SetlistGroup.headerKey));
+    await openWhatToPlay(tester);
+    await tester.tap(
+      find.byKey(ValueKey('picker-set-edit-${library.activeSetlist!.id}')),
+    );
     await settle(tester);
   }
 
@@ -102,8 +118,7 @@ void main() {
       library.playSong(library.visibleSongs[0], metronome, index: 0);
       await metronome.play();
       await tester.pump();
-      await tester.tap(find.byKey(SetlistGroup.headerKey));
-      await settle(tester);
+      await openFromHeader(tester);
       await tester.tap(find.byKey(const ValueKey('picker-edit-0')));
       await settle(tester);
       await tester.tap(find.byKey(SongEditor.previewKey));
@@ -205,8 +220,10 @@ void main() {
   }) async {
     if (freePlay) {
       await tester.tap(find.byKey(SetlistGroup.songsKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(QuickPick.songLibraryKey));
     } else {
-      await tester.tap(find.byTooltip('Settings'));
+      await tester.tap(find.byTooltip('Menu'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Song library'));
     }
@@ -326,8 +343,7 @@ void main() {
         '(${size.width.toInt()}x${size.height.toInt()})', (tester) async {
       await pumpWithSets(tester, loaded: false);
       tester.view.physicalSize = size;
-      await tester.tap(find.byKey(SetlistGroup.setlistsKey));
-      await settle(tester);
+      await openWhatToPlay(tester);
       await tester.tap(
         find.descendant(
           of: find.byType(SetlistPicker),
@@ -349,8 +365,7 @@ void main() {
       library.setlists.firstWhere((l) => l.name == 'Saturday set').id,
       metronome,
     );
-    await tester.tap(find.byKey(SetlistGroup.headerKey));
-    await settle(tester);
+    await openFromHeader(tester);
     await tester.tap(find.byKey(SetlistPicker.backToSetlistsKey));
     await tester.pumpAndSettle();
     Finder inPicker(String text) => find.descendant(
@@ -393,8 +408,7 @@ void main() {
     tester,
   ) async {
     await pumpWithSets(tester, loaded: false);
-    await tester.tap(find.byKey(SetlistGroup.setlistsKey));
-    await tester.pumpAndSettle();
+    await openWhatToPlay(tester);
     expect(find.text('What to play'), findsOneWidget);
     expect(find.text('New setlist'), findsOneWidget);
     await tester.tap(find.byTooltip('Back'));
@@ -402,9 +416,7 @@ void main() {
     expect(find.byType(SetlistPicker), findsNothing);
   });
 
-  testWidgets('back steps set page, What to play, main screen', (
-    tester,
-  ) async {
+  testWidgets('back steps set page, What to play, main screen', (tester) async {
     await pumpWithSets(tester);
     await openFromHeader(tester);
     expect(find.byKey(SetlistPicker.backToSetlistsKey), findsOneWidget);
@@ -611,8 +623,7 @@ void main() {
       tester,
     ) async {
       await pumpWithSets(tester, loaded: false);
-      await tester.tap(find.byKey(SetlistGroup.setlistsKey));
-      await settle(tester);
+      await openWhatToPlay(tester);
       await tester.tap(find.byKey(SetlistPicker.newSetlistKey));
       await tester.pumpAndSettle();
       final field = tester.widget<TextField>(
@@ -650,8 +661,7 @@ void main() {
 
     testWidgets('a new set left empty is discarded', (tester) async {
       await pumpWithSets(tester, loaded: false);
-      await tester.tap(find.byKey(SetlistGroup.setlistsKey));
-      await settle(tester);
+      await openWhatToPlay(tester);
       await tester.tap(find.byKey(SetlistPicker.newSetlistKey));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(SetlistPicker.backToSetlistsKey));
@@ -663,8 +673,7 @@ void main() {
       tester,
     ) async {
       await pumpWithSets(tester, loaded: false);
-      await tester.tap(find.byKey(SetlistGroup.setlistsKey));
-      await settle(tester);
+      await openWhatToPlay(tester);
       final friday = library.setlists.firstWhere((l) => l.name == 'Friday set');
       await tester.tap(find.byKey(ValueKey('picker-set-edit-${friday.id}')));
       await settle(tester);

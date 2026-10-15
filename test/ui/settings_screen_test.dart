@@ -65,7 +65,7 @@ void main() {
         home: MetronomeScreen(controller: metronome, library: library),
       ),
     );
-    await tester.tap(find.byTooltip('Settings'));
+    await tester.tap(find.byTooltip('Menu'));
     await tester.pumpAndSettle();
   }
 

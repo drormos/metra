@@ -4,6 +4,8 @@ import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/library.dart';
 import 'haptics.dart';
+import 'icons.dart';
+import 'quick_pick.dart';
 import 'save_as_new_dialog.dart';
 import 'setlist_picker.dart';
 import 'subdivision_icon.dart';
@@ -17,14 +19,10 @@ class SetlistGroup extends StatelessWidget {
     super.key,
     required this.library,
     required this.metronome,
-    required this.onOpenPicker,
-    required this.onSongLibrary,
   });
 
   final LibraryController library;
   final MetronomeController metronome;
-  final VoidCallback onOpenPicker;
-  final VoidCallback onSongLibrary;
 
   static const headerKey = Key('setlist-header');
   static const previousKey = Key('previous-song');
@@ -37,6 +35,13 @@ class SetlistGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final setlist = library.activeSetlist;
+    // Each ⌄ opens its dropdown just above this group.
+    void pick(QuickPickKind kind) => showQuickPick(
+      context,
+      kind: kind,
+      library: library,
+      metronome: metronome,
+    );
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
       decoration: BoxDecoration(
@@ -49,7 +54,7 @@ class SetlistGroup extends StatelessWidget {
           SizedBox(
             height: 44,
             child: setlist != null
-                ? _setlistHeader(colors, setlist)
+                ? _setlistHeader(colors, setlist, pick)
                 : library.singleSong
                 ? _singleSongHeader(colors)
                 : _freePlayHeader(colors),
@@ -58,7 +63,9 @@ class SetlistGroup extends StatelessWidget {
           const SizedBox(height: 14),
           SizedBox(
             height: 68,
-            child: setlist == null ? _freePlayRow(colors) : _stepRow(colors),
+            child: setlist == null
+                ? _freePlayRow(colors, pick)
+                : _stepRow(colors),
           ),
         ],
       ),
@@ -71,7 +78,7 @@ class SetlistGroup extends StatelessWidget {
     padding: const EdgeInsets.only(left: 6),
     child: Row(
       children: [
-        const Icon(Icons.notes, size: 18),
+        const MetronomeIcon(size: 18),
         const SizedBox(width: 10),
         const Expanded(
           child: Text('Free play', style: TextStyle(fontSize: 16)),
@@ -114,17 +121,21 @@ class SetlistGroup extends StatelessWidget {
   );
 
   /// An outlined dropdown-style control: it must look tappable.
-  Widget _setlistHeader(MetraColors colors, Setlist setlist) {
+  Widget _setlistHeader(
+    MetraColors colors,
+    Setlist setlist,
+    void Function(QuickPickKind) pick,
+  ) {
     final index = library.currentIndex;
     return OutlinedButton(
       key: headerKey,
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 12),
       ),
-      onPressed: onOpenPicker,
+      onPressed: () => pick(QuickPickKind.set),
       child: Row(
         children: [
-          const Icon(Icons.notes, size: 18),
+          const SetlistIcon(),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -153,10 +164,9 @@ class SetlistGroup extends StatelessWidget {
   }
 
   /// Two equal outlined buttons, quieter than previous/next (52px tall,
-  /// centred in the 68px row): Setlists opens the picker (its What to play
-  /// has "New setlist", also with no sets yet); Songs opens the song
-  /// library, the way to play a single song.
-  Widget _freePlayRow(MetraColors colors) {
+  /// centred in the 68px row), each opening its dropdown: the main-screen
+  /// way to play a single song or switch to a set.
+  Widget _freePlayRow(MetraColors colors, void Function(QuickPickKind) pick) {
     return Center(
       child: SizedBox(
         height: 52,
@@ -167,9 +177,9 @@ class SetlistGroup extends StatelessWidget {
               child: _freePlayButton(
                 colors,
                 key: setlistsKey,
-                icon: const Icon(Icons.format_list_bulleted, size: 18),
+                icon: const SetlistIcon(),
                 label: 'Setlists',
-                onPressed: onOpenPicker,
+                onPressed: () => pick(QuickPickKind.sets),
               ),
             ),
             const SizedBox(width: 8),
@@ -179,7 +189,7 @@ class SetlistGroup extends StatelessWidget {
                 key: songsKey,
                 icon: const SubdivisionIcon(1, size: 18),
                 label: 'Songs',
-                onPressed: onSongLibrary,
+                onPressed: () => pick(QuickPickKind.songs),
               ),
             ),
           ],

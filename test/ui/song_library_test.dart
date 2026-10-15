@@ -236,9 +236,7 @@ void main() {
     expect(library.songs, hasLength(4));
   });
 
-  testWidgets('an empty library offers New song in the middle', (
-    tester,
-  ) async {
+  testWidgets('an empty library offers New song in the middle', (tester) async {
     await pumpLibrary(tester);
     library.deleteSongs({for (final s in library.songs) s.id});
     await tester.pump();

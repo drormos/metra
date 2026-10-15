@@ -12,7 +12,8 @@ import 'meter_control.dart';
 import 'segmented.dart';
 import 'theme.dart';
 
-/// Opens settings (ui-spec.md "Settings", `settings.reference.html`).
+/// Opens the Menu (ui-spec.md "Menu", `settings.reference.html`): your
+/// music first, then the settings.
 /// Changes apply at once. Leaving stops a visual offset test that started
 /// the click.
 Future<void> openSettings(
@@ -71,7 +72,7 @@ class SettingsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const BackBar(title: 'Settings'),
+            const BackBar(title: 'Menu'),
             Expanded(
               child: ListenableBuilder(
                 listenable: Listenable.merge([metronome, ?library]),

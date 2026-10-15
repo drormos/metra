@@ -8,6 +8,7 @@ class MetraColors extends ThemeExtension<MetraColors> {
   const MetraColors({
     required this.background,
     required this.sheet,
+    required this.dim,
     required this.surface,
     required this.divider,
     required this.selectedRow,
@@ -31,6 +32,7 @@ class MetraColors extends ThemeExtension<MetraColors> {
   static const stageBlack = MetraColors(
     background: Color(0xFF000000),
     sheet: Color(0xFF111111),
+    dim: Color(0x99000000),
     surface: Color(0xFF1A1A1A),
     divider: Color(0xFF1F1F1F),
     selectedRow: Color(0xFF242424),
@@ -54,6 +56,7 @@ class MetraColors extends ThemeExtension<MetraColors> {
   static const daylight = MetraColors(
     background: Color(0xFFF3F1EC),
     sheet: Color(0xFFECE9E2),
+    dim: Color(0x59000000),
     surface: Color(0xFFE3DFD6),
     divider: Color(0xFFDCD8CF),
     selectedRow: Color(0xFFDAD5CB),
@@ -75,8 +78,11 @@ class MetraColors extends ThemeExtension<MetraColors> {
 
   final Color background;
 
-  /// Bottom sheets.
+  /// Bottom sheets, dialogs, dropdown panels.
   final Color sheet;
+
+  /// Over the main screen while a dropdown panel is open.
+  final Color dim;
 
   /// Filled buttons.
   final Color surface;

@@ -10,6 +10,7 @@ import 'repeat_button.dart';
 import 'setlist_group.dart';
 import 'setlist_picker.dart';
 import 'save_as_new_dialog.dart';
+import 'icons.dart';
 import 'settings_screen.dart';
 import 'song_library.dart';
 import 'subdivision_icon.dart';
@@ -216,19 +217,7 @@ class MetronomeScreen extends StatelessWidget {
         ),
         if (library case final library?) ...[
           const SizedBox(height: 12),
-          SetlistGroup(
-            library: library,
-            metronome: controller,
-            // The setlist control opens the loaded set's page (What to
-            // play behind it); "Setlists" opens What to play.
-            onOpenPicker: () => openSetlists(
-              context,
-              library: library,
-              metronome: controller,
-              loadedSet: true,
-            ),
-            onSongLibrary: () => openSongLibrary(context, library, controller),
-          ),
+          SetlistGroup(library: library, metronome: controller),
         ],
         if (error != null) ...[
           const SizedBox(height: 12),
@@ -242,7 +231,7 @@ class MetronomeScreen extends StatelessWidget {
     );
   }
 
-  /// Song title, then subdivision, time signature and settings buttons.
+  /// Song title, then subdivision, time signature and Menu buttons.
   /// The tempo name; while the loaded song has unsaved main-screen
   /// changes, Revert and Save to song instead (ui-spec.md "Changes to a
   /// loaded song").
@@ -374,7 +363,7 @@ class MetronomeScreen extends StatelessWidget {
         const SizedBox(width: 8),
         Builder(
           builder: (context) => _squareButton(
-            tooltip: 'Settings',
+            tooltip: 'Menu',
             onPressed: () => openSettings(
               context,
               metronome: controller,
@@ -390,7 +379,7 @@ class MetronomeScreen extends StatelessWidget {
                   ? null
                   : () => openSongLibrary(context, library, controller),
             ),
-            child: const Icon(Icons.tune, size: 20),
+            child: const MenuIcon(),
           ),
         ),
       ],

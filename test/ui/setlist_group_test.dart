@@ -8,9 +8,13 @@ import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
+import 'package:metra/src/ui/editor_scaffold.dart';
+import 'package:metra/src/ui/play_marker.dart';
+import 'package:metra/src/ui/quick_pick.dart';
 import 'package:metra/src/ui/save_as_new_dialog.dart';
 import 'package:metra/src/ui/setlist_group.dart';
 import 'package:metra/src/ui/setlist_picker.dart';
+import 'package:metra/src/ui/song_editor.dart';
 import 'package:metra/src/ui/song_library.dart';
 
 import '../audio/fake_click_output.dart';
@@ -86,18 +90,6 @@ void main() {
       expect(find.text('Setlists'), findsOneWidget);
       expect(find.text('Songs'), findsOneWidget);
       expect(find.text('Create a setlist'), findsNothing);
-    });
-
-    testWidgets('Free play with setlists: Setlists opens the picker', (
-      tester,
-    ) async {
-      await pumpScreen(tester);
-      library.addSetlist('Friday set');
-      await tester.pump();
-      expect(find.text('Create a setlist'), findsNothing);
-      await tester.tap(find.byKey(SetlistGroup.setlistsKey));
-      await tester.pumpAndSettle();
-      expect(find.text('What to play'), findsOneWidget);
     });
 
     testWidgets('Single song: header and its Free play button', (tester) async {
@@ -190,13 +182,6 @@ void main() {
       expect(find.byKey(MetronomeScreen.tempoNameKey), findsOneWidget);
     });
 
-    testWidgets('Songs opens the song library', (tester) async {
-      await pumpScreen(tester);
-      await tester.tap(find.byKey(SetlistGroup.songsKey));
-      await tester.pumpAndSettle();
-      expect(find.byType(SongLibrary), findsOneWidget);
-    });
-
     testWidgets('the Setlists and Songs buttons are the same size', (
       tester,
     ) async {
@@ -205,30 +190,6 @@ void main() {
         tester.getSize(find.byKey(SetlistGroup.setlistsKey)),
         tester.getSize(find.byKey(SetlistGroup.songsKey)),
       );
-    });
-
-    testWidgets('with no sets, Setlists opens What to play to make one; an '
-        'empty new set is discarded', (tester) async {
-      await pumpScreen(tester);
-      await tester.tap(find.byKey(SetlistGroup.setlistsKey));
-      await tester.pumpAndSettle();
-      expect(find.text('What to play'), findsOneWidget);
-      expect(
-        find.byKey(SetlistPicker.newSetlistKey),
-        findsNothing,
-        reason: 'no bottom bar while there are no sets',
-      );
-      await tester.tap(find.byKey(SetlistPicker.emptyActionKey));
-      await tester.pumpAndSettle();
-      expect(find.byKey(SetlistPicker.titleFieldKey), findsOneWidget);
-      expect(find.text('No songs yet'), findsOneWidget);
-      await tester.enterText(find.byType(TextField), 'Saturday');
-      await tester.testTextInput.receiveAction(TextInputAction.done);
-      await tester.pump();
-      expect(library.setlists.single.name, 'Saturday');
-      Navigator.pop(tester.element(find.byType(SetlistPicker)));
-      await tester.pumpAndSettle();
-      expect(library.setlists, isEmpty, reason: 'left empty');
     });
 
     testWidgets('setlist mode: header, position, neighbours', (tester) async {
@@ -256,14 +217,6 @@ void main() {
       await tester.pump();
       expect(title(tester), 'Two');
       expect(find.bySemanticsLabel('Previous song: One'), findsOneWidget);
-    });
-
-    testWidgets('the header opens the picker', (tester) async {
-      await withSet(tester);
-      await tester.tap(find.byKey(SetlistGroup.headerKey));
-      await tester.pumpAndSettle();
-      expect(find.byKey(SetlistPicker.backToSetlistsKey), findsOneWidget);
-      expect(find.text('3 songs'), findsOneWidget);
     });
 
     testWidgets('same size and position in both modes', (tester) async {
@@ -309,4 +262,253 @@ void main() {
       expect(find.byKey(MetronomeScreen.bpmKey), findsOneWidget);
     });
   }
+
+  group('quick-pick dropdowns', () {
+    /// Songs added out of A–Z order; "Friday set" (One, Two, Three) and
+    /// "Saturday set" (Three), Saturday played most recently.
+    Future<void> withLibrary(WidgetTester tester, {bool loaded = false}) async {
+      await pumpScreen(tester);
+      final songs = {
+        for (final (name, bpm) in [('Two', 110), ('One', 100), ('Three', 120)])
+          name: library
+              .addSong(
+                name: name,
+                bpm: bpm,
+                pattern: const MetronomePattern.standard(),
+              )
+              .id,
+      };
+      final friday = library.saveSetlist(
+        name: 'Friday set',
+        songIds: [songs['One']!, songs['Two']!, songs['Three']!],
+      );
+      final saturday = library.saveSetlist(
+        name: 'Saturday set',
+        songIds: [songs['Three']!],
+      );
+      library
+        ..setActiveSetlist(friday.id)
+        ..setActiveSetlist(saturday.id)
+        ..detachSong();
+      if (loaded) {
+        library.loadSetlist(friday.id, metronome);
+        library.nextSong(metronome); // Two, 2 of 3
+      }
+      await tester.pump();
+    }
+
+    List<String> rows(WidgetTester tester, String prefix) => [
+      for (final w in tester.widgetList<InkWell>(
+        find.byWidgetPredicate(
+          (w) =>
+              w is InkWell &&
+              w.key is ValueKey<String> &&
+              (w.key! as ValueKey<String>).value.startsWith(prefix),
+        ),
+      ))
+        (w.key! as ValueKey<String>).value,
+    ];
+
+    testWidgets('Songs ⌄: A–Z; a tap plays it as a single song and closes', (
+      tester,
+    ) async {
+      await withLibrary(tester);
+      await tester.tap(find.byKey(SetlistGroup.songsKey));
+      await tester.pumpAndSettle();
+      expect(find.byType(QuickPick), findsOneWidget);
+      expect(find.byType(SearchField), findsNothing, reason: 'only 3 songs');
+      expect(
+        rows(
+          tester,
+          'quick-song-',
+        ).map((k) => library.songById(k.substring(11))!.name),
+        ['One', 'Three', 'Two'],
+      );
+      await tester.tap(find.text('Three'));
+      await tester.pumpAndSettle();
+      expect(find.byType(QuickPick), findsNothing);
+      expect(library.singleSong, isTrue);
+      expect(library.currentSong?.name, 'Three');
+      expect(metronome.bpm, 120);
+    });
+
+    testWidgets('Songs ⌄: search above 8 songs; "Song library ›"', (
+      tester,
+    ) async {
+      await withLibrary(tester);
+      for (var i = 4; i <= 9; i++) {
+        library.addSong(
+          name: 'Song $i',
+          bpm: 100,
+          pattern: const MetronomePattern.standard(),
+        );
+      }
+      await tester.tap(find.byKey(SetlistGroup.songsKey));
+      await tester.pumpAndSettle();
+      expect(find.byType(SearchField), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'thr');
+      await tester.pump();
+      expect(rows(tester, 'quick-song-'), hasLength(1));
+      await tester.tap(find.byKey(QuickPick.songLibraryKey));
+      await tester.pumpAndSettle();
+      expect(find.byType(SongLibrary), findsOneWidget);
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+      expect(find.byType(QuickPick), findsNothing, reason: 'main screen');
+    });
+
+    testWidgets('Setlists ⌄: recently played first; a tap loads song 1', (
+      tester,
+    ) async {
+      await withLibrary(tester);
+      await tester.tap(find.byKey(SetlistGroup.setlistsKey));
+      await tester.pumpAndSettle();
+      expect(
+        rows(
+          tester,
+          'quick-set-',
+        ).map((k) => library.setlists.firstWhere((l) => k.endsWith(l.id)).name),
+        ['Saturday set', 'Friday set'],
+      );
+      await tester.tap(find.text('Friday set'));
+      await tester.pumpAndSettle();
+      expect(library.activeSetlist?.name, 'Friday set');
+      expect(library.currentSong?.name, 'One');
+    });
+
+    testWidgets('"Manage setlists ›" opens What to play; ‹ returns', (
+      tester,
+    ) async {
+      await withLibrary(tester);
+      await tester.tap(find.byKey(SetlistGroup.setlistsKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(QuickPick.manageSetlistsKey));
+      await tester.pumpAndSettle();
+      expect(find.text('What to play'), findsOneWidget);
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SetlistPicker), findsNothing);
+      expect(find.byType(QuickPick), findsNothing);
+    });
+
+    testWidgets('tap outside closes; nothing changes', (tester) async {
+      await withLibrary(tester);
+      await tester.tap(find.byKey(SetlistGroup.setlistsKey));
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(200, 60));
+      await tester.pumpAndSettle();
+      expect(find.byType(QuickPick), findsNothing);
+      expect(library.activeSetlist, isNull);
+    });
+
+    testWidgets('empty: "No setlists yet", "New setlist ›" opens a new set', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      await tester.tap(find.byKey(SetlistGroup.setlistsKey));
+      await tester.pumpAndSettle();
+      expect(find.text('No setlists yet'), findsOneWidget);
+      await tester.tap(find.byKey(QuickPick.newSetlistKey));
+      await tester.pumpAndSettle();
+      expect(find.byKey(SetlistPicker.titleFieldKey), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('What to play'), findsOneWidget);
+      expect(library.setlists, isEmpty, reason: 'left empty');
+    });
+
+    testWidgets('empty: "No songs yet", "New song ›" opens the editor', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      await tester.tap(find.byKey(SetlistGroup.songsKey));
+      await tester.pumpAndSettle();
+      expect(find.text('No songs yet'), findsOneWidget);
+      await tester.tap(find.byKey(QuickPick.newSongKey));
+      await tester.pumpAndSettle();
+      expect(find.byType(SongEditor), findsOneWidget);
+    });
+
+    testWidgets('set ⌄: header, current song marked; a tap jumps to it', (
+      tester,
+    ) async {
+      await withLibrary(tester, loaded: true);
+      await tester.tap(find.byKey(SetlistGroup.headerKey));
+      await tester.pumpAndSettle();
+      final panel = find.byType(QuickPick);
+      expect(
+        find.descendant(of: panel, matching: find.text('2 of 3')),
+        findsOneWidget,
+      );
+      expect(rows(tester, 'quick-set-song-'), hasLength(3));
+      expect(
+        tester
+            .widgetList<PlayMarker>(find.byType(PlayMarker))
+            .where((m) => m.current),
+        hasLength(1),
+      );
+      await tester.tap(
+        find.descendant(of: panel, matching: find.text('Three')),
+      );
+      await tester.pumpAndSettle();
+      expect(library.currentSong?.name, 'Three');
+      expect(library.currentIndex, 2);
+      expect(find.byType(QuickPick), findsNothing);
+    });
+
+    testWidgets('set ⌄: Free play detaches; "Other setlists ›" swaps', (
+      tester,
+    ) async {
+      await withLibrary(tester, loaded: true);
+      await tester.tap(find.byKey(SetlistGroup.headerKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(QuickPick.otherSetlistsKey));
+      await tester.pumpAndSettle();
+      expect(rows(tester, 'quick-set-song-'), isEmpty);
+      expect(find.byKey(QuickPick.manageSetlistsKey), findsOneWidget);
+      await tester.tapAt(const Offset(200, 60));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(SetlistGroup.headerKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(QuickPick.freePlayKey));
+      await tester.pumpAndSettle();
+      expect(library.activeSetlist, isNull);
+      expect(library.currentSong, isNull);
+      expect(metronome.bpm, 110, reason: 'the click keeps its tempo');
+    });
+
+    testWidgets('long-press a song edits it; back returns to main', (
+      tester,
+    ) async {
+      await withLibrary(tester);
+      await tester.tap(find.byKey(SetlistGroup.songsKey));
+      await tester.pumpAndSettle();
+      await tester.longPress(find.text('Two'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SongEditor), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Two'), findsOneWidget);
+      expect(library.currentSong, isNull, reason: 'nothing loaded');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(SongEditor), findsNothing);
+      expect(find.byType(QuickPick), findsNothing);
+    });
+
+    testWidgets("long-press a set opens its page; back returns to main", (
+      tester,
+    ) async {
+      await withLibrary(tester);
+      await tester.tap(find.byKey(SetlistGroup.setlistsKey));
+      await tester.pumpAndSettle();
+      await tester.longPress(find.text('Friday set'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(SetlistPicker.backToSetlistsKey), findsOneWidget);
+      expect(find.text('3 songs'), findsOneWidget);
+      expect(library.activeSetlist, isNull, reason: 'not loaded');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(SetlistPicker), findsNothing);
+    });
+  });
 }

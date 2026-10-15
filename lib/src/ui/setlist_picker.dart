@@ -9,6 +9,7 @@ import '../controller/metronome_controller.dart';
 import '../model/library.dart';
 import 'editor_scaffold.dart';
 import 'haptics.dart';
+import 'icons.dart';
 import 'library_pick.dart';
 import 'play_marker.dart';
 import 'song_editor.dart';
@@ -19,38 +20,51 @@ import 'theme.dart';
 /// page, which both plays and edits the set. Full screen; opening them
 /// never touches the click, only choosing a song or a set does.
 ///
-/// With [loadedSet] (the main screen's setlist control), opens on the
-/// loaded set's page, with What to play behind it; otherwise on What to
-/// play. Back steps set page → What to play → where it was opened from.
+/// Opens on What to play; back steps set page → What to play → where it
+/// was opened from (Menu or main screen). With [setId] (long-press in the
+/// Setlists dropdown), opens on that set's page alone: back returns
+/// straight to the main screen. With [newSet], on a new set's page, What
+/// to play behind it.
 Future<void> openSetlists(
   BuildContext context, {
   required LibraryController library,
   required MetronomeController metronome,
-  bool loadedSet = false,
-}) => Navigator.push(
-  context,
-  MaterialPageRoute<void>(
-    builder: (_) => SetlistPicker(
-      library: library,
-      metronome: metronome,
-      loadedSet: loadedSet,
+  String? setId,
+  bool newSet = false,
+}) {
+  // Created up front: creating it while the page builds would notify
+  // the library's listeners mid-build.
+  final created = newSet ? library.addSetlist(library.newSetlistName()) : null;
+  return Navigator.push(
+    context,
+    MaterialPageRoute<void>(
+      builder: (_) => SetlistPicker(
+        library: library,
+        metronome: metronome,
+        setId: setId,
+        newSetId: created?.id,
+      ),
     ),
-  ),
-);
+  );
+}
 
 class SetlistPicker extends StatefulWidget {
   const SetlistPicker({
     super.key,
     required this.library,
     required this.metronome,
-    this.loadedSet = false,
+    this.setId,
+    this.newSetId,
   });
 
   final LibraryController library;
   final MetronomeController metronome;
 
-  /// Opens on the loaded set's page rather than What to play.
-  final bool loadedSet;
+  /// Opens on this set's page alone, rather than What to play.
+  final String? setId;
+
+  /// Opens on the page of this just-created set, What to play behind it.
+  final String? newSetId;
 
   static const backToSetlistsKey = Key('picker-back-to-setlists');
   static const freePlayKey = Key('picker-free-play');
@@ -74,9 +88,9 @@ class _SetlistPickerState extends State<SetlistPicker> {
   // Navigation inside the picker: the set page shown, or null for What to
   // play. Everything else here is page UI state; the set itself is saved
   // in the library as it changes.
-  late String? _pageId = widget.loadedSet
-      ? widget.library.activeSetlist?.id
-      : null;
+  late String? _pageId = widget.setId;
+  // Opened on a set's page with no What to play behind it: back leaves.
+  late bool _alone = widget.setId != null;
   // The page is for a new set: its title starts as a field.
   bool _isNew = false;
   // A set created here, discarded if it's left with no songs.
@@ -123,8 +137,17 @@ class _SetlistPickerState extends State<SetlistPicker> {
         : null;
   }
 
-  void _openNewSet() {
-    final created = _library.addSetlist(_library.newSetlistName());
+  @override
+  void initState() {
+    super.initState();
+    final id = widget.newSetId;
+    if (id != null) _showNew(_library.setlists.firstWhere((l) => l.id == id));
+  }
+
+  void _openNewSet() =>
+      _showNew(_library.addSetlist(_library.newSetlistName()));
+
+  void _showNew(Setlist created) {
     _pageId = created.id;
     _isNew = true;
     _createdId = created.id;
@@ -166,6 +189,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
     if (abandoned != null) _library.deleteSetlist(abandoned);
     setState(() {
       _pageId = null;
+      _alone = false;
       _isNew = false;
       _createdId = null; // kept now: only new sets are discarded
       _renaming = false;
@@ -197,7 +221,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
     return PopScope(
       // Back ends marking first, then steps from a set's page to What to
       // play, and only then leaves.
-      canPop: !marking && _page == null,
+      canPop: !marking && (_page == null || _alone),
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         if (marking) {
@@ -599,6 +623,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
     _library.deleteSetlist(setlist.id);
     setState(() {
       _pageId = null;
+      _alone = false;
       _isNew = false;
       _renaming = false;
     });
@@ -644,7 +669,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
                     },
                     child: Row(
                       children: [
-                        const _MetronomeIcon(),
+                        const MetronomeIcon(),
                         const SizedBox(width: 16),
                         Flexible(
                           child: Column(
@@ -795,7 +820,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
                 width: 22,
                 child: marking
                     ? MarkCircle(checked: marked)
-                    : Icon(Icons.notes, size: 18, color: colors.muted),
+                    : SetlistIcon(color: colors.muted),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -872,49 +897,6 @@ class _SetlistPickerState extends State<SetlistPicker> {
   // Shared pieces
 
   static String _count(int n) => n == 1 ? '1 song' : '$n songs';
-}
-
-/// The Free play icon from set-switcher.reference.html: a metronome body
-/// with its pendulum.
-class _MetronomeIcon extends StatelessWidget {
-  const _MetronomeIcon();
-
-  @override
-  Widget build(BuildContext context) => CustomPaint(
-    size: const Size(26, 26),
-    painter: _MetronomePainter(IconTheme.of(context).color!),
-  );
-}
-
-class _MetronomePainter extends CustomPainter {
-  _MetronomePainter(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.scale(size.width / 26, size.height / 26);
-    final stroke = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..strokeJoin = StrokeJoin.round;
-    canvas
-      ..drawPath(
-        Path()
-          ..moveTo(9, 3)
-          ..lineTo(17, 3)
-          ..lineTo(22, 23)
-          ..lineTo(4, 23)
-          ..close(),
-        stroke,
-      )
-      ..drawLine(const Offset(13, 19), const Offset(18, 6), stroke)
-      ..drawLine(const Offset(8, 19), const Offset(18, 19), stroke);
-  }
-
-  @override
-  bool shouldRepaint(_MetronomePainter old) => old.color != color;
 }
 
 /// "Free play" (ui-spec.md "Detaching a song"): detaches the song and any
