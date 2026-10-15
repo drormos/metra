@@ -214,8 +214,6 @@ class MetronomeScreen extends StatelessWidget {
               context,
               library: library,
               metronome: controller,
-              onSongLibrary: () =>
-                  openSongLibrary(context, library, controller),
             ),
             onSongLibrary: () => openSongLibrary(context, library, controller),
             // "Create a setlist": the picker on a new set's page.
@@ -223,8 +221,6 @@ class MetronomeScreen extends StatelessWidget {
               context,
               library: library,
               metronome: controller,
-              onSongLibrary: () =>
-                  openSongLibrary(context, library, controller),
               newSet: true,
             ),
           ),
@@ -363,8 +359,6 @@ class MetronomeScreen extends StatelessWidget {
                       context,
                       library: library,
                       metronome: controller,
-                      onSongLibrary: () =>
-                          openSongLibrary(context, library, controller),
                     ),
               onSongLibrary: library == null
                   ? null

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
 
 import '../controller/library_controller.dart';
@@ -25,7 +24,6 @@ Future<void> showSetlistPicker(
   BuildContext context, {
   required LibraryController library,
   required MetronomeController metronome,
-  required VoidCallback onSongLibrary,
   bool newSet = false,
 }) {
   final height = MediaQuery.sizeOf(context).height;
@@ -47,7 +45,6 @@ Future<void> showSetlistPicker(
     builder: (_) => SetlistPicker(
       library: library,
       metronome: metronome,
-      onSongLibrary: onSongLibrary,
       newSetId: created,
     ),
   );
@@ -59,7 +56,6 @@ Future<void> openSetlistsScreen(
   BuildContext context, {
   required LibraryController library,
   required MetronomeController metronome,
-  required VoidCallback onSongLibrary,
 }) => Navigator.push(
   context,
   MaterialPageRoute<void>(
@@ -71,7 +67,6 @@ Future<void> openSetlistsScreen(
           child: SetlistPicker(
             library: library,
             metronome: metronome,
-            onSongLibrary: onSongLibrary,
             fullScreen: true,
           ),
         ),
@@ -85,14 +80,12 @@ class SetlistPicker extends StatefulWidget {
     super.key,
     required this.library,
     required this.metronome,
-    required this.onSongLibrary,
     this.fullScreen = false,
     this.newSetId,
   });
 
   final LibraryController library;
   final MetronomeController metronome;
-  final VoidCallback onSongLibrary;
 
   /// A full screen rather than a sheet: opens on What to play, whose back
   /// chevron leaves the screen.
@@ -110,6 +103,8 @@ class SetlistPicker extends StatefulWidget {
   static const deleteKey = Key('picker-delete');
   static const removeKey = Key('picker-remove-marked');
   static const deleteMarkedKey = Key('picker-delete-marked');
+  static const removeSongsKey = Key('picker-remove-songs');
+  static const deleteSetsKey = Key('picker-delete-sets');
   static const cancelMarksKey = Key('picker-cancel-marks');
   static const titleFieldKey = Key('picker-title-field');
 
@@ -131,15 +126,15 @@ class _SetlistPickerState extends State<SetlistPicker> {
   bool _renaming = false;
   final _name = TextEditingController();
   final _search = TextEditingController();
-  // Marked rows (positions; a song may appear twice).
+  // "Remove songs" / "Delete setlists" marking, and what's marked (song
+  // positions, since a song may appear twice; set ids).
+  bool _markingSongs = false;
+  bool _markingSets = false;
   final _marked = <int>{};
   // Sets marked for deleting in What to play.
   final _markedSets = <String>{};
   // The picker's own messenger, so the Undo bar shows inside the sheet.
   final _messenger = GlobalKey<ScaffoldMessengerState>();
-  // How far the finger moved since the last long-press lift.
-  Offset _down = Offset.zero;
-  double _moved = 0;
 
   LibraryController get _library => widget.library;
 
@@ -227,14 +222,21 @@ class _SetlistPickerState extends State<SetlistPicker> {
       _isNew = false;
       _createdId = null; // kept now: only new sets are discarded
       _renaming = false;
-      _marked.clear();
+      _endMarking();
     });
   }
 
   void _openPage(Setlist setlist) => setState(() {
     _pageId = setlist.id;
-    _marked.clear();
+    _endMarking();
   });
+
+  void _endMarking() {
+    _markingSongs = false;
+    _markingSets = false;
+    _marked.clear();
+    _markedSets.clear();
+  }
 
   /// Closes the sheet (or the full screen from Settings).
   void _close() => Navigator.pop(context);
@@ -242,14 +244,9 @@ class _SetlistPickerState extends State<SetlistPicker> {
   @override
   Widget build(BuildContext context) => PopScope(
     // The back gesture ends marking before it closes anything.
-    canPop: _marked.isEmpty && _markedSets.isEmpty,
+    canPop: !_markingSongs && !_markingSets,
     onPopInvokedWithResult: (didPop, _) {
-      if (!didPop) {
-        setState(() {
-          _marked.clear();
-          _markedSets.clear();
-        });
-      }
+      if (!didPop) setState(_endMarking);
     },
     child: ScaffoldMessenger(
       key: _messenger,
@@ -351,17 +348,10 @@ class _SetlistPickerState extends State<SetlistPicker> {
               : ReorderableListView.builder(
                   buildDefaultDragHandles: false,
                   itemCount: songs.length,
-                  // Long-press lifts the row; letting go without moving
-                  // marks it instead of reordering.
-                  onReorderStart: (_) {
-                    Haptics.medium();
-                    _moved = 0;
-                  },
-                  onReorderEnd: (index) {
-                    if (_moved < kTouchSlop) _toggleMark(index);
-                  },
+                  // Long-press and drag reorders; long-press does nothing
+                  // else.
+                  onReorderStart: (_) => Haptics.medium(),
                   onReorderItem: (from, to) {
-                    if (_moved < kTouchSlop) return;
                     _library.reorderSetlist(setlist.id, from, to);
                     _remapMarks(from, to);
                   },
@@ -370,7 +360,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
                       _row(colors, setlist, songs[i], i, current: i == current),
                 ),
         ),
-        if (_marked.isNotEmpty)
+        if (_markingSongs)
           _markingBar(colors, setlist)
         else
           _bottomBar(colors, [
@@ -392,7 +382,17 @@ class _SetlistPickerState extends State<SetlistPicker> {
               ),
             ),
             const SizedBox(width: 8),
-            Expanded(child: _songLibraryButton()),
+            Expanded(
+              child: OutlinedButton(
+                key: SetlistPicker.removeSongsKey,
+                onPressed: songs.isEmpty
+                    ? null
+                    : () => setState(() => _markingSongs = true),
+                child: const FittedBox(
+                  child: Text('Remove songs', style: TextStyle(fontSize: 17)),
+                ),
+              ),
+            ),
           ]),
       ],
     );
@@ -471,108 +471,84 @@ class _SetlistPickerState extends State<SetlistPicker> {
     int index, {
     required bool current,
   }) {
-    final marking = _marked.isNotEmpty;
+    final marking = _markingSongs;
     final marked = _marked.contains(index);
     final highlighted = marking ? marked : current;
-    return Dismissible(
+    return ReorderableDelayedDragStartListener(
       // Keyed by position: the same song may appear twice.
       key: ValueKey('picker-row-$index-${song.id}'),
-      direction: marking ? DismissDirection.none : DismissDirection.endToStart,
-      background: Container(
-        color: colors.accentSounding,
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 24),
-        child: Text(
-          'Remove',
-          style: TextStyle(
-            color: colors.onPrimary,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-      onDismissed: (_) => _remove(setlist, {index}),
-      child: Listener(
-        onPointerDown: (event) => _down = event.position,
-        onPointerMove: (event) =>
-            _moved = max(_moved, (event.position - _down).distance),
-        child: ReorderableDelayedDragStartListener(
-          index: index,
-          child: Material(
-            color: highlighted ? colors.selectedRow : colors.sheet,
-            child: InkWell(
-              key: ValueKey('picker-song-$index'),
-              onTap: marking
-                  ? () => _toggleMark(index)
-                  : () => _play(setlist, song, index),
-              child: Ink(
-                height: 60,
-                padding: const EdgeInsets.only(left: 24),
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: colors.divider)),
+      index: index,
+      child: Material(
+        color: highlighted ? colors.selectedRow : colors.sheet,
+        child: InkWell(
+          key: ValueKey('picker-song-$index'),
+          onTap: marking
+              ? () => _toggleMark(index)
+              : () => _play(setlist, song, index),
+          child: Ink(
+            height: 60,
+            padding: const EdgeInsets.only(left: 24),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: colors.divider)),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 22,
+                  child: marking
+                      ? MarkCircle(checked: marked)
+                      : PlayMarker(current: current),
                 ),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 22,
-                      child: marked
-                          ? Icon(Icons.check, size: 20, color: colors.accent)
-                          : PlayMarker(current: current),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    song.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: current ? FontWeight.w600 : FontWeight.w500,
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text(
-                        song.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: current
-                              ? FontWeight.w600
-                              : FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Text(
+                  '${song.bpm}',
+                  style: TextStyle(
+                    fontFamily: MetraFonts.condensed,
+                    fontSize: 24,
+                    fontWeight: current ? FontWeight.w700 : FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                SizedBox(
+                  width: 30,
+                  child: Text(
+                    song.pattern.timeSignature,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(fontSize: 14, color: colors.muted),
+                  ),
+                ),
+                // Hidden while marking; the slot keeps the layout.
+                SizedBox(
+                  width: 52,
+                  height: 60,
+                  child: marking
+                      ? null
+                      : IconButton(
+                          key: ValueKey('picker-edit-$index'),
+                          tooltip: 'Edit ${song.name}',
+                          color: colors.muted,
+                          onPressed: () => openSongEditor(
+                            context,
+                            _library,
+                            widget.metronome,
+                            song: song,
+                          ),
+                          icon: const Icon(Icons.edit_outlined, size: 20),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Text(
-                      '${song.bpm}',
-                      style: TextStyle(
-                        fontFamily: MetraFonts.condensed,
-                        fontSize: 24,
-                        fontWeight: current ? FontWeight.w700 : FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    SizedBox(
-                      width: 30,
-                      child: Text(
-                        song.pattern.timeSignature,
-                        textAlign: TextAlign.right,
-                        style: TextStyle(fontSize: 14, color: colors.muted),
-                      ),
-                    ),
-                    // Hidden while marking; the slot keeps the layout.
-                    SizedBox(
-                      width: 52,
-                      height: 60,
-                      child: marking
-                          ? null
-                          : IconButton(
-                              key: ValueKey('picker-edit-$index'),
-                              tooltip: 'Edit ${song.name}',
-                              color: colors.muted,
-                              onPressed: () => openSongEditor(
-                                context,
-                                _library,
-                                widget.metronome,
-                                song: song,
-                              ),
-                              icon: const Icon(Icons.edit_outlined, size: 20),
-                            ),
-                    ),
-                  ],
                 ),
-              ),
+              ],
             ),
           ),
         ),
@@ -617,10 +593,10 @@ class _SetlistPickerState extends State<SetlistPicker> {
   Widget _markingBar(MetraColors colors, Setlist setlist) => _selectionBar(
     colors,
     count: _marked.length,
-    action: 'Remove from set',
+    action: 'Remove',
     actionKey: SetlistPicker.removeKey,
     onAction: () => _remove(setlist, {..._marked}),
-    onCancel: () => setState(_marked.clear),
+    onCancel: () => setState(_endMarking),
   );
 
   /// "N selected · Cancel" and a red [action], replacing the bottom buttons
@@ -663,7 +639,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
                 foregroundColor: colors.accentSounding,
                 minimumSize: const Size(0, 44),
               ),
-              onPressed: onAction,
+              onPressed: count == 0 ? null : onAction,
               // Shrinks rather than overflowing on narrow phones.
               child: FittedBox(
                 child: Text(
@@ -684,7 +660,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
   /// Out of this set only (the songs stay in the library); Undo for ~5 s.
   void _remove(Setlist setlist, Set<int> indices) {
     final before = _library.removeEntries(setlist.id, indices);
-    setState(_marked.clear);
+    setState(_endMarking);
     _messenger.currentState!
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -850,14 +826,14 @@ class _SetlistPickerState extends State<SetlistPicker> {
             children: [for (final setlist in sets) _setRow(colors, setlist)],
           ),
         ),
-        if (_markedSets.isNotEmpty)
+        if (_markingSets)
           _selectionBar(
             colors,
             count: _markedSets.length,
             action: 'Delete',
             actionKey: SetlistPicker.deleteMarkedKey,
             onAction: () => _deleteSets({..._markedSets}),
-            onCancel: () => setState(_markedSets.clear),
+            onCancel: () => setState(_endMarking),
           )
         else
           _bottomBar(colors, [
@@ -876,105 +852,94 @@ class _SetlistPickerState extends State<SetlistPicker> {
               ),
             ),
             const SizedBox(width: 8),
-            Expanded(child: _songLibraryButton()),
+            Expanded(
+              child: OutlinedButton(
+                key: SetlistPicker.deleteSetsKey,
+                onPressed: _library.setlists.isEmpty
+                    ? null
+                    : () => setState(() => _markingSets = true),
+                child: const FittedBox(
+                  child: Text(
+                    'Delete setlists',
+                    style: TextStyle(fontSize: 17),
+                  ),
+                ),
+              ),
+            ),
           ]),
       ],
     );
   }
 
   /// Tap = load the set at song 1 and close (every row, the loaded one
-  /// too); the pencil opens its page without loading it. Long-press marks
-  /// sets for deleting; swipe left deletes one.
+  /// too); the pencil opens its page without loading it. While "Delete
+  /// setlists" is marking, a tap marks instead.
   Widget _setRow(MetraColors colors, Setlist setlist) {
-    final marking = _markedSets.isNotEmpty;
+    final marking = _markingSets;
     final marked = _markedSets.contains(setlist.id);
-    return Dismissible(
+    return Material(
       key: ValueKey('picker-set-row-${setlist.id}'),
-      direction: marking ? DismissDirection.none : DismissDirection.endToStart,
-      background: Container(
-        color: colors.accentSounding,
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 24),
-        child: Text(
-          'Delete',
-          style: TextStyle(
-            color: colors.onPrimary,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+      color: marked ? colors.selectedRow : colors.sheet,
+      child: InkWell(
+        key: ValueKey('picker-set-${setlist.id}'),
+        onTap: marking
+            ? () => _toggleSetMark(setlist.id)
+            : () {
+                Haptics.medium(); // the set (and song) changes
+                _library.loadSetlist(setlist.id, widget.metronome);
+                _close();
+              },
+        child: Ink(
+          height: 64,
+          padding: const EdgeInsets.only(left: 24),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: colors.divider)),
           ),
-        ),
-      ),
-      // Deleted only once confirmed; the row slides back otherwise.
-      confirmDismiss: (_) => _deleteSets({setlist.id}),
-      child: Material(
-        color: marked ? colors.selectedRow : colors.sheet,
-        child: InkWell(
-          key: ValueKey('picker-set-${setlist.id}'),
-          onTap: marking
-              ? () => _toggleSetMark(setlist.id)
-              : () {
-                  Haptics.medium(); // the set (and song) changes
-                  _library.loadSetlist(setlist.id, widget.metronome);
-                  _close();
-                },
-          onLongPress: marking
-              ? null
-              : () {
-                  Haptics.medium();
-                  setState(() => _markedSets.add(setlist.id));
-                },
-          child: Ink(
-            height: 64,
-            padding: const EdgeInsets.only(left: 24),
-            decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: colors.divider)),
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 22,
-                  child: marked
-                      ? Icon(Icons.check, size: 20, color: colors.accent)
-                      : Icon(Icons.notes, size: 18, color: colors.muted),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        setlist.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                        ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 22,
+                child: marking
+                    ? MarkCircle(checked: marked)
+                    : Icon(Icons.notes, size: 18, color: colors.muted),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      setlist.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
                       ),
-                      Text(
-                        _count(setlist.songIds.length),
-                        style: TextStyle(fontSize: 13, color: colors.muted),
+                    ),
+                    Text(
+                      _count(setlist.songIds.length),
+                      style: TextStyle(fontSize: 13, color: colors.muted),
+                    ),
+                  ],
+                ),
+              ),
+              // Hidden while marking; the slot keeps the layout.
+              SizedBox(
+                width: 52,
+                height: 64,
+                child: marking
+                    ? null
+                    : IconButton(
+                        key: ValueKey('picker-set-edit-${setlist.id}'),
+                        tooltip: 'Open ${setlist.name}',
+                        color: colors.muted,
+                        onPressed: () => _openPage(setlist),
+                        icon: const Icon(Icons.edit_outlined, size: 20),
                       ),
-                    ],
-                  ),
-                ),
-                // Hidden while marking; the slot keeps the layout.
-                SizedBox(
-                  width: 52,
-                  height: 64,
-                  child: marking
-                      ? null
-                      : IconButton(
-                          key: ValueKey('picker-set-edit-${setlist.id}'),
-                          tooltip: 'Open ${setlist.name}',
-                          color: colors.muted,
-                          onPressed: () => _openPage(setlist),
-                          icon: const Icon(Icons.edit_outlined, size: 20),
-                        ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1006,20 +971,11 @@ class _SetlistPickerState extends State<SetlistPicker> {
     );
     if (!ok || !mounted) return false;
     _library.deleteSetlists(ids);
-    setState(_markedSets.clear);
+    setState(_endMarking);
     return true;
   }
 
   // Shared pieces
-
-  // Text only: it sits beside "Add songs" or "New setlist".
-  Widget _songLibraryButton() => OutlinedButton(
-    onPressed: widget.onSongLibrary,
-    // Shrinks rather than overflowing beside its neighbour on narrow phones.
-    child: const FittedBox(
-      child: Text('Song library', style: TextStyle(fontSize: 17)),
-    ),
-  );
 
   Widget _bottomBar(MetraColors colors, List<Widget> buttons) => Container(
     padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
