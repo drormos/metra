@@ -1,13 +1,16 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:metra/src/controller/library_controller.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/click_sound.dart';
 import 'package:metra/src/model/click_volumes.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/storage/library_store.dart';
+import 'package:metra/src/ui/about.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/setlist_picker.dart';
 import 'package:metra/src/ui/settings_screen.dart';
@@ -22,6 +25,15 @@ void main() {
   late MetronomeController metronome;
   late LibraryController library;
 
+  setUpAll(
+    () => PackageInfo.setMockInitialValues(
+      appName: 'Metra',
+      packageName: 'com.example.metra',
+      version: '1.2.3',
+      buildNumber: '7',
+      buildSignature: '',
+    ),
+  );
   setUp(() => dir = Directory.systemTemp.createTempSync('metra_settings'));
   tearDown(() {
     try {
@@ -94,7 +106,56 @@ void main() {
     await tapVisible(tester, find.byKey(SettingsScreen.vibrateKey));
     expect(library.vibrate, isFalse);
     await reveal(tester, find.byKey(SettingsScreen.testKey));
+    await reveal(tester, find.byKey(SettingsScreen.versionKey));
   });
+
+  testWidgets('About: the version line, copied on long-press', (tester) async {
+    final copied = <Object?>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') copied.add(call.arguments);
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await openSettingsScreen(tester);
+    await reveal(tester, find.byKey(SettingsScreen.versionKey));
+    expect(find.text('Metra 1.2.3 (7)'), findsOneWidget);
+    await tester.longPress(find.byKey(SettingsScreen.versionKey));
+    await tester.pump();
+    expect(copied, [
+      {'text': 'Metra 1.2.3 (7)'},
+    ]);
+    expect(find.text('Copied'), findsOneWidget);
+  });
+
+  testWidgets('About Metra opens the note', (tester) async {
+    await openSettingsScreen(tester);
+    await tapVisible(tester, find.byKey(SettingsScreen.aboutKey));
+    await tester.pumpAndSettle();
+    expect(find.byType(AboutScreen), findsOneWidget);
+    expect(find.text(AboutScreen.promise), findsOneWidget);
+  });
+
+  test(
+    'the feedback email: address, subject, body starts with the version',
+    () async {
+      final uri = await feedbackUri();
+      expect(uri.scheme, 'mailto');
+      expect(uri.path, 'dror945@gmail.com');
+      expect(uri.query, isNot(contains('+')), reason: 'spaces as %20');
+      final params = Uri.splitQueryString(uri.query);
+      expect(params['subject'], 'Metra feedback (v1.2.3 build 7)');
+      expect(params['body'], startsWith('Metra 1.2.3 (7)\n'));
+      expect(params['body'], endsWith('\n\n'));
+    },
+  );
 
   testWidgets('Your music: counts, Setlists and Song library', (tester) async {
     await openSettingsScreen(tester);
