@@ -194,10 +194,12 @@ class _LibraryPickState extends State<LibraryPick> {
                     if (widget.inSet.contains(song.id))
                       Text(
                         'Already in this set',
+                        // A warning, not a block: it can still be added.
                         style: TextStyle(
                           fontSize: 13,
                           height: 1.25,
-                          color: colors.muted,
+                          fontWeight: FontWeight.w600,
+                          color: colors.accentSounding,
                         ),
                       ),
                   ],
