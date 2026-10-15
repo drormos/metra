@@ -294,6 +294,14 @@ class _SongLibraryState extends State<SongLibrary> {
       child: InkWell(
         key: ValueKey('library-${song.id}'),
         onTap: _marking ? () => _toggleMark(song.id) : () => _load(song),
+        // Long-press = the pencil (Long-press rule); nothing while marking.
+        onLongPress: _marking
+            ? null
+            : () {
+                Haptics.medium();
+                _edit(song);
+              },
+        enableFeedback: false, // Our own haptic, gated by the setting.
         child: Ink(
           height: 64,
           padding: const EdgeInsets.only(left: 24),

@@ -173,6 +173,23 @@ void main() {
     expect(listed(tester).last, 'Echo');
   });
 
+  testWidgets('long-press a row = its pencil; nothing while marking', (
+    tester,
+  ) async {
+    await pumpLibrary(tester);
+    await tester.longPress(find.text('Delta'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SongEditor), findsOneWidget);
+    expect(library.currentSong, isNull, reason: 'not loaded');
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(SongLibrary.deleteSongsKey));
+    await tester.pump();
+    await tester.longPress(find.text('Delta'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SongEditor), findsNothing);
+  });
+
   testWidgets('New song opens the editor on a new song', (tester) async {
     await pumpLibrary(tester);
     metronome.setBpm(87); // a new song starts at the main screen's tempo

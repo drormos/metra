@@ -801,6 +801,14 @@ class _SetlistPickerState extends State<SetlistPicker> {
       color: marked ? colors.selectedRow : colors.background,
       child: InkWell(
         key: ValueKey('picker-set-${setlist.id}'),
+        // Long-press = the pencil (Long-press rule); nothing while marking.
+        onLongPress: marking
+            ? null
+            : () {
+                Haptics.medium();
+                _openPage(setlist);
+              },
+        enableFeedback: false, // Our own haptic, gated by the setting.
         onTap: marking
             ? () => _toggleSetMark(setlist.id)
             : () {

@@ -101,13 +101,32 @@ void main() {
     await settle(tester);
   }
 
-  testWidgets('the title is not a control', (tester) async {
+  testWidgets('a tap on the title does nothing; long-press edits the song', (
+    tester,
+  ) async {
     await pumpWithSets(tester);
     library.playSong(library.visibleSongs[1], metronome, index: 1);
     await tester.pump();
     await tester.tap(find.byKey(MetronomeScreen.titleKey));
     await tester.pumpAndSettle();
     expect(find.byType(SongEditor), findsNothing);
+    await tester.longPress(find.byKey(MetronomeScreen.titleKey));
+    await tester.pumpAndSettle();
+    expect(find.byType(SongEditor), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Two'), findsOneWidget);
+  });
+
+  testWidgets('stage buttons have no long-press action', (tester) async {
+    await pumpWithSets(tester);
+    library.playSong(library.visibleSongs[1], metronome, index: 1);
+    await tester.pump();
+    for (final key in [SetlistGroup.previousKey, SetlistGroup.nextKey]) {
+      await tester.longPress(find.byKey(key));
+      await tester.pumpAndSettle();
+    }
+    expect(library.currentSong?.name, 'Two', reason: 'no step on long-press');
+    expect(find.byType(SongEditor), findsNothing);
+    expect(find.byType(SetlistPicker), findsNothing);
   });
 
   for (final stopFirst in [false, true]) {
@@ -739,7 +758,7 @@ void main() {
       await tester.pump();
     });
 
-    testWidgets('long-press and swipe do nothing in What to play', (
+    testWidgets('long-press opens the set page; swipe does nothing', (
       tester,
     ) async {
       await pumpWithSets(tester);
@@ -748,6 +767,10 @@ void main() {
       await tester.longPress(row);
       await tester.pump();
       expect(find.byType(MarkCircle), findsNothing);
+      expect(find.byKey(SetlistPicker.backToSetlistsKey), findsOneWidget);
+      expect(library.activeSetlist?.name, isNot('Saturday set'));
+      await tester.tap(find.byKey(SetlistPicker.backToSetlistsKey));
+      await tester.pump();
       await tester.drag(row, const Offset(-600, 0));
       await tester.pumpAndSettle();
       expect(find.byType(AlertDialog), findsNothing);

@@ -12,6 +12,7 @@ import 'setlist_picker.dart';
 import 'save_as_new_dialog.dart';
 import 'icons.dart';
 import 'settings_screen.dart';
+import 'song_editor.dart';
 import 'song_library.dart';
 import 'subdivision_icon.dart';
 import 'tempo_ruler.dart';
@@ -312,18 +313,26 @@ class MetronomeScreen extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          // Never a control (ui-spec.md); songs are edited with the pencil
-          // in the picker or the song library.
-          child: Text(
-            song?.name ?? '',
-            key: titleKey,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontFamily: MetraFonts.condensed,
-              fontSize: 34,
-              fontWeight: FontWeight.w700,
-              height: 1,
+          // A tap does nothing, so a stray touch on stage never leaves the
+          // main screen; long-press edits the loaded song (Long-press rule).
+          child: GestureDetector(
+            onLongPress: library == null || song == null
+                ? null
+                : () {
+                    Haptics.medium();
+                    openSongEditor(context, library, controller, song: song);
+                  },
+            child: Text(
+              song?.name ?? '',
+              key: titleKey,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontFamily: MetraFonts.condensed,
+                fontSize: 34,
+                fontWeight: FontWeight.w700,
+                height: 1,
+              ),
             ),
           ),
         ),
