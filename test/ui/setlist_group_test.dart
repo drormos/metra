@@ -478,6 +478,60 @@ void main() {
       expect(metronome.bpm, 110, reason: 'the click keeps its tempo');
     });
 
+    for (final inPanel in [false, true]) {
+      testWidgets(
+        'long-press the set (${inPanel ? 'panel header' : 'main '
+                  'control'}) opens its page; one haptic; the click continues',
+        (tester) async {
+          final haptics = <Object?>[];
+          tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            SystemChannels.platform,
+            (call) async {
+              if (call.method == 'HapticFeedback.vibrate') {
+                haptics.add(call.arguments);
+              }
+              return null;
+            },
+          );
+          addTearDown(
+            () => tester.binding.defaultBinaryMessenger
+                .setMockMethodCallHandler(SystemChannels.platform, null),
+          );
+          await withLibrary(tester, loaded: true);
+          await metronome.play();
+          if (inPanel) {
+            await tester.tap(find.byKey(SetlistGroup.headerKey));
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 200));
+            await tester.longPress(find.byKey(QuickPick.setHeaderKey));
+          } else {
+            await tester.longPress(find.byKey(SetlistGroup.headerKey));
+          }
+          for (var i = 0; i < 6; i++) {
+            await tester.pump(const Duration(milliseconds: 100));
+          }
+          expect(find.byType(QuickPick), findsNothing);
+          expect(find.byKey(SetlistPicker.backToSetlistsKey), findsOneWidget);
+          expect(find.text('3 songs'), findsOneWidget);
+          expect(haptics, ['HapticFeedbackType.mediumImpact']);
+          expect(metronome.isPlaying, isTrue);
+          expect(library.currentSong?.name, 'Two', reason: 'nothing reloads');
+          await tester.binding.handlePopRoute();
+          // Not pumpAndSettle: the click is playing.
+          for (var i = 0; i < 6; i++) {
+            await tester.pump(const Duration(milliseconds: 100));
+          }
+          expect(
+            find.byType(SetlistPicker),
+            findsNothing,
+            reason: 'main screen',
+          );
+          metronome.stop();
+          await tester.pump();
+        },
+      );
+    }
+
     testWidgets('long-press a song edits it; back returns to main', (
       tester,
     ) async {

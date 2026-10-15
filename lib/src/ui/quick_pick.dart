@@ -147,6 +147,7 @@ class QuickPick extends StatefulWidget {
   static const manageSetlistsKey = Key('quick-pick-manage-setlists');
   static const freePlayKey = Key('quick-pick-free-play');
   static const otherSetlistsKey = Key('quick-pick-other-setlists');
+  static const setHeaderKey = Key('quick-pick-set-header');
   static const newSongKey = Key('quick-pick-new-song');
   static const newSetlistKey = Key('quick-pick-new-setlist');
 
@@ -321,24 +322,39 @@ class _QuickPickState extends State<QuickPick> {
     final songs = _library.visibleSongs;
     final current = _library.currentIndex;
     return _Panel(
-      top: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                setlist?.name ?? '',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 13, color: colors.muted),
+      // Long-press the set itself = its page, like its rows.
+      top: InkWell(
+        key: QuickPick.setHeaderKey,
+        enableFeedback: false, // Our own haptic, gated by the setting.
+        onLongPress: setlist == null
+            ? null
+            : () => _edit(
+                (pages) => openSetlists(
+                  pages,
+                  library: _library,
+                  metronome: widget.metronome,
+                  setId: setlist.id,
+                ),
               ),
-            ),
-            if (current >= 0)
-              Text(
-                '${current + 1} of ${songs.length}',
-                style: TextStyle(fontSize: 13, color: colors.muted),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  setlist?.name ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13, color: colors.muted),
+                ),
               ),
-          ],
+              if (current >= 0)
+                Text(
+                  '${current + 1} of ${songs.length}',
+                  style: TextStyle(fontSize: 13, color: colors.muted),
+                ),
+            ],
+          ),
         ),
       ),
       list: ListView(
@@ -474,6 +490,7 @@ class _QuickPickState extends State<QuickPick> {
       key: key,
       onTap: onTap,
       onLongPress: onLongPress,
+      enableFeedback: false, // Our own haptic, gated by the setting.
       child: Ink(
         height: _rowHeight,
         padding: const EdgeInsets.symmetric(horizontal: 14),

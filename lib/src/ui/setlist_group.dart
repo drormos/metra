@@ -54,7 +54,21 @@ class SetlistGroup extends StatelessWidget {
           SizedBox(
             height: 44,
             child: setlist != null
-                ? _setlistHeader(colors, setlist, pick)
+                ? _setlistHeader(
+                    colors,
+                    setlist,
+                    pick,
+                    // Long-press = that set's page; back returns here.
+                    () {
+                      Haptics.medium();
+                      openSetlists(
+                        context,
+                        library: library,
+                        metronome: metronome,
+                        setId: setlist.id,
+                      );
+                    },
+                  )
                 : library.singleSong
                 ? _singleSongHeader(colors)
                 : _freePlayHeader(colors),
@@ -125,14 +139,18 @@ class SetlistGroup extends StatelessWidget {
     MetraColors colors,
     Setlist setlist,
     void Function(QuickPickKind) pick,
+    VoidCallback openPage,
   ) {
     final index = library.currentIndex;
     return OutlinedButton(
       key: headerKey,
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 12),
+        // Our own haptic on long-press, gated by "Vibrate on touch".
+        enableFeedback: false,
       ),
       onPressed: () => pick(QuickPickKind.set),
+      onLongPress: openPage,
       child: Row(
         children: [
           const SetlistIcon(),
