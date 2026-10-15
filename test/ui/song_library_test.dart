@@ -186,6 +186,91 @@ void main() {
     expect(library.songs.firstWhere((s) => s.name == 'Song 1').bpm, 87);
   });
 
+  testWidgets('Delete songs: mark, confirm naming the sets, delete', (
+    tester,
+  ) async {
+    await pumpLibrary(tester);
+    final delta = library.songs.firstWhere((s) => s.name == 'Delta');
+    library.playSingleSong(delta, metronome);
+    metronome.setBpm(133); // an unsaved change, kept as Free play
+    await tester.tap(find.byKey(SongLibrary.deleteSongsKey));
+    await tester.pump();
+    expect(find.byType(MarkCircle), findsNWidgets(4));
+    expect(find.byTooltip('Edit Delta'), findsNothing, reason: 'no pencils');
+    await tester.tap(find.text('Charlie'));
+    await tester.tap(find.text('Delta'));
+    await tester.pump();
+    expect(library.currentSong?.name, 'Delta', reason: 'a tap marks');
+    expect(find.text('2 selected'), findsOneWidget);
+    await tester.tap(find.byKey(SongLibrary.deleteMarkedKey));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Delete 2 songs? They will also be removed from Gig.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Delete').last);
+    await tester.pumpAndSettle();
+    expect(listed(tester), ['alpha', 'Bravo']);
+    expect(library.setlists.firstWhere((l) => l.name == 'Gig').songIds, [
+      library.songs.firstWhere((s) => s.name == 'alpha').id,
+    ]);
+    expect(library.currentSong, isNull, reason: 'Free play');
+    expect(metronome.bpm, 133, reason: 'the click is unchanged');
+    expect(find.byKey(SongLibrary.deleteSongsKey), findsOneWidget);
+  });
+
+  testWidgets('Cancel and back end marking without deleting', (tester) async {
+    await pumpLibrary(tester);
+    await tester.tap(find.byKey(SongLibrary.deleteSongsKey));
+    await tester.pump();
+    await tester.tap(find.text('Delta'));
+    await tester.tap(find.byKey(SelectionBar.cancelKey));
+    await tester.pump();
+    expect(find.byType(MarkCircle), findsNothing);
+    await tester.tap(find.byKey(SongLibrary.deleteSongsKey));
+    await tester.pump();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(SongLibrary), findsOneWidget, reason: 'still open');
+    expect(find.byType(MarkCircle), findsNothing);
+    expect(library.songs, hasLength(4));
+  });
+
+  testWidgets('an empty library offers New song in the middle', (
+    tester,
+  ) async {
+    await pumpLibrary(tester);
+    library.deleteSongs({for (final s in library.songs) s.id});
+    await tester.pump();
+    expect(find.text('No songs yet'), findsOneWidget);
+    expect(find.byKey(SongLibrary.deleteSongsKey), findsNothing);
+    await tester.tap(find.byKey(SongLibrary.emptyNewSongKey));
+    await tester.pumpAndSettle();
+    expect(find.byType(SongEditor), findsOneWidget);
+  });
+
+  test('delete message names the sets', () {
+    Song song(String name) => Song(
+      id: name,
+      name: name,
+      bpm: 100,
+      pattern: const MetronomePattern.standard(),
+    );
+    Setlist set(String name) => Setlist(id: name, name: name, songIds: []);
+    expect(SongLibrary.deleteMessage([song('A')], []), 'Delete A?');
+    expect(
+      SongLibrary.deleteMessage([song('A')], [set('X'), set('Y')]),
+      'Delete A? It will also be removed from X and Y.',
+    );
+    expect(
+      SongLibrary.deleteMessage(
+        [song('A'), song('B')],
+        [set('X'), set('Y'), set('Z')],
+      ),
+      'Delete 2 songs? They will also be removed from 3 setlists.',
+    );
+  });
+
   test('usage line', () {
     Setlist set(String name) => Setlist(id: name, name: name, songIds: []);
     expect(SongLibrary.usage([]), 'Not in a setlist');

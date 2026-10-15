@@ -527,6 +527,31 @@ void main() {
       expect(names(), ['One', 'Two', 'Three', 'Two']);
     });
 
+    testWidgets('Select all checks the songs shown, respecting the search', (
+      tester,
+    ) async {
+      await pumpWithSets(tester);
+      await openFromHeader(tester);
+      await tester.tap(find.byKey(SetlistPicker.addSongsKey));
+      await tester.pumpAndSettle();
+      expect(find.text('3 songs'), findsOneWidget);
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(LibraryPick),
+          matching: find.byType(TextField),
+        ),
+        't',
+      );
+      await tester.pump();
+      expect(find.text('2 songs'), findsOneWidget, reason: 'Two, Three');
+      await tester.tap(find.byKey(LibraryPick.selectAllKey));
+      await tester.pump();
+      expect(find.text('Add 2 songs'), findsOneWidget);
+      await tester.tap(find.byKey(LibraryPick.selectAllKey));
+      await tester.pump();
+      expect(find.text('Add songs'), findsOneWidget, reason: 'unchecks all');
+    });
+
     testWidgets('Rename turns the title into a field; Done saves', (
       tester,
     ) async {
@@ -566,7 +591,7 @@ void main() {
       expect(find.text('What to play'), findsOneWidget);
     });
 
-    testWidgets('New setlist: default name selected, Start with all songs', (
+    testWidgets('New setlist: default name selected, Add songs in the middle', (
       tester,
     ) async {
       await pumpWithSets(tester, loaded: false);
@@ -583,15 +608,21 @@ void main() {
         const TextSelection(baseOffset: 0, extentOffset: 9),
       );
       expect(
-        tester
-            .widget<OutlinedButton>(find.byKey(SetlistPicker.removeSongsKey))
-            .onPressed,
-        isNull,
-        reason: 'nothing to remove yet',
+        find.byKey(SetlistPicker.removeSongsKey),
+        findsNothing,
+        reason: 'no bottom bar while the set is empty',
       );
-      await tester.tap(find.byKey(SetlistPicker.allSongsKey));
+      await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pump();
+      await tester.tap(find.byKey(SetlistPicker.emptyActionKey));
+      await tester.pumpAndSettle();
+      expect(find.text('Add to Setlist 1'), findsOneWidget);
+      await tester.tap(find.byKey(LibraryPick.selectAllKey));
+      await tester.pump();
+      await tester.tap(find.byKey(LibraryPick.addKey));
+      await tester.pumpAndSettle();
       expect(find.text('3 songs'), findsOneWidget);
+      expect(find.byKey(SetlistPicker.removeSongsKey), findsOneWidget);
       await tester.tap(find.byKey(SetlistPicker.backToSetlistsKey));
       await tester.pumpAndSettle();
       expect(

@@ -9,6 +9,7 @@ import 'beat_indicator.dart';
 import 'editor_scaffold.dart';
 import 'haptics.dart';
 import 'meter_control.dart';
+import 'song_library.dart';
 import 'subdivision_icon.dart';
 import 'theme.dart';
 
@@ -150,13 +151,9 @@ class _SongEditorState extends State<SongEditor> {
 
   Future<void> _delete() async {
     final song = widget.song!;
-    final sets = _library.setlistsUsing(song.id).map((l) => l.name).toList();
     final ok = await confirm(
       context,
-      sets.isEmpty
-          ? 'Delete “${song.name}”?'
-          : 'Delete “${song.name}”? It will be removed from '
-                '${sets.join(', ')}.',
+      SongLibrary.deleteMessage([song], _library.setlistsUsing(song.id)),
       'Delete',
     );
     if (!ok || !mounted) return;

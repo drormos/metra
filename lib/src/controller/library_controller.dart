@@ -384,24 +384,32 @@ class LibraryController extends ChangeNotifier {
       ..sort((a, b) => (b.editedAt ?? epoch).compareTo(a.editedAt ?? epoch));
   }
 
-  /// Also removes the song from every setlist.
-  void deleteSong(String id) => _update(
-    _library.copyWith(
+  /// Deletes songs from the library and every set. Deleting the loaded
+  /// song switches to Free play; the click keeps going as it is.
+  void deleteSongs(Set<String> ids) {
+    final deleted = _library.copyWith(
       songs: [
         for (final s in songs)
-          if (s.id != id) s,
+          if (!ids.contains(s.id)) s,
       ],
       setlists: [
         for (final list in setlists)
           list.copyWith(
             songIds: [
               for (final s in list.songIds)
-                if (s != id) s,
+                if (!ids.contains(s)) s,
             ],
           ),
       ],
-    ),
-  );
+    );
+    _update(
+      ids.contains(_library.currentSongId)
+          ? deleted.withSession(setlistId: null, songId: null, position: -1)
+          : deleted,
+    );
+  }
+
+  void deleteSong(String id) => deleteSongs({id});
 
   /// Every song, A–Z by name (case-insensitive): the library's order.
   List<Song> get songsAZ =>

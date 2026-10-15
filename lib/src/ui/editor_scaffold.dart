@@ -246,12 +246,12 @@ class SearchField extends StatelessWidget {
 }
 
 /// Top bar of full screens that apply changes at once (song library,
-/// settings): a back chevron, a title, an optional [trailing] action.
+/// settings): a back chevron and a title, [centered] or after the chevron.
 class BackBar extends StatelessWidget {
-  const BackBar({super.key, required this.title, this.trailing});
+  const BackBar({super.key, required this.title, this.centered = false});
 
   final String title;
-  final Widget? trailing;
+  final bool centered;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -273,12 +273,170 @@ class BackBar extends StatelessWidget {
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              textAlign: centered ? TextAlign.center : TextAlign.start,
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
             ),
           ),
-          ?trailing,
+          // Balances the chevron so the title sits in the middle.
+          if (centered) const SizedBox(width: 48),
         ],
       ),
+    ),
+  );
+}
+
+/// The two side-by-side buttons at the bottom of a list ("New song ·
+/// Delete songs" and the like).
+class BottomBar extends StatelessWidget {
+  const BottomBar({super.key, required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+    decoration: BoxDecoration(
+      border: Border(top: BorderSide(color: context.colors.divider)),
+    ),
+    child: SizedBox(height: 56, child: Row(children: children)),
+  );
+}
+
+/// "N selected · Cancel" and a red [action], replacing a [BottomBar]
+/// while rows are marked (removing songs, deleting sets or songs).
+class SelectionBar extends StatelessWidget {
+  const SelectionBar({
+    super.key,
+    required this.count,
+    required this.action,
+    required this.actionKey,
+    required this.onAction,
+    required this.onCancel,
+  });
+
+  static const cancelKey = Key('selection-cancel');
+
+  final int count;
+  final String action;
+  final Key actionKey;
+  final VoidCallback onAction;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return BottomBar(
+      children: [
+        Expanded(
+          child: Text(
+            '$count selected',
+            style: TextStyle(fontSize: 15, color: colors.muted),
+          ),
+        ),
+        SizedBox(
+          height: 44,
+          child: OutlinedButton(
+            key: cancelKey,
+            onPressed: onCancel,
+            child: const Text('Cancel'),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: TextButton(
+            key: actionKey,
+            style: TextButton.styleFrom(
+              foregroundColor: colors.accentSounding,
+              minimumSize: const Size(0, 44),
+            ),
+            onPressed: count == 0 ? null : onAction,
+            // Shrinks rather than overflowing on narrow phones.
+            child: FittedBox(
+              child: Text(
+                action,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// An empty list (ui-spec.md "Empty lists"): a title, a hint, and the
+/// list's main action as a big filled button in the middle, while the
+/// bottom bar is hidden. [below] goes under it (e.g. a set's footer).
+class EmptyListState extends StatelessWidget {
+  const EmptyListState({
+    super.key,
+    required this.title,
+    required this.hint,
+    required this.action,
+    required this.actionKey,
+    required this.onAction,
+    this.below,
+  });
+
+  final String title;
+  final String hint;
+  final String action;
+  final Key actionKey;
+  final VoidCallback onAction;
+  final Widget? below;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => constraints.hasBoundedHeight
+        // Centred, yet scrolls when the keyboard leaves too little room.
+        ? SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: _content(context),
+            ),
+          )
+        // Already inside a list.
+        : _content(context),
+  );
+
+  Widget _content(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          hint,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14,
+            height: 1.5,
+            color: context.colors.muted,
+          ),
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          height: 56,
+          child: FilledButton.icon(
+            key: actionKey,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+            ),
+            onPressed: onAction,
+            icon: const Icon(Icons.add, size: 20),
+            label: Text(action, style: const TextStyle(fontSize: 17)),
+          ),
+        ),
+        ?below,
+      ],
     ),
   );
 }

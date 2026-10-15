@@ -339,7 +339,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       find.text(
-        'Delete “Alpha”? It will be removed from Friday set, Rehearsal.',
+        'Delete Alpha? It will also be removed from Friday set and Rehearsal.',
       ),
       findsOneWidget,
     );

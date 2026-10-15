@@ -42,6 +42,8 @@ class LibraryPick extends StatefulWidget {
 
   static const addKey = Key('pick-add');
   static const newSongKey = Key('pick-new-song');
+  static const selectAllKey = Key('pick-select-all');
+  static const emptyNewSongKey = Key('pick-empty-new-song');
 
   @override
   State<LibraryPick> createState() => _LibraryPickState();
@@ -55,6 +57,12 @@ class _LibraryPickState extends State<LibraryPick> {
   void dispose() {
     _search.dispose();
     super.dispose();
+  }
+
+  /// With no songs to pick from, a new song goes straight into the set.
+  Future<void> _newSongIntoSet() async {
+    final id = await widget.newSong(context);
+    if (id != null && mounted) Navigator.pop(context, [id]);
   }
 
   Future<void> _newSong() async {
@@ -85,64 +93,130 @@ class _LibraryPickState extends State<LibraryPick> {
           ),
           Divider(height: 1, color: colors.divider),
           Expanded(
-            child: songs.isEmpty
+            child: widget.library.songs.isEmpty
+                ? EmptyListState(
+                    title: 'No songs yet',
+                    hint:
+                        'Create the first song. It goes into your library '
+                        'and this set.',
+                    action: 'New song',
+                    actionKey: LibraryPick.emptyNewSongKey,
+                    onAction: _newSongIntoSet,
+                  )
+                : songs.isEmpty
                 ? Center(
                     child: Text(
-                      widget.library.songs.isEmpty
-                          ? 'No songs yet. Use New song.'
-                          : 'No songs match.',
+                      'No songs match.',
                       style: TextStyle(color: colors.muted),
                     ),
                   )
                 : ListView(
-                    children: [for (final song in songs) _row(colors, song)],
+                    children: [
+                      _selectAll(colors, songs),
+                      for (final song in songs) _row(colors, song),
+                    ],
                   ),
           ),
         ],
       ),
-      bottom: SizedBox(
-        height: 56,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              flex: 5,
-              child: OutlinedButton.icon(
-                key: LibraryPick.newSongKey,
-                onPressed: _newSong,
-                icon: const Icon(Icons.add, size: 20),
-                label: const FittedBox(
-                  child: Text('New song', style: TextStyle(fontSize: 16)),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 7, // 1 : 1.4, as in library-pick.reference.html
-              child: FilledButton(
-                key: LibraryPick.addKey,
-                onPressed: count == 0
-                    ? null
-                    : () => Navigator.pop(context, [
-                        // Library order, as listed.
-                        for (final song in widget.library.songsAZ)
-                          if (_checked.contains(song.id)) song.id,
-                      ]),
-                child: FittedBox(
-                  child: Text(
-                    count == 0
-                        ? 'Add songs'
-                        : 'Add $count ${count == 1 ? 'song' : 'songs'}',
-                    style: const TextStyle(fontSize: 17),
+      // Hidden while empty: "New song" is in the middle.
+      bottom: widget.library.songs.isEmpty
+          ? null
+          : SizedBox(
+              height: 56,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    flex: 5,
+                    child: OutlinedButton.icon(
+                      key: LibraryPick.newSongKey,
+                      onPressed: _newSong,
+                      icon: const Icon(Icons.add, size: 20),
+                      label: const FittedBox(
+                        child: Text('New song', style: TextStyle(fontSize: 16)),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 7, // 1 : 1.4, as in library-pick.reference.html
+                    child: FilledButton(
+                      key: LibraryPick.addKey,
+                      onPressed: count == 0
+                          ? null
+                          : () => Navigator.pop(context, [
+                              // Library order, as listed.
+                              for (final song in widget.library.songsAZ)
+                                if (_checked.contains(song.id)) song.id,
+                            ]),
+                      child: FittedBox(
+                        child: Text(
+                          count == 0
+                              ? 'Add songs'
+                              : 'Add $count ${count == 1 ? 'song' : 'songs'}',
+                          style: const TextStyle(fontSize: 17),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+    );
+  }
+
+  /// Checks every song shown (respecting the search), or unchecks them
+  /// all when they're all checked.
+  Widget _selectAll(MetraColors colors, List<Song> shown) {
+    final all = shown.every((song) => _checked.contains(song.id));
+    return Semantics(
+      checked: all,
+      child: InkWell(
+        key: LibraryPick.selectAllKey,
+        onTap: () => setState(() {
+          final ids = shown.map((song) => song.id);
+          all ? _checked.removeAll(ids) : _checked.addAll(ids);
+        }),
+        child: Container(
+          height: 56,
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: colors.divider)),
+          ),
+          child: Row(
+            children: [
+              _checkbox(colors, all),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Text(
+                  'Select all',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+              Text(
+                shown.length == 1 ? '1 song' : '${shown.length} songs',
+                style: TextStyle(fontSize: 14, color: colors.muted),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+
+  Widget _checkbox(MetraColors colors, bool checked) => Container(
+    width: 24,
+    height: 24,
+    decoration: BoxDecoration(
+      color: checked ? colors.accent : null,
+      borderRadius: BorderRadius.circular(4),
+      border: checked ? null : Border.all(color: colors.beatResting, width: 2),
+    ),
+    child: checked
+        ? Icon(Icons.check, size: 18, color: colors.onPrimary)
+        : null,
+  );
 
   Widget _row(MetraColors colors, Song song) {
     final checked = _checked.contains(song.id);
@@ -161,20 +235,7 @@ class _LibraryPickState extends State<LibraryPick> {
           ),
           child: Row(
             children: [
-              Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: checked ? colors.accent : null,
-                  borderRadius: BorderRadius.circular(4),
-                  border: checked
-                      ? null
-                      : Border.all(color: colors.beatResting, width: 2),
-                ),
-                child: checked
-                    ? Icon(Icons.check, size: 18, color: colors.onPrimary)
-                    : null,
-              ),
+              _checkbox(colors, checked),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(

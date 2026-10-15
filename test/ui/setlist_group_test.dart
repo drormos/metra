@@ -213,7 +213,12 @@ void main() {
       await tester.tap(find.byKey(SetlistGroup.setlistsKey));
       await tester.pumpAndSettle();
       expect(find.text('What to play'), findsOneWidget);
-      await tester.tap(find.byKey(SetlistPicker.newSetlistKey));
+      expect(
+        find.byKey(SetlistPicker.newSetlistKey),
+        findsNothing,
+        reason: 'no bottom bar while there are no sets',
+      );
+      await tester.tap(find.byKey(SetlistPicker.emptyActionKey));
       await tester.pumpAndSettle();
       expect(find.byKey(SetlistPicker.titleFieldKey), findsOneWidget);
       expect(find.text('No songs yet'), findsOneWidget);

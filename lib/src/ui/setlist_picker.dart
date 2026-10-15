@@ -85,14 +85,14 @@ class SetlistPicker extends StatefulWidget {
   static const freePlayKey = Key('picker-free-play');
   static const newSetlistKey = Key('picker-new-setlist');
   static const addSongsKey = Key('picker-add-songs');
-  static const allSongsKey = Key('picker-all-songs');
+  static const emptyActionKey = Key('picker-empty-action');
   static const renameKey = Key('picker-rename');
   static const deleteKey = Key('picker-delete');
   static const removeKey = Key('picker-remove-marked');
   static const deleteMarkedKey = Key('picker-delete-marked');
   static const removeSongsKey = Key('picker-remove-songs');
   static const deleteSetsKey = Key('picker-delete-sets');
-  static const cancelMarksKey = Key('picker-cancel-marks');
+  static const cancelMarksKey = SelectionBar.cancelKey;
   static const titleFieldKey = Key('picker-title-field');
 
   @override
@@ -340,78 +340,70 @@ class _SetlistPickerState extends State<SetlistPicker> {
                 ),
         ),
         // The keyboard (naming the set) leaves no room for the buttons.
-        if (_keyboardUp)
+        // Hidden while the set is empty: its action is in the middle.
+        if (_keyboardUp || songs.isEmpty)
           const SizedBox.shrink()
         else if (_markingSongs)
           _markingBar(colors, setlist)
         else
-          _bottomBar(colors, [
-            Expanded(
-              child: FilledButton.icon(
-                key: SetlistPicker.addSongsKey,
-                // The primary action while the set is empty.
-                style: songs.isEmpty
-                    ? null
-                    : FilledButton.styleFrom(
-                        backgroundColor: colors.surface,
-                        foregroundColor: colors.text,
-                      ),
-                onPressed: () => _addSongs(setlist),
-                icon: const Icon(Icons.add, size: 20),
-                label: const FittedBox(
-                  child: Text('Add songs', style: TextStyle(fontSize: 17)),
+          BottomBar(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  key: SetlistPicker.addSongsKey,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colors.surface,
+                    foregroundColor: colors.text,
+                  ),
+                  onPressed: () => _addSongs(setlist),
+                  icon: const Icon(Icons.add, size: 20),
+                  label: const FittedBox(
+                    child: Text('Add songs', style: TextStyle(fontSize: 17)),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton(
-                key: SetlistPicker.removeSongsKey,
-                onPressed: songs.isEmpty
-                    ? null
-                    : () => setState(() => _markingSongs = true),
-                child: const FittedBox(
-                  child: Text('Remove songs', style: TextStyle(fontSize: 17)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  key: SetlistPicker.removeSongsKey,
+                  onPressed: () => setState(() => _markingSongs = true),
+                  child: const FittedBox(
+                    child: Text('Remove songs', style: TextStyle(fontSize: 17)),
+                  ),
                 ),
               ),
-            ),
-          ]),
+            ],
+          ),
       ],
     );
   }
 
-  Widget _emptyState(MetraColors colors, Setlist setlist) => ListView(
-    padding: const EdgeInsets.fromLTRB(24, 40, 24, 24),
-    children: [
-      const Text(
-        'No songs yet',
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-      ),
-      const SizedBox(height: 6),
-      Text(
-        'Add songs from your library, or create new ones as you go.',
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 14, color: colors.muted),
-      ),
-      if (_library.songs.isNotEmpty) ...[
-        const SizedBox(height: 16),
-        Center(
-          child: OutlinedButton(
-            key: SetlistPicker.allSongsKey,
-            // Every song in the library, A–Z, to trim down.
-            onPressed: () => _library.updateSetlist(
-              setlist.copyWith(
-                songIds: [for (final song in _library.songsAZ) song.id],
-              ),
-            ),
-            child: const Text('Start with all songs'),
-          ),
-        ),
-      ],
-      if (!_isNew) _pageFooter(colors, setlist),
-    ],
-  );
+  /// "Add songs" in the middle; "New song" if the library is empty too.
+  Widget _emptyState(MetraColors colors, Setlist setlist) {
+    final noLibrary = _library.songs.isEmpty;
+    return EmptyListState(
+      title: 'No songs yet',
+      hint: noLibrary
+          ? 'Create the first song. It goes into your library and this set.'
+          : 'Pick songs from your library. You can reorder them later.',
+      action: noLibrary ? 'New song' : 'Add songs',
+      actionKey: SetlistPicker.emptyActionKey,
+      onAction: noLibrary
+          ? () => _newSongInto(setlist)
+          : () => _addSongs(setlist),
+      below: _isNew ? null : _pageFooter(colors, setlist),
+    );
+  }
+
+  /// Creates a song and adds it to [setlist].
+  Future<void> _newSongInto(Setlist setlist) async {
+    final song = await openSongEditor(context, _library, widget.metronome);
+    final latest = _page;
+    if (song == null || latest == null) return;
+    _library.updateSetlist(
+      latest.copyWith(songIds: [...latest.songIds, song.id]),
+    );
+  }
 
   /// After the last row, so it's never in the way on stage.
   Widget _pageFooter(MetraColors colors, Setlist setlist) => Padding(
@@ -572,71 +564,12 @@ class _SetlistPickerState extends State<SetlistPicker> {
     });
   }
 
-  Widget _markingBar(MetraColors colors, Setlist setlist) => _selectionBar(
-    colors,
+  Widget _markingBar(MetraColors colors, Setlist setlist) => SelectionBar(
     count: _marked.length,
     action: 'Remove',
     actionKey: SetlistPicker.removeKey,
     onAction: () => _remove(setlist, {..._marked}),
     onCancel: () => setState(_endMarking),
-  );
-
-  /// "N selected · Cancel" and a red [action], replacing the bottom buttons
-  /// while rows are marked.
-  Widget _selectionBar(
-    MetraColors colors, {
-    required int count,
-    required String action,
-    required Key actionKey,
-    required VoidCallback onAction,
-    required VoidCallback onCancel,
-  }) => Container(
-    padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-    decoration: BoxDecoration(
-      border: Border(top: BorderSide(color: colors.divider)),
-    ),
-    child: SizedBox(
-      height: 56,
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              '$count selected',
-              style: TextStyle(fontSize: 15, color: colors.muted),
-            ),
-          ),
-          SizedBox(
-            height: 44,
-            child: OutlinedButton(
-              key: SetlistPicker.cancelMarksKey,
-              onPressed: onCancel,
-              child: const Text('Cancel'),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: TextButton(
-              key: actionKey,
-              style: TextButton.styleFrom(
-                foregroundColor: colors.accentSounding,
-                minimumSize: const Size(0, 44),
-              ),
-              onPressed: count == 0 ? null : onAction,
-              // Shrinks rather than overflowing on narrow phones.
-              child: FittedBox(
-                child: Text(
-                  action,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
   );
 
   /// Out of this set only (the songs stay in the library); Undo for ~5 s.
@@ -791,41 +724,51 @@ class _SetlistPickerState extends State<SetlistPicker> {
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Setlists',
-                        style: TextStyle(fontSize: 14, color: colors.muted),
+              if (_library.setlists.isEmpty)
+                EmptyListState(
+                  title: 'No setlists yet',
+                  hint: 'A setlist keeps songs in the order you play them.',
+                  action: 'New setlist',
+                  actionKey: SetlistPicker.emptyActionKey,
+                  onAction: () => setState(_openNewSet),
+                )
+              else ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Setlists',
+                          style: TextStyle(fontSize: 14, color: colors.muted),
+                        ),
                       ),
-                    ),
-                    Text(
-                      'Recently played',
-                      style: TextStyle(fontSize: 13, color: colors.muted),
-                    ),
-                  ],
+                      Text(
+                        'Recently played',
+                        style: TextStyle(fontSize: 13, color: colors.muted),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-                child: SearchField(
-                  controller: _search,
-                  hint: 'Search setlists',
-                  onChanged: (_) => setState(() {}),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                  child: SearchField(
+                    controller: _search,
+                    hint: 'Search setlists',
+                    onChanged: (_) => setState(() {}),
+                  ),
                 ),
-              ),
-              Divider(height: 1, color: colors.divider),
-              for (final setlist in sets) _setRow(colors, setlist),
+                Divider(height: 1, color: colors.divider),
+                for (final setlist in sets) _setRow(colors, setlist),
+              ],
             ],
           ),
         ),
-        if (_keyboardUp)
+        // Hidden with no sets: "New setlist" is in the middle.
+        if (_keyboardUp || _library.setlists.isEmpty)
           const SizedBox.shrink()
         else if (_markingSets)
-          _selectionBar(
-            colors,
+          SelectionBar(
             count: _markedSets.length,
             action: 'Delete',
             actionKey: SetlistPicker.deleteMarkedKey,
@@ -833,37 +776,37 @@ class _SetlistPickerState extends State<SetlistPicker> {
             onCancel: () => setState(_endMarking),
           )
         else
-          _bottomBar(colors, [
-            Expanded(
-              child: FilledButton.icon(
-                key: SetlistPicker.newSetlistKey,
-                style: FilledButton.styleFrom(
-                  backgroundColor: colors.surface,
-                  foregroundColor: colors.text,
-                ),
-                onPressed: () => setState(_openNewSet),
-                icon: const Icon(Icons.add, size: 20),
-                label: const FittedBox(
-                  child: Text('New setlist', style: TextStyle(fontSize: 17)),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton(
-                key: SetlistPicker.deleteSetsKey,
-                onPressed: _library.setlists.isEmpty
-                    ? null
-                    : () => setState(() => _markingSets = true),
-                child: const FittedBox(
-                  child: Text(
-                    'Delete setlists',
-                    style: TextStyle(fontSize: 17),
+          BottomBar(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  key: SetlistPicker.newSetlistKey,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colors.surface,
+                    foregroundColor: colors.text,
+                  ),
+                  onPressed: () => setState(_openNewSet),
+                  icon: const Icon(Icons.add, size: 20),
+                  label: const FittedBox(
+                    child: Text('New setlist', style: TextStyle(fontSize: 17)),
                   ),
                 ),
               ),
-            ),
-          ]),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  key: SetlistPicker.deleteSetsKey,
+                  onPressed: () => setState(() => _markingSets = true),
+                  child: const FittedBox(
+                    child: Text(
+                      'Delete setlists',
+                      style: TextStyle(fontSize: 17),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
       ],
     );
   }
@@ -973,14 +916,6 @@ class _SetlistPickerState extends State<SetlistPicker> {
   }
 
   // Shared pieces
-
-  Widget _bottomBar(MetraColors colors, List<Widget> buttons) => Container(
-    padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-    decoration: BoxDecoration(
-      border: Border(top: BorderSide(color: colors.divider)),
-    ),
-    child: SizedBox(height: 56, child: Row(children: buttons)),
-  );
 
   static String _count(int n) => n == 1 ? '1 song' : '$n songs';
 }
