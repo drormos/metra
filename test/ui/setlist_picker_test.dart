@@ -282,7 +282,7 @@ void main() {
     await pumpWithSets(tester);
     library.nextSong(metronome); // One
     await openFromHeader(tester);
-    expect(find.byIcon(Icons.play_arrow), findsWidgets);
+    expect(find.byType(PlayMarker), findsNWidgets(3));
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('picker-song-0')),
@@ -389,15 +389,32 @@ void main() {
     metronome.stop();
   });
 
-  testWidgets('in Free play the picker opens on What to play, no back', (
+  testWidgets('in Free play, Setlists opens What to play; ‹ goes back', (
     tester,
   ) async {
     await pumpWithSets(tester, loaded: false);
     await tester.tap(find.byKey(SetlistGroup.setlistsKey));
     await tester.pumpAndSettle();
     expect(find.text('What to play'), findsOneWidget);
-    expect(find.byTooltip('Back'), findsNothing);
     expect(find.text('New setlist'), findsOneWidget);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SetlistPicker), findsNothing);
+  });
+
+  testWidgets('back steps set page, What to play, main screen', (
+    tester,
+  ) async {
+    await pumpWithSets(tester);
+    await openFromHeader(tester);
+    expect(find.byKey(SetlistPicker.backToSetlistsKey), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('What to play'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(SetlistPicker), findsNothing);
+    expect(library.activeSetlist?.name, 'Friday set', reason: 'unchanged');
   });
 
   testWidgets('the songs view: "‹ Setlists" goes up, Free play detaches', (
@@ -410,7 +427,6 @@ void main() {
     await tester.tap(find.byKey(SetlistPicker.backToSetlistsKey));
     await settle(tester);
     expect(find.text('What to play'), findsOneWidget);
-    expect(find.byTooltip('Back'), findsNothing, reason: 'the top level');
     // The loaded set's pencil: its page, nothing reloads.
     await tester.tap(
       find.byKey(ValueKey('picker-set-edit-${library.activeSetlist!.id}')),

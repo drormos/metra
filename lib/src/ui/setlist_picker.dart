@@ -14,54 +14,26 @@ import 'play_marker.dart';
 import 'song_editor.dart';
 import 'theme.dart';
 
-/// The setlist picker sheet (ui-spec.md "Setlist picker"): a set page that
-/// both plays and edits a set, below a "What to play" top level for
-/// switching sets or going to Free play. Opening it never touches the
-/// click; only choosing a song or a set does.
+/// The setlist pages (ui-spec.md "Setlists"): What to play, the top
+/// level for switching sets or going to Free play, and below it a set's
+/// page, which both plays and edits the set. Full screen; opening them
+/// never touches the click, only choosing a song or a set does.
 ///
-/// Opens on the loaded set's page, else on What to play.
-Future<void> showSetlistPicker(
+/// With [loadedSet] (the main screen's setlist control), opens on the
+/// loaded set's page, with What to play behind it; otherwise on What to
+/// play. Back steps set page → What to play → where it was opened from.
+Future<void> openSetlists(
   BuildContext context, {
   required LibraryController library,
   required MetronomeController metronome,
-}) {
-  final height = MediaQuery.sizeOf(context).height;
-  final colors = context.colors;
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    // The top ~104px of the main screen stays visible, dimmed.
-    constraints: BoxConstraints(maxHeight: height - 104),
-    shape: RoundedRectangleBorder(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-      side: BorderSide(color: colors.border),
-    ),
-    builder: (_) => SetlistPicker(library: library, metronome: metronome),
-  );
-}
-
-/// The picker's What to play view as a full screen (from Settings > Your
-/// music > Setlists). Back leaves it; playing something closes it too.
-Future<void> openSetlistsScreen(
-  BuildContext context, {
-  required LibraryController library,
-  required MetronomeController metronome,
+  bool loadedSet = false,
 }) => Navigator.push(
   context,
   MaterialPageRoute<void>(
-    builder: (_) => Scaffold(
-      backgroundColor: context.colors.sheet,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: SetlistPicker(
-            library: library,
-            metronome: metronome,
-            fullScreen: true,
-          ),
-        ),
-      ),
+    builder: (_) => SetlistPicker(
+      library: library,
+      metronome: metronome,
+      loadedSet: loadedSet,
     ),
   ),
 );
@@ -71,15 +43,14 @@ class SetlistPicker extends StatefulWidget {
     super.key,
     required this.library,
     required this.metronome,
-    this.fullScreen = false,
+    this.loadedSet = false,
   });
 
   final LibraryController library;
   final MetronomeController metronome;
 
-  /// A full screen rather than a sheet: opens on What to play, whose back
-  /// chevron leaves the screen.
-  final bool fullScreen;
+  /// Opens on the loaded set's page rather than What to play.
+  final bool loadedSet;
 
   static const backToSetlistsKey = Key('picker-back-to-setlists');
   static const freePlayKey = Key('picker-free-play');
@@ -103,9 +74,9 @@ class _SetlistPickerState extends State<SetlistPicker> {
   // Navigation inside the picker: the set page shown, or null for What to
   // play. Everything else here is page UI state; the set itself is saved
   // in the library as it changes.
-  late String? _pageId = widget.fullScreen
-      ? null
-      : widget.library.activeSetlist?.id;
+  late String? _pageId = widget.loadedSet
+      ? widget.library.activeSetlist?.id
+      : null;
   // The page is for a new set: its title starts as a field.
   bool _isNew = false;
   // A set created here, discarded if it's left with no songs.
@@ -120,7 +91,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
   final _marked = <int>{};
   // Sets marked for deleting in What to play.
   final _markedSets = <String>{};
-  // The picker's own messenger, so the Undo bar shows inside the sheet.
+  // The picker's own messenger, so the Undo bar shows on this page.
   final _messenger = GlobalKey<ScaffoldMessengerState>();
 
   LibraryController get _library => widget.library;
@@ -217,30 +188,40 @@ class _SetlistPickerState extends State<SetlistPicker> {
   }
 
   /// After loading something: always back on the main screen, closing
-  /// the sheet, or this screen and Settings when opened from there.
+  /// Settings too when opened from there.
   void _close() => Navigator.popUntil(context, (route) => route.isFirst);
 
   @override
-  Widget build(BuildContext context) => PopScope(
-    // The back gesture ends marking before it closes anything.
-    canPop: !_markingSongs && !_markingSets,
-    onPopInvokedWithResult: (didPop, _) {
-      if (!didPop) setState(_endMarking);
-    },
-    child: ScaffoldMessenger(
-      key: _messenger,
-      child: Scaffold(
-        backgroundColor: context.colors.sheet,
-        body: ListenableBuilder(
-          listenable: _library,
-          builder: (context, _) {
-            final page = _page;
-            return page == null ? _whatToPlayView(context) : _setPage(page);
-          },
+  Widget build(BuildContext context) {
+    final marking = _markingSongs || _markingSets;
+    return PopScope(
+      // Back ends marking first, then steps from a set's page to What to
+      // play, and only then leaves.
+      canPop: !marking && _page == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (marking) {
+          setState(_endMarking);
+        } else {
+          _showWhatToPlay();
+        }
+      },
+      child: ScaffoldMessenger(
+        key: _messenger,
+        child: Scaffold(
+          body: SafeArea(
+            child: ListenableBuilder(
+              listenable: _library,
+              builder: (context, _) {
+                final page = _page;
+                return page == null ? _whatToPlayView(context) : _setPage(page);
+              },
+            ),
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
   // Set page
 
@@ -453,7 +434,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
       key: ValueKey('picker-row-$index-${song.id}'),
       index: index,
       child: Material(
-        color: highlighted ? colors.selectedRow : colors.sheet,
+        color: highlighted ? colors.selectedRow : colors.background,
         child: InkWell(
           key: ValueKey('picker-song-$index'),
           onTap: marking
@@ -634,46 +615,19 @@ class _SetlistPickerState extends State<SetlistPicker> {
       for (final set in _library.setlistsRecentlyPlayed)
         if (query.isEmpty || set.name.toLowerCase().contains(query)) set,
     ];
-    // The header scrolls with the list, so the sheet still fits when the
-    // keyboard is up for the search.
+    // ‹ leaves for wherever this was opened from; nothing was loaded.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const BackBar(title: 'What to play', centered: true),
         Expanded(
+          // Free play scrolls with the list, so the search still fits when
+          // the keyboard is up.
           child: ListView(
             children: [
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  widget.fullScreen ? 12 : 24,
-                  0,
-                  24,
-                  12,
-                ),
-                child: SizedBox(
-                  height: 48,
-                  child: Row(
-                    children: [
-                      if (widget.fullScreen)
-                        IconButton(
-                          tooltip: 'Back',
-                          // Back to Settings: nothing was loaded.
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.chevron_left, size: 28),
-                        ),
-                      const Text(
-                        'What to play',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
               // A mode, not a setlist: framed and set apart from the list.
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
                 child: SizedBox(
                   height: 72,
                   child: OutlinedButton(
@@ -819,7 +773,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
     final marked = _markedSets.contains(setlist.id);
     return Material(
       key: ValueKey('picker-set-row-${setlist.id}'),
-      color: marked ? colors.selectedRow : colors.sheet,
+      color: marked ? colors.selectedRow : colors.background,
       child: InkWell(
         key: ValueKey('picker-set-${setlist.id}'),
         onTap: marking
@@ -965,7 +919,7 @@ class _MetronomePainter extends CustomPainter {
 
 /// "Free play" (ui-spec.md "Detaching a song"): detaches the song and any
 /// setlist, keeping the click as it sounds; [closes] also closes the
-/// sheet or screen it sits on.
+/// page it sits on (and Settings, if that's in the stack).
 class FreePlayButton extends StatelessWidget {
   const FreePlayButton({super.key, required this.library, this.closes = false});
 

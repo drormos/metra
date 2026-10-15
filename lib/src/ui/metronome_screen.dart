@@ -219,10 +219,13 @@ class MetronomeScreen extends StatelessWidget {
           SetlistGroup(
             library: library,
             metronome: controller,
-            onOpenPicker: () => showSetlistPicker(
+            // The setlist control opens the loaded set's page (What to
+            // play behind it); "Setlists" opens What to play.
+            onOpenPicker: () => openSetlists(
               context,
               library: library,
               metronome: controller,
+              loadedSet: true,
             ),
             onSongLibrary: () => openSongLibrary(context, library, controller),
           ),
@@ -378,7 +381,7 @@ class MetronomeScreen extends StatelessWidget {
               library: library,
               onSetlists: library == null
                   ? null
-                  : () => openSetlistsScreen(
+                  : () => openSetlists(
                       context,
                       library: library,
                       metronome: controller,
