@@ -112,6 +112,31 @@ void main() {
     expect(find.byType(SongLibrary), findsOneWidget);
   });
 
+  testWidgets('loading from Settings > Setlists lands on the main screen', (
+    tester,
+  ) async {
+    await openSettingsScreen(tester);
+    await tester.tap(find.text('Setlists'));
+    await tester.pumpAndSettle();
+    final friday = library.setlists.firstWhere((l) => l.name == 'Friday set');
+    await tester.tap(find.byKey(ValueKey('picker-set-${friday.id}')));
+    await tester.pumpAndSettle();
+    expect(find.byType(SetlistPicker), findsNothing);
+    expect(find.byType(SettingsScreen), findsNothing, reason: 'Settings too');
+    expect(library.activeSetlist?.id, friday.id);
+  });
+
+  testWidgets('Free play from Settings > Setlists lands on the main screen', (
+    tester,
+  ) async {
+    await openSettingsScreen(tester);
+    await tester.tap(find.text('Setlists'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(SetlistPicker.freePlayKey));
+    await tester.pumpAndSettle();
+    expect(find.byType(SettingsScreen), findsNothing);
+  });
+
   testWidgets('theme and click sound apply at once', (tester) async {
     await openSettingsScreen(tester);
     await tester.tap(find.text('Dark'));

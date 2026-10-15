@@ -19,20 +19,14 @@ import 'theme.dart';
 /// switching sets or going to Free play. Opening it never touches the
 /// click; only choosing a song or a set does.
 ///
-/// Opens on the loaded set's page, else on What to play; with [newSet], on
-/// the page of a new set (from "Create a setlist").
+/// Opens on the loaded set's page, else on What to play.
 Future<void> showSetlistPicker(
   BuildContext context, {
   required LibraryController library,
   required MetronomeController metronome,
-  bool newSet = false,
 }) {
   final height = MediaQuery.sizeOf(context).height;
   final colors = context.colors;
-  // Created up front: not while the sheet builds.
-  final created = newSet
-      ? library.addSetlist(library.newSetlistName()).id
-      : null;
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -43,11 +37,7 @@ Future<void> showSetlistPicker(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
       side: BorderSide(color: colors.border),
     ),
-    builder: (_) => SetlistPicker(
-      library: library,
-      metronome: metronome,
-      newSetId: created,
-    ),
+    builder: (_) => SetlistPicker(library: library, metronome: metronome),
   );
 }
 
@@ -82,7 +72,6 @@ class SetlistPicker extends StatefulWidget {
     required this.library,
     required this.metronome,
     this.fullScreen = false,
-    this.newSetId,
   });
 
   final LibraryController library;
@@ -91,9 +80,6 @@ class SetlistPicker extends StatefulWidget {
   /// A full screen rather than a sheet: opens on What to play, whose back
   /// chevron leaves the screen.
   final bool fullScreen;
-
-  /// Open on the page of this just-created set.
-  final String? newSetId;
 
   static const backToSetlistsKey = Key('picker-back-to-setlists');
   static const freePlayKey = Key('picker-free-play');
@@ -117,9 +103,9 @@ class _SetlistPickerState extends State<SetlistPicker> {
   // Navigation inside the picker: the set page shown, or null for What to
   // play. Everything else here is page UI state; the set itself is saved
   // in the library as it changes.
-  late String? _pageId =
-      widget.newSetId ??
-      (widget.fullScreen ? null : widget.library.activeSetlist?.id);
+  late String? _pageId = widget.fullScreen
+      ? null
+      : widget.library.activeSetlist?.id;
   // The page is for a new set: its title starts as a field.
   bool _isNew = false;
   // A set created here, discarded if it's left with no songs.
@@ -144,17 +130,6 @@ class _SetlistPickerState extends State<SetlistPicker> {
       if (list.id == _pageId) return list;
     }
     return null;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    final page = _page;
-    if (widget.newSetId != null && page != null) {
-      _isNew = true;
-      _createdId = page.id;
-      _startEditingName(page.name);
-    }
   }
 
   @override
@@ -241,8 +216,9 @@ class _SetlistPickerState extends State<SetlistPicker> {
     _markedSets.clear();
   }
 
-  /// Closes the sheet (or the full screen from Settings).
-  void _close() => Navigator.pop(context);
+  /// After loading something: always back on the main screen, closing
+  /// the sheet, or this screen and Settings when opened from there.
+  void _close() => Navigator.popUntil(context, (route) => route.isFirst);
 
   @override
   Widget build(BuildContext context) => PopScope(
@@ -747,7 +723,8 @@ class _SetlistPickerState extends State<SetlistPicker> {
                       if (widget.fullScreen)
                         IconButton(
                           tooltip: 'Back',
-                          onPressed: _close,
+                          // Back to Settings: nothing was loaded.
+                          onPressed: () => Navigator.pop(context),
                           icon: const Icon(Icons.chevron_left, size: 28),
                         ),
                       const Text(
@@ -1074,7 +1051,8 @@ class FreePlayButton extends StatelessWidget {
       onPressed: () {
         Haptics.medium(); // the song detached
         library.detachSong();
-        if (closes) Navigator.pop(context);
+        // Back on the main screen (past Settings, if opened from there).
+        if (closes) Navigator.popUntil(context, (route) => route.isFirst);
       },
       child: const Text(
         'Free play',

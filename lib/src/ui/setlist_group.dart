@@ -18,16 +18,12 @@ class SetlistGroup extends StatelessWidget {
     required this.metronome,
     required this.onOpenPicker,
     required this.onSongLibrary,
-    required this.onNewSetlist,
   });
 
   final LibraryController library;
   final MetronomeController metronome;
   final VoidCallback onOpenPicker;
   final VoidCallback onSongLibrary;
-
-  /// Free play with no setlists yet: "Create a setlist".
-  final VoidCallback onNewSetlist;
 
   static const headerKey = Key('setlist-header');
   static const previousKey = Key('previous-song');
@@ -134,11 +130,10 @@ class SetlistGroup extends StatelessWidget {
   }
 
   /// Two equal outlined buttons, quieter than previous/next (52px tall,
-  /// centred in the 68px row): Setlists opens the picker (with none yet,
-  /// "Create a setlist" opens a new set's page); Songs opens the song
+  /// centred in the 68px row): Setlists opens the picker (its What to play
+  /// has "New setlist", also with no sets yet); Songs opens the song
   /// library, the way to play a single song.
   Widget _freePlayRow(MetraColors colors) {
-    final none = library.setlists.isEmpty;
     return Center(
       child: SizedBox(
         height: 52,
@@ -150,9 +145,8 @@ class SetlistGroup extends StatelessWidget {
                 colors,
                 key: setlistsKey,
                 icon: const Icon(Icons.format_list_bulleted, size: 18),
-                label: none ? 'Create a setlist' : 'Setlists',
-                onPressed: none ? onNewSetlist : onOpenPicker,
-                chevron: !none,
+                label: 'Setlists',
+                onPressed: onOpenPicker,
               ),
             ),
             const SizedBox(width: 8),
@@ -163,7 +157,6 @@ class SetlistGroup extends StatelessWidget {
                 icon: const SubdivisionIcon(1, size: 18),
                 label: 'Songs',
                 onPressed: onSongLibrary,
-                chevron: true,
               ),
             ),
           ],
@@ -178,7 +171,6 @@ class SetlistGroup extends StatelessWidget {
     required Widget icon,
     required String label,
     required VoidCallback onPressed,
-    required bool chevron,
   }) => OutlinedButton(
     key: key,
     style: OutlinedButton.styleFrom(
@@ -197,7 +189,7 @@ class SetlistGroup extends StatelessWidget {
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
           ),
         ),
-        if (chevron) Icon(Icons.expand_more, size: 18, color: colors.muted),
+        Icon(Icons.expand_more, size: 18, color: colors.muted),
       ],
     ),
   );

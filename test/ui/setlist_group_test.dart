@@ -77,14 +77,14 @@ void main() {
     Rect groupRect(WidgetTester tester) =>
         tester.getRect(find.byType(SetlistGroup));
 
-    testWidgets('Free play with no setlists: Create a setlist and Songs', (
+    testWidgets('Free play with no setlists: Setlists and Songs', (
       tester,
     ) async {
       await pumpScreen(tester);
       expect(find.text('Free play'), findsOneWidget);
-      expect(find.text('Create a setlist'), findsOneWidget);
+      expect(find.text('Setlists'), findsOneWidget);
       expect(find.text('Songs'), findsOneWidget);
-      expect(find.byTooltip('New setlist'), findsNothing, reason: 'no +');
+      expect(find.text('Create a setlist'), findsNothing);
     });
 
     testWidgets('Free play with setlists: Setlists opens the picker', (
@@ -168,10 +168,13 @@ void main() {
       );
     });
 
-    testWidgets('Create a setlist opens a new set page; empty, it is '
-        'discarded', (tester) async {
+    testWidgets('with no sets, Setlists opens What to play to make one; an '
+        'empty new set is discarded', (tester) async {
       await pumpScreen(tester);
-      await tester.tap(find.text('Create a setlist'));
+      await tester.tap(find.byKey(SetlistGroup.setlistsKey));
+      await tester.pumpAndSettle();
+      expect(find.text('What to play'), findsOneWidget);
+      await tester.tap(find.byKey(SetlistPicker.newSetlistKey));
       await tester.pumpAndSettle();
       expect(find.byKey(SetlistPicker.titleFieldKey), findsOneWidget);
       expect(find.text('No songs yet'), findsOneWidget);
