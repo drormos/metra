@@ -329,19 +329,34 @@ class _SetlistPickerState extends State<SetlistPicker> {
         Expanded(
           child: songs.isEmpty
               ? _emptyState(colors, setlist)
-              : ReorderableListView.builder(
-                  buildDefaultDragHandles: false,
-                  itemCount: songs.length,
-                  // Long-press and drag reorders; long-press does nothing
-                  // else.
-                  onReorderStart: (_) => Haptics.medium(),
-                  onReorderItem: (from, to) {
-                    _library.reorderSetlist(setlist.id, from, to);
-                    _remapMarks(from, to);
-                  },
-                  footer: _pageFooter(colors, setlist),
-                  itemBuilder: (context, i) =>
-                      _row(colors, setlist, songs[i], i, current: i == current),
+              : CustomScrollView(
+                  slivers: [
+                    // Dashed slots behind the rows show only where a gap
+                    // opens: the drop slot while a row is dragged.
+                    DecoratedSliver(
+                      decoration: _DropSlots(colors.slot),
+                      sliver: SliverReorderableList(
+                        itemCount: songs.length,
+                        // Long-press and drag reorders; long-press does
+                        // nothing else.
+                        onReorderStart: (_) => Haptics.medium(),
+                        onReorderEnd: (_) => Haptics.tick(), // settles
+                        onReorderItem: (from, to) {
+                          _library.reorderSetlist(setlist.id, from, to);
+                          _remapMarks(from, to);
+                        },
+                        proxyDecorator: _liftedRow,
+                        itemBuilder: (context, i) => _row(
+                          colors,
+                          setlist,
+                          songs[i],
+                          i,
+                          current: i == current,
+                        ),
+                      ),
+                    ),
+                    SliverToBoxAdapter(child: _pageFooter(colors, setlist)),
+                  ],
                 ),
         ),
         // The keyboard (naming the set) leaves no room for the buttons.
@@ -457,79 +472,116 @@ class _SetlistPickerState extends State<SetlistPicker> {
       // Keyed by position: the same song may appear twice.
       key: ValueKey('picker-row-$index-${song.id}'),
       index: index,
-      child: Material(
-        color: highlighted ? colors.selectedRow : colors.background,
-        child: InkWell(
-          key: ValueKey('picker-song-$index'),
-          onTap: marking
-              ? () => _toggleMark(index)
-              : () => _play(setlist, song, index),
-          child: Ink(
-            height: 60,
-            padding: const EdgeInsets.only(left: 24),
-            decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: colors.divider)),
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 22,
-                  child: marking
-                      ? MarkCircle(checked: marked)
-                      : PlayMarker(current: current),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    song.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: current ? FontWeight.w600 : FontWeight.w500,
+      child: Builder(
+        builder: (context) => Material(
+          color: _LiftedRow.of(context)
+              ? colors.lifted
+              : highlighted
+              ? colors.selectedRow
+              : colors.background,
+          child: InkWell(
+            key: ValueKey('picker-song-$index'),
+            onTap: marking
+                ? () => _toggleMark(index)
+                : () => _play(setlist, song, index),
+            child: Ink(
+              height: 60,
+              padding: const EdgeInsets.only(left: 24),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: colors.divider)),
+              ),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 22,
+                    child: marking
+                        ? MarkCircle(checked: marked)
+                        : PlayMarker(current: current),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      song.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: current ? FontWeight.w600 : FontWeight.w500,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Text(
-                  '${song.bpm}',
-                  style: TextStyle(
-                    fontFamily: MetraFonts.condensed,
-                    fontSize: 24,
-                    fontWeight: current ? FontWeight.w700 : FontWeight.w600,
+                  const SizedBox(width: 14),
+                  Text(
+                    '${song.bpm}',
+                    style: TextStyle(
+                      fontFamily: MetraFonts.condensed,
+                      fontSize: 24,
+                      fontWeight: current ? FontWeight.w700 : FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 14),
-                SizedBox(
-                  width: 30,
-                  child: Text(
-                    song.pattern.timeSignature,
-                    textAlign: TextAlign.right,
-                    style: TextStyle(fontSize: 14, color: colors.muted),
+                  const SizedBox(width: 14),
+                  SizedBox(
+                    width: 30,
+                    child: Text(
+                      song.pattern.timeSignature,
+                      textAlign: TextAlign.right,
+                      style: TextStyle(fontSize: 14, color: colors.muted),
+                    ),
                   ),
-                ),
-                // Hidden while marking; the slot keeps the layout.
-                SizedBox(
-                  width: 52,
-                  height: 60,
-                  child: marking
-                      ? null
-                      : IconButton(
-                          key: ValueKey('picker-edit-$index'),
-                          tooltip: 'Edit ${song.name}',
-                          color: colors.muted,
-                          onPressed: () => openSongEditor(
-                            context,
-                            _library,
-                            widget.metronome,
-                            song: song,
+                  // Hidden while marking; the slot keeps the layout.
+                  SizedBox(
+                    width: 52,
+                    height: 60,
+                    child: marking
+                        ? null
+                        : IconButton(
+                            key: ValueKey('picker-edit-$index'),
+                            tooltip: 'Edit ${song.name}',
+                            color: colors.muted,
+                            onPressed: () => openSongEditor(
+                              context,
+                              _library,
+                              widget.metronome,
+                              song: song,
+                            ),
+                            icon: const Icon(Icons.edit_outlined, size: 20),
                           ),
-                          icon: const Icon(Icons.edit_outlined, size: 20),
-                        ),
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// The row while dragged (setlist-drag.reference.html): picked up for
+  /// the whole drag, with an outline, a deep shadow and ~103% scale.
+  Widget _liftedRow(Widget child, int index, Animation<double> animation) {
+    final colors = context.colors;
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) => Transform.scale(
+        scale: 1 + 0.03 * Curves.easeOut.transform(animation.value),
+        child: child,
+      ),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: colors.text, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: colors.shadow,
+              offset: const Offset(0, 10),
+              blurRadius: 28,
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: _LiftedRow(child: child),
         ),
       ),
     );
@@ -907,6 +959,55 @@ class _SetlistPickerState extends State<SetlistPicker> {
   static String _count(int n) => n == 1 ? '1 song' : '$n songs';
 }
 
+/// Tells a song row it's the dragged copy, so it paints the lifted color.
+class _LiftedRow extends InheritedWidget {
+  const _LiftedRow({required super.child});
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_LiftedRow>() != null;
+
+  @override
+  bool updateShouldNotify(_LiftedRow old) => false;
+}
+
+/// A dashed slot behind every 60px row of a set's page. The rows cover
+/// them, so one shows only where a dragged row will land.
+class _DropSlots extends Decoration {
+  const _DropSlots(this.color);
+
+  final Color color;
+
+  @override
+  BoxPainter createBoxPainter([VoidCallback? onChanged]) =>
+      _DropSlotsPainter(color);
+}
+
+class _DropSlotsPainter extends BoxPainter {
+  _DropSlotsPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Offset offset, ImageConfiguration configuration) {
+    final size = configuration.size!;
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    for (var top = 0.0; top + 60 <= size.height + 0.5; top += 60) {
+      final slot = RRect.fromRectAndRadius(
+        Rect.fromLTWH(offset.dx + 7, offset.dy + top + 1, size.width - 14, 58),
+        const Radius.circular(6),
+      );
+      for (final metric in (Path()..addRRect(slot)).computeMetrics()) {
+        for (var d = 0.0; d < metric.length; d += 10) {
+          canvas.drawPath(metric.extractPath(d, d + 6), paint);
+        }
+      }
+    }
+  }
+}
+
 /// "Free play" (ui-spec.md "Detaching a song"): detaches the song and any
 /// setlist, keeping the click as it sounds; [closes] also closes the
 /// page it sits on (and Settings, if that's in the stack).
@@ -918,14 +1019,18 @@ class FreePlayButton extends StatelessWidget {
   final LibraryController library;
   final bool closes;
 
+  /// Fixed, and the same as "Save as song", so swapping modes never
+  /// changes a header's layout.
+  static const size = Size(128, 40);
+
   @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 40,
+  Widget build(BuildContext context) => SizedBox.fromSize(
+    size: size,
     child: OutlinedButton(
       key: buttonKey,
       style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        minimumSize: const Size(0, 40),
+        padding: EdgeInsets.zero,
+        minimumSize: size,
       ),
       onPressed: () {
         Haptics.medium(); // the song detached

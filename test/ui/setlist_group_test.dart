@@ -182,6 +182,29 @@ void main() {
       expect(find.byKey(MetronomeScreen.tempoNameKey), findsOneWidget);
     });
 
+    testWidgets('header buttons are a fixed 128x40 in every mode', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      expect(
+        tester.getSize(find.byKey(SetlistGroup.saveAsSongKey)),
+        const Size(128, 40),
+      );
+      library.playSingleSong(
+        library.addSong(
+          name: 'A very long song name',
+          bpm: 90,
+          pattern: const MetronomePattern.standard(),
+        ),
+        metronome,
+      );
+      await tester.pump();
+      expect(
+        tester.getSize(find.byKey(FreePlayButton.buttonKey)),
+        const Size(128, 40),
+      );
+    });
+
     testWidgets('the Setlists and Songs buttons are the same size', (
       tester,
     ) async {

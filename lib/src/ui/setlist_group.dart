@@ -98,13 +98,13 @@ class SetlistGroup extends StatelessWidget {
           child: Text('Free play', style: TextStyle(fontSize: 16)),
         ),
         Builder(
-          builder: (context) => SizedBox(
-            height: 40,
+          builder: (context) => SizedBox.fromSize(
+            size: FreePlayButton.size,
             child: OutlinedButton(
               key: saveAsSongKey,
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                minimumSize: const Size(0, 40),
+                padding: EdgeInsets.zero,
+                minimumSize: FreePlayButton.size,
               ),
               onPressed: () => showSaveAsNewSong(context, library, metronome),
               child: const Text(

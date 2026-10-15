@@ -15,6 +15,7 @@ import 'package:metra/src/ui/setlist_group.dart';
 import 'package:metra/src/ui/setlist_picker.dart';
 import 'package:metra/src/ui/song_editor.dart';
 import 'package:metra/src/ui/song_library.dart';
+import 'package:metra/src/ui/theme.dart';
 
 import '../audio/fake_click_output.dart';
 import 'test_theme.dart';
@@ -211,8 +212,21 @@ void main() {
       await gesture.moveBy(const Offset(0, 25)); // one 60px row down
       await tester.pump(const Duration(milliseconds: 50));
     }
+    // Picked up for the whole drag: the lifted copy, outlined.
+    final lifted = find.byWidgetPredicate(
+      (w) =>
+          w is Material &&
+          w.color == MetraColors.stageBlack.lifted &&
+          w.child is InkWell,
+    );
+    expect(lifted, findsOneWidget);
     await gesture.up();
     await settle(tester);
+    expect(lifted, findsNothing);
+    expect(haptics, [
+      'HapticFeedbackType.mediumImpact',
+      'HapticFeedbackType.lightImpact',
+    ], reason: 'settles with a light tick');
     expect(library.activeSetlist!.songIds, [ids[1], ids[0], ids[2]]);
     expect(library.currentSong, isNull, reason: 'a drag loads nothing');
     expect(find.byType(SetlistPicker), findsOneWidget, reason: 'still open');

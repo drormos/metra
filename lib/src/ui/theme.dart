@@ -9,6 +9,9 @@ class MetraColors extends ThemeExtension<MetraColors> {
     required this.background,
     required this.sheet,
     required this.dim,
+    required this.lifted,
+    required this.slot,
+    required this.shadow,
     required this.surface,
     required this.divider,
     required this.selectedRow,
@@ -33,6 +36,9 @@ class MetraColors extends ThemeExtension<MetraColors> {
     background: Color(0xFF000000),
     sheet: Color(0xFF111111),
     dim: Color(0x99000000),
+    lifted: Color(0xFF2A2A2A),
+    slot: Color(0xFF4A4A4A),
+    shadow: Color(0xD9000000),
     surface: Color(0xFF1A1A1A),
     divider: Color(0xFF1F1F1F),
     selectedRow: Color(0xFF242424),
@@ -57,6 +63,9 @@ class MetraColors extends ThemeExtension<MetraColors> {
     background: Color(0xFFF3F1EC),
     sheet: Color(0xFFECE9E2),
     dim: Color(0x59000000),
+    lifted: Color(0xFFFFFFFF),
+    slot: Color(0xFFA8A39A),
+    shadow: Color(0x40000000),
     surface: Color(0xFFE3DFD6),
     divider: Color(0xFFDCD8CF),
     selectedRow: Color(0xFFDAD5CB),
@@ -83,6 +92,12 @@ class MetraColors extends ThemeExtension<MetraColors> {
 
   /// Over the main screen while a dropdown panel is open.
   final Color dim;
+
+  /// A set's page while reordering: the lifted row, the dashed drop slot,
+  /// and the lifted row's shadow.
+  final Color lifted;
+  final Color slot;
+  final Color shadow;
 
   /// Filled buttons.
   final Color surface;
