@@ -232,6 +232,8 @@ class _SetlistPickerState extends State<SetlistPicker> {
     _endMarking();
   });
 
+  bool get _keyboardUp => MediaQuery.viewInsetsOf(context).bottom > 0;
+
   void _endMarking() {
     _markingSongs = false;
     _markingSets = false;
@@ -361,7 +363,10 @@ class _SetlistPickerState extends State<SetlistPicker> {
                       _row(colors, setlist, songs[i], i, current: i == current),
                 ),
         ),
-        if (_markingSongs)
+        // The keyboard (naming the set) leaves no room for the buttons.
+        if (_keyboardUp)
+          const SizedBox.shrink()
+        else if (_markingSongs)
           _markingBar(colors, setlist)
         else
           _bottomBar(colors, [
@@ -720,114 +725,128 @@ class _SetlistPickerState extends State<SetlistPicker> {
       for (final set in _library.setlistsRecentlyPlayed)
         if (query.isEmpty || set.name.toLowerCase().contains(query)) set,
     ];
+    // The header scrolls with the list, so the sheet still fits when the
+    // keyboard is up for the search.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(widget.fullScreen ? 12 : 24, 0, 24, 12),
-          child: SizedBox(
-            height: 48,
-            child: Row(
-              children: [
-                if (widget.fullScreen)
-                  IconButton(
-                    tooltip: 'Back',
-                    onPressed: _close,
-                    icon: const Icon(Icons.chevron_left, size: 28),
-                  ),
-                const Text(
-                  'What to play',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+        Expanded(
+          child: ListView(
+            children: [
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  widget.fullScreen ? 12 : 24,
+                  0,
+                  24,
+                  12,
                 ),
-              ],
-            ),
-          ),
-        ),
-        // A mode, not a setlist: framed and set apart from the list.
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
-          child: SizedBox(
-            height: 72,
-            child: OutlinedButton(
-              key: SetlistPicker.freePlayKey,
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                alignment: Alignment.centerLeft,
-              ),
-              onPressed: () {
-                // Detaches any song; the click keeps going as it is.
-                Haptics.medium();
-                _library.detachSong();
-                _close();
-              },
-              child: Row(
-                children: [
-                  const _MetronomeIcon(),
-                  const SizedBox(width: 16),
-                  Flexible(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Free play',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.w600,
-                          ),
+                child: SizedBox(
+                  height: 48,
+                  child: Row(
+                    children: [
+                      if (widget.fullScreen)
+                        IconButton(
+                          tooltip: 'Back',
+                          onPressed: _close,
+                          icon: const Icon(Icons.chevron_left, size: 28),
                         ),
-                        Text(
-                          'No setlist, any tempo',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: colors.muted,
+                      const Text(
+                        'What to play',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // A mode, not a setlist: framed and set apart from the list.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+                child: SizedBox(
+                  height: 72,
+                  child: OutlinedButton(
+                    key: SetlistPicker.freePlayKey,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                      alignment: Alignment.centerLeft,
+                    ),
+                    onPressed: () {
+                      // Detaches any song; the click keeps going as it is.
+                      Haptics.medium();
+                      _library.detachSong();
+                      _close();
+                    },
+                    child: Row(
+                      children: [
+                        const _MetronomeIcon(),
+                        const SizedBox(width: 16),
+                        Flexible(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Free play',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                'No setlist, any tempo',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: colors.muted,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Setlists',
-                  style: TextStyle(fontSize: 14, color: colors.muted),
                 ),
               ),
-              Text(
-                'Recently played',
-                style: TextStyle(fontSize: 13, color: colors.muted),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Setlists',
+                        style: TextStyle(fontSize: 14, color: colors.muted),
+                      ),
+                    ),
+                    Text(
+                      'Recently played',
+                      style: TextStyle(fontSize: 13, color: colors.muted),
+                    ),
+                  ],
+                ),
               ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                child: SearchField(
+                  controller: _search,
+                  hint: 'Search setlists',
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              Divider(height: 1, color: colors.divider),
+              for (final setlist in sets) _setRow(colors, setlist),
             ],
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-          child: SearchField(
-            controller: _search,
-            hint: 'Search setlists',
-            onChanged: (_) => setState(() {}),
-          ),
-        ),
-        Divider(height: 1, color: colors.divider),
-        Expanded(
-          child: ListView(
-            children: [for (final setlist in sets) _setRow(colors, setlist)],
-          ),
-        ),
-        if (_markingSets)
+        if (_keyboardUp)
+          const SizedBox.shrink()
+        else if (_markingSets)
           _selectionBar(
             colors,
             count: _markedSets.length,

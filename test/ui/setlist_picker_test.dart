@@ -321,6 +321,26 @@ void main() {
     expect(metronome.bpm, 100);
   });
 
+  for (final size in const [Size(400, 900), Size(360, 640)]) {
+    testWidgets('What to play fits with the keyboard up '
+        '(${size.width.toInt()}x${size.height.toInt()})', (tester) async {
+      await pumpWithSets(tester, loaded: false);
+      tester.view.physicalSize = size;
+      await tester.tap(find.byKey(SetlistGroup.setlistsKey));
+      await settle(tester);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(SetlistPicker),
+          matching: find.byType(TextField),
+        ),
+      );
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      addTearDown(tester.view.resetViewInsets);
+      await settle(tester);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('What to play lists recently played first and searches', (
     tester,
   ) async {

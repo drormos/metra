@@ -77,7 +77,14 @@ class MetronomeScreen extends StatelessWidget {
         const SingleActivator(LogicalKeyboardKey.arrowDown, shift: true): () =>
             controller.nudge(-5),
       },
-      child: Focus(autofocus: true, child: Scaffold(body: metronome)),
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          // No text fields here; a sheet's keyboard mustn't squeeze it.
+          resizeToAvoidBottomInset: false,
+          body: metronome,
+        ),
+      ),
     );
   }
 
