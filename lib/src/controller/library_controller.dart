@@ -59,20 +59,37 @@ class LibraryController extends ChangeNotifier {
   /// Only the mode changes: the click keeps going as it is.
   void setActiveSetlist(String? id) {
     if (id == null) return detachSong();
-    final position =
-        setlists
-            .where((l) => l.id == id)
-            .firstOrNull
-            ?.songIds
-            .indexOf(_library.currentSongId ?? '') ??
-        -1;
+    final list = setlists.firstWhere((l) => l.id == id);
     _update(
-      _library.withSession(
-        setlistId: id,
-        songId: _library.currentSongId,
-        position: position,
-      ),
+      _library
+          .copyWith(
+            setlists: [
+              for (final l in setlists)
+                l.id == id ? l.copyWith(playedAt: DateTime.now()) : l,
+            ],
+          )
+          .withSession(
+            setlistId: id,
+            songId: _library.currentSongId,
+            position: list.songIds.indexOf(_library.currentSongId ?? ''),
+          ),
     );
+  }
+
+  /// Choosing a set: loads it at its first song (while playing, restarts
+  /// on beat 1), even if it's already loaded.
+  void loadSetlist(String id, MetronomeController metronome) {
+    setActiveSetlist(id);
+    final songs = visibleSongs;
+    if (songs.isNotEmpty) playSong(songs.first, metronome, index: 0);
+  }
+
+  /// Sets loaded most recently first; never-played sets after them, in
+  /// creation order.
+  List<Setlist> get setlistsRecentlyPlayed {
+    final epoch = DateTime.fromMillisecondsSinceEpoch(0);
+    return [...setlists]
+      ..sort((a, b) => (b.playedAt ?? epoch).compareTo(a.playedAt ?? epoch));
   }
 
   /// Songs of the active setlist in order, or all songs in Free play.
@@ -198,6 +215,22 @@ class LibraryController extends ChangeNotifier {
   void addToSetlist(String setlistId, String songId) {
     final list = setlists.firstWhere((s) => s.id == setlistId);
     updateSetlist(list.copyWith(songIds: [...list.songIds, songId]));
+  }
+
+  /// Removes the entries at [indices] (only those occurrences; the songs
+  /// stay in the library). Returns the set as it was, for Undo through
+  /// [updateSetlist].
+  Setlist removeEntries(String setlistId, Set<int> indices) {
+    final list = setlists.firstWhere((s) => s.id == setlistId);
+    updateSetlist(
+      list.copyWith(
+        songIds: [
+          for (final (i, id) in list.songIds.indexed)
+            if (!indices.contains(i)) id,
+        ],
+      ),
+    );
+    return list;
   }
 
   /// Removes the entry at [index] (a song may appear more than once).

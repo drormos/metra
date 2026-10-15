@@ -7,7 +7,6 @@ import 'package:metra/src/controller/library_controller.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/storage/library_store.dart';
-import 'package:metra/src/ui/editor_scaffold.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/setlist_group.dart';
 import 'package:metra/src/ui/setlist_picker.dart';
@@ -169,18 +168,20 @@ void main() {
       );
     });
 
-    testWidgets('Create a setlist opens the editor; saving loads the set', (
-      tester,
-    ) async {
+    testWidgets('Create a setlist opens a new set page; empty, it is '
+        'discarded', (tester) async {
       await pumpScreen(tester);
       await tester.tap(find.text('Create a setlist'));
       await tester.pumpAndSettle();
+      expect(find.byKey(SetlistPicker.titleFieldKey), findsOneWidget);
+      expect(find.text('No songs yet'), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'Saturday');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pump();
-      await tester.tap(find.byKey(EditorScaffold.actionKey));
+      expect(library.setlists.single.name, 'Saturday');
+      Navigator.pop(tester.element(find.byType(SetlistPicker)));
       await tester.pumpAndSettle();
-      expect(library.activeSetlist?.name, 'Saturday');
-      expect(find.textContaining(' of '), findsNothing, reason: 'empty set');
+      expect(library.setlists, isEmpty, reason: 'left empty');
     });
 
     testWidgets('setlist mode: header, position, neighbours', (tester) async {

@@ -7,11 +7,9 @@ import '../model/tempo_name.dart';
 import 'beat_indicator.dart';
 import 'haptics.dart';
 import 'repeat_button.dart';
-import 'setlist_editor.dart';
 import 'setlist_group.dart';
 import 'setlist_picker.dart';
 import 'settings_screen.dart';
-import 'song_editor.dart';
 import 'song_library.dart';
 import 'subdivision_icon.dart';
 import 'tempo_ruler.dart';
@@ -216,18 +214,19 @@ class MetronomeScreen extends StatelessWidget {
               context,
               library: library,
               metronome: controller,
-              onEditSetlist: () => openSetlistEditor(
-                context,
-                library,
-                setlist: library.activeSetlist,
-                newSong: (context) => _newSong(context, library),
-              ),
               onSongLibrary: () =>
                   openSongLibrary(context, library, controller),
-              onNewSetlist: () => _newSetlist(context, library),
             ),
             onSongLibrary: () => openSongLibrary(context, library, controller),
-            onNewSetlist: () => _newSetlist(context, library),
+            // "Create a setlist": the picker on a new set's page.
+            onNewSetlist: () => showSetlistPicker(
+              context,
+              library: library,
+              metronome: controller,
+              onSongLibrary: () =>
+                  openSongLibrary(context, library, controller),
+              newSet: true,
+            ),
           ),
         ],
         if (error != null) ...[
@@ -364,15 +363,8 @@ class MetronomeScreen extends StatelessWidget {
                       context,
                       library: library,
                       metronome: controller,
-                      onEditSetlist: () => openSetlistEditor(
-                        context,
-                        library,
-                        setlist: library.activeSetlist,
-                        newSong: (context) => _newSong(context, library),
-                      ),
                       onSongLibrary: () =>
                           openSongLibrary(context, library, controller),
-                      onNewSetlist: () => _newSetlist(context, library),
                     ),
               onSongLibrary: library == null
                   ? null
@@ -412,22 +404,6 @@ class MetronomeScreen extends StatelessWidget {
     3: 'triplets',
     4: 'sixteenth notes',
   };
-
-  /// Plain picker (the spec leaves it undesigned). Changing the time
-  /// signature resets custom accents; while playing, the next beat starts a
-  /// bar in the new meter.
-  Future<void> _newSetlist(BuildContext context, LibraryController library) =>
-      openSetlistEditor(
-        context,
-        library,
-        newSong: (context) => _newSong(context, library),
-      );
-
-  // Pick mode's "New song": the song editor on a new song; returns its id.
-  Future<String?> _newSong(
-    BuildContext context,
-    LibraryController library,
-  ) async => (await openSongEditor(context, library, controller))?.id;
 
   Widget _step(String label, int delta, bool enabled) => Expanded(
     child: SizedBox(

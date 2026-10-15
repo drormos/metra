@@ -135,7 +135,7 @@ class SetlistGroup extends StatelessWidget {
 
   /// Two equal outlined buttons, quieter than previous/next (52px tall,
   /// centred in the 68px row): Setlists opens the picker (with none yet,
-  /// "Create a setlist" opens the setlist editor); Songs opens the song
+  /// "Create a setlist" opens a new set's page); Songs opens the song
   /// library, the way to play a single song.
   Widget _freePlayRow(MetraColors colors) {
     final none = library.setlists.isEmpty;

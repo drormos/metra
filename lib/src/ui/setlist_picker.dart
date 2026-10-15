@@ -1,29 +1,39 @@
+import 'dart:async';
+import 'dart:math';
+
+import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
 
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/library.dart';
+import 'editor_scaffold.dart';
 import 'haptics.dart';
+import 'library_pick.dart';
 import 'play_marker.dart';
 import 'song_editor.dart';
 import 'theme.dart';
 
-/// The setlist picker sheet (ui-spec.md, `setlist-picker` and
-/// `set-switcher` references): a songs view for the loaded set and a "What
-/// to play" view for switching sets or going to Free play. Opening it never
-/// touches the click; only choosing a song or a set does.
+/// The setlist picker sheet (ui-spec.md "Setlist picker"): a set page that
+/// both plays and edits a set, below a "What to play" top level for
+/// switching sets or going to Free play. Opening it never touches the
+/// click; only choosing a song or a set does.
 ///
-/// Opens on the songs view with a setlist loaded, else on "What to play".
+/// Opens on the loaded set's page, else on What to play; with [newSet], on
+/// the page of a new set (from "Create a setlist").
 Future<void> showSetlistPicker(
   BuildContext context, {
   required LibraryController library,
   required MetronomeController metronome,
-  required VoidCallback onEditSetlist,
   required VoidCallback onSongLibrary,
-  required VoidCallback onNewSetlist,
+  bool newSet = false,
 }) {
   final height = MediaQuery.sizeOf(context).height;
   final colors = context.colors;
+  // Created up front: not while the sheet builds.
+  final created = newSet
+      ? library.addSetlist(library.newSetlistName()).id
+      : null;
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -37,9 +47,8 @@ Future<void> showSetlistPicker(
     builder: (_) => SetlistPicker(
       library: library,
       metronome: metronome,
-      onEditSetlist: onEditSetlist,
       onSongLibrary: onSongLibrary,
-      onNewSetlist: onNewSetlist,
+      newSetId: created,
     ),
   );
 }
@@ -50,9 +59,7 @@ Future<void> openSetlistsScreen(
   BuildContext context, {
   required LibraryController library,
   required MetronomeController metronome,
-  required VoidCallback onEditSetlist,
   required VoidCallback onSongLibrary,
-  required VoidCallback onNewSetlist,
 }) => Navigator.push(
   context,
   MaterialPageRoute<void>(
@@ -64,9 +71,7 @@ Future<void> openSetlistsScreen(
           child: SetlistPicker(
             library: library,
             metronome: metronome,
-            onEditSetlist: onEditSetlist,
             onSongLibrary: onSongLibrary,
-            onNewSetlist: onNewSetlist,
             fullScreen: true,
           ),
         ),
@@ -80,53 +85,187 @@ class SetlistPicker extends StatefulWidget {
     super.key,
     required this.library,
     required this.metronome,
-    required this.onEditSetlist,
     required this.onSongLibrary,
-    required this.onNewSetlist,
     this.fullScreen = false,
+    this.newSetId,
   });
+
+  final LibraryController library;
+  final MetronomeController metronome;
+  final VoidCallback onSongLibrary;
 
   /// A full screen rather than a sheet: opens on What to play, whose back
   /// chevron leaves the screen.
   final bool fullScreen;
 
-  final LibraryController library;
-  final MetronomeController metronome;
-  final VoidCallback onEditSetlist;
-  final VoidCallback onSongLibrary;
-  final VoidCallback onNewSetlist;
+  /// Open on the page of this just-created set.
+  final String? newSetId;
 
   static const backToSetlistsKey = Key('picker-back-to-setlists');
   static const freePlayKey = Key('picker-free-play');
+  static const newSetlistKey = Key('picker-new-setlist');
+  static const addSongsKey = Key('picker-add-songs');
+  static const allSongsKey = Key('picker-all-songs');
+  static const renameKey = Key('picker-rename');
+  static const deleteKey = Key('picker-delete');
+  static const removeKey = Key('picker-remove-marked');
+  static const cancelMarksKey = Key('picker-cancel-marks');
+  static const titleFieldKey = Key('picker-title-field');
 
   @override
   State<SetlistPicker> createState() => _SetlistPickerState();
 }
 
 class _SetlistPickerState extends State<SetlistPicker> {
-  // Which view is showing; navigation inside the sheet only.
-  late bool _whatToPlay =
-      widget.fullScreen || widget.library.activeSetlist == null;
+  // Navigation inside the picker: the set page shown, or null for What to
+  // play. Everything else here is page UI state; the set itself is saved
+  // in the library as it changes.
+  late String? _pageId =
+      widget.newSetId ??
+      (widget.fullScreen ? null : widget.library.activeSetlist?.id);
+  // The page is for a new set: its title starts as a field.
+  bool _isNew = false;
+  // A set created here, discarded if it's left with no songs.
+  String? _createdId;
+  bool _renaming = false;
+  final _name = TextEditingController();
+  final _search = TextEditingController();
+  // Marked rows (positions; a song may appear twice).
+  final _marked = <int>{};
+  // The picker's own messenger, so the Undo bar shows inside the sheet.
+  final _messenger = GlobalKey<ScaffoldMessengerState>();
+  // How far the finger moved since the last long-press lift.
+  Offset _down = Offset.zero;
+  double _moved = 0;
 
   LibraryController get _library => widget.library;
 
+  Setlist? get _page {
+    for (final list in _library.setlists) {
+      if (list.id == _pageId) return list;
+    }
+    return null;
+  }
+
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: _library,
-    builder: (context, _) {
-      final setlist = _library.activeSetlist;
-      return _whatToPlay || setlist == null
-          ? _whatToPlayView(context)
-          : _songsView(context, setlist);
+  void initState() {
+    super.initState();
+    final page = _page;
+    if (widget.newSetId != null && page != null) {
+      _isNew = true;
+      _createdId = page.id;
+      _startEditingName(page.name);
+    }
+  }
+
+  @override
+  void dispose() {
+    // Not during dispose: deleting notifies listeners mid-teardown.
+    final abandoned = _abandonedNewSet();
+    if (abandoned != null) {
+      scheduleMicrotask(() => _library.deleteSetlist(abandoned));
+    }
+    _name.dispose();
+    _search.dispose();
+    super.dispose();
+  }
+
+  /// The id of a set created here and being left empty: it's discarded.
+  String? _abandonedNewSet() {
+    final page = _page;
+    return page != null && page.id == _createdId && page.songIds.isEmpty
+        ? page.id
+        : null;
+  }
+
+  void _openNewSet() {
+    final created = _library.addSetlist(_library.newSetlistName());
+    _pageId = created.id;
+    _isNew = true;
+    _createdId = created.id;
+    _startEditingName(created.name);
+  }
+
+  void _startEditingName(String name) {
+    _name
+      ..text = name
+      ..selection = TextSelection(baseOffset: 0, extentOffset: name.length);
+  }
+
+  /// Saves a valid typed name; an empty or taken one keeps the old name.
+  void _commitName() {
+    final page = _page;
+    if (page == null || !(_isNew || _renaming)) return;
+    final name = _name.text.trim();
+    if (name.isEmpty || _library.setlistNameTaken(name, exceptId: page.id)) {
+      return;
+    }
+    if (name != page.name) _library.updateSetlist(page.copyWith(name: name));
+    setState(() {
+      _renaming = false;
+      _isNew = false;
+    });
+  }
+
+  String? get _nameError {
+    final name = _name.text.trim();
+    if (name.isEmpty) return 'Give the set a name';
+    return _library.setlistNameTaken(name, exceptId: _pageId)
+        ? 'Another setlist already has this name'
+        : null;
+  }
+
+  void _showWhatToPlay() {
+    if (_isNew || _renaming) _commitName();
+    final abandoned = _abandonedNewSet();
+    if (abandoned != null) _library.deleteSetlist(abandoned);
+    setState(() {
+      _pageId = null;
+      _isNew = false;
+      _createdId = null; // kept now: only new sets are discarded
+      _renaming = false;
+      _marked.clear();
+    });
+  }
+
+  void _openPage(Setlist setlist) => setState(() {
+    _pageId = setlist.id;
+    _marked.clear();
+  });
+
+  /// Closes the sheet (or the full screen from Settings).
+  void _close() => Navigator.pop(context);
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    // The back gesture ends marking before it closes anything.
+    canPop: _marked.isEmpty,
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop) setState(_marked.clear);
     },
+    child: ScaffoldMessenger(
+      key: _messenger,
+      child: Scaffold(
+        backgroundColor: context.colors.sheet,
+        body: ListenableBuilder(
+          listenable: _library,
+          builder: (context, _) {
+            final page = _page;
+            return page == null ? _whatToPlayView(context) : _setPage(page);
+          },
+        ),
+      ),
+    ),
   );
 
-  // Songs view
+  // Set page
 
-  Widget _songsView(BuildContext context, Setlist setlist) {
+  Widget _setPage(Setlist setlist) {
     final colors = context.colors;
-    final songs = _library.visibleSongs;
-    final current = _library.currentIndex;
+    final songs = [for (final id in setlist.songIds) ?_library.songById(id)];
+    final loaded = setlist.id == _library.activeSetlist?.id;
+    final current = loaded ? _library.currentIndex : -1;
+    final editingName = _isNew || _renaming;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -142,7 +281,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
                   minimumSize: const Size(0, 44),
                   padding: const EdgeInsets.fromLTRB(6, 0, 12, 0),
                 ),
-                onPressed: () => setState(() => _whatToPlay = true),
+                onPressed: _showWhatToPlay,
                 icon: const Icon(Icons.chevron_left, size: 22),
                 label: const Text(
                   'Setlists',
@@ -155,29 +294,40 @@ class _SetlistPickerState extends State<SetlistPicker> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(24, 8, 16, 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  setlist.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 4),
+          child: editingName
+              ? TextField(
+                  key: SetlistPicker.titleFieldKey,
+                  controller: _name,
+                  autofocus: true,
+                  textInputAction: TextInputAction.done,
+                  onChanged: (_) => setState(() {}),
+                  onSubmitted: (_) => _commitName(),
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w600,
                   ),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    errorText: _nameError,
+                    errorStyle: TextStyle(color: colors.accentSounding),
+                  ),
+                )
+              : SizedBox(
+                  height: 48,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      setlist.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-              SizedBox(
-                height: 44,
-                child: OutlinedButton(
-                  onPressed: widget.onEditSetlist,
-                  child: const Text('Edit', style: TextStyle(fontSize: 16)),
-                ),
-              ),
-            ],
-          ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
@@ -189,119 +339,369 @@ class _SetlistPickerState extends State<SetlistPicker> {
         Divider(height: 1, color: colors.divider),
         Expanded(
           child: songs.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(
-                      'No songs in this set yet. Use Edit to add some.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: colors.muted),
-                    ),
-                  ),
-                )
-              // Long-press and drag reorders the set, saved at once;
-              // playback is unaffected.
+              ? _emptyState(colors, setlist)
               : ReorderableListView.builder(
                   buildDefaultDragHandles: false,
                   itemCount: songs.length,
-                  onReorderStart: (_) => Haptics.medium(),
-                  onReorderItem: (from, to) =>
-                      _library.reorderSetlist(setlist.id, from, to),
+                  // Long-press lifts the row; letting go without moving
+                  // marks it instead of reordering.
+                  onReorderStart: (_) {
+                    Haptics.medium();
+                    _moved = 0;
+                  },
+                  onReorderEnd: (index) {
+                    if (_moved < kTouchSlop) _toggleMark(index);
+                  },
+                  onReorderItem: (from, to) {
+                    if (_moved < kTouchSlop) return;
+                    _library.reorderSetlist(setlist.id, from, to);
+                    _remapMarks(from, to);
+                  },
+                  footer: _pageFooter(colors, setlist),
                   itemBuilder: (context, i) =>
-                      ReorderableDelayedDragStartListener(
-                        // Keyed by position: the same song may appear twice.
-                        key: ValueKey('picker-row-$i-${songs[i].id}'),
-                        index: i,
-                        child: _songRow(
-                          colors,
-                          songs[i],
-                          i,
-                          current: i == current,
-                        ),
-                      ),
+                      _row(colors, setlist, songs[i], i, current: i == current),
                 ),
         ),
-        _bottomBar(colors, [Expanded(child: _songLibraryButton())]),
+        if (_marked.isNotEmpty)
+          _markingBar(colors, setlist)
+        else
+          _bottomBar(colors, [
+            Expanded(
+              child: FilledButton.icon(
+                key: SetlistPicker.addSongsKey,
+                // The primary action while the set is empty.
+                style: songs.isEmpty
+                    ? null
+                    : FilledButton.styleFrom(
+                        backgroundColor: colors.surface,
+                        foregroundColor: colors.text,
+                      ),
+                onPressed: () => _addSongs(setlist),
+                icon: const Icon(Icons.add, size: 20),
+                label: const FittedBox(
+                  child: Text('Add songs', style: TextStyle(fontSize: 17)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: _songLibraryButton()),
+          ]),
       ],
     );
   }
 
-  Widget _songRow(
+  Widget _emptyState(MetraColors colors, Setlist setlist) => ListView(
+    padding: const EdgeInsets.fromLTRB(24, 40, 24, 24),
+    children: [
+      const Text(
+        'No songs yet',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+      ),
+      const SizedBox(height: 6),
+      Text(
+        'Add songs from your library, or create new ones as you go.',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 14, color: colors.muted),
+      ),
+      if (_library.songs.isNotEmpty) ...[
+        const SizedBox(height: 16),
+        Center(
+          child: OutlinedButton(
+            key: SetlistPicker.allSongsKey,
+            // Every song in the library, A–Z, to trim down.
+            onPressed: () => _library.updateSetlist(
+              setlist.copyWith(
+                songIds: [for (final song in _library.songsAZ) song.id],
+              ),
+            ),
+            child: const Text('Start with all songs'),
+          ),
+        ),
+      ],
+      if (!_isNew) _pageFooter(colors, setlist),
+    ],
+  );
+
+  /// After the last row, so it's never in the way on stage.
+  Widget _pageFooter(MetraColors colors, Setlist setlist) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+    child: Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 16,
+      children: [
+        if (!_isNew)
+          TextButton(
+            key: SetlistPicker.renameKey,
+            style: TextButton.styleFrom(
+              foregroundColor: colors.muted,
+              minimumSize: const Size(0, 44),
+            ),
+            onPressed: () => setState(() {
+              _renaming = true;
+              _startEditingName(setlist.name);
+            }),
+            child: const Text('Rename setlist', style: TextStyle(fontSize: 15)),
+          ),
+        TextButton(
+          key: SetlistPicker.deleteKey,
+          style: TextButton.styleFrom(
+            foregroundColor: colors.accentSounding,
+            minimumSize: const Size(0, 44),
+          ),
+          onPressed: () => _delete(setlist),
+          child: const Text('Delete setlist', style: TextStyle(fontSize: 15)),
+        ),
+      ],
+    ),
+  );
+
+  Widget _row(
     MetraColors colors,
+    Setlist setlist,
     Song song,
     int index, {
     required bool current,
-  }) => Material(
-    type: MaterialType.transparency,
-    child: InkWell(
-      key: ValueKey('picker-song-$index'),
-      onTap: () {
-        // Same rules as next/previous; the sheet closes after.
-        Haptics.medium();
-        _library.playSong(song, widget.metronome, index: index);
-        Navigator.pop(context);
-      },
-      child: Ink(
-        height: 60,
-        padding: const EdgeInsets.only(left: 24),
-        decoration: BoxDecoration(
-          color: current ? colors.selectedRow : null,
-          border: Border(bottom: BorderSide(color: colors.divider)),
+  }) {
+    final marking = _marked.isNotEmpty;
+    final marked = _marked.contains(index);
+    final highlighted = marking ? marked : current;
+    return Dismissible(
+      // Keyed by position: the same song may appear twice.
+      key: ValueKey('picker-row-$index-${song.id}'),
+      direction: marking ? DismissDirection.none : DismissDirection.endToStart,
+      background: Container(
+        color: colors.accentSounding,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        child: Text(
+          'Remove',
+          style: TextStyle(
+            color: colors.onPrimary,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        child: Row(
-          children: [
-            PlayMarker(current: current),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                song.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: current ? FontWeight.w600 : FontWeight.w500,
+      ),
+      onDismissed: (_) => _remove(setlist, {index}),
+      child: Listener(
+        onPointerDown: (event) => _down = event.position,
+        onPointerMove: (event) =>
+            _moved = max(_moved, (event.position - _down).distance),
+        child: ReorderableDelayedDragStartListener(
+          index: index,
+          child: Material(
+            color: highlighted ? colors.selectedRow : colors.sheet,
+            child: InkWell(
+              key: ValueKey('picker-song-$index'),
+              onTap: marking
+                  ? () => _toggleMark(index)
+                  : () => _play(setlist, song, index),
+              child: Ink(
+                height: 60,
+                padding: const EdgeInsets.only(left: 24),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: colors.divider)),
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 22,
+                      child: marked
+                          ? Icon(Icons.check, size: 20, color: colors.accent)
+                          : PlayMarker(current: current),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        song.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: current
+                              ? FontWeight.w600
+                              : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Text(
+                      '${song.bpm}',
+                      style: TextStyle(
+                        fontFamily: MetraFonts.condensed,
+                        fontSize: 24,
+                        fontWeight: current ? FontWeight.w700 : FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    SizedBox(
+                      width: 30,
+                      child: Text(
+                        song.pattern.timeSignature,
+                        textAlign: TextAlign.right,
+                        style: TextStyle(fontSize: 14, color: colors.muted),
+                      ),
+                    ),
+                    // Hidden while marking; the slot keeps the layout.
+                    SizedBox(
+                      width: 52,
+                      height: 60,
+                      child: marking
+                          ? null
+                          : IconButton(
+                              key: ValueKey('picker-edit-$index'),
+                              tooltip: 'Edit ${song.name}',
+                              color: colors.muted,
+                              onPressed: () => openSongEditor(
+                                context,
+                                _library,
+                                widget.metronome,
+                                song: song,
+                              ),
+                              icon: const Icon(Icons.edit_outlined, size: 20),
+                            ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(width: 14),
-            Text(
-              '${song.bpm}',
-              style: TextStyle(
-                fontFamily: MetraFonts.condensed,
-                fontSize: 24,
-                fontWeight: current ? FontWeight.w700 : FontWeight.w600,
-              ),
-            ),
-            const SizedBox(width: 14),
-            SizedBox(
-              width: 30,
-              child: Text(
-                song.pattern.timeSignature,
-                textAlign: TextAlign.right,
-                style: TextStyle(fontSize: 14, color: colors.muted),
-              ),
-            ),
-            SizedBox(
-              width: 52,
-              height: 60,
-              child: IconButton(
-                key: ValueKey('picker-edit-$index'),
-                tooltip: 'Edit ${song.name}',
-                color: colors.muted,
-                onPressed: () => openSongEditor(
-                  context,
-                  _library,
-                  widget.metronome,
-                  song: song,
-                ),
-                icon: const Icon(Icons.edit_outlined, size: 20),
-              ),
-            ),
-          ],
+          ),
         ),
+      ),
+    );
+  }
+
+  /// Loads the song (and this set, if it isn't the loaded one) with the
+  /// next/previous rules, then closes.
+  void _play(Setlist setlist, Song song, int index) {
+    Haptics.medium(); // the song changed
+    if (setlist.id != _library.activeSetlist?.id) {
+      _library.setActiveSetlist(setlist.id);
+    }
+    _library.playSong(song, widget.metronome, index: index);
+    _close();
+  }
+
+  void _toggleMark(int index) {
+    Haptics.tick();
+    setState(
+      () =>
+          _marked.contains(index) ? _marked.remove(index) : _marked.add(index),
+    );
+  }
+
+  /// Marks follow their rows when a row is dragged.
+  void _remapMarks(int from, int to) {
+    if (_marked.isEmpty) return;
+    final order = [for (var i = 0; i <= max(from, to); i++) i];
+    order.insert(to, order.removeAt(from));
+    setState(() {
+      final moved = {
+        for (final m in _marked) m > max(from, to) ? m : order.indexOf(m),
+      };
+      _marked
+        ..clear()
+        ..addAll(moved);
+    });
+  }
+
+  Widget _markingBar(MetraColors colors, Setlist setlist) => Container(
+    padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+    decoration: BoxDecoration(
+      border: Border(top: BorderSide(color: colors.divider)),
+    ),
+    child: SizedBox(
+      height: 56,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '${_marked.length} selected',
+              style: TextStyle(fontSize: 15, color: colors.muted),
+            ),
+          ),
+          SizedBox(
+            height: 44,
+            child: OutlinedButton(
+              key: SetlistPicker.cancelMarksKey,
+              onPressed: () => setState(_marked.clear),
+              child: const Text('Cancel'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: TextButton(
+              key: SetlistPicker.removeKey,
+              style: TextButton.styleFrom(
+                foregroundColor: colors.accentSounding,
+                minimumSize: const Size(0, 44),
+              ),
+              onPressed: () => _remove(setlist, {..._marked}),
+              // Shrinks rather than overflowing on narrow phones.
+              child: const FittedBox(
+                child: Text(
+                  'Remove from set',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     ),
   );
+
+  /// Out of this set only (the songs stay in the library); Undo for ~5 s.
+  void _remove(Setlist setlist, Set<int> indices) {
+    final before = _library.removeEntries(setlist.id, indices);
+    setState(_marked.clear);
+    _messenger.currentState!
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 5),
+          content: Text(
+            indices.length == 1 ? 'Removed' : '${indices.length} removed',
+          ),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () => _library.updateSetlist(before),
+          ),
+        ),
+      );
+  }
+
+  Future<void> _addSongs(Setlist setlist) async {
+    final ids = await pickSongs(
+      context,
+      _library,
+      setName: setlist.name,
+      inSet: setlist.songIds.toSet(),
+      newSong: (context) async =>
+          (await openSongEditor(context, _library, widget.metronome))?.id,
+    );
+    final latest = _page;
+    if (ids == null || ids.isEmpty || latest == null) return;
+    _library.updateSetlist(
+      latest.copyWith(songIds: [...latest.songIds, ...ids]),
+    );
+  }
+
+  Future<void> _delete(Setlist setlist) async {
+    final ok = await confirm(
+      context,
+      'Delete “${setlist.name}”? Its songs stay in your library.',
+      'Delete',
+    );
+    if (!ok || !mounted) return;
+    _library.deleteSetlist(setlist.id);
+    setState(() {
+      _pageId = null;
+      _isNew = false;
+      _renaming = false;
+    });
+  }
 
   // What to play view
 
@@ -310,6 +710,11 @@ class _SetlistPickerState extends State<SetlistPicker> {
   Widget _whatToPlayView(BuildContext context) {
     final colors = context.colors;
     final active = _library.activeSetlist;
+    final query = _search.text.trim().toLowerCase();
+    final sets = [
+      for (final set in _library.setlistsRecentlyPlayed)
+        if (query.isEmpty || set.name.toLowerCase().contains(query)) set,
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -322,7 +727,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
                 if (widget.fullScreen)
                   IconButton(
                     tooltip: 'Back',
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: _close,
                     icon: const Icon(Icons.chevron_left, size: 28),
                   ),
                 const Text(
@@ -348,7 +753,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
                 // Detaches any song; the click keeps going as it is.
                 Haptics.medium();
                 _library.detachSong();
-                Navigator.pop(context);
+                _close();
               },
               child: Row(
                 children: [
@@ -388,16 +793,34 @@ class _SetlistPickerState extends State<SetlistPicker> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-          child: Text(
-            'Setlists',
-            style: TextStyle(fontSize: 14, color: colors.muted),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Setlists',
+                  style: TextStyle(fontSize: 14, color: colors.muted),
+                ),
+              ),
+              Text(
+                'Recently played',
+                style: TextStyle(fontSize: 13, color: colors.muted),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+          child: SearchField(
+            controller: _search,
+            hint: 'Search setlists',
+            onChanged: (_) => setState(() {}),
           ),
         ),
         Divider(height: 1, color: colors.divider),
         Expanded(
           child: ListView(
             children: [
-              for (final setlist in _library.setlists)
+              for (final setlist in sets)
                 _setRow(colors, setlist, current: setlist.id == active?.id),
             ],
           ),
@@ -405,11 +828,12 @@ class _SetlistPickerState extends State<SetlistPicker> {
         _bottomBar(colors, [
           Expanded(
             child: FilledButton.icon(
+              key: SetlistPicker.newSetlistKey,
               style: FilledButton.styleFrom(
                 backgroundColor: colors.surface,
                 foregroundColor: colors.text,
               ),
-              onPressed: widget.onNewSetlist,
+              onPressed: () => setState(_openNewSet),
               icon: const Icon(Icons.add, size: 20),
               label: const FittedBox(
                 child: Text('New setlist', style: TextStyle(fontSize: 17)),
@@ -417,43 +841,42 @@ class _SetlistPickerState extends State<SetlistPicker> {
             ),
           ),
           const SizedBox(width: 8),
-          Expanded(child: _songLibraryButton(icon: false)),
+          Expanded(child: _songLibraryButton()),
         ]),
       ],
     );
   }
 
+  /// Tap = load the set at song 1 and close (every row, the loaded one
+  /// too); the pencil opens its page without loading it.
   Widget _setRow(
     MetraColors colors,
     Setlist setlist, {
     required bool current,
   }) => Material(
-    type: MaterialType.transparency,
+    color: current ? colors.selectedRow : colors.sheet,
     child: InkWell(
       key: ValueKey('picker-set-${setlist.id}'),
       onTap: () {
-        // The loaded set: just its songs, nothing reloads.
-        if (setlist.id == _library.activeSetlist?.id) {
-          return setState(() => _whatToPlay = false);
-        }
-        // Another set: load it at its first song, then show its songs.
-        _library.setActiveSetlist(setlist.id);
-        final songs = _library.visibleSongs;
-        if (songs.isNotEmpty) {
-          Haptics.medium(); // the song changes
-          _library.playSong(songs.first, widget.metronome, index: 0);
-        }
-        setState(() => _whatToPlay = false);
+        Haptics.medium(); // the set (and song) changes
+        _library.loadSetlist(setlist.id, widget.metronome);
+        _close();
       },
       child: Ink(
-        height: 72,
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+        height: 64,
+        padding: const EdgeInsets.only(left: 24),
         decoration: BoxDecoration(
-          color: current ? colors.selectedRow : null,
           border: Border(bottom: BorderSide(color: colors.divider)),
         ),
         child: Row(
           children: [
+            SizedBox(
+              width: 22,
+              child: current
+                  ? Icon(Icons.check, size: 20, color: colors.accent)
+                  : null,
+            ),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -464,18 +887,28 @@ class _SetlistPickerState extends State<SetlistPicker> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 19,
+                      fontSize: 18,
                       fontWeight: current ? FontWeight.w600 : FontWeight.w500,
                     ),
                   ),
                   Text(
                     _count(setlist.songIds.length),
-                    style: TextStyle(fontSize: 14, color: colors.muted),
+                    style: TextStyle(fontSize: 13, color: colors.muted),
                   ),
                 ],
               ),
             ),
-            if (current) Icon(Icons.check, size: 22, color: colors.accent),
+            SizedBox(
+              width: 52,
+              height: 64,
+              child: IconButton(
+                key: ValueKey('picker-set-edit-${setlist.id}'),
+                tooltip: 'Open ${setlist.name}',
+                color: colors.muted,
+                onPressed: () => _openPage(setlist),
+                icon: const Icon(Icons.edit_outlined, size: 20),
+              ),
+            ),
           ],
         ),
       ),
@@ -484,11 +917,11 @@ class _SetlistPickerState extends State<SetlistPicker> {
 
   // Shared pieces
 
-  Widget _songLibraryButton({bool icon = true}) => OutlinedButton.icon(
+  // Text only: it sits beside "Add songs" or "New setlist".
+  Widget _songLibraryButton() => OutlinedButton(
     onPressed: widget.onSongLibrary,
-    icon: icon ? const Icon(Icons.library_music_outlined, size: 20) : null,
-    // Shrinks rather than overflowing beside "New setlist" on narrow phones.
-    label: const FittedBox(
+    // Shrinks rather than overflowing beside its neighbour on narrow phones.
+    child: const FittedBox(
       child: Text('Song library', style: TextStyle(fontSize: 17)),
     ),
   );

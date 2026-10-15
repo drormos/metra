@@ -211,12 +211,18 @@ class LabeledField extends StatelessWidget {
   }
 }
 
-/// The outlined "Search songs" field of the song library screens.
+/// The outlined search field of the song library and What to play.
 class SearchField extends StatelessWidget {
-  const SearchField({super.key, required this.controller, this.onChanged});
+  const SearchField({
+    super.key,
+    required this.controller,
+    this.onChanged,
+    this.hint = 'Search songs',
+  });
 
   final TextEditingController controller;
   final ValueChanged<String>? onChanged;
+  final String hint;
 
   @override
   Widget build(BuildContext context) {
@@ -229,7 +235,7 @@ class SearchField extends StatelessWidget {
       controller: controller,
       onChanged: onChanged,
       decoration: InputDecoration(
-        hintText: 'Search songs',
+        hintText: hint,
         prefixIcon: Icon(Icons.search, color: colors.muted),
         contentPadding: const EdgeInsets.symmetric(vertical: 12),
         border: border,

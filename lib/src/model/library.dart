@@ -59,24 +59,43 @@ class Song {
 /// An ordered list of songs, by id.
 @immutable
 class Setlist {
-  const Setlist({required this.id, required this.name, required this.songIds});
+  const Setlist({
+    required this.id,
+    required this.name,
+    required this.songIds,
+    this.playedAt,
+  });
 
   final String id;
   final String name;
   final List<String> songIds;
 
-  Setlist copyWith({String? name, List<String>? songIds}) => Setlist(
-    id: id,
-    name: name ?? this.name,
-    songIds: songIds ?? this.songIds,
-  );
+  /// When the set was last loaded, for "Recently played"; null if never.
+  final DateTime? playedAt;
 
-  Map<String, Object?> toJson() => {'id': id, 'name': name, 'songIds': songIds};
+  Setlist copyWith({String? name, List<String>? songIds, DateTime? playedAt}) =>
+      Setlist(
+        id: id,
+        name: name ?? this.name,
+        songIds: songIds ?? this.songIds,
+        playedAt: playedAt ?? this.playedAt,
+      );
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'name': name,
+    'songIds': songIds,
+    'playedAt': playedAt?.millisecondsSinceEpoch,
+  };
 
   factory Setlist.fromJson(Map<String, Object?> json) => Setlist(
     id: json['id'] as String,
     name: json['name'] as String,
     songIds: [for (final id in json['songIds'] as List) id as String],
+    playedAt: switch (json['playedAt']) {
+      final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
+      _ => null, // never played, or an older file
+    },
   );
 }
 
