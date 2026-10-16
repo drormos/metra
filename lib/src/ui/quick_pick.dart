@@ -212,30 +212,23 @@ class _QuickPickState extends State<QuickPick> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final panel = switch (_kind) {
-      QuickPickKind.songs => _songsPanel(),
-      QuickPickKind.sets => _setsPanel(),
-      QuickPickKind.set => _setPanel(),
-    };
-    if (_library.activeSetlist == null && !_library.singleSong) return panel;
-    // Not in Free play: every panel starts with it, pinned, always in the
-    // same place ("tap any ⌄, tap Free play").
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _action(
-          key: QuickPick.freePlayKey,
-          icon: const MetronomeIcon(size: 16),
-          label: 'Free play',
-          onTap: () => _choose(_library.detachSong),
-        ),
-        Container(height: 2, color: context.colors.border),
-        Flexible(child: panel),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => switch (_kind) {
+    QuickPickKind.songs => _songsPanel(),
+    QuickPickKind.sets => _setsPanel(),
+    QuickPickKind.set => _setPanel(),
+  };
+
+  /// Unless already in Free play, every panel ends with it, the last
+  /// pinned row, always in the same place ("tap any ⌄, tap Free play").
+  List<Widget> _freePlay() => [
+    if (_library.activeSetlist != null || _library.singleSong)
+      _action(
+        key: QuickPick.freePlayKey,
+        icon: const MetronomeIcon(size: 16),
+        label: 'Free play',
+        onTap: () => _choose(_library.detachSong),
+      ),
+  ];
 
   Widget _songsPanel() {
     final colors = context.colors;
@@ -293,6 +286,7 @@ class _QuickPickState extends State<QuickPick> {
                   (pages) => openSongLibrary(pages, _library, widget.metronome),
                 ),
               ),
+        ..._freePlay(),
       ],
     );
   }
@@ -335,6 +329,7 @@ class _QuickPickState extends State<QuickPick> {
                   ),
                 ),
               ),
+        ..._freePlay(),
       ],
     );
   }
@@ -404,6 +399,7 @@ class _QuickPickState extends State<QuickPick> {
           opens: true,
           onTap: () => setState(() => _kind = QuickPickKind.sets),
         ),
+        ..._freePlay(),
       ],
     );
   }

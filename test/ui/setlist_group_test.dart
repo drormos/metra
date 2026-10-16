@@ -572,7 +572,7 @@ void main() {
       );
     }
 
-    testWidgets('"Free play" is the first row, pinned, unless in Free play', (
+    testWidgets('"Free play" is the last pinned row, unless in Free play', (
       tester,
     ) async {
       await withLibrary(tester);
@@ -589,9 +589,9 @@ void main() {
       final firstSong = tester.getRect(
         find.byKey(const ValueKey('quick-set-song-0')),
       );
-      expect(freePlay.bottom, lessThan(firstSong.top), reason: 'above');
       final other = tester.getRect(find.byKey(QuickPick.otherSetlistsKey));
       expect(other.top, greaterThan(firstSong.bottom), reason: 'footer');
+      expect(freePlay.top, greaterThanOrEqualTo(other.bottom), reason: 'last');
     });
 
     testWidgets('long-press a song edits it; back returns to main', (

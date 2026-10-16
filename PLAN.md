@@ -221,7 +221,7 @@ Decisions made with the user that the spec doesn't state (or states differently)
 - `SetlistGroup` is now the source bar (name kept to spare churn): one 68px row, no frame. Setlist mode: previous | 76px "4/12 ⌄" (setlist icon; tap = set dropdown, long-press = the set's page) | next; Free play / Single song: "Setlists ⌄" | "Songs ⌄". The old Free play / Single song headers and their buttons are gone; `FreePlayButton` lives on in the set page's top bar.
 - Title block (`MetronomeScreen._titleBlock`, fixed 54px, no text scaling: the 34px title is large already): title over a 17px set-name subtitle (empty in Single song); in Free play a quiet "+ New song" text button opening the Save as new dialog, titled "New song" there. Long-press title = song editor, long-press subtitle = set page.
 - Tempo cluster: the BPM column aligns to the bottom of its free space, so spare height goes above the BPM; 6px between the ruler and the steps.
-- Dropdowns: a pinned "Free play" row (2px line under it) tops every panel unless already in Free play; removed from the set panel's footer. Panels sit above the bar (they anchor to `SetlistGroup`).
+- Dropdowns: a pinned "Free play" row is the last action row of every panel unless already in Free play (`_freePlay()`); it was first, then moved per the spec. Panels sit above the bar (they anchor to `SetlistGroup`).
 - Semantics labels for previous/next and the center button now sit inside the buttons, so screen readers keep the tap action.
 
 ## Phase 5q: Media card toggle and tempo steps (done)
