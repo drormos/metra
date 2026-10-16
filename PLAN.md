@@ -250,6 +250,13 @@ Decisions made with the user that the spec doesn't state (or states differently)
 ## Phase 5v: Unsaved-change actions as plain text (done)
 - "Revert · Save · Save as new" under the BPM: plain `TextButton`s, muted Saira 15/500, 44px tall, separated by dim dots (`beatResting`, #3A3A3A). "Save" is Save to song (same key, `saveToSongKey`); actions unchanged.
 
+## Pre-release review fixes (done)
+- Voice limit 128 (`SoloudClickOutput.maxVoices`, was 32): scheduled clicks hold a voice from `playScheduled` until they finish, and at the limit flutter_soloud silently stops the oldest of the same sound. The 2 s background lookahead at 300 bpm in 16ths holds ~45. A test checks the worst case fits.
+- A tempo or pattern change while the device starts (between Start and the anchor) restarts on beat 1 with it once started; before, the scheduler wasn't running to take it and the click played the old values.
+- Calls (like music apps): a ringing or active call stops the click (the media handler's stop, so the card stays), and it starts again when the call ends, unless the user started the click during the call. No audio focus, so `CallMonitor.kt` watches the call: Android 12+ `AudioManager.addOnModeChangedListener` (any mode but normal; covers VoIP; no permission), older Android `PhoneStateListener.LISTEN_CALL_STATE` (no permission before Android 12; cellular only). Logic in `CallPause` (tested).
+- Loading: a bad song, setlist or setting is skipped or falls back instead of setting the whole file aside; a malformed file (no song/setlist lists, newer version) still is.
+- Play Console: declare the `mediaPlayback` foreground service (description + video) before the first review.
+
 ## Release builds
 - Signing: `android/key.properties` (gitignored) → keystore `~/keys/metra-release.jks` (alias `metra`, PKCS12, RSA 4096, 10000 days). A copy of the properties sits next to the keystore. Losing the keystore means no updates to installed copies: back up `~/keys/`. Without `key.properties`, release builds fall back to the debug key.
 - `keytool` isn't on the PATH (no system Java): use `/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/keytool`.

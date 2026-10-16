@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:metra/src/audio/call_pause.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/platform/android_bridge.dart';
 
@@ -84,5 +85,21 @@ void main() {
     await fromTile('start');
     expect(controller.isPlaying, isTrue);
     controller.stop();
+  });
+
+  test('a call from CallMonitor pauses and resumes the click', () async {
+    AndroidBridge.attachCalls(CallPause(controller));
+    Future<void> call(bool active) => messenger.handlePlatformMessage(
+      AndroidBridge.android.name,
+      codec.encodeMethodCall(MethodCall('callActive', active)),
+      (_) {},
+    );
+    await controller.play();
+    await call(true);
+    expect(controller.isPlaying, isFalse);
+    await call(false);
+    expect(controller.isPlaying, isTrue);
+    controller.stop();
+    AndroidBridge.android.setMethodCallHandler(null);
   });
 }

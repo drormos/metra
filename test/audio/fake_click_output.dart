@@ -20,6 +20,9 @@ class FakeClickOutput implements ClickOutput {
   bool prepared = false;
   int releaseCount = 0;
 
+  /// Set to hold [prepare] until it completes (a slow device start).
+  Completer<void>? prepareGate;
+
   /// Set to make [prepare] / [recover] throw.
   Object? deviceError;
   int recoverCount = 0;
@@ -35,6 +38,7 @@ class FakeClickOutput implements ClickOutput {
 
   @override
   Future<void> prepare() async {
+    await prepareGate?.future;
     if (deviceError != null) throw deviceError!;
     prepared = true;
   }

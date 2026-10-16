@@ -31,16 +31,17 @@ class MainActivity : AudioServiceActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         TileBridge.attach(this, flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "metra/android")
-            .setMethodCallHandler { call, result ->
-                when (call.method) {
-                    "setLaunchTheme" -> {
-                        setLaunchTheme(call.arguments as String)
-                        result.success(null)
-                    }
-                    else -> result.notImplemented()
+        val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "metra/android")
+        CallMonitor.attach(this, channel)
+        channel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "setLaunchTheme" -> {
+                    setLaunchTheme(call.arguments as String)
+                    result.success(null)
                 }
+                else -> result.notImplemented()
             }
+        }
     }
 
     // Already running (warm): the tile asked to start.

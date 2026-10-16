@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../audio/call_pause.dart';
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 
@@ -70,6 +71,13 @@ abstract final class AndroidBridge {
       await controller.play();
     }
   }
+
+  /// Calls ring and end (`CallMonitor.kt`): the click pauses for them.
+  static void attachCalls(CallPause calls) =>
+      android.setMethodCallHandler((call) async {
+        if (call.method != 'callActive') throw MissingPluginException();
+        await calls.callChanged(active: call.arguments as bool);
+      });
 
   static Future<Object?> _call(
     MethodChannel channel,

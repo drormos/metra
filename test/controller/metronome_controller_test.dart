@@ -1,5 +1,9 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:metra/src/audio/soloud_click_output.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/click_sound.dart';
 import 'package:metra/src/model/click_volumes.dart';
@@ -73,6 +77,23 @@ void main() {
       await future;
       expect(output.prepared, isTrue);
       expect(output.clicks, isNotEmpty);
+    });
+
+    test('a change while the device starts is what plays', () async {
+      output.prepareGate = Completer();
+      final playing = controller.play();
+      controller
+        ..setBpm(60)
+        ..setPattern(MetronomePattern.simple(beatsPerBar: 3, stepsPerBeat: 1));
+      output.prepareGate!.complete();
+      await playing;
+      for (var i = 0; i < 40; i++) {
+        output.time += _ms * 25;
+        controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      }
+      final times = output.liveTimes;
+      expect(times[1] - times[0], const Duration(seconds: 1));
+      expect(output.live.first.level, StepLevel.accent);
     });
 
     test('play while playing is a no-op', () async {
@@ -162,6 +183,26 @@ void main() {
         controller.lookaheadForTesting,
         MetronomeController.backgroundLookahead,
       );
+    });
+
+    test('background clicks fit in the engine voice limit', () async {
+      controller
+        ..setBpm(MetronomeController.maxBpm)
+        ..setSubdivision(4)
+        ..didChangeAppLifecycleState(AppLifecycleState.hidden);
+      await controller.play();
+      var most = 0;
+      for (var i = 0; i < 400; i++) {
+        output.time += _ms * 25;
+        controller.didChangeAppLifecycleState(AppLifecycleState.hidden);
+        // Pending or still ringing (the longest sample is 0.25 s).
+        final held = output.live
+            .where((c) => c.at > output.time - _ms * 250)
+            .length;
+        most = max(most, held);
+      }
+      expect(most, greaterThan(32)); // the old limit was too small
+      expect(most, lessThanOrEqualTo(SoloudClickOutput.maxVoices));
     });
   });
 

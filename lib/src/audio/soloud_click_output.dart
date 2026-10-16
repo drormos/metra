@@ -16,8 +16,7 @@ class SoloudClickOutput implements ClickOutput {
   static Future<SoloudClickOutput> create() async {
     final soloud = SoLoud.instance;
     await soloud.init();
-    // Headroom for fast subdivisions (default is 16).
-    soloud.setMaxActiveVoiceCount(32);
+    soloud.setMaxActiveVoiceCount(maxVoices);
     // All sounds up front (a few KB each), so switching never waits.
     return SoloudClickOutput._({
       for (final sound in ClickSound.values)
@@ -27,6 +26,11 @@ class SoloudClickOutput implements ClickOutput {
         ),
     });
   }
+
+  /// Scheduled clicks hold a voice from [schedule] until they finish
+  /// ringing, and at the limit SoLoud silently drops the oldest one. The
+  /// background lookahead (2 s) at 300 bpm in 16ths needs ~45 (default 16).
+  static const maxVoices = 128;
 
   static const _defaultIdleTimeout = Duration(milliseconds: 500);
 

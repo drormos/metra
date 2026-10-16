@@ -81,6 +81,34 @@ void main() {
     );
   });
 
+  test('a bad entry is skipped; the rest of the library loads', () {
+    final json = jsonDecode(
+      jsonEncode(
+        Library.empty
+            .copyWith(
+              songs: [
+                Song(id: 'a', name: 'Good', bpm: 90, pattern: waltz),
+                Song(id: 'b', name: 'Bad', bpm: 100, pattern: waltz),
+              ],
+              setlists: [
+                const Setlist(id: 's', name: 'Good', songIds: ['a', 'b']),
+                const Setlist(id: 't', name: 'Bad', songIds: []),
+              ],
+            )
+            .toJson(),
+      ),
+    );
+    (json['songs'] as List)[1]['bpm'] = 'fast';
+    (json['setlists'] as List)[1]['songIds'] = null;
+    json['lastPattern'] = {'steps': 'garbage'};
+    json['visualOffsetMs'] = null;
+    final library = Library.fromJson(json);
+    expect([for (final s in library.songs) s.name], ['Good']);
+    expect([for (final s in library.setlists) s.name], ['Good']);
+    expect(library.lastPattern, Library.empty.lastPattern);
+    expect(library.visualOffset, Duration.zero);
+  });
+
   test('newer file versions are rejected rather than misread', () {
     final json = Library.empty.toJson()..['version'] = 99;
     expect(() => Library.fromJson(json), throwsFormatException);

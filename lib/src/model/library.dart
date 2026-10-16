@@ -215,7 +215,9 @@ class Library {
     'setlists': [for (final setlist in setlists) setlist.toJson()],
   };
 
-  /// Throws on malformed data, and on files from a newer app version.
+  /// Throws on a malformed file, and on files from a newer app version. A
+  /// bad song, setlist or setting is skipped or falls back, so one broken
+  /// entry doesn't hide the rest of the library.
   factory Library.fromJson(Map<String, Object?> json) {
     final fileVersion = json['version'] as int;
     if (fileVersion > version) {
@@ -223,12 +225,18 @@ class Library {
         'Library version $fileVersion is newer than $version',
       );
     }
+    final songs = json['songs'] as List;
+    final setlists = json['setlists'] as List;
     return Library(
-      lastBpm: json['lastBpm'] as int,
-      lastPattern: MetronomePattern.fromJson(
-        json['lastPattern'] as Map<String, Object?>,
-      ),
-      visualOffset: Duration(milliseconds: json['visualOffsetMs'] as int),
+      lastBpm: _orNull(() => json['lastBpm'] as int) ?? empty.lastBpm,
+      lastPattern:
+          _orNull(
+            () => MetronomePattern.fromJson(
+              json['lastPattern'] as Map<String, Object?>,
+            ),
+          ) ??
+          empty.lastPattern,
+      visualOffset: Duration(milliseconds: json['visualOffsetMs'] as int? ?? 0),
       // Optional (older files lack it); an unknown name falls back rather
       // than discarding the whole library.
       clickSound:
@@ -246,13 +254,21 @@ class Library {
       currentSongId: json['currentSongId'] as String?,
       currentPosition: json['currentPosition'] as int? ?? -1,
       songs: [
-        for (final song in json['songs'] as List)
-          Song.fromJson(song as Map<String, Object?>),
+        for (final song in songs)
+          ?_orNull(() => Song.fromJson(song as Map<String, Object?>)),
       ],
       setlists: [
-        for (final setlist in json['setlists'] as List)
-          Setlist.fromJson(setlist as Map<String, Object?>),
+        for (final setlist in setlists)
+          ?_orNull(() => Setlist.fromJson(setlist as Map<String, Object?>)),
       ],
     );
+  }
+
+  static T? _orNull<T>(T Function() read) {
+    try {
+      return read();
+    } catch (_) {
+      return null;
+    }
   }
 }

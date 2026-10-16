@@ -285,7 +285,13 @@ class MetronomeController extends ChangeNotifier {
 
   Future<void> _start() async {
     try {
-      await _scheduler.start(bpm: _bpm.toDouble(), pattern: _pattern);
+      final bpm = _bpm, pattern = _pattern;
+      await _scheduler.start(bpm: bpm.toDouble(), pattern: pattern);
+      // Changed while the device was starting, when the scheduler wasn't
+      // running to take it: restart with what the screen shows.
+      if (_bpm != bpm || _pattern != pattern) {
+        _scheduler.restartNow(bpm: _bpm.toDouble(), pattern: _pattern);
+      }
       _setAudioError(null);
     } catch (e) {
       _scheduler.stop();

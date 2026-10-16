@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import 'src/audio/call_pause.dart';
 import 'src/audio/headphone_guard.dart';
 import 'src/audio/metronome_audio_handler.dart';
 import 'src/audio/soloud_click_output.dart';
@@ -55,6 +56,7 @@ Future<void> main() async {
       if (library != null) AndroidBridge.syncLaunchTheme(library);
       // Not awaited: a start from the tile waits for the first frame.
       AndroidBridge.attachTile(controller, stop: handler?.stop);
+      AndroidBridge.attachCalls(CallPause(controller, stop: handler?.stop));
     }
   }
   // Edge to edge: the screens keep clear of the bars with SafeArea.
