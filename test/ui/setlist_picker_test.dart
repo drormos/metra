@@ -275,7 +275,7 @@ void main() {
     await loadFromLibrary(tester, 'Two', freePlay: true);
     expect(library.activeSetlist, isNull);
     expect(library.singleSong, isTrue);
-    expect(find.text('Single song'), findsOneWidget);
+    expect(library.singleSong, isTrue);
     expect(
       tester.widget<Text>(find.byKey(MetronomeScreen.titleKey)).data,
       'Two',
@@ -292,7 +292,7 @@ void main() {
     await loadFromLibrary(tester, 'Two'); // a song that is in the set
     expect(library.activeSetlist, isNull);
     expect(library.singleSong, isTrue);
-    expect(find.text('Single song'), findsOneWidget);
+    expect(library.singleSong, isTrue);
     expect(metronome.bpm, 110);
   });
 

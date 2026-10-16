@@ -86,13 +86,15 @@ void main() {
       tester,
     ) async {
       await pumpScreen(tester);
-      expect(find.text('Free play'), findsOneWidget);
+      expect(find.byKey(MetronomeScreen.newSongKey), findsOneWidget);
       expect(find.text('Setlists'), findsOneWidget);
       expect(find.text('Songs'), findsOneWidget);
       expect(find.text('Create a setlist'), findsNothing);
     });
 
-    testWidgets('Single song: header and its Free play button', (tester) async {
+    testWidgets('Single song: the title only; Free play from a dropdown', (
+      tester,
+    ) async {
       final haptics = <Object?>[];
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.platform,
@@ -119,23 +121,29 @@ void main() {
       library.playSong(song, metronome);
       await metronome.play();
       await tester.pump();
-      expect(find.text('Single song'), findsOneWidget);
       expect(
         tester.widget<Text>(find.byKey(MetronomeScreen.titleKey)).data,
         'Solo',
+      );
+      expect(
+        tester.widget<Text>(find.byKey(MetronomeScreen.subtitleKey)).data,
+        '',
+        reason: 'no subtitle in Single song',
       );
       expect(find.byKey(SetlistGroup.songsKey), findsOneWidget);
       expect(groupRect(tester), rect, reason: 'no control moves');
       metronome.nudge(1); // unsaved change: Revert / Save to song showing
       await tester.pump();
       expect(find.byKey(MetronomeScreen.revertKey), findsOneWidget);
-      await tester.tap(find.byKey(FreePlayButton.buttonKey));
+      await tester.tap(find.byKey(SetlistGroup.songsKey));
       await tester.pump();
-      expect(find.text('Free play'), findsOneWidget);
-      expect(
-        tester.widget<Text>(find.byKey(MetronomeScreen.titleKey)).data,
-        '',
-      );
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.tap(find.byKey(QuickPick.freePlayKey));
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(MetronomeScreen.newSongKey), findsOneWidget);
+      expect(find.byKey(MetronomeScreen.titleKey), findsNothing);
       expect(find.byKey(MetronomeScreen.revertKey), findsNothing);
       expect(metronome.isPlaying, isTrue);
       expect(metronome.bpm, 91, reason: 'the click is unchanged');
@@ -144,14 +152,14 @@ void main() {
       await tester.pump();
     });
 
-    testWidgets('Free play: "Save as song" saves the click as a song', (
+    testWidgets('Free play: "+ New song" saves the click as a song', (
       tester,
     ) async {
       await pumpScreen(tester);
       metronome.setBpm(87);
-      await tester.tap(find.byKey(SetlistGroup.saveAsSongKey));
+      await tester.tap(find.byKey(MetronomeScreen.newSongKey));
       await tester.pumpAndSettle();
-      expect(find.text('Save as new song'), findsOneWidget);
+      expect(find.text('New song'), findsWidgets);
       final field = tester.widget<TextField>(find.byKey(SaveAsNewKeys.name));
       expect(field.controller!.text, 'Song 1');
       expect(find.textContaining('Replace'), findsNothing, reason: 'no set');
@@ -159,7 +167,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(library.singleSong, isTrue);
       expect(library.currentSong?.bpm, 87);
-      expect(find.text('Single song'), findsOneWidget);
+      expect(find.byKey(MetronomeScreen.newSongKey), findsNothing);
     });
 
     testWidgets('Save as new from a set: Replace by default', (tester) async {
@@ -182,27 +190,36 @@ void main() {
       expect(find.byKey(MetronomeScreen.tempoNameKey), findsOneWidget);
     });
 
-    testWidgets('header buttons are a fixed 128x40 in every mode', (
+    testWidgets('title block and source bar keep their size in every mode', (
       tester,
     ) async {
-      await pumpScreen(tester);
-      expect(
-        tester.getSize(find.byKey(SetlistGroup.saveAsSongKey)),
-        const Size(128, 40),
-      );
-      library.playSingleSong(
-        library.addSong(
-          name: 'A very long song name',
-          bpm: 90,
-          pattern: const MetronomePattern.standard(),
-        ),
-        metronome,
-      );
+      await withSet(tester);
+      Rect title() => tester.getRect(find.byKey(MetronomeScreen.titleKey));
+      Rect bar() => tester.getRect(find.byType(SetlistGroup));
+      await tester.tap(find.byKey(SetlistGroup.nextKey));
+      await tester.pump();
+      final inSet = (title(), bar());
+      expect(bar().height, SetlistGroup.height);
+      library.playSingleSong(library.visibleSongs.first, metronome);
+      await tester.pump();
+      expect((title(), bar()), inSet, reason: 'Single song');
+      library.detachSong();
+      await tester.pump();
+      expect(bar(), inSet.$2, reason: 'Free play');
+      expect(find.byKey(MetronomeScreen.newSongKey), findsOneWidget);
+    });
+
+    testWidgets('long-press the set name opens the set page', (tester) async {
+      await withSet(tester);
+      await tester.tap(find.byKey(SetlistGroup.nextKey));
       await tester.pump();
       expect(
-        tester.getSize(find.byKey(FreePlayButton.buttonKey)),
-        const Size(128, 40),
+        tester.widget<Text>(find.byKey(MetronomeScreen.subtitleKey)).data,
+        'Friday set',
       );
+      await tester.longPress(find.byKey(MetronomeScreen.subtitleKey));
+      await tester.pumpAndSettle();
+      expect(find.byKey(SetlistPicker.backToSetlistsKey), findsOneWidget);
     });
 
     testWidgets('the Setlists and Songs buttons are the same size', (
@@ -218,7 +235,7 @@ void main() {
     testWidgets('setlist mode: header, position, neighbours', (tester) async {
       await withSet(tester);
       expect(find.text('Friday set'), findsOneWidget);
-      expect(find.textContaining(' of 3'), findsNothing, reason: 'no song yet');
+      expect(find.text('–/3'), findsOneWidget, reason: 'no song yet');
       expect(enabled(tester, SetlistGroup.previousKey), isFalse);
       expect(find.text('One'), findsOneWidget, reason: 'next = first song');
 
@@ -226,7 +243,7 @@ void main() {
       await tester.pump();
       expect(title(tester), 'One');
       expect(metronome.bpm, 100);
-      expect(find.text('1 of 3'), findsOneWidget);
+      expect(find.text('1/3'), findsOneWidget);
       expect(find.text('Two'), findsOneWidget);
       expect(find.text('110 bpm'), findsOneWidget);
 
@@ -554,6 +571,28 @@ void main() {
         },
       );
     }
+
+    testWidgets('"Free play" is the first row, pinned, unless in Free play', (
+      tester,
+    ) async {
+      await withLibrary(tester);
+      await tester.tap(find.byKey(SetlistGroup.songsKey));
+      await tester.pumpAndSettle();
+      expect(find.byKey(QuickPick.freePlayKey), findsNothing);
+      await tester.tapAt(const Offset(200, 60));
+      await tester.pumpAndSettle();
+      library.loadSetlist(library.setlists.first.id, metronome);
+      await tester.pump();
+      await tester.tap(find.byKey(SetlistGroup.headerKey));
+      await tester.pumpAndSettle();
+      final freePlay = tester.getRect(find.byKey(QuickPick.freePlayKey));
+      final firstSong = tester.getRect(
+        find.byKey(const ValueKey('quick-set-song-0')),
+      );
+      expect(freePlay.bottom, lessThan(firstSong.top), reason: 'above');
+      final other = tester.getRect(find.byKey(QuickPick.otherSetlistsKey));
+      expect(other.top, greaterThan(firstSong.bottom), reason: 'footer');
+    });
 
     testWidgets('long-press a song edits it; back returns to main', (
       tester,

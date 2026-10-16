@@ -39,6 +39,8 @@ class MetronomeScreen extends StatelessWidget {
   static const revertKey = Key('revert');
   static const saveToSongKey = Key('save-to-song');
   static const saveAsNewKey = Key('save-as-new');
+  static const newSongKey = Key('new-song');
+  static const subtitleKey = Key('subtitle');
 
   /// The most the main screen's text grows with the system font size.
   static const maxTextScale = 1.3;
@@ -110,11 +112,12 @@ class MetronomeScreen extends StatelessWidget {
         _topRow(context),
         const SizedBox(height: 16),
         BeatIndicator(controller: controller),
-        // The BPM area takes all the free height and shrinks first on
-        // small phones.
+        // The tempo cluster (BPM, tempo line, ruler, steps) stays one
+        // group: spare height goes above the BPM, which also shrinks first
+        // on small phones.
         Expanded(
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
               Flexible(
                 child: FittedBox(
@@ -139,6 +142,7 @@ class MetronomeScreen extends StatelessWidget {
             ],
           ),
         ),
+        const SizedBox(height: 6),
         TempoSteps(bpm: bpm, onStep: controller.nudge, height: 60),
         const SizedBox(height: 12),
         SizedBox(
@@ -199,7 +203,6 @@ class MetronomeScreen extends StatelessWidget {
     );
   }
 
-  /// Song title, then subdivision, time signature and Menu buttons.
   /// The tempo name; while the loaded song has unsaved main-screen
   /// changes, Revert and Save to song instead (ui-spec.md "Changes to a
   /// loaded song").
@@ -273,34 +276,109 @@ class MetronomeScreen extends StatelessWidget {
     );
   }
 
+  /// Fixed 54px in every mode, so nothing shifts: the song title over the
+  /// set's name (an empty line in Single song), or "+ New song" in Free
+  /// play. Taps do nothing, so a stray touch on stage never leaves the
+  /// main screen; long-presses are shortcuts (Long-press rule).
+  Widget _titleBlock(BuildContext context) {
+    final colors = context.colors;
+    final library = this.library;
+    final song = library?.currentSong;
+    if (library != null && song == null && library.activeSetlist == null) {
+      // Free play: quiet, one tap, makes a song of what's sounding now.
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: Transform.translate(
+          offset: const Offset(-8, 0),
+          child: TextButton.icon(
+            key: newSongKey,
+            style: TextButton.styleFrom(
+              foregroundColor: colors.muted,
+              minimumSize: const Size(0, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+            ),
+            onPressed: () => showSaveAsNewSong(context, library, controller),
+            icon: const Icon(Icons.add, size: 16),
+            label: const Text(
+              'New song',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ),
+      );
+    }
+    final set = library?.activeSetlist;
+    void longPress(VoidCallback open) {
+      Haptics.medium();
+      open();
+    }
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onLongPress: library == null || song == null
+              ? null
+              : () => longPress(
+                  () =>
+                      openSongEditor(context, library, controller, song: song),
+                ),
+          child: Text(
+            song?.name ?? '',
+            key: titleKey,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontFamily: MetraFonts.condensed,
+              fontSize: 34,
+              fontWeight: FontWeight.w700,
+              height: 1,
+            ),
+          ),
+        ),
+        const SizedBox(height: 3),
+        // Always 17px, so the title sits in the same place in every mode.
+        SizedBox(
+          height: 17,
+          child: GestureDetector(
+            onLongPress: library == null || set == null
+                ? null
+                : () => longPress(
+                    () => openSetlists(
+                      context,
+                      library: library,
+                      metronome: controller,
+                      setId: set.id,
+                    ),
+                  ),
+            child: Text(
+              set?.name ?? '',
+              key: subtitleKey,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14,
+                height: 17 / 14,
+                color: colors.muted,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _topRow(BuildContext context) {
     final pattern = controller.pattern;
     final library = this.library;
-    final song = library?.currentSong;
     return Row(
       children: [
         Expanded(
-          // A tap does nothing, so a stray touch on stage never leaves the
-          // main screen; long-press edits the loaded song (Long-press rule).
-          child: GestureDetector(
-            onLongPress: library == null || song == null
-                ? null
-                : () {
-                    Haptics.medium();
-                    openSongEditor(context, library, controller, song: song);
-                  },
-            child: Text(
-              song?.name ?? '',
-              key: titleKey,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontFamily: MetraFonts.condensed,
-                fontSize: 34,
-                fontWeight: FontWeight.w700,
-                height: 1,
-              ),
-            ),
+          child: SizedBox(
+            height: 54,
+            // Fixed height; the 34px title is large text already.
+            child: MediaQuery.withNoTextScaling(child: _titleBlock(context)),
           ),
         ),
         const SizedBox(width: 8),

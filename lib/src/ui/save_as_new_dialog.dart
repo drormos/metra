@@ -6,7 +6,8 @@ import 'haptics.dart';
 import 'theme.dart';
 
 /// "Save as new song" (ui-spec.md, `save-as-new.reference.html`): from
-/// "Save as new" under the BPM, or "Save as song" in the Free play header.
+/// "Save as new" under the BPM, or "+ New song" in Free play (titled "New
+/// song" there).
 /// Saves what the click plays now as a new library song and loads it; the
 /// click carries on unchanged.
 Future<void> showSaveAsNewSong(
@@ -73,7 +74,8 @@ class _SaveAsNewDialogState extends State<_SaveAsNewDialog> {
     final song = _song;
     final set = _set;
     return AlertDialog(
-      title: const Text('Save as new song'),
+      // From Free play it's simply a new song from what's sounding.
+      title: Text(song == null ? 'New song' : 'Save as new song'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
