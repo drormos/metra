@@ -263,6 +263,7 @@ Decisions made with the user that the spec doesn't state (or states differently)
 - `keytool` isn't on the PATH (no system Java): use `/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/keytool`.
 - **Every shared build bumps the build number** (`version: 1.0.0+N` in `pubspec.yaml`, the `+N`), so Android accepts it as an update and feedback emails name the exact build. Bump the version name (`1.0.0`) for user-visible releases.
 - App ID `com.dror.metra` (was the template's `com.example.metra`; the Play Store refuses it and it can't change after sharing). Debug builds are `com.dror.metra.debug`, labelled "Metra dev" (`manifestPlaceholders["appLabel"]`), so they install beside the real app instead of over it. iOS/macOS bundle IDs follow.
+- Play: `flutter build appbundle --release` → `build/app/outputs/bundle/release/app-release.aab`, signed with the same keystore, which is the upload key (Google Play app signing holds the final key).
 - Build: `flutter build apk --release` → `build/app/outputs/flutter-apk/app-release.apk`. Install on the phone with `adb install -r` (keeps the library); `flutter install` uninstalls first and wipes it. `adb` is `~/Library/Android/sdk/platform-tools/adb`.
 - Release builds log nothing (`debugPrint` is silenced in `main`).
 
