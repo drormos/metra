@@ -221,12 +221,29 @@ class SetlistGroup extends StatelessWidget {
       size: const Size(10, 16),
       painter: _Chevron(color: colors.text, forward: forward),
     );
+    // One balanced unit with the chevron: the tempo in condensed 17px,
+    // "bpm" small and muted.
     final bpm = Flexible(
-      child: Text(
-        '${song?.bpm} bpm',
+      child: Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: '${song?.bpm}',
+              style: TextStyle(
+                fontFamily: MetraFonts.condensed,
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+                color: colors.stepTempo,
+              ),
+            ),
+            TextSpan(
+              text: ' bpm',
+              style: TextStyle(fontSize: 11, color: colors.muted),
+            ),
+          ],
+        ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(fontSize: 12, color: colors.muted),
       ),
     );
     return FilledButton(
@@ -276,8 +293,8 @@ class SetlistGroup extends StatelessWidget {
                         ? MainAxisAlignment.end
                         : MainAxisAlignment.start,
                     children: forward
-                        ? [bpm, const SizedBox(width: 4), chevron]
-                        : [chevron, const SizedBox(width: 4), bpm],
+                        ? [bpm, const SizedBox(width: 8), chevron]
+                        : [chevron, const SizedBox(width: 8), bpm],
                   ),
                 ],
               ),
