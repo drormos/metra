@@ -222,7 +222,7 @@ void main() {
         final subtitle = tester.getRect(
           find.byKey(MetronomeScreen.subtitleKey),
         );
-        final bpmLine = tester.getRect(find.text('110 bpm'));
+        final bpmLine = tester.getRect(find.text('110 BPM'));
         final long = 'A very long song name that has to shrink to fit';
         for (final s in library.songs) {
           library.updateSong(s.copyWith(name: '$long ${s.name}'));
@@ -240,7 +240,7 @@ void main() {
           tester.getRect(find.byKey(MetronomeScreen.subtitleKey)),
           subtitle,
         );
-        expect(tester.getRect(find.text('110 bpm')), bpmLine);
+        expect(tester.getRect(find.text('110 BPM')), bpmLine);
       },
     );
 
@@ -280,7 +280,7 @@ void main() {
       expect(metronome.bpm, 100);
       expect(position('1/3'), findsOneWidget);
       expect(find.text('Two'), findsOneWidget);
-      expect(find.text('110 bpm'), findsOneWidget);
+      expect(find.text('110 BPM'), findsOneWidget);
 
       await tester.tap(find.byKey(SetlistGroup.nextKey));
       await tester.tap(find.byKey(SetlistGroup.nextKey));

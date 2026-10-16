@@ -10,7 +10,6 @@ class MetraColors extends ThemeExtension<MetraColors> {
     required this.background,
     required this.sheet,
     required this.dim,
-    required this.stepTempo,
     required this.lifted,
     required this.slot,
     required this.shadow,
@@ -38,7 +37,6 @@ class MetraColors extends ThemeExtension<MetraColors> {
     background: Color(0xFF000000),
     sheet: Color(0xFF111111),
     dim: Color(0x99000000),
-    stepTempo: Color(0xFFD0D0D0),
     lifted: Color(0xFF2A2A2A),
     slot: Color(0xFF4A4A4A),
     shadow: Color(0xD9000000),
@@ -66,7 +64,6 @@ class MetraColors extends ThemeExtension<MetraColors> {
     background: Color(0xFFF3F1EC),
     sheet: Color(0xFFECE9E2),
     dim: Color(0x59000000),
-    stepTempo: Color(0xFF4A4A4A),
     lifted: Color(0xFFFFFFFF),
     slot: Color(0xFFA8A39A),
     shadow: Color(0x40000000),
@@ -96,9 +93,6 @@ class MetraColors extends ThemeExtension<MetraColors> {
 
   /// Over the main screen while a dropdown panel is open.
   final Color dim;
-
-  /// The neighbouring song's tempo on Previous / Next.
-  final Color stepTempo;
 
   /// A set's page while reordering: the lifted row, the dashed drop slot,
   /// and the lifted row's shadow.

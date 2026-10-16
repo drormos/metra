@@ -216,34 +216,22 @@ class SetlistGroup extends StatelessWidget {
     required bool forward,
     required VoidCallback onPressed,
   }) {
-    // Bolder and larger than the bpm text: it says which way.
     final chevron = CustomPaint(
-      size: const Size(10, 16),
-      painter: _Chevron(color: colors.text, forward: forward),
+      size: const Size.square(15),
+      painter: _Chevron(color: colors.muted, forward: forward),
     );
-    // One balanced unit with the chevron: the tempo in condensed 17px,
-    // "bpm" small and muted.
+    // One grey bold unit with the chevron: "‹ 98 BPM" / "168 BPM ›".
     final bpm = Flexible(
-      child: Text.rich(
-        TextSpan(
-          children: [
-            TextSpan(
-              text: '${song?.bpm}',
-              style: TextStyle(
-                fontFamily: MetraFonts.condensed,
-                fontSize: 17,
-                fontWeight: FontWeight.w600,
-                color: colors.stepTempo,
-              ),
-            ),
-            TextSpan(
-              text: ' bpm',
-              style: TextStyle(fontSize: 11, color: colors.muted),
-            ),
-          ],
-        ),
+      child: Text(
+        '${song?.bpm} BPM',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 13 * 0.02,
+          color: colors.muted,
+        ),
       ),
     );
     return FilledButton(
@@ -293,8 +281,8 @@ class SetlistGroup extends StatelessWidget {
                         ? MainAxisAlignment.end
                         : MainAxisAlignment.start,
                     children: forward
-                        ? [bpm, const SizedBox(width: 8), chevron]
-                        : [chevron, const SizedBox(width: 8), bpm],
+                        ? [bpm, const SizedBox(width: 5), chevron]
+                        : [chevron, const SizedBox(width: 5), bpm],
                   ),
                 ],
               ),
@@ -303,8 +291,8 @@ class SetlistGroup extends StatelessWidget {
   }
 }
 
-/// The small Previous / Next chevron on the bpm line: 16px tall, 2.6px
-/// stroke.
+/// The Previous / Next chevron on the tempo line: 15px, 2.8 stroke (in a
+/// 16-unit box, as in main-screen.reference.html).
 class _Chevron extends CustomPainter {
   _Chevron({required this.color, required this.forward});
 
@@ -313,16 +301,17 @@ class _Chevron extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final (tip, back) = forward ? (8.0, 2.0) : (2.0, 8.0);
+    canvas.scale(size.width / 16);
+    final (tip, back) = forward ? (11.0, 6.0) : (5.0, 10.0);
     canvas.drawPath(
       Path()
-        ..moveTo(back, 1)
+        ..moveTo(back, 3)
         ..lineTo(tip, 8)
-        ..lineTo(back, 15),
+        ..lineTo(back, 13),
       Paint()
         ..color = color
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.6
+        ..strokeWidth = 2.8
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round,
     );
