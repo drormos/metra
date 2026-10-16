@@ -213,6 +213,37 @@ void main() {
       expect(find.byKey(MetronomeScreen.newSongKey), findsOneWidget);
     });
 
+    testWidgets(
+      'fixed lines: shrinking names never move the lines under them',
+      (tester) async {
+        await withSet(tester);
+        await tester.tap(find.byKey(SetlistGroup.nextKey)); // One, next: Two
+        await tester.pump();
+        final subtitle = tester.getRect(
+          find.byKey(MetronomeScreen.subtitleKey),
+        );
+        final bpmLine = tester.getRect(find.text('110 bpm'));
+        final long = 'A very long song name that has to shrink to fit';
+        for (final s in library.songs) {
+          library.updateSong(s.copyWith(name: '$long ${s.name}'));
+        }
+        await tester.pump();
+        expect(
+          tester
+              .widget<Text>(find.byKey(MetronomeScreen.titleKey))
+              .style!
+              .fontSize,
+          lessThan(34),
+          reason: 'the title shrank',
+        );
+        expect(
+          tester.getRect(find.byKey(MetronomeScreen.subtitleKey)),
+          subtitle,
+        );
+        expect(tester.getRect(find.text('110 bpm')), bpmLine);
+      },
+    );
+
     testWidgets('long-press the set name opens the set page', (tester) async {
       await withSet(tester);
       await tester.tap(find.byKey(SetlistGroup.nextKey));

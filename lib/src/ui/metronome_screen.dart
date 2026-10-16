@@ -328,20 +328,29 @@ class MetronomeScreen extends StatelessWidget {
                       openSongEditor(context, library, controller, song: song),
                 ),
           // 34px, shrinking to 22px for long names; ellipsis only below.
-          child: FitText(
-            song?.name ?? '',
-            textKey: titleKey,
-            minFontSize: 22,
-            style: const TextStyle(
-              fontFamily: MetraFonts.condensed,
-              fontSize: 34,
-              fontWeight: FontWeight.w700,
-              height: 1,
+          // A fixed 34px line box, the name at its bottom: a shrunk title
+          // never moves the subtitle.
+          child: SizedBox(
+            height: 34,
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: FitText(
+                song?.name ?? '',
+                textKey: titleKey,
+                minFontSize: 22,
+                style: const TextStyle(
+                  fontFamily: MetraFonts.condensed,
+                  fontSize: 34,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
+                ),
+              ),
             ),
           ),
         ),
         const SizedBox(height: 3),
-        // Always 17px, so the title sits in the same place in every mode.
+        // Always 17px; with the 34px title box it fills the 54px block,
+        // so the subtitle sits on the block's bottom in every mode.
         SizedBox(
           height: 17,
           child: GestureDetector(

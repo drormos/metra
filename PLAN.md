@@ -243,6 +243,10 @@ Decisions made with the user that the spec doesn't state (or states differently)
 - The number is centred alone: an empty 44px twin above balances the 44px tempo line hanging under it (like "bpm" and its twin), so the line is reserved and never meets the ruler. The number opts out of text scaling (it's huge already).
 - `TabularText` caches slot widths per style; `clearCache()` (tests only) for tests that load the real font after measuring with the test font. In the app fonts are bundled, so the first measurement is the real one.
 
+## Phase 5u: Fixed lines, bpm-line chevron (done)
+- Title: a 34px line box (name bottom-aligned) + 3 + the 17px subtitle = the 54px block, so the subtitle sits on the block's bottom whatever the title's size. Previous/Next: a 22px line box for the 18px name, bottom-aligned, above the bpm line; the content is a fixed height, so the bpm line never moves. Test: long names shrink the title, the subtitle and bpm line rects don't change.
+- The bpm-line chevron is drawn (`_Chevron`): 16px tall, 2.6px stroke, round, in the text colour, centred with the muted 12px bpm text.
+
 ## Release builds
 - Signing: `android/key.properties` (gitignored) → keystore `~/keys/metra-release.jks` (alias `metra`, PKCS12, RSA 4096, 10000 days). A copy of the properties sits next to the keystore. Losing the keystore means no updates to installed copies: back up `~/keys/`. Without `key.properties`, release builds fall back to the debug key.
 - `keytool` isn't on the PATH (no system Java): use `/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/keytool`.

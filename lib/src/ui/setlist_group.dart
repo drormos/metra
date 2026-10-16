@@ -216,10 +216,10 @@ class SetlistGroup extends StatelessWidget {
     required bool forward,
     required VoidCallback onPressed,
   }) {
-    final chevron = Icon(
-      forward ? Icons.chevron_right : Icons.chevron_left,
-      size: 14,
-      color: colors.text,
+    // Bolder and larger than the bpm text: it says which way.
+    final chevron = CustomPaint(
+      size: const Size(10, 16),
+      painter: _Chevron(color: colors.text, forward: forward),
     );
     final bpm = Flexible(
       child: Text(
@@ -250,14 +250,24 @@ class SetlistGroup extends StatelessWidget {
                 // Full width: the name uses all of it, aligned by textAlign.
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  FitText(
-                    song.name,
-                    minFontSize: 13,
-                    textAlign: forward ? TextAlign.right : TextAlign.left,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      height: 1.2,
+                  // A fixed line box for 18px, the name at its bottom: a
+                  // shrunk name never moves the bpm line.
+                  SizedBox(
+                    height: 22,
+                    child: Align(
+                      alignment: forward
+                          ? Alignment.bottomRight
+                          : Alignment.bottomLeft,
+                      child: FitText(
+                        song.name,
+                        minFontSize: 13,
+                        textAlign: forward ? TextAlign.right : TextAlign.left,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          height: 1.2,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -274,4 +284,34 @@ class SetlistGroup extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The small Previous / Next chevron on the bpm line: 16px tall, 2.6px
+/// stroke.
+class _Chevron extends CustomPainter {
+  _Chevron({required this.color, required this.forward});
+
+  final Color color;
+  final bool forward;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final (tip, back) = forward ? (8.0, 2.0) : (2.0, 8.0);
+    canvas.drawPath(
+      Path()
+        ..moveTo(back, 1)
+        ..lineTo(tip, 8)
+        ..lineTo(back, 15),
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.6
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_Chevron old) =>
+      old.color != color || old.forward != forward;
 }
