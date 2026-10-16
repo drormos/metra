@@ -81,10 +81,47 @@ void main() {
     expect(handler.mediaItem.value?.artUri, Uri.file('/c/121.png'));
   });
 
-  test('removing the task stops playback', () async {
+  AudioProcessingState card() => handler.playbackState.value.processingState;
+
+  test('removing the task stops playback and the card', () async {
     await controller.play();
     await handler.onTaskRemoved();
     expect(controller.isPlaying, isFalse);
+    expect(card(), AudioProcessingState.idle);
+  });
+
+  group('when the card is shown', () {
+    test('stopped from outside: stays, stopped, with Start', () async {
+      await controller.play();
+      expect(card(), AudioProcessingState.ready);
+      await handler.stop(); // the card's Stop, a headset, a watch
+      expect(controller.isPlaying, isFalse);
+      expect(card(), AudioProcessingState.ready);
+      expect(handler.playbackState.value.controls, [MediaControl.play]);
+      controller.setBpm(90);
+      expect(card(), AudioProcessingState.ready, reason: 'still shown');
+    });
+
+    test('swiping the stopped card removes it', () async {
+      await controller.play();
+      await handler.pause();
+      await handler.onNotificationDeleted();
+      expect(card(), AudioProcessingState.idle);
+    });
+
+    test('stopped inside the app: removed', () async {
+      await controller.play();
+      controller.stop();
+      expect(card(), AudioProcessingState.idle);
+    });
+
+    test('restarted, then stopped in the app: removed', () async {
+      await controller.play();
+      await handler.stop();
+      await controller.play();
+      controller.stop();
+      expect(card(), AudioProcessingState.idle);
+    });
   });
 
   group('with songs', () {

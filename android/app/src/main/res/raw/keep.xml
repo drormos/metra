@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- audio_service looks up its notification button icons by name, so release
+     resource shrinking would delete them and the media notification fails
+     to build ("You must specify an icon resource id"). -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/audio_service_*" />

@@ -30,8 +30,12 @@ abstract final class AndroidBridge {
   }
 
   /// The tile shows Playing / Stopped and toggles the click; opened from
-  /// the tile, the app starts it.
-  static Future<void> attachTile(MetronomeController controller) async {
+  /// the tile, the app starts it. [stop] is the media handler's stop, so a
+  /// stop from the tile keeps the stopped media card.
+  static Future<void> attachTile(
+    MetronomeController controller, {
+    Future<void> Function()? stop,
+  }) async {
     bool? sent;
     void sync() {
       if (controller.isPlaying == sent) return;
@@ -46,7 +50,11 @@ abstract final class AndroidBridge {
         // False tells the tile to open the app and start there instead.
         case 'toggle':
           try {
-            await controller.toggle();
+            if (controller.isPlaying && stop != null) {
+              await stop();
+            } else {
+              await controller.toggle();
+            }
             return true;
           } on Object {
             return false;

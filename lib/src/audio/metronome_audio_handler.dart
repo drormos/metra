@@ -24,14 +24,32 @@ class MetronomeAudioHandler extends BaseAudioHandler {
   int? _coverBpm;
   Uri? _coverUri;
 
+  // Stopped from outside the app (the card, headset, watch, the tile): the
+  // card stays, stopped with Start, until swiped away. Stopping inside the
+  // app removes it (ui-spec.md "Media controls", "When it's shown").
+  bool _keepCard = false;
+
   @override
   Future<void> play() => _controller.play();
 
   @override
-  Future<void> pause() async => _controller.stop();
+  Future<void> pause() => stop();
 
+  /// A stop from outside the app.
   @override
-  Future<void> stop() async => _controller.stop();
+  Future<void> stop() async {
+    _keepCard = _controller.isPlaying || _keepCard;
+    _controller.stop();
+    _publish();
+  }
+
+  /// The stopped card was swiped away.
+  @override
+  Future<void> onNotificationDeleted() async {
+    _keepCard = false;
+    _controller.stop();
+    _publish();
+  }
 
   @override
   Future<void> skipToNext() async => _library?.nextSong(_controller);
@@ -39,14 +57,17 @@ class MetronomeAudioHandler extends BaseAudioHandler {
   @override
   Future<void> skipToPrevious() async => _library?.previousSong(_controller);
 
-  /// Swiping the app away from recents stops the click.
+  /// Swiping the app away from recents stops the click and removes the
+  /// card.
   @override
-  Future<void> onTaskRemoved() => stop();
+  Future<void> onTaskRemoved() => onNotificationDeleted();
 
   // Playing = ready + playing: audio_service then starts the foreground
-  // service; stopped = idle releases it.
+  // service. Stopped and ready keeps the card (no longer foreground);
+  // idle removes it and releases the service.
   void _publish() {
     final playing = _controller.isPlaying;
+    if (playing) _keepCard = false;
     final transport = playing ? MediaControl.stop : MediaControl.play;
     final library = _library;
     final set = library?.activeSetlist;
@@ -57,7 +78,7 @@ class MetronomeAudioHandler extends BaseAudioHandler {
             ? [MediaControl.skipToPrevious, transport, MediaControl.skipToNext]
             : [transport],
         androidCompactActionIndices: set != null ? const [0, 1, 2] : const [0],
-        processingState: playing
+        processingState: playing || _keepCard
             ? AudioProcessingState.ready
             : AudioProcessingState.idle,
         playing: playing,

@@ -55,6 +55,22 @@ void main() {
     expect(playingSent(), [false, true, false]);
   });
 
+  test('a stop from the tile goes through the media handler', () async {
+    var stops = 0;
+    await AndroidBridge.attachTile(
+      controller,
+      stop: () async {
+        stops++;
+        controller.stop();
+      },
+    );
+    await fromTile('toggle');
+    expect(stops, 0, reason: 'starting is plain');
+    await fromTile('toggle');
+    expect(stops, 1);
+    expect(controller.isPlaying, isFalse);
+  });
+
   test('opened from the tile, the app starts the click', () async {
     pendingStart = true;
     await AndroidBridge.attachTile(controller);

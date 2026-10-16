@@ -41,6 +41,9 @@ Future<void> main() async {
   if (controller != null) {
     library = await _loadLibrary();
     library?.attach(controller);
+    // A fresh launch is always Free play, with the click as it last
+    // sounded; the song stays as stored (ui-spec.md "Modes").
+    library?.detachSong();
     if (library case final library?) {
       // "Vibrate on touch" gates every haptic.
       void syncHaptics() => Haptics.enabled = library.vibrate;
@@ -48,10 +51,10 @@ Future<void> main() async {
       library.addListener(syncHaptics);
     }
     if (Platform.isAndroid) {
-      await _initAndroidBackground(controller, library);
+      final handler = await _initAndroidBackground(controller, library);
       if (library != null) AndroidBridge.syncLaunchTheme(library);
       // Not awaited: a start from the tile waits for the first frame.
-      AndroidBridge.attachTile(controller);
+      AndroidBridge.attachTile(controller, stop: handler?.stop);
     }
   }
   // Edge to edge: the screens keep clear of the bars with SafeArea.
@@ -100,13 +103,13 @@ Future<LibraryController?> _loadLibrary() async {
 }
 
 /// Keeps playing with the screen off or the app in the background. Failure
-/// only costs background playback, so it doesn't block the app.
-Future<void> _initAndroidBackground(
+/// only costs background playback, so it doesn't block the app (null).
+Future<MetronomeAudioHandler?> _initAndroidBackground(
   MetronomeController controller,
   LibraryController? library,
 ) async {
   try {
-    await AudioService.init(
+    final handler = await AudioService.init(
       builder: () => MetronomeAudioHandler(
         controller,
         library: library,
@@ -116,12 +119,13 @@ Future<void> _initAndroidBackground(
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.dror.metra.playback',
         androidNotificationChannelName: 'Metronome playback',
-        androidNotificationOngoing: true,
       ),
     );
     await stopOnHeadphoneRemoval(controller);
+    return handler;
   } catch (e) {
     debugPrint('Background playback unavailable: $e');
+    return null;
   }
 }
 
