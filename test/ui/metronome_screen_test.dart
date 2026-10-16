@@ -681,29 +681,57 @@ void main() {
     expect(seen, containsAll([111, 188]));
   });
 
-  testWidgets('the BPM grows with the screen: 172px up to 240px', (
+  Future<void> loadNumberFonts(WidgetTester tester) =>
+      tester.runAsync(() async {
+        TabularText.clearCache(); // measured with the test font so far
+        for (final (family, file) in [
+          (MetraFonts.condensed, 'SairaExtraCondensed-Bold'),
+          (MetraFonts.body, 'Saira-Medium'),
+        ]) {
+          await (FontLoader(
+            family,
+          )..addFont(rootBundle.load('assets/fonts/$file.ttf'))).load();
+        }
+      });
+
+  double numberSize(WidgetTester tester) => tester
+      .widget<TabularText>(find.byKey(MetronomeScreen.bpmKey))
+      .style!
+      .fontSize!;
+
+  testWidgets('the BPM size comes from the area: bigger on taller screens', (
     tester,
   ) async {
-    double size(Size screen) {
-      tester.view
-        ..physicalSize = screen
-        ..devicePixelRatio = 1;
-      return tester
-          .widget<TabularText>(find.byKey(MetronomeScreen.bpmKey))
-          .style!
-          .fontSize!;
-    }
-
+    await loadNumberFonts(tester);
     addTearDown(tester.view.reset);
-    await pumpScreen(tester);
     tester.view
-      ..physicalSize = const Size(400, 480)
+      ..physicalSize = const Size(400, 560)
       ..devicePixelRatio = 1;
-    await tester.pump();
-    expect(size(const Size(400, 480)), 172);
+    await pumpScreen(tester);
+    final short = numberSize(tester); // height-bound
     tester.view.physicalSize = const Size(400, 1100);
     await tester.pump();
-    expect(size(const Size(400, 1100)), 240);
+    final tall = numberSize(tester); // width-bound: three digits fit
+    expect(tall, greaterThan(short));
+    expect(tall, lessThanOrEqualTo(240));
+  });
+
+  testWidgets('99 and 100: same size, the number stays centred', (
+    tester,
+  ) async {
+    await loadNumberFonts(tester);
+    controller.setBpm(100);
+    await pumpScreen(tester);
+    final number = find.byKey(MetronomeScreen.bpmKey);
+    final size = numberSize(tester);
+    final centre = tester.getRect(number).center;
+    final ruler = tester.getRect(find.byType(TempoRuler));
+    final line = tester.getRect(find.byKey(MetronomeScreen.tempoNameKey));
+    expect(line.bottom, lessThanOrEqualTo(ruler.top), reason: 'no overlap');
+    controller.setBpm(99);
+    await tester.pump();
+    expect(numberSize(tester), size);
+    expect(tester.getRect(number).center, centre);
   });
 
   testWidgets('the BPM number alone is centred; "bpm" hangs off its right', (

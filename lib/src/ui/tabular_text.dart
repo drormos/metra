@@ -29,6 +29,10 @@ class TabularText extends StatelessWidget {
     return widest;
   });
 
+  /// Tests that load a real font after measuring with the test font.
+  @visibleForTesting
+  static void clearCache() => _slots.clear();
+
   static bool isDigit(String c) => '0123456789'.contains(c);
 
   @override

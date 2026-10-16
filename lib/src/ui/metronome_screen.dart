@@ -113,25 +113,28 @@ class MetronomeScreen extends StatelessWidget {
         _topRow(context),
         const SizedBox(height: 16),
         BeatIndicator(controller: controller),
-        // Two groups (ui-spec.md "Vertical layout"): the display (BPM and
-        // its tempo line) centred in the free space, as large as fits
-        // (172–240px); the controls below it, at fixed spacing.
+        // Two groups (ui-spec.md "Vertical layout"): the BPM number alone
+        // centred in the free space, the tempo line hanging under it (an
+        // empty twin above balances it, as "bpm" is balanced); then the
+        // controls, at fixed spacing.
         Expanded(
           child: LayoutBuilder(
             builder: (context, box) => Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Flexible(
-                    // Shrinks below 172px only when it can't fit at all.
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: BpmReadout(
-                        bpm: bpm,
-                        fontSize: ((box.maxHeight - 44) / 0.85).clamp(172, 240),
-                        unitSize: 18,
-                        numberKey: bpmKey,
+                  const SizedBox(height: 44),
+                  // Sized for three digits from the area, never the value;
+                  // the number is large already, so no text scaling.
+                  MediaQuery.withNoTextScaling(
+                    child: BpmReadout(
+                      bpm: bpm,
+                      fontSize: BpmReadout.fit(
+                        context,
+                        Size(box.maxWidth, box.maxHeight - 88),
                       ),
+                      unitSize: 18,
+                      numberKey: bpmKey,
                     ),
                   ),
                   // Fixed height: the tempo name, or Revert / Save to song.

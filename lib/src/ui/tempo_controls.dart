@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../controller/metronome_controller.dart';
@@ -22,9 +24,48 @@ class BpmReadout extends StatelessWidget {
   final double unitSize;
   final Key? numberKey;
 
+  static TextStyle numberStyle(double fontSize) => TextStyle(
+    fontFamily: MetraFonts.condensed,
+    fontSize: fontSize,
+    fontWeight: FontWeight.w700,
+    height: 0.85,
+  );
+
+  static TextStyle _unitStyle(double unitSize) =>
+      TextStyle(fontFamily: MetraFonts.body, fontSize: unitSize);
+
+  /// The largest font size at which three digits, with "bpm" and its
+  /// balancing twin, fit [area], up to [max]. It depends on the area only,
+  /// never on the value: 99 and 100 share it, two digits are just
+  /// narrower.
+  /// Measured with [context]'s default text style, as the widgets are.
+  static double fit(
+    BuildContext context,
+    Size area, {
+    double max = 240,
+    double unitSize = 18,
+  }) {
+    final base = DefaultTextStyle.of(context).style;
+    final unit = TextPainter(
+      text: TextSpan(text: 'bpm', style: base.merge(_unitStyle(unitSize))),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final sides = 2 * (unit.width + unitSize * 0.45);
+    unit.dispose();
+    // A digit slot is proportional to the font size.
+    final slotPerPx = TabularText.slotWidth(base.merge(numberStyle(100))) / 100;
+    // A pixel spare and a whole size keep layout rounding from overflowing.
+    final byWidth = (area.width - sides - 1) / (3 * slotPerPx);
+    final byHeight = area.height / 0.85;
+    return math.max(
+      1,
+      math.min(max, math.min(byWidth, byHeight)).floorToDouble(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final unit = TextStyle(fontSize: unitSize, color: context.colors.muted);
+    final unit = _unitStyle(unitSize).copyWith(color: context.colors.muted);
     final gap = unitSize * 0.45;
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -41,16 +82,7 @@ class BpmReadout extends StatelessWidget {
         ),
         SizedBox(width: gap),
         // Fixed digit slots: the readout never changes width or shakes.
-        TabularText(
-          '$bpm',
-          key: numberKey,
-          style: TextStyle(
-            fontFamily: MetraFonts.condensed,
-            fontSize: fontSize,
-            fontWeight: FontWeight.w700,
-            height: 0.85,
-          ),
-        ),
+        TabularText('$bpm', key: numberKey, style: numberStyle(fontSize)),
         SizedBox(width: gap),
         Text('bpm', style: unit),
       ],

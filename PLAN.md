@@ -238,6 +238,11 @@ Decisions made with the user that the spec doesn't state (or states differently)
 - `FitText`: one line, starts at the style's size and scales down to fit (width grows in step with font size), floored at a minimum; ellipsis only below that. Title 34 → 22px; Previous/Next names 18 → 13px.
 - Previous/Next: name on line 1 across the full button width; line 2 small and muted with a small chevron, "‹ 98 bpm" left on Previous, "168 bpm ›" right on Next. The big chevrons are gone.
 
+## Phase 5t: BPM size from the area, number centred alone (done)
+- `BpmReadout.fit(context, area)`: the largest whole size at which three digits (in `TabularText` slots) plus "bpm" and its twin fit the area, up to 240px, measured with the same resolved styles as the widgets (1px spare against rounding). From the area only, never the value: 99 and 100 share it; the `FittedBox` that rescaled per value is gone.
+- The number is centred alone: an empty 44px twin above balances the 44px tempo line hanging under it (like "bpm" and its twin), so the line is reserved and never meets the ruler. The number opts out of text scaling (it's huge already).
+- `TabularText` caches slot widths per style; `clearCache()` (tests only) for tests that load the real font after measuring with the test font. In the app fonts are bundled, so the first measurement is the real one.
+
 ## Release builds
 - Signing: `android/key.properties` (gitignored) → keystore `~/keys/metra-release.jks` (alias `metra`, PKCS12, RSA 4096, 10000 days). A copy of the properties sits next to the keystore. Losing the keystore means no updates to installed copies: back up `~/keys/`. Without `key.properties`, release builds fall back to the debug key.
 - `keytool` isn't on the PATH (no system Java): use `/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/keytool`.
