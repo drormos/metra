@@ -247,6 +247,9 @@ Decisions made with the user that the spec doesn't state (or states differently)
 - Title: a 34px line box (name bottom-aligned) + 3 + the 17px subtitle = the 54px block, so the subtitle sits on the block's bottom whatever the title's size. Previous/Next: a 22px line box for the 18px name, bottom-aligned, above the bpm line; the content is a fixed height, so the bpm line never moves. Test: long names shrink the title, the subtitle and bpm line rects don't change.
 - The bpm line ("option 4, all grey, bold"): the drawn chevron (`_Chevron`, 15px in a 16-unit box, 2.8 stroke, muted) on the outer side, 5px, then "98 BPM" (13px, weight 700, muted, 0.02em spacing), vertically centred; mirrored on Next. Saira is bundled at 500/600 only, so 700 renders as 600.
 
+## Phase 5v: Unsaved-change actions as plain text (done)
+- "Revert · Save · Save as new" under the BPM: plain `TextButton`s, muted Saira 15/500, 44px tall, separated by dim dots (`beatResting`, #3A3A3A). "Save" is Save to song (same key, `saveToSongKey`); actions unchanged.
+
 ## Release builds
 - Signing: `android/key.properties` (gitignored) → keystore `~/keys/metra-release.jks` (alias `metra`, PKCS12, RSA 4096, 10000 days). A copy of the properties sits next to the keystore. Losing the keystore means no updates to installed copies: back up `~/keys/`. Without `key.properties`, release builds fall back to the debug key.
 - `keytool` isn't on the PATH (no system Java): use `/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/keytool`.
