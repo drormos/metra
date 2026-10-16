@@ -111,7 +111,7 @@ void main() {
 
   test('newer file versions are rejected rather than misread', () {
     final json = Library.empty.toJson()..['version'] = 99;
-    expect(() => Library.fromJson(json), throwsFormatException);
+    expect(() => Library.fromJson(json), throwsA(isA<NewerLibraryException>()));
   });
 
   test('click sound survives JSON; missing or unknown falls back', () {

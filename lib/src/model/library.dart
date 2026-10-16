@@ -220,11 +220,7 @@ class Library {
   /// entry doesn't hide the rest of the library.
   factory Library.fromJson(Map<String, Object?> json) {
     final fileVersion = json['version'] as int;
-    if (fileVersion > version) {
-      throw FormatException(
-        'Library version $fileVersion is newer than $version',
-      );
-    }
+    if (fileVersion > version) throw NewerLibraryException(fileVersion);
     final songs = json['songs'] as List;
     final setlists = json['setlists'] as List;
     return Library(
@@ -271,4 +267,16 @@ class Library {
       return null;
     }
   }
+}
+
+/// The file was saved by a newer app version (after a downgrade). It is
+/// left as it is, so updating the app again opens it.
+class NewerLibraryException implements Exception {
+  const NewerLibraryException(this.fileVersion);
+
+  final int fileVersion;
+
+  @override
+  String toString() =>
+      'Library version $fileVersion is newer than ${Library.version}';
 }

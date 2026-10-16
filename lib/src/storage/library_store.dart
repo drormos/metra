@@ -14,16 +14,26 @@ class LibraryStore {
   final File file;
   Future<void> _writes = Future.value();
 
-  /// An unreadable file is renamed aside (kept for recovery) and an empty
-  /// library is returned, so the app still starts.
+  /// An unreadable file is moved aside (kept for recovery) and an empty
+  /// library is returned, so the app still starts. Throws, touching
+  /// nothing, for a file from a newer app version
+  /// ([NewerLibraryException]) or one that can't be kept aside: saving
+  /// over it would lose it.
   Future<Library> load() async {
     if (!await file.exists()) return Library.empty;
     try {
       final json = jsonDecode(await file.readAsString());
       return Library.fromJson(json as Map<String, Object?>);
+    } on NewerLibraryException {
+      rethrow;
     } catch (_) {
-      final stamp = DateTime.now().millisecondsSinceEpoch;
-      await file.rename('${file.path}.corrupt-$stamp');
+      final aside =
+          '${file.path}.corrupt-${DateTime.now().millisecondsSinceEpoch}';
+      try {
+        await file.rename(aside);
+      } on FileSystemException {
+        await file.copy(aside);
+      }
       return Library.empty;
     }
   }

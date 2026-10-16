@@ -71,7 +71,7 @@ Decisions made with the user that the spec doesn't state (or states differently)
 - Visual offset defaults to 0 ms (measured by eye on macOS: 0 ms on built-in speakers, 20 ms on a USB-dongle wireless headset), adjustable in the settings sheet from −200 to +500 ms in 10 ms steps to cover Bluetooth output. Not persisted until Phase 2.
 - The drift check captures the mixer output rather than recording the speakers. The engine clock is paced by the output device, so the mix timeline is what plays; capture must use the engine's channel count (it does not convert channels).
 - No audio focus on Android: focus would pause the user's music, and playing along with a track is a core use. Instead the click stops when a personal output (headphones, Bluetooth, USB audio) disappears, so it never jumps to the speaker. (audio_session's "becoming noisy" event only fires with focus, so this watches device removal.)
-- Android 13+ notification permission is requested once at first launch (`MainActivity`); declining only hides the Play/Stop notification, playback still works.
+- No notification permission: the media card is a media-session notification, which Android 13+ exempts (ui-spec.md "Media controls"). It was requested at launch until the pre-release review.
 - Audio device failures trigger one automatic `startAudioDevice()` retry; if it fails, the controller exposes the error for the UI.
 
 ## Phase 2: Persistence, Setlists & Mobile Background
@@ -81,7 +81,7 @@ Decisions made with the user that the spec doesn't state (or states differently)
    - Verified on a real Android phone (speaker): keeps playing on the lock screen, when minimized, and alongside other music; stops when the app is swiped away. Unplugging headphones stops the click.
    - `MainActivity` must extend `AudioServiceActivity`. A plain `FlutterActivity` makes audio_service start a second engine that runs `main()` again and re-initializes SoLoud.
 2. **Persistence:** Simple JSON file storage for songs, setlists, and the visual latency offset.
-   - One `library.json` in the app support folder (`LibraryStore`): written to a temp file then renamed, so a crash mid-save can't corrupt it; an unreadable file is kept aside as `library.json.corrupt-<time>` and the app starts empty.
+   - One `library.json` in the app support folder (`LibraryStore`): written to a temp file then renamed, so a crash mid-save can't corrupt it; an unreadable file is kept aside as `library.json.corrupt-<time>` (renamed, or copied if renaming fails) and the app starts empty; a bad song or setlist is skipped rather than the whole file. A file from a newer app version, or one that can't be kept aside, is left untouched and the app runs without saving, saying why on the main screen. Failed saves show a notice until one works.
    - `LibraryController` owns songs and setlists (deleting a song removes it from setlists) and saves on every change.
    - Also restores the last session: tempo, pattern and flash offset.
 3. **Setlist UI:** Side panel (macOS) or sheet (Android) for switching songs without stopping playback. A song switch applies tempo and pattern at the next bar boundary.
@@ -255,14 +255,16 @@ Decisions made with the user that the spec doesn't state (or states differently)
 - A tempo or pattern change while the device starts (between Start and the anchor) restarts on beat 1 with it once started; before, the scheduler wasn't running to take it and the click played the old values.
 - Calls (like music apps): a ringing or active call stops the click (the media handler's stop, so the card stays), and it starts again when the call ends, unless the user started the click during the call. No audio focus, so `CallMonitor.kt` watches the call: Android 12+ `AudioManager.addOnModeChangedListener` (any mode but normal; covers VoIP; no permission), older Android `PhoneStateListener.LISTEN_CALL_STATE` (no permission before Android 12; cellular only). Logic in `CallPause` (tested).
 - Loading: a bad song, setlist or setting is skipped or falls back instead of setting the whole file aside; a malformed file (no song/setlist lists, newer version) still is.
+- Low items: engine failure screen in plain words with Try again (re-runs `main`; nothing past the engine ran); media covers written via a temp file; `cupertino_icons` removed.
 - Play Console: declare the `mediaPlayback` foreground service (description + video) before the first review.
 
 ## Release builds
-- Signing: `android/key.properties` (gitignored) → keystore `~/keys/metra-release.jks` (alias `metra`, PKCS12, RSA 4096, 10000 days). A copy of the properties sits next to the keystore. Losing the keystore means no updates to installed copies: back up `~/keys/`. Without `key.properties`, release builds fall back to the debug key.
+- Signing: `android/key.properties` (gitignored) → keystore `~/keys/metra-release.jks` (alias `metra`, PKCS12, RSA 4096, 10000 days). A copy of the properties sits next to the keystore. Losing the keystore means no updates to installed copies: back up `~/keys/`. Without `key.properties`, release builds fail (no silent debug signing).
 - `keytool` isn't on the PATH (no system Java): use `/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/keytool`.
 - **Every shared build bumps the build number** (`version: 1.0.0+N` in `pubspec.yaml`, the `+N`), so Android accepts it as an update and feedback emails name the exact build. Bump the version name (`1.0.0`) for user-visible releases.
 - App ID `com.dror.metra` (was the template's `com.example.metra`; the Play Store refuses it and it can't change after sharing). Debug builds are `com.dror.metra.debug`, labelled "Metra dev" (`manifestPlaceholders["appLabel"]`), so they install beside the real app instead of over it. iOS/macOS bundle IDs follow.
-- Build: `flutter build apk --release` → `build/app/outputs/flutter-apk/app-release.apk`.
+- Build: `flutter build apk --release` → `build/app/outputs/flutter-apk/app-release.apk`. Install on the phone with `adb install -r` (keeps the library); `flutter install` uninstalls first and wipes it. `adb` is `~/Library/Android/sdk/platform-tools/adb`.
+- Release builds log nothing (`debugPrint` is silenced in `main`).
 
 ## Phase 6: Settings, Time Signature, App Icon
 1. **Time signature sheet (done; `TimeSignatureSheet`; the beats −/+ and 4 | 8 are `MeterControl`, shared with the song editor; every change ticks)** (`time-signature`): from the "4/4" button. "Common": 2/4, 3/4, 4/4, 5/4, 6/8, 7/8, 9/8, 12/8 in a 4×2 grid (current = filled white, black text; tapping applies and closes). "Custom": beats −/+ (1–16; hold repeats at 6/s, no acceleration), "/", 4 | 8; applies as you change it. Keeps beat states where possible. While playing, a change starts a new bar on the next beat (as today; chosen over the spec's "next downbeat" so changes feel instant). In setlist mode it's a change to the loaded song (Phase 5 step 5).

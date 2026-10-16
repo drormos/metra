@@ -620,6 +620,23 @@ void main() {
       );
     },
   );
+
+  test('a failed save is reported until a save works again', () async {
+    await library.flush();
+    final blocker = Directory(store.file.path);
+    if (store.file.existsSync()) store.file.deleteSync();
+    blocker.createSync(); // the rename onto it fails
+    var notified = 0;
+    library.addListener(() => notified++);
+    library.setVibrate(false);
+    await library.flush();
+    expect(library.saveFailed, isTrue);
+    blocker.deleteSync();
+    library.setVibrate(true);
+    await library.flush();
+    expect(library.saveFailed, isFalse);
+    expect(notified, 4); // two changes, failed, recovered
+  });
 }
 
 class _CountingStore extends LibraryStore {

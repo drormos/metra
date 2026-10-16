@@ -8,8 +8,9 @@ plugins {
 }
 
 // Release signing: android/key.properties (gitignored) points at the
-// keystore kept outside the repo. Without it, release builds fall back to
-// the debug key so `flutter run --release` still works.
+// keystore kept outside the repo. Without it, release builds fail rather
+// than quietly signing with the debug key (Play refuses those, and a
+// debug-signed copy can't be updated by the real one).
 val keystoreProperties = Properties().apply {
     val file = rootProject.file("key.properties")
     if (file.exists()) load(FileInputStream(file))
@@ -61,7 +62,6 @@ android {
         }
         release {
             signingConfig = signingConfigs.findByName("release")
-                ?: signingConfigs.getByName("debug")
         }
     }
 }
@@ -74,4 +74,10 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+gradle.taskGraph.whenReady {
+    if (keystoreProperties.isEmpty && allTasks.any { it.name.contains("Release") }) {
+        throw GradleException("Release builds need android/key.properties (see PLAN.md, Release builds).")
+    }
 }

@@ -19,6 +19,10 @@ class LibraryController extends ChangeNotifier {
   Library? _unsaved;
   Future<void>? _writing;
   int _idCounter = 0;
+  bool _saveFailed = false;
+
+  /// The last save failed; cleared by the next one that works.
+  bool get saveFailed => _saveFailed;
 
   ThemeMode get themeMode => _library.themeMode;
 
@@ -517,11 +521,19 @@ class LibraryController extends ChangeNotifier {
       _unsaved = null;
       try {
         await _store.save(library);
+        _setSaveFailed(false);
       } catch (e) {
         debugPrint('Saving library failed: $e');
+        _setSaveFailed(true);
       }
     }
     _writing = null;
+  }
+
+  void _setSaveFailed(bool failed) {
+    if (failed == _saveFailed) return;
+    _saveFailed = failed;
+    notifyListeners();
   }
 
   String _newId() =>

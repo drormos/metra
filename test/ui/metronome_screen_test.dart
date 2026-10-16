@@ -898,4 +898,18 @@ void main() {
       await tester.pump();
     });
   });
+
+  testWidgets('says why the library is unavailable', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: testTheme,
+        home: MetronomeScreen(
+          controller: controller,
+          libraryProblem: 'Update the app',
+        ),
+      ),
+    );
+    addTearDown(controller.dispose);
+    expect(find.text('Update the app'), findsOneWidget);
+  });
 }

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -58,5 +59,13 @@ void main() {
     sub.createSync();
     await subStore.save(Library.empty.copyWith(lastBpm: 77));
     expect((await subStore.load()).lastBpm, 77);
+  });
+
+  test('a newer file is left untouched and the load fails', () async {
+    final newer = jsonEncode(Library.empty.toJson()..['version'] = 99);
+    file.writeAsStringSync(newer);
+    await expectLater(store.load(), throwsA(isA<NewerLibraryException>()));
+    expect(file.readAsStringSync(), newer);
+    expect(dir.listSync(), hasLength(1));
   });
 }

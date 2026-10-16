@@ -75,7 +75,10 @@ Future<Uint8List> renderMediaCover(int bpm, {int size = 512}) async {
 Future<Uri> mediaCoverFile(Directory dir, int bpm) async {
   final file = File('${dir.path}/media_cover_$bpm.png');
   if (!await file.exists()) {
-    await file.writeAsBytes(await renderMediaCover(bpm));
+    // Through a temp file: a crash mid-write never leaves a broken cover.
+    final temp = File('${file.path}.tmp');
+    await temp.writeAsBytes(await renderMediaCover(bpm), flush: true);
+    await temp.rename(file.path);
   }
   return file.uri;
 }

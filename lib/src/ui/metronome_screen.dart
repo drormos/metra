@@ -23,12 +23,23 @@ import 'theme.dart';
 /// Main screen (ui-spec.md), the same phone layout on every platform.
 /// Stateless; all metronome state lives in [controller].
 class MetronomeScreen extends StatelessWidget {
-  const MetronomeScreen({super.key, required this.controller, this.library});
+  const MetronomeScreen({
+    super.key,
+    required this.controller,
+    this.library,
+    this.libraryProblem,
+  });
 
   final MetronomeController controller;
 
   /// Null when storage is unavailable: no song panel then.
   final LibraryController? library;
+
+  /// Why [library] is null, for the user; null when there's nothing to say.
+  final String? libraryProblem;
+
+  static const saveFailedNotice =
+      "Couldn't save your changes. Metra tries again with your next change.";
 
   static const bpmKey = Key('bpm');
   static const playKey = Key('play');
@@ -194,10 +205,14 @@ class MetronomeScreen extends StatelessWidget {
           const SizedBox(height: 12),
           SetlistGroup(library: library, metronome: controller),
         ],
-        if (error != null) ...[
+        for (final notice in [
+          if (error != null) 'Audio problem: $error',
+          ?libraryProblem,
+          if (library?.saveFailed ?? false) saveFailedNotice,
+        ]) ...[
           const SizedBox(height: 12),
           Text(
-            'Audio problem: $error',
+            notice,
             textAlign: TextAlign.center,
             style: TextStyle(color: colors.accentSounding),
           ),
