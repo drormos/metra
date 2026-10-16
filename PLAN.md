@@ -234,6 +234,10 @@ Decisions made with the user that the spec doesn't state (or states differently)
 - BPM font size = `((free height − 44) / 0.85).clamp(172, 240)`, still in a scale-down `FittedBox`: on a 390px-wide phone a three-digit number tops out near 200px wide-bound, so the extra size shows on taller and wider screens.
 - No jitter: Saira Extra Condensed has no `tnum` (`FontFeature.tabularFigures()` measured: no change; "111" 80px vs "188" 107.5px at 100px). `TabularText` puts each digit in a slot as wide as the widest digit, centred; used for the BPM (main screen and editor) and the set position. The ruler painter lays its labels out in the same slots (`TabularText.slotWidth`). Test: holding +1 from 100 to 199 with the real font never changes the number's rect.
 
+## Phase 5s: Shrink-to-fit names, Previous/Next layout (done)
+- `FitText`: one line, starts at the style's size and scales down to fit (width grows in step with font size), floored at a minimum; ellipsis only below that. Title 34 → 22px; Previous/Next names 18 → 13px.
+- Previous/Next: name on line 1 across the full button width; line 2 small and muted with a small chevron, "‹ 98 bpm" left on Previous, "168 bpm ›" right on Next. The big chevrons are gone.
+
 ## Release builds
 - Signing: `android/key.properties` (gitignored) → keystore `~/keys/metra-release.jks` (alias `metra`, PKCS12, RSA 4096, 10000 days). A copy of the properties sits next to the keystore. Losing the keystore means no updates to installed copies: back up `~/keys/`. Without `key.properties`, release builds fall back to the debug key.
 - `keytool` isn't on the PATH (no system Java): use `/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/keytool`.

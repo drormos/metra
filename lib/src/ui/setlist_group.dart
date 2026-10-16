@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/library.dart';
+import 'fit_text.dart';
 import 'haptics.dart';
 import 'icons.dart';
 import 'quick_pick.dart';
@@ -206,6 +207,8 @@ class SetlistGroup extends StatelessWidget {
     );
   }
 
+  /// The name on line 1, full width (18px, shrinking to 13px); line 2
+  /// small and muted with a small chevron: "‹ 98 bpm" / "168 bpm ›".
   Widget _stepButton({
     required Key key,
     required MetraColors colors,
@@ -213,41 +216,25 @@ class SetlistGroup extends StatelessWidget {
     required bool forward,
     required VoidCallback onPressed,
   }) {
-    final align = forward ? CrossAxisAlignment.end : CrossAxisAlignment.start;
-    final label = Flexible(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: align,
-        children: [
-          if (song != null) ...[
-            Text(
-              song.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                height: 1.2,
-              ),
-            ),
-            Text(
-              '${song.bpm} bpm',
-              style: TextStyle(fontSize: 12, color: colors.muted),
-            ),
-          ],
-        ],
-      ),
-    );
     final chevron = Icon(
       forward ? Icons.chevron_right : Icons.chevron_left,
-      size: 24,
+      size: 14,
+      color: colors.text,
+    );
+    final bpm = Flexible(
+      child: Text(
+        '${song?.bpm} bpm',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(fontSize: 12, color: colors.muted),
+      ),
     );
     return FilledButton(
       key: key,
       style: FilledButton.styleFrom(
         backgroundColor: colors.surface,
         foregroundColor: colors.text,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
       ),
       onPressed: song == null ? null : onPressed,
       // The label goes inside, so the button keeps its actions.
@@ -256,14 +243,34 @@ class SetlistGroup extends StatelessWidget {
             ? (forward ? 'No next song' : 'No previous song')
             : '${forward ? 'Next' : 'Previous'} song: ${song.name}',
         excludeSemantics: true,
-        child: Row(
-          mainAxisAlignment: forward
-              ? MainAxisAlignment.end
-              : MainAxisAlignment.start,
-          children: forward
-              ? [label, const SizedBox(width: 4), chevron]
-              : [chevron, const SizedBox(width: 4), label],
-        ),
+        child: song == null
+            ? const SizedBox.expand()
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                // Full width: the name uses all of it, aligned by textAlign.
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FitText(
+                    song.name,
+                    minFontSize: 13,
+                    textAlign: forward ? TextAlign.right : TextAlign.left,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisAlignment: forward
+                        ? MainAxisAlignment.end
+                        : MainAxisAlignment.start,
+                    children: forward
+                        ? [bpm, const SizedBox(width: 4), chevron]
+                        : [chevron, const SizedBox(width: 4), bpm],
+                  ),
+                ],
+              ),
       ),
     );
   }

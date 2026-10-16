@@ -5,6 +5,7 @@ import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/tempo_name.dart';
 import 'beat_indicator.dart';
+import 'fit_text.dart';
 import 'haptics.dart';
 import 'setlist_group.dart';
 import 'setlist_picker.dart';
@@ -323,11 +324,11 @@ class MetronomeScreen extends StatelessWidget {
                   () =>
                       openSongEditor(context, library, controller, song: song),
                 ),
-          child: Text(
+          // 34px, shrinking to 22px for long names; ellipsis only below.
+          child: FitText(
             song?.name ?? '',
-            key: titleKey,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            textKey: titleKey,
+            minFontSize: 22,
             style: const TextStyle(
               fontFamily: MetraFonts.condensed,
               fontSize: 34,
