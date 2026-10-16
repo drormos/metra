@@ -224,6 +224,11 @@ Decisions made with the user that the spec doesn't state (or states differently)
 - Dropdowns: a pinned "Free play" row (2px line under it) tops every panel unless already in Free play; removed from the set panel's footer. Panels sit above the bar (they anchor to `SetlistGroup`).
 - Semantics labels for previous/next and the center button now sit inside the buttons, so screen readers keep the tap action.
 
+## Phase 5q: Media card toggle and tempo steps (done)
+- One toggle: `MediaControl.pause` (❚❚) while playing, `play` (▶) when stopped; pause and stop requests (card, headset, car, watch) both run the outside stop. The in-app button stays "Stop".
+- Setlist mode: previous / toggle / next. Free play and Single song: `[−1, toggle, +1, −5, +5]` as custom actions (`step` with `{'delta': n}` → `controller.nudge`, so in Single song it's an unsaved change). The order is for Android 13+, which puts the first two custom actions in the previous / next slots: the compact card reads −1 ▶ +1 and the expanded one adds −5 and +5 after them. The spec's −5 −1 ▶ +1 +5 order can't be had there; older Android shows the list order.
+- Step icons: vector drawables `ic_step_{minus,plus}{1,5}` (strokes, no text), kept from resource shrinking alongside audio_service's.
+
 ## Release builds
 - Signing: `android/key.properties` (gitignored) → keystore `~/keys/metra-release.jks` (alias `metra`, PKCS12, RSA 4096, 10000 days). A copy of the properties sits next to the keystore. Losing the keystore means no updates to installed copies: back up `~/keys/`. Without `key.properties`, release builds fall back to the debug key.
 - `keytool` isn't on the PATH (no system Java): use `/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/keytool`.

@@ -22,11 +22,24 @@ void main() {
 
   tearDown(() => controller.dispose());
 
+  /// The card's buttons, in order, as labels.
+  List<String> buttons() => [
+    for (final c in handler.playbackState.value.controls) c.label,
+  ];
+  const freePlayButtons = [
+    'Tempo −1',
+    'Play',
+    'Tempo +1',
+    'Tempo −5',
+    'Tempo +5',
+  ];
+
   test('starts idle with a play control', () {
     final state = handler.playbackState.value;
     expect(state.playing, isFalse);
     expect(state.processingState, AudioProcessingState.idle);
-    expect(state.controls, [MediaControl.play]);
+    expect(buttons(), freePlayButtons);
+    expect(state.androidCompactActionIndices, [0, 1, 2], reason: '−1 ▶ +1');
   });
 
   test('notification play/stop drive the controller', () async {
@@ -44,7 +57,7 @@ void main() {
     final state = handler.playbackState.value;
     expect(state.playing, isTrue);
     expect(state.processingState, AudioProcessingState.ready);
-    expect(state.controls, [MediaControl.stop]);
+    expect(buttons()[1], 'Pause', reason: 'one toggle, ❚❚ while playing');
 
     controller.stop();
     expect(handler.playbackState.value.playing, isFalse);
@@ -90,6 +103,23 @@ void main() {
     expect(card(), AudioProcessingState.idle);
   });
 
+  test('tempo steps are main-screen steps; pause stops', () async {
+    for (final c in handler.playbackState.value.controls) {
+      final custom = c.customAction;
+      if (custom != null) {
+        await handler.customAction(custom.name, custom.extras);
+      }
+    }
+    expect(controller.bpm, 120, reason: '−1 +1 −5 +5 cancel out');
+    final plus5 = handler.playbackState.value.controls.last.customAction!;
+    await handler.customAction(plus5.name, plus5.extras);
+    expect(controller.bpm, 125);
+    await controller.play();
+    await handler.pause();
+    expect(controller.isPlaying, isFalse);
+    expect(card(), AudioProcessingState.ready, reason: 'an outside stop');
+  });
+
   group('when the card is shown', () {
     test('stopped from outside: stays, stopped, with Start', () async {
       await controller.play();
@@ -97,7 +127,7 @@ void main() {
       await handler.stop(); // the card's Stop, a headset, a watch
       expect(controller.isPlaying, isFalse);
       expect(card(), AudioProcessingState.ready);
-      expect(handler.playbackState.value.controls, [MediaControl.play]);
+      expect(buttons()[1], 'Play');
       controller.setBpm(90);
       expect(card(), AudioProcessingState.ready, reason: 'still shown');
     });
@@ -141,27 +171,21 @@ void main() {
       dir.deleteSync(recursive: true);
     });
 
-    test('shows previous/next only with a setlist loaded', () {
-      expect(handler.playbackState.value.controls, [MediaControl.play]);
+    test('previous/next in a setlist; tempo steps otherwise', () {
+      expect(buttons(), freePlayButtons);
       final song = library.addSong(
         name: 'Opener',
         bpm: 150,
         pattern: const MetronomePattern.standard(),
       );
       library.playSingleSong(song, controller);
-      expect(handler.playbackState.value.controls, [
-        MediaControl.play,
-      ], reason: 'Single song: hidden, not disabled');
+      expect(buttons(), freePlayButtons, reason: 'Single song');
       expect(handler.mediaItem.value?.title, 'Opener');
       final gig = library.addSetlist('Gig');
       library
         ..addToSetlist(gig.id, song.id)
         ..setActiveSetlist(gig.id);
-      expect(handler.playbackState.value.controls, [
-        MediaControl.skipToPrevious,
-        MediaControl.play,
-        MediaControl.skipToNext,
-      ]);
+      expect(buttons(), ['Previous', 'Play', 'Next'], reason: 'no tempo');
     });
 
     test('skip buttons switch songs; title shows the song', () async {

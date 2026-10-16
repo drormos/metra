@@ -8,8 +8,9 @@ import '../controller/metronome_controller.dart';
 /// keeps the app alive as a media foreground service (screen off or app in
 /// background) and shows the media card in the notification and lock
 /// screen (ui-spec.md "Media controls"): title, subtitle and a cover that
-/// follow the main screen, Start/Stop, and previous/next song only in
-/// setlist mode. No duration, so no seek bar.
+/// follow the main screen, and one ▶ / ❚❚ toggle that starts and stops.
+/// Setlist mode adds previous/next; Free play and Single song add the
+/// main screen's −5 −1 +1 +5 tempo steps. No duration, so no seek bar.
 class MetronomeAudioHandler extends BaseAudioHandler {
   MetronomeAudioHandler(this._controller, {this._library, this._cover}) {
     Listenable.merge([_controller, ?_library]).addListener(_publish);
@@ -43,6 +44,32 @@ class MetronomeAudioHandler extends BaseAudioHandler {
     _publish();
   }
 
+  /// A tempo step from the card (Free play and Single song). In Single
+  /// song it's an unsaved change, as on the main screen.
+  @override
+  Future<void> customAction(String name, [Map<String, dynamic>? extras]) async {
+    if (name == stepAction) _controller.nudge(extras!['delta'] as int);
+  }
+
+  static const stepAction = 'step';
+
+  static MediaControl _step(int delta, String icon, String label) =>
+      MediaControl.custom(
+        androidIcon: 'drawable/ic_step_$icon',
+        label: label,
+        name: stepAction,
+        extras: {'delta': delta},
+      );
+
+  // Android 13+ puts the first two custom actions in the previous / next
+  // slots, so −1 and +1 come first: the compact card shows −1 ▶ +1.
+  static final _steps = [
+    _step(-1, 'minus1', 'Tempo −1'),
+    _step(1, 'plus1', 'Tempo +1'),
+    _step(-5, 'minus5', 'Tempo −5'),
+    _step(5, 'plus5', 'Tempo +5'),
+  ];
+
   /// The stopped card was swiped away.
   @override
   Future<void> onNotificationDeleted() async {
@@ -68,16 +95,16 @@ class MetronomeAudioHandler extends BaseAudioHandler {
   void _publish() {
     final playing = _controller.isPlaying;
     if (playing) _keepCard = false;
-    final transport = playing ? MediaControl.stop : MediaControl.play;
+    // One toggle: ❚❚ while playing (a pause request stops), ▶ when not.
+    final toggle = playing ? MediaControl.pause : MediaControl.play;
     final library = _library;
     final set = library?.activeSetlist;
-    // Previous/next only in setlist mode (hidden, not disabled, otherwise).
     playbackState.add(
       PlaybackState(
         controls: set != null
-            ? [MediaControl.skipToPrevious, transport, MediaControl.skipToNext]
-            : [transport],
-        androidCompactActionIndices: set != null ? const [0, 1, 2] : const [0],
+            ? [MediaControl.skipToPrevious, toggle, MediaControl.skipToNext]
+            : [_steps[0], toggle, _steps[1], _steps[2], _steps[3]],
+        androidCompactActionIndices: const [0, 1, 2],
         processingState: playing || _keepCard
             ? AudioProcessingState.ready
             : AudioProcessingState.idle,
