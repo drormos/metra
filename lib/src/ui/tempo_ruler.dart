@@ -6,6 +6,7 @@ import 'package:flutter/physics.dart';
 
 import '../controller/metronome_controller.dart';
 import 'haptics.dart';
+import 'tabular_text.dart';
 import 'theme.dart';
 
 /// Horizontal tempo ruler (ui-spec.md): a tick per bpm, a labeled tick
@@ -367,20 +368,26 @@ class _RulerPainter extends CustomPainter {
       canvas.drawRect(Rect.fromLTWH(x - 1, 0, 2, major ? 20 : 12), fill);
       if (major) {
         final current = b == bpm;
-        final label = TextPainter(
-          text: TextSpan(
-            text: '$b',
-            style: TextStyle(
-              fontFamily: MetraFonts.body,
-              fontSize: 13,
-              height: 18 / 13,
-              fontWeight: current ? FontWeight.w600 : FontWeight.w500,
-              color: current ? colors.text : colors.muted,
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout();
-        label.paint(canvas, Offset(x - label.width / 2, 23));
+        final style = TextStyle(
+          fontFamily: MetraFonts.body,
+          fontSize: 13,
+          height: 18 / 13,
+          fontWeight: current ? FontWeight.w600 : FontWeight.w500,
+          color: current ? colors.text : colors.muted,
+        );
+        // Each digit centred in a fixed slot (see TabularText).
+        final slot = TabularText.slotWidth(style);
+        final digits = '$b';
+        var left = x - digits.length * slot / 2;
+        for (final d in digits.split('')) {
+          final glyph = TextPainter(
+            text: TextSpan(text: d, style: style),
+            textDirection: TextDirection.ltr,
+          )..layout();
+          glyph.paint(canvas, Offset(left + (slot - glyph.width) / 2, 23));
+          glyph.dispose();
+          left += slot;
+        }
       }
     }
 

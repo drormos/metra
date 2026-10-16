@@ -8,6 +8,7 @@ import 'icons.dart';
 import 'quick_pick.dart';
 import 'setlist_picker.dart';
 import 'subdivision_icon.dart';
+import 'tabular_text.dart';
 import 'theme.dart';
 
 /// The source bar at the bottom of the main screen (ui-spec.md "Source
@@ -170,7 +171,7 @@ class SetlistGroup extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
+                        TabularText(
                           position,
                           style: const TextStyle(
                             fontFamily: MetraFonts.condensed,

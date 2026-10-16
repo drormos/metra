@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
+import 'package:metra/src/ui/tabular_text.dart';
+import 'package:metra/src/ui/theme.dart';
 import 'package:metra/src/ui/repeat_button.dart';
 import 'package:metra/src/ui/haptics.dart';
 import 'package:metra/src/ui/tempo_ruler.dart';
@@ -34,12 +36,12 @@ void main() {
     addTearDown(controller.dispose);
   }
 
-  Text bpmText(WidgetTester tester) =>
-      tester.widget<Text>(find.byKey(MetronomeScreen.bpmKey));
+  TabularText bpmText(WidgetTester tester) =>
+      tester.widget<TabularText>(find.byKey(MetronomeScreen.bpmKey));
 
   testWidgets('shows the current bpm', (tester) async {
     await pumpScreen(tester);
-    expect(bpmText(tester).data, '120');
+    expect(bpmText(tester).text, '120');
     expect(find.text('bpm'), findsWidgets); // plus its invisible twin
   });
 
@@ -47,10 +49,10 @@ void main() {
     await pumpScreen(tester);
     await tester.tap(find.text('+5'));
     await tester.pump();
-    expect(bpmText(tester).data, '125');
+    expect(bpmText(tester).text, '125');
     await tester.tap(find.text('−1'));
     await tester.pump();
-    expect(bpmText(tester).data, '124');
+    expect(bpmText(tester).text, '124');
     await tester.tap(find.text('+1'));
     await tester.tap(find.text('−5'));
     await tester.pump();
@@ -650,6 +652,58 @@ void main() {
       expect(controller.bpm, 121);
       semantics.dispose();
     });
+  });
+
+  testWidgets('no jitter: holding +1 from 100 to 199 never changes the width', (
+    tester,
+  ) async {
+    // The real font: the test font's digits are all the same width anyway.
+    await tester.runAsync(() async {
+      final loader = FontLoader(MetraFonts.condensed)
+        ..addFont(rootBundle.load('assets/fonts/SairaExtraCondensed-Bold.ttf'));
+      await loader.load();
+    });
+    controller.setBpm(100);
+    await pumpScreen(tester);
+    final number = find.byKey(MetronomeScreen.bpmKey);
+    final rect = tester.getRect(number);
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('+1')),
+    );
+    final seen = <int>{};
+    for (var i = 0; i < 400 && controller.bpm < 199; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      seen.add(controller.bpm);
+      expect(tester.getRect(number), rect, reason: '${controller.bpm}');
+    }
+    await gesture.up();
+    expect(controller.bpm, greaterThanOrEqualTo(199));
+    expect(seen, containsAll([111, 188]));
+  });
+
+  testWidgets('the BPM grows with the screen: 172px up to 240px', (
+    tester,
+  ) async {
+    double size(Size screen) {
+      tester.view
+        ..physicalSize = screen
+        ..devicePixelRatio = 1;
+      return tester
+          .widget<TabularText>(find.byKey(MetronomeScreen.bpmKey))
+          .style!
+          .fontSize!;
+    }
+
+    addTearDown(tester.view.reset);
+    await pumpScreen(tester);
+    tester.view
+      ..physicalSize = const Size(400, 480)
+      ..devicePixelRatio = 1;
+    await tester.pump();
+    expect(size(const Size(400, 480)), 172);
+    tester.view.physicalSize = const Size(400, 1100);
+    await tester.pump();
+    expect(size(const Size(400, 1100)), 240);
   });
 
   testWidgets('the BPM number alone is centred; "bpm" hangs off its right', (

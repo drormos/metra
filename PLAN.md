@@ -229,6 +229,11 @@ Decisions made with the user that the spec doesn't state (or states differently)
 - Setlist mode: previous / toggle / next. Free play and Single song: `[−1, toggle, +1, −5, +5]` as custom actions (`step` with `{'delta': n}` → `controller.nudge`, so in Single song it's an unsaved change). The order is for Android 13+, which puts the first two custom actions in the previous / next slots: the compact card reads −1 ▶ +1 and the expanded one adds −5 and +5 after them. The spec's −5 −1 ▶ +1 +5 order can't be had there; older Android shows the list order.
 - Step icons: vector drawables `ic_step_{minus,plus}{1,5}` (strokes, no text), kept from resource shrinking alongside audio_service's.
 
+## Phase 5r: Vertical layout, BPM size, no jitter (done)
+- Two groups: the display (BPM + tempo line) is centred in an `Expanded` between the beat blocks and the ruler; the controls (ruler, 18px = 6 + the 12px gap, steps, Start/Tap, source bar) have fixed spacing at the bottom.
+- BPM font size = `((free height − 44) / 0.85).clamp(172, 240)`, still in a scale-down `FittedBox`: on a 390px-wide phone a three-digit number tops out near 200px wide-bound, so the extra size shows on taller and wider screens.
+- No jitter: Saira Extra Condensed has no `tnum` (`FontFeature.tabularFigures()` measured: no change; "111" 80px vs "188" 107.5px at 100px). `TabularText` puts each digit in a slot as wide as the widest digit, centred; used for the BPM (main screen and editor) and the set position. The ruler painter lays its labels out in the same slots (`TabularText.slotWidth`). Test: holding +1 from 100 to 199 with the real font never changes the number's rect.
+
 ## Release builds
 - Signing: `android/key.properties` (gitignored) → keystore `~/keys/metra-release.jks` (alias `metra`, PKCS12, RSA 4096, 10000 days). A copy of the properties sits next to the keystore. Losing the keystore means no updates to installed copies: back up `~/keys/`. Without `key.properties`, release builds fall back to the debug key.
 - `keytool` isn't on the PATH (no system Java): use `/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/keytool`.

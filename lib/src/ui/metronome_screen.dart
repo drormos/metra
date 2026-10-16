@@ -112,37 +112,36 @@ class MetronomeScreen extends StatelessWidget {
         _topRow(context),
         const SizedBox(height: 16),
         BeatIndicator(controller: controller),
-        // The tempo cluster (BPM, tempo line, ruler, steps) stays one
-        // group: spare height goes above the BPM, which also shrinks first
-        // on small phones.
+        // Two groups (ui-spec.md "Vertical layout"): the display (BPM and
+        // its tempo line) centred in the free space, as large as fits
+        // (172–240px); the controls below it, at fixed spacing.
         Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      BpmReadout(
+          child: LayoutBuilder(
+            builder: (context, box) => Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    // Shrinks below 172px only when it can't fit at all.
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: BpmReadout(
                         bpm: bpm,
-                        fontSize: 172,
+                        fontSize: ((box.maxHeight - 44) / 0.85).clamp(172, 240),
                         unitSize: 18,
                         numberKey: bpmKey,
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                  // Fixed height: the tempo name, or Revert / Save to song.
+                  SizedBox(height: 44, child: _tempoLine(colors, bpm)),
+                ],
               ),
-              // Fixed height: the tempo name, or Revert / Save to song.
-              SizedBox(height: 44, child: _tempoLine(colors, bpm)),
-              const SizedBox(height: 4),
-              TempoRuler(bpm: bpm, onChanged: controller.setBpm),
-            ],
+            ),
           ),
         ),
-        const SizedBox(height: 6),
+        TempoRuler(bpm: bpm, onChanged: controller.setBpm),
+        const SizedBox(height: 18), // 6px + the normal 12px gap
         TempoSteps(bpm: bpm, onStep: controller.nudge, height: 60),
         const SizedBox(height: 12),
         SizedBox(

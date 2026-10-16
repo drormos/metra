@@ -11,6 +11,7 @@ import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/editor_scaffold.dart';
 import 'package:metra/src/ui/meter_control.dart';
 import 'package:metra/src/ui/song_editor.dart';
+import 'package:metra/src/ui/tabular_text.dart';
 import 'package:metra/src/ui/tempo_ruler.dart';
 
 import '../audio/fake_click_output.dart';
@@ -102,7 +103,7 @@ void main() {
   }
 
   String bpm(WidgetTester tester) =>
-      tester.widget<Text>(find.byKey(SongEditor.bpmKey)).data!;
+      tester.widget<TabularText>(find.byKey(SongEditor.bpmKey)).text;
 
   testWidgets('a new song opens with a unique default name, selected', (
     tester,

@@ -16,6 +16,7 @@ import 'package:metra/src/ui/setlist_group.dart';
 import 'package:metra/src/ui/setlist_picker.dart';
 import 'package:metra/src/ui/song_editor.dart';
 import 'package:metra/src/ui/song_library.dart';
+import 'package:metra/src/ui/tabular_text.dart';
 
 import '../audio/fake_click_output.dart';
 import 'test_theme.dart';
@@ -78,6 +79,9 @@ void main() {
 
     bool enabled(WidgetTester tester, Key key) =>
         tester.widget<FilledButton>(find.byKey(key)).onPressed != null;
+
+    Finder position(String text) =>
+        find.byWidgetPredicate((w) => w is TabularText && w.text == text);
 
     Rect groupRect(WidgetTester tester) =>
         tester.getRect(find.byType(SetlistGroup));
@@ -235,7 +239,7 @@ void main() {
     testWidgets('setlist mode: header, position, neighbours', (tester) async {
       await withSet(tester);
       expect(find.text('Friday set'), findsOneWidget);
-      expect(find.text('–/3'), findsOneWidget, reason: 'no song yet');
+      expect(position('–/3'), findsOneWidget, reason: 'no song yet');
       expect(enabled(tester, SetlistGroup.previousKey), isFalse);
       expect(find.text('One'), findsOneWidget, reason: 'next = first song');
 
@@ -243,7 +247,7 @@ void main() {
       await tester.pump();
       expect(title(tester), 'One');
       expect(metronome.bpm, 100);
-      expect(find.text('1/3'), findsOneWidget);
+      expect(position('1/3'), findsOneWidget);
       expect(find.text('Two'), findsOneWidget);
       expect(find.text('110 bpm'), findsOneWidget);
 

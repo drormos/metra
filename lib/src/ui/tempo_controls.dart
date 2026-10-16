@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import '../controller/metronome_controller.dart';
 import 'haptics.dart';
 import 'repeat_button.dart';
+import 'tabular_text.dart';
 import 'theme.dart';
 
 /// The BPM number with "bpm" hanging off its right: the number alone is
-/// centred (main screen at 172px, song editor at 84px).
+/// centred (main screen 172–240px, song editor 84px).
 class BpmReadout extends StatelessWidget {
   const BpmReadout({
     super.key,
@@ -39,7 +40,8 @@ class BpmReadout extends StatelessWidget {
           ),
         ),
         SizedBox(width: gap),
-        Text(
+        // Fixed digit slots: the readout never changes width or shakes.
+        TabularText(
           '$bpm',
           key: numberKey,
           style: TextStyle(
@@ -47,8 +49,6 @@ class BpmReadout extends StatelessWidget {
             fontSize: fontSize,
             fontWeight: FontWeight.w700,
             height: 0.85,
-            // Fixed-width digits: the readout doesn't shift.
-            fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
         SizedBox(width: gap),
