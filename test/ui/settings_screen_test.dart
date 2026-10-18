@@ -11,6 +11,7 @@ import 'package:metra/src/model/click_volumes.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/about.dart';
+import 'package:metra/src/ui/menu_panel.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/setlist_picker.dart';
 import 'package:metra/src/ui/settings_screen.dart';
@@ -43,8 +44,8 @@ void main() {
     }
   });
 
-  /// The main screen with two setlists and three songs, then Settings.
-  Future<void> openSettingsScreen(
+  /// The main screen with two setlists and three songs, then the Menu.
+  Future<void> openMenu(
     WidgetTester tester, {
     Size size = const Size(400, 900),
   }) async {
@@ -81,6 +82,25 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// Then Menu → Settings.
+  Future<void> openSettingsScreen(
+    WidgetTester tester, {
+    Size size = const Size(400, 900),
+  }) async {
+    await openMenu(tester, size: size);
+    await tester.tap(find.byKey(MenuPanel.settingsKey));
+    await tester.pumpAndSettle();
+  }
+
+  /// Back on the main screen: no panel, no page over it.
+  void expectMain() {
+    expect(find.byType(MenuPanel), findsNothing);
+    expect(find.byType(SettingsScreen), findsNothing);
+    expect(find.byType(SetlistPicker), findsNothing);
+    expect(find.byType(SongLibrary), findsNothing);
+    expect(find.byType(MetronomeScreen), findsOneWidget);
+  }
+
   /// Scrolls settings until [finder] is built and on screen.
   Future<void> reveal(WidgetTester tester, Finder finder) async {
     await tester.scrollUntilVisible(
@@ -106,7 +126,83 @@ void main() {
     await tapVisible(tester, find.byKey(SettingsScreen.vibrateKey));
     expect(library.vibrate, isFalse);
     await reveal(tester, find.byKey(SettingsScreen.testKey));
-    await reveal(tester, find.byKey(SettingsScreen.versionKey));
+  });
+
+  testWidgets('Settings: only sound, volume, theme and the offset', (
+    tester,
+  ) async {
+    await openSettingsScreen(tester);
+    expect(find.text('Settings'), findsOneWidget);
+    for (final gone in ['Your music', 'About', 'Send feedback']) {
+      expect(find.text(gone), findsNothing);
+    }
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expectMain();
+  });
+
+  testWidgets('the Menu panel: rows, counts; closes on outside tap, swipe, '
+      'back; the click keeps playing', (tester) async {
+    await openMenu(tester);
+    await metronome.play();
+    // Not pumpAndSettle: while playing, the beat blocks animate every frame.
+    Future<void> settle() async {
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    final panel = tester.getRect(find.byKey(MenuPanel.surfaceKey));
+    expect(panel.width, MenuPanel.width);
+    expect(panel.right, 400, reason: 'from the right');
+    for (final text in [
+      'Menu',
+      'Your music',
+      'Song library',
+      'Setlists',
+      'Settings',
+      'Sound, volume, theme',
+      'Send feedback',
+      'About Metra',
+    ]) {
+      expect(
+        find.descendant(of: find.byType(MenuPanel), matching: find.text(text)),
+        findsOneWidget,
+        reason: text,
+      );
+    }
+    expect(
+      find.descendant(
+        of: find.byKey(MenuPanel.songLibraryKey),
+        matching: find.text('3'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(MenuPanel.setlistsKey),
+        matching: find.text('2'),
+      ),
+      findsOneWidget,
+    );
+    await tester.tapAt(const Offset(20, 450));
+    await settle();
+    expectMain();
+    await tester.tap(find.byTooltip('Menu'));
+    await settle();
+    await tester.fling(
+      find.byKey(MenuPanel.surfaceKey),
+      const Offset(200, 0),
+      1000,
+    );
+    await settle();
+    expectMain();
+    await tester.tap(find.byTooltip('Menu'));
+    await settle();
+    await tester.binding.handlePopRoute();
+    await settle();
+    expectMain();
+    expect(metronome.isPlaying, isTrue);
+    metronome.stop();
   });
 
   testWidgets('About: the version line, copied on long-press', (tester) async {
@@ -124,10 +220,9 @@ void main() {
         null,
       ),
     );
-    await openSettingsScreen(tester);
-    await reveal(tester, find.byKey(SettingsScreen.versionKey));
+    await openMenu(tester);
     expect(find.text('Metra 1.2.3 (7)'), findsOneWidget);
-    await tester.longPress(find.byKey(SettingsScreen.versionKey));
+    await tester.longPress(find.byKey(MenuPanel.versionKey));
     await tester.pump();
     expect(copied, [
       {'text': 'Metra 1.2.3 (7)'},
@@ -135,12 +230,19 @@ void main() {
     expect(find.text('Copied'), findsOneWidget);
   });
 
-  testWidgets('About Metra opens the note', (tester) async {
-    await openSettingsScreen(tester);
-    await tapVisible(tester, find.byKey(SettingsScreen.aboutKey));
+  testWidgets('About Metra opens the note; back returns to main', (
+    tester,
+  ) async {
+    await openMenu(tester);
+    await tester.tap(find.byKey(MenuPanel.aboutKey));
     await tester.pumpAndSettle();
     expect(find.byType(AboutScreen), findsOneWidget);
+    expect(find.byType(MenuPanel), findsNothing, reason: 'the panel closed');
     expect(find.text(AboutScreen.promise), findsOneWidget);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AboutScreen), findsNothing);
+    expectMain();
   });
 
   test(
@@ -157,45 +259,50 @@ void main() {
     },
   );
 
-  testWidgets('Your music: counts, Setlists and Song library', (tester) async {
-    await openSettingsScreen(tester);
-    expect(find.text('2 setlists'), findsOneWidget);
-    expect(find.text('3 songs'), findsOneWidget);
-    await tester.tap(find.text('Setlists'));
+  testWidgets('Your music: Setlists and Song library; back to main', (
+    tester,
+  ) async {
+    await openMenu(tester);
+    await tester.tap(find.byKey(MenuPanel.setlistsKey));
     await tester.pumpAndSettle();
     expect(find.text('What to play'), findsOneWidget);
     expect(find.byType(SetlistPicker), findsOneWidget);
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
-    expect(find.byType(SettingsScreen), findsOneWidget);
-    await tester.tap(find.text('Song library'));
+    expectMain();
+    await tester.tap(find.byTooltip('Menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(MenuPanel.songLibraryKey));
     await tester.pumpAndSettle();
     expect(find.byType(SongLibrary), findsOneWidget);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    expectMain();
   });
 
-  testWidgets('loading from Settings > Setlists lands on the main screen', (
+  testWidgets('loading from Menu > Setlists lands on the main screen', (
     tester,
   ) async {
-    await openSettingsScreen(tester);
-    await tester.tap(find.text('Setlists'));
+    await openMenu(tester);
+    await tester.tap(find.byKey(MenuPanel.setlistsKey));
     await tester.pumpAndSettle();
     final friday = library.setlists.firstWhere((l) => l.name == 'Friday set');
     await tester.tap(find.byKey(ValueKey('picker-set-${friday.id}')));
     await tester.pumpAndSettle();
     expect(find.byType(SetlistPicker), findsNothing);
-    expect(find.byType(SettingsScreen), findsNothing, reason: 'Settings too');
+    expectMain();
     expect(library.activeSetlist?.id, friday.id);
   });
 
-  testWidgets('Free play from Settings > Setlists lands on the main screen', (
+  testWidgets('Free play from Menu > Setlists lands on the main screen', (
     tester,
   ) async {
-    await openSettingsScreen(tester);
-    await tester.tap(find.text('Setlists'));
+    await openMenu(tester);
+    await tester.tap(find.byKey(MenuPanel.setlistsKey));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(SetlistPicker.freePlayKey));
     await tester.pumpAndSettle();
-    expect(find.byType(SettingsScreen), findsNothing);
+    expectMain();
   });
 
   testWidgets('theme and click sound apply at once', (tester) async {

@@ -20,8 +20,8 @@ import 'theme.dart';
 /// page, which both plays and edits the set. Full screen; opening them
 /// never touches the click, only choosing a song or a set does.
 ///
-/// Opens on What to play; back steps set page → What to play → where it
-/// was opened from (Menu or main screen). With [setId] (long-press in the
+/// Opens on What to play; back steps set page → What to play → the main
+/// screen. With [setId] (long-press in the
 /// Setlists dropdown), opens on that set's page alone: back returns
 /// straight to the main screen. With [newSet], on a new set's page, What
 /// to play behind it.
@@ -692,11 +692,11 @@ class _SetlistPickerState extends State<SetlistPicker> {
       for (final set in _library.setlistsRecentlyPlayed)
         if (query.isEmpty || set.name.toLowerCase().contains(query)) set,
     ];
-    // ‹ leaves for wherever this was opened from; nothing was loaded.
+    // ‹ always returns to the main screen; nothing was loaded.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const BackBar(title: 'What to play', centered: true),
+        BackBar(title: 'What to play', centered: true, onBack: _close),
         Expanded(
           // Free play scrolls with the list, so the search still fits when
           // the keyboard is up.

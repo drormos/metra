@@ -273,6 +273,11 @@ Decisions made with the user that the spec doesn't state (or states differently)
 - Time signature sheet: "Polyrhythm" row (Off · 2–7, Off slightly wider, beat count dimmed and disabled) with the plain-words hint. The meter button reads "4/4 · 3" when on.
 - Volume: fourth slider "Polyrhythm", default 70%, in Reset.
 
+## Phase 5y: Menu panel and Settings page (done)
+- ☰ opens `MenuPanel` (`showMenuPanel`): a see-through route sliding in from the right, 304px, `sheet` color with a 1px `border` left edge, over the `dim` barrier. Tap outside (barrier), a swipe right (60px or a fling), or back closes it; the click is untouched. Rows: Your music (Song library, Setlists, with counts; hidden without storage), then Settings (gear, "Sound, volume, theme"), Send feedback, About Metra, rows without an icon keep the 22px icon column; the version line at the bottom (long-press copies).
+- A row pops the panel first, then opens its page from the main screen's context, so back from any of them lands on the main screen. "What to play" ‹ now always goes to the main screen too (`BackBar.onBack` → pop to the first route).
+- The old Menu page is now "Settings" (`SettingsScreen`, `openSettings`): Theme, Click sound, Vibration, Volume (four sliders), Visual offset. Your music and About moved to the panel. The click sound list is unchanged for now (a separate change replaces Classic with Bell).
+
 ## Pre-release review fixes (done)
 - Voice limit 128 (`SoloudClickOutput.maxVoices`, was 32): scheduled clicks hold a voice from `playScheduled` until they finish, and at the limit flutter_soloud silently stops the oldest of the same sound. The 2 s background lookahead at 300 bpm in 16ths holds ~45. A test checks the worst case fits.
 - A tempo or pattern change while the device starts (between Start and the anchor) restarts on beat 1 with it once started; before, the scheduler wasn't running to take it and the click played the old values.

@@ -248,10 +248,18 @@ class SearchField extends StatelessWidget {
 /// Top bar of full screens that apply changes at once (song library,
 /// settings): a back chevron and a title, [centered] or after the chevron.
 class BackBar extends StatelessWidget {
-  const BackBar({super.key, required this.title, this.centered = false});
+  const BackBar({
+    super.key,
+    required this.title,
+    this.centered = false,
+    this.onBack,
+  });
 
   final String title;
   final bool centered;
+
+  /// Instead of popping this page.
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -265,7 +273,7 @@ class BackBar extends StatelessWidget {
         children: [
           IconButton(
             tooltip: 'Back',
-            onPressed: () => Navigator.maybePop(context),
+            onPressed: onBack ?? () => Navigator.maybePop(context),
             icon: const Icon(Icons.chevron_left, size: 28),
           ),
           Expanded(

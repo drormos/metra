@@ -7,57 +7,37 @@ import '../controller/metronome_controller.dart';
 import '../model/click_sound.dart';
 import '../model/click_volumes.dart';
 import '../model/metronome_pattern.dart';
-import 'about.dart';
 import 'editor_scaffold.dart';
 import 'meter_control.dart';
 import 'segmented.dart';
 import 'theme.dart';
 
-/// Opens the Menu (ui-spec.md "Menu", `settings.reference.html`): your
-/// music first, then the settings.
-/// Changes apply at once. Leaving stops a visual offset test that started
-/// the click.
+/// Opens Settings (ui-spec.md "Settings", `settings.reference.html`),
+/// from Menu → Settings. Changes apply at once. Leaving stops a visual
+/// offset test that started the click.
 Future<void> openSettings(
   BuildContext context, {
   required MetronomeController metronome,
   LibraryController? library,
-  VoidCallback? onSetlists,
-  VoidCallback? onSongLibrary,
 }) async {
   await Navigator.push(
     context,
     MaterialPageRoute<void>(
-      builder: (_) => SettingsScreen(
-        metronome: metronome,
-        library: library,
-        onSetlists: onSetlists,
-        onSongLibrary: onSongLibrary,
-      ),
+      builder: (_) => SettingsScreen(metronome: metronome, library: library),
     ),
   );
   metronome.endOffsetTest();
 }
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({
-    super.key,
-    required this.metronome,
-    this.library,
-    this.onSetlists,
-    this.onSongLibrary,
-  });
+  const SettingsScreen({super.key, required this.metronome, this.library});
 
   final MetronomeController metronome;
 
-  /// Null when storage is unavailable: no Your music, theme or vibration.
+  /// Null when storage is unavailable: no theme or vibration.
   final LibraryController? library;
-  final VoidCallback? onSetlists;
-  final VoidCallback? onSongLibrary;
 
   static const vibrateKey = Key('settings-vibrate');
-  static const feedbackKey = Key('settings-feedback');
-  static const aboutKey = Key('settings-about');
-  static const versionKey = Key('settings-version');
   static const resetKey = Key('settings-volume-reset');
   static const offsetKey = Key('settings-offset');
   static const testKey = Key('settings-offset-test');
@@ -76,7 +56,7 @@ class SettingsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const BackBar(title: 'Menu'),
+            const BackBar(title: 'Settings'),
             Expanded(
               child: ListenableBuilder(
                 listenable: Listenable.merge([metronome, ?library]),
@@ -84,7 +64,6 @@ class SettingsScreen extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
                   children: [
                     if (library != null) ...[
-                      _section(context, 'Your music', _yourMusic(context)),
                       _section(
                         context,
                         'Theme',
@@ -104,7 +83,6 @@ class SettingsScreen extends StatelessWidget {
                       _section(context, 'Vibration', _vibration(context)),
                     _volumeSection(context),
                     _section(context, 'Visual offset', _offset(context)),
-                    _section(context, 'About', _about(context)),
                   ],
                 ),
               ),
@@ -144,118 +122,6 @@ class SettingsScreen extends StatelessWidget {
       ],
     ),
   );
-
-  Widget _yourMusic(BuildContext context) {
-    final library = this.library!;
-    String count(int n, String one) => n == 1 ? '1 $one' : '$n ${one}s';
-    return _navFrame(context, [
-      _navRow(
-        context,
-        'Setlists',
-        count(library.setlists.length, 'setlist'),
-        onSetlists,
-      ),
-      _navRow(
-        context,
-        'Song library',
-        count(library.songs.length, 'song'),
-        onSongLibrary,
-      ),
-    ]);
-  }
-
-  /// Send feedback and About Metra, then the version line (long-press
-  /// copies it).
-  Widget _about(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      _navFrame(context, [
-        _navRow(
-          context,
-          'Send feedback',
-          "Tell Dror what works and what doesn't",
-          () => sendFeedback(context),
-          key: feedbackKey,
-        ),
-        _navRow(
-          context,
-          'About Metra',
-          'Why this app exists',
-          () => Navigator.push(
-            context,
-            MaterialPageRoute<void>(builder: (_) => const AboutScreen()),
-          ),
-          key: aboutKey,
-        ),
-      ]),
-      const VersionLine(key: versionKey),
-    ],
-  );
-
-  /// Navigation rows inside a thin frame.
-  Widget _navFrame(BuildContext context, List<Widget> rows) => Container(
-    decoration: BoxDecoration(
-      border: Border.all(color: context.colors.divider, width: 2),
-      borderRadius: BorderRadius.circular(4),
-    ),
-    child: Material(
-      type: MaterialType.transparency,
-      child: Column(
-        children: [
-          for (final (i, row) in rows.indexed) ...[
-            if (i > 0) Divider(height: 1, color: context.colors.divider),
-            row,
-          ],
-        ],
-      ),
-    ),
-  );
-
-  Widget _navRow(
-    BuildContext context,
-    String title,
-    String detail,
-    VoidCallback? onTap, {
-    Key? key,
-  }) {
-    final colors = context.colors;
-    return InkWell(
-      key: key,
-      onTap: onTap,
-      child: Container(
-        height: 60,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    detail,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 13, color: colors.muted),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right, size: 20, color: colors.muted),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _clickSound(BuildContext context) {
     final colors = context.colors;

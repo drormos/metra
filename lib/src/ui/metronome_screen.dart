@@ -9,14 +9,13 @@ import '../model/tempo_name.dart';
 import 'beat_indicator.dart';
 import 'fit_text.dart';
 import 'haptics.dart';
+import 'menu_panel.dart';
 import 'poly_lane.dart';
 import 'setlist_group.dart';
 import 'setlist_picker.dart';
 import 'save_as_new_dialog.dart';
 import 'icons.dart';
-import 'settings_screen.dart';
 import 'song_editor.dart';
-import 'song_library.dart';
 import 'subdivision_icon.dart';
 import 'tempo_controls.dart';
 import 'tempo_ruler.dart';
@@ -477,21 +476,8 @@ class MetronomeScreen extends StatelessWidget {
         Builder(
           builder: (context) => _squareButton(
             tooltip: 'Menu',
-            onPressed: () => openSettings(
-              context,
-              metronome: controller,
-              library: library,
-              onSetlists: library == null
-                  ? null
-                  : () => openSetlists(
-                      context,
-                      library: library,
-                      metronome: controller,
-                    ),
-              onSongLibrary: library == null
-                  ? null
-                  : () => openSongLibrary(context, library, controller),
-            ),
+            onPressed: () =>
+                showMenuPanel(context, metronome: controller, library: library),
             child: const MenuIcon(),
           ),
         ),
