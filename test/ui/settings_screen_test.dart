@@ -148,7 +148,7 @@ void main() {
     () async {
       final uri = await feedbackUri();
       expect(uri.scheme, 'mailto');
-      expect(uri.path, 'dror945@gmail.com');
+      expect(uri.path, 'metra.application@gmail.com');
       expect(uri.query, isNot(contains('+')), reason: 'spaces as %20');
       final params = Uri.splitQueryString(uri.query);
       expect(params['subject'], 'Metra feedback (v1.2.3 build 7)');

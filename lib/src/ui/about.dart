@@ -13,7 +13,7 @@ import 'theme.dart';
 /// Menu > About (ui-spec.md "Menu"): Send feedback, About Metra, and the
 /// version line.
 
-const feedbackEmail = 'dror945@gmail.com';
+const feedbackEmail = 'metra.application@gmail.com';
 
 /// The app's version and build.
 Future<PackageInfo> appVersion() => PackageInfo.fromPlatform();
