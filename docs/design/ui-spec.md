@@ -21,7 +21,8 @@ Design references (design-tool files: read them for exact sizes and colors, don'
 - `media-controls.reference.html`: lock-screen media card and compact notification (setlist, playing).
 - `media-cover.reference.html`: media card in Free play (stopped) and the generated cover image.
 - `time-signature.reference.html`: the time signature sheet.
-- `settings.reference.html`: the Menu (your music + settings) at full scroll length.
+- `menu.reference.html`: the Menu side panel open over the main screen.
+- `settings.reference.html`: the Settings page at full scroll length.
 - `drop-songs.reference.html`, `drop-sets.reference.html`, `drop-set.reference.html`: the quick-pick dropdowns on the main screen.
 
 ## Principles
@@ -32,7 +33,7 @@ Every feature, now and later, is checked against these before it's designed. If 
 2. **Nothing interrupts the click.** Opening a sheet, page, list, or editor never stops or changes playback. Only an explicit action (start/stop, tempo change, choosing a song) affects it; changes land on beat or bar lines, never mid-beat.
 3. **Only what sounds lights up.** Visual feedback follows the audio exactly.
 4. **Nothing moves.** Free play, Single song, and setlist mode share one layout; only content changes. Start/Tap, tempo controls, and the mode tabs never change position. Fixed slots for changing text and numbers (no jitter, no reflow).
-5. **One screen to play, the Menu to manage.** Choosing and playing happens on the main screen (tabs switch at once; lists open from the context row's center button; quick choices like time signature are a sheet). Creating, editing, and organizing are full pages reached from the Menu.
+5. **One screen to play, the Menu to manage.** Choosing and playing happens on the main screen (tabs switch at once; lists open from the context row's center button; quick choices like time signature are a sheet). Creating, editing, and organizing are full pages reached from the Menu (☰, a side panel of places to go).
 6. **One way to do each thing, in one place.** No duplicate routes on the main screen; one concept per job (setlists group songs, no second grouping system).
 7. **Nothing hidden that matters.** Every action has a visible control. Gestures (long-press, drag) are only shortcuts or direct manipulation, never the only way.
 8. **Tap does, long-press edits.** A tap plays or switches; a long-press on a song or set opens its editor or page. Never on stage-critical buttons.
@@ -169,7 +170,7 @@ Two full pages (not sheets), black background like the song library. Playback co
 - **New setlist** ("New setlist" in What to play) opens this page for a new set: the title is a text field, focused, with a unique default name already filled in and fully selected ("Setlist 5", using the next free number), highlighted with the accent color. Typing replaces it; leaving it untouched keeps it. The list shows an empty state: "No songs yet", a short hint, and a big filled red "Add songs" button right under it (where the eye lands when the keyboard closes). The bottom bar is hidden while the set is empty and appears with the first song (see "Empty lists" under Behavior). If the library itself is empty, the center button reads "New song" instead (creates a song and adds it to this set). A new set left with no songs is discarded when you leave the page. See `setlist-new.reference.html`.
 
 **What to play view** (see `set-switcher.reference.html`):
-- Top bar like the song library: ‹ (back to the Menu, or to the main screen if opened from a dropdown) and the centered title "What to play". It never leads to a set's page, so there's no loop with the set page's "‹ Setlists".
+- Top bar like the song library: ‹ (back to the main screen) and the centered title "What to play". It never leads to a set's page, so there's no loop with the set page's "‹ Setlists".
 - **Free play** first, as its own framed button with a metronome icon and the line "No setlist, any tempo". It's a mode, not a setlist, so it's visually separate from the list. Tapping it always switches to Free play and detaches any loaded song (see "Detaching a song").
 - Then a muted "Setlists" label (with "Recently played" muted on the right), a search field ("Search setlists", same style as the song library's; filters by name as you type), and one 64px row per set, built like the picker's song rows:
   - Left: a 22px slot with a muted list icon (the set's counterpart of a song row's play icon). Then the name and a muted "12 songs" line.
@@ -252,31 +253,38 @@ A second pulse that divides each bar evenly, against the main beats (e.g. 3 agai
 - **Where it lives:** only in the time signature sheet (tap "4/4"), because it's part of the bar's shape. No new button on the main screen. When on, the time signature button reads "4/4 · 3", so it's never hidden.
 - **Choices:** Off, 2, 3, 4, 5, 6, 7 pulses per bar; the one equal to the beat count is dimmed. Default Off. If you change the beats so they equal the chosen number (3 against 4, then pick 3/4), the polyrhythm turns Off.
 - **Timing:** pulse k (0-based) of n sits at beat position k × beats ÷ n inside the bar, so pulse 1 lands with beat 1 and the pulses are perfectly even across the bar. Positions are stored in beats, not milliseconds, so tempo changes, the ruler, and Tap tempo carry the pulses along exactly like subdivisions (same clear-and-reschedule). Works for any time signature, including /8.
-- **Sound:** the chosen click sound (Classic, Woodblock, Beep, Cowbell) played higher, so it's clearly a separate voice without any new sound files (e.g. ~1.5× playback speed, a fifth up; tune by ear). Accented pulses are louder. Subdivisions keep playing on the main beats only; the polyrhythm has no subdivisions.
+- **Sound:** the chosen click sound (Woodblock, Beep, Cowbell, Bell) played higher, so it's clearly a separate voice without any new sound files (e.g. ~1.5× playback speed, a fifth up; tune by ear). Accented pulses are louder. Subdivisions keep playing on the main beats only; the polyrhythm has no subdivisions.
 - **Lane on the main screen:** shown only when a polyrhythm is on. One row, 22px tall, 3px radius, right under the subdivision strip (2px gap). The n cells are placed by time, not squeezed into the beat grid: each cell starts exactly where its pulse falls across the bar's width (with the same 6px gaps), so cell 1 lines up with beat 1 and you can see 3 against 4 at a glance. Its height comes from the flexible space; the BPM, ruler, and buttons never move.
 - **Cell states** work like beat blocks, in a quieter palette: tapping a cell cycles regular → accent → muted → regular (light haptic); all regular by default. Resting: regular #262626, accent #5A1A16, muted dark with a thin dashed outline. Only the sounding cell lights (regular white, accent red #FF3B30) for the length of its pulse, then returns to resting. Muted cells never light.
-- **While playing:** turning it on or changing the number starts the new pulses at the next beat 1. Turning it Off stops the pulses at once. Cell taps are heard from the next pulse.
+- **While playing:** turning it on or changing the number starts the new pulses at the next beat, in the bar's own grid (the rest of that bar's pulses play, so there's no wait for beat 1). Turning it Off stops the pulses at once. Cell taps are heard from the next pulse.
 - **Saved in songs** like the rest of the bar: song fields `polyrhythm` (0 = off, 2–7) and `polyStates` (one state per pulse). Changing it while a song is loaded follows "Changes to a loaded song" (Revert / Save / Save as new). Free play keeps it across launches with the other click settings.
-- **Volume:** a fourth slider "Polyrhythm" in Menu → Volume, default 70%; "Reset" includes it.
+- **Volume:** a fourth slider "Polyrhythm" in Settings → Volume, default 70%; "Reset" includes it.
 - **Visual offset** applies to the lane exactly as to the beat blocks.
 - Media controls, setlists, and the trainer are unchanged by it.
 
 ## Menu
 
-A full screen opened from the Menu button (☰, three equal lines) at the top right of the main screen; it was called Settings. It holds your music first, then the settings. See `settings.reference.html` (full scroll length).
+The ☰ button at the top right of the main screen opens a **side panel** that slides in from the right (304px wide, #111111, 1px #2E2E2E left border) over the dimmed main screen. It's a list of places to go, which is what ☰ promises; settings have their own page. The click keeps playing. Tap outside, swipe it right, or use back to close it. Opening it gives no haptic. See `menu.reference.html`.
 
-- **Top bar:** back chevron and "Menu". Changes apply immediately; there's no Save.
-- **Your music** (first section): two navigation rows inside a thin frame, each with a muted count and a right chevron: "Setlists" (opens the Setlists page, What to play) and "Song library" (opens the song library). This is where setlists and songs are created and edited; the main screen's dropdowns are only for choosing what to play.
+- **Title** "Menu" at the top.
+- **Your music** (small muted heading): "Song library" (note icon, muted count, ›) and "Setlists" (note-queue icon, count, ›). This is where songs and setlists are created and edited; the main screen's lists are for choosing what to play.
+- After a gap: **"Settings"** (gear icon, muted line "Sound, volume, theme", ›), **"Send feedback"** (muted line "Tell Dror what works and what doesn't"), **"About Metra"** (muted line "Why this app exists"). Rows without an icon keep the icon column empty so the labels line up.
+- At the bottom of the panel, centered and muted: "Metra 1.0.0 (2)" (version and build). Long-pressing it copies it.
+- Rows are 56px, separated by 1px #1F1F1F lines. Tapping a row closes the panel and opens that page; back from any of these pages returns to the main screen.
+- "Send feedback" opens the phone's share/email with an email to metra.application@gmail.com, subject "Metra feedback (v1.0.0 build 2)", and a body that starts with the app version, phone model, and Android version, then an empty line for the message.
+- "About Metra" opens a simple page with Dror's short note on why he made it (written by him), plus one line: "No ads, no account, no tracking. Your songs stay on your phone."
+
+## Settings
+
+A full page opened from Menu → Settings. See `settings.reference.html` (full scroll length).
+
+- **Top bar:** back chevron and "Settings". Changes apply immediately; there's no Save.
 - **Theme:** System / Dark / Light segmented control.
-- **Click sound:** a 2×2 grid of buttons: Classic, Woodblock, Beep, Cowbell. Selected = filled white. Tapping selects it and plays a short sample. Every tap plays the sample, including a tap on the sound that's already selected, so you can listen as many times as you like. A new tap restarts the sample.
+- **Click sound:** a 2×2 grid of buttons: Woodblock, Beep, Cowbell, Bell. Default Woodblock. (Classic was removed: it sounded almost the same as Woodblock. A saved "classic" setting loads as Woodblock.) The four are kept clearly apart by character and pitch range: Woodblock (wood, mid), Beep (pure tone), Cowbell (a high, clean agogo-style metal bell, not the drum-machine square-wave one), Bell (a small bright ding, highest of all). Cowbell and Bell are defined in `sounds/click_prototypes.py` (chosen by ear); Woodblock and Beep are unchanged. Selected = filled white. Tapping selects it and plays a short sample. Every tap plays the sample, including a tap on the sound that's already selected, so you can listen as many times as you like. A new tap restarts the sample.
 - **Vibration:** one switch, "Vibrate on touch", default on, with the hint "Only when vibration is on in your phone's settings". It can only turn the app's haptics off; it never overrides the system setting.
 - **Volume:** four sliders (Accent, Beat, Subdivision, Polyrhythm) with percentages, and a small "Reset" text button on the right of the section heading that resets only the volumes to their defaults: Accent 100%, Beat 80%, Subdivision 45%, Polyrhythm 70%.
 - **Visual offset** (stored as `visualOffset`): a large block that flashes on every click, − / + buttons around the current value in ms, and a Start test / Stop test button (primary color). Range −200 to +500 ms, default 0 ms (right for built-in speakers; Bluetooth headsets typically need a positive value, e.g. about 20 ms on the user's headset). The test plays the click on this screen so you can adjust while listening until the flash lands on the sound; if the click is already playing, the test uses it instead of starting its own. Leaving the screen stops a test it started. A short hint explains it's for Bluetooth headphones and doesn't change the sound.
 - No reset for the other settings.
-- **About** (last section): two navigation rows in a thin frame, then the version.
-  - "Send feedback" (muted line "Tell Dror what works and what doesn't"): opens the phone's share/email with an email to metra.application@gmail.com, subject "Metra feedback (v1.0.0 build 2)", and a body that starts with the app version, phone model, and Android version, then an empty line for the message.
-  - "About Metra" (muted line "Why this app exists"): a simple page with Dror's short note on why he made it (written by him), plus one line: "No ads, no account, no tracking. Your songs stay on your phone."
-  - Under the frame, a centered muted line: "Metra 1.0.0 (2)" (version and build number). Long-pressing it copies it.
 
 ## App icon
 
