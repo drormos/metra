@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Metra – Song editor, collapsed</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Extra+Condensed:wght@600;700&amp;family=Saira:wght@500;600&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#FFFFFF}a:hover{color:#FF3B30}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; background: #000000; color: #FFFFFF; font-family: 'Saira', system-ui, sans-serif">
+
+<div style="padding: 52px 16px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1F1F1F">
+<button style="height: 44px; padding: 0 12px; border: 0; background: transparent; color: #FFFFFF; font-family: inherit; font-size: 16px; font-weight: 500">Cancel</button>
+<div style="font-size: 17px; font-weight: 600">Song</div>
+<button style="height: 44px; padding: 0 18px; border: 0; border-radius: 4px; background: #FF3B30; color: #000000; font-family: inherit; font-size: 16px; font-weight: 600">Save</button>
+</div>
+
+<div style="padding: 24px 24px 0; display: flex; flex-direction: column; gap: 28px">
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<label for="song-name" style="font-size: 14px; color: #8C8C8C">Name</label>
+<input id="song-name" value="Dead Weight" style="height: 52px; box-sizing: border-box; padding: 0 14px; border: 2px solid #2E2E2E; border-radius: 4px; background: transparent; color: #FFFFFF; font-family: 'Saira Extra Condensed', sans-serif; font-size: 26px; font-weight: 700">
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="font-size: 14px; color: #8C8C8C">Tempo</div>
+<div style="display: flex; justify-content: center"><div style="position: relative"><span style="font-family: 'Saira Extra Condensed', sans-serif; font-size: 84px; font-weight: 700; line-height: 0.9; font-variant-numeric: tabular-nums">120</span><span style="position: absolute; left: 100%; bottom: 8px; padding-left: 6px; font-size: 16px; color: #8C8C8C">bpm</span></div></div>
+<div style="position: relative; height: 46px; margin-top: 2px; border-top: 2px solid #1F1F1F; border-bottom: 2px solid #1F1F1F; overflow: hidden">
+<div style="position: absolute; left: 0; top: 0; width: 342px; height: 12px; background-image: repeating-linear-gradient(to right, #4A4A4A 0 2px, transparent 2px 14px); background-position: 2px 0"></div>
+<div style="position: absolute; left: 0; top: 0; width: 342px; height: 20px; background-image: repeating-linear-gradient(to right, #8C8C8C 0 2px, transparent 2px 70px); background-position: 30px 0"></div>
+<div style="position: absolute; left: 11px; top: 23px; width: 40px; text-align: center; font-size: 13px; line-height: 18px; color: #8C8C8C">110</div>
+<div style="position: absolute; left: 81px; top: 23px; width: 40px; text-align: center; font-size: 13px; line-height: 18px; color: #8C8C8C">115</div>
+<div style="position: absolute; left: 151px; top: 23px; width: 40px; text-align: center; font-size: 13px; line-height: 18px; font-weight: 600; color: #FFFFFF">120</div>
+<div style="position: absolute; left: 221px; top: 23px; width: 40px; text-align: center; font-size: 13px; line-height: 18px; color: #8C8C8C">125</div>
+<div style="position: absolute; left: 291px; top: 23px; width: 40px; text-align: center; font-size: 13px; line-height: 18px; color: #8C8C8C">130</div>
+<div style="position: absolute; left: 169px; top: 0; width: 4px; height: 22px; background: #FF3B30"></div>
+</div>
+<div style="display: flex; gap: 8px"><button style="flex: 1 1 0; height: 52px; border: 0; border-radius: 4px; background: #1A1A1A; color: #FFFFFF; font-family: 'Saira Extra Condensed', sans-serif; font-size: 26px; font-weight: 600">−5</button><button style="flex: 1 1 0; height: 52px; border: 0; border-radius: 4px; background: #1A1A1A; color: #FFFFFF; font-family: 'Saira Extra Condensed', sans-serif; font-size: 26px; font-weight: 600">−1</button><button style="flex: 1 1 0; height: 52px; border: 0; border-radius: 4px; background: #1A1A1A; color: #FFFFFF; font-family: 'Saira Extra Condensed', sans-serif; font-size: 26px; font-weight: 600">+1</button><button style="flex: 1 1 0; height: 52px; border: 0; border-radius: 4px; background: #1A1A1A; color: #FFFFFF; font-family: 'Saira Extra Condensed', sans-serif; font-size: 26px; font-weight: 600">+5</button></div>
+<button style="height: 48px; border: 2px solid #2E2E2E; border-radius: 4px; background: transparent; color: #FFFFFF; font-family: inherit; font-size: 16px; font-weight: 600">Tap tempo</button>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="font-size: 14px; color: #8C8C8C">Time signature</div>
+<div style="display: flex; align-items: center; gap: 10px">
+<button aria-label="Fewer beats" style="width: 48px; height: 48px; border: 0; border-radius: 4px; background: #1A1A1A; color: #FFFFFF; font-family: 'Saira Extra Condensed', sans-serif; font-size: 26px; font-weight: 600">−</button>
+<div style="width: 40px; text-align: center; font-family: 'Saira Extra Condensed', sans-serif; font-size: 40px; font-weight: 700">4</div>
+<button aria-label="More beats" style="width: 48px; height: 48px; border: 0; border-radius: 4px; background: #1A1A1A; color: #FFFFFF; font-family: 'Saira Extra Condensed', sans-serif; font-size: 26px; font-weight: 600">+</button>
+<div style="font-family: 'Saira Extra Condensed', sans-serif; font-size: 40px; font-weight: 600; color: #8C8C8C; padding: 0 6px">/</div>
+<div role="radiogroup" aria-label="Beat unit" style="flex-grow: 1; display: flex; border: 2px solid #2E2E2E; border-radius: 4px; overflow: hidden">
+<button role="radio" aria-checked="true" style="flex: 1 1 0; height: 44px; border: 0; background: #FFFFFF; color: #000000; font-family: 'Saira Extra Condensed', sans-serif; font-size: 26px; font-weight: 700">4</button>
+<button role="radio" aria-checked="false" style="flex: 1 1 0; height: 44px; border: 0; background: transparent; color: #FFFFFF; font-family: 'Saira Extra Condensed', sans-serif; font-size: 26px; font-weight: 700">8</button>
+</div>
+</div>
+</div>
+
+<button aria-expanded="false" style="height: 72px; padding: 0 16px; border: 2px solid #2E2E2E; border-radius: 4px; background: transparent; color: #FFFFFF; font-family: inherit; text-align: left; display: flex; align-items: center; justify-content: space-between">
+<span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 17px; font-weight: 600">Pattern and subdivision</span><span style="font-size: 14px; color: #8C8C8C">Sixteenths, custom pattern</span></span>
+<svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="#FFFFFF" stroke-width="2" aria-hidden="true"><polyline points="3,5 7,9 11,5"></polyline></svg>
+</button>
+
+<div style="display: flex; flex-direction: column; gap: 12px; padding-top: 4px; border-top: 1px solid #1F1F1F">
+<div style="padding-top: 16px; font-size: 14px; color: #8C8C8C; line-height: 1.5">In 2 setlists: Friday set, Rehearsal. Changes apply to both.</div>
+<button style="height: 48px; align-self: flex-start; padding: 0 4px; border: 0; background: transparent; color: #FF4A3D; font-family: inherit; font-size: 16px; font-weight: 600">Delete song</button>
+</div>
+</div>
+
+<div style="flex-grow: 1"></div>
+<div style="padding: 14px 24px 32px; border-top: 1px solid #1F1F1F; background: #000000">
+<button style="width: 100%; height: 60px; border: 2px solid #2E2E2E; border-radius: 4px; background: transparent; color: #FFFFFF; font-family: inherit; font-size: 18px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 12px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><polygon points="3,1 15,8 3,15" fill="currentColor"></polygon></svg>Preview</button>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
