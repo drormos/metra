@@ -266,7 +266,11 @@ void main() {
     expect(name(), 'Allegro');
     controller.setBpm(60);
     await tester.pump();
-    expect(name(), 'Largo');
+    expect(name(), 'Larghetto');
+    controller.setBpm(200);
+    await tester.pump();
+    expect(name(), 'Prestissimo', reason: 'the longest name fits');
+    expect(tester.takeException(), isNull);
   });
 
   group('beat blocks', () {
