@@ -121,7 +121,7 @@ class Library {
     required this.lastBpm,
     required this.lastPattern,
     required this.visualOffset,
-    this.clickSound = ClickSound.classic,
+    this.clickSound = ClickSound.woodblock,
     this.themeMode = ThemeMode.system,
     this.vibrate = true,
     this.volumes = ClickVolumes.defaults,
@@ -249,7 +249,7 @@ class Library {
       // than discarding the whole library.
       clickSound:
           ClickSound.values.asNameMap()[json['clickSound']] ??
-          ClickSound.classic,
+          ClickSound.woodblock,
       themeMode:
           ThemeMode.values.asNameMap()[json['themeMode']] ?? ThemeMode.system,
       vibrate: json['vibrate'] as bool? ?? true, // older files: on

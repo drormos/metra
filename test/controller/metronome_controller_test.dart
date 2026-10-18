@@ -322,12 +322,13 @@ void main() {
 
   group('click sound', () {
     test('while stopped every tap plays the sample', () {
-      controller.setClickSound(ClickSound.woodblock);
-      expect(controller.clickSound, ClickSound.woodblock);
-      expect(output.currentSound, ClickSound.woodblock);
+      expect(controller.clickSound, ClickSound.woodblock, reason: 'default');
+      controller.setClickSound(ClickSound.bell);
+      expect(controller.clickSound, ClickSound.bell);
+      expect(output.currentSound, ClickSound.bell);
       expect(output.previewCount, 1);
       expect(notifications, 1);
-      controller.setClickSound(ClickSound.woodblock);
+      controller.setClickSound(ClickSound.bell);
       expect(output.previewCount, 2, reason: 'the same sound plays again');
       expect(notifications, 1, reason: 'but nothing changed');
       controller.setClickSound(ClickSound.beep, preview: false);

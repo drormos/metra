@@ -3,9 +3,11 @@
 //
 // Run with: dart run tool/generate_clicks.dart
 //
-// Every sound starts at its loudest on sample 0 (cosine phase, squares at
-// +1), so the files have zero leading silence. Peaks are normalized so all
-// sounds play at the same level: accent 0.9, normal 0.7 of full scale.
+// Every sound starts at its loudest on sample 0 (cosine phase), so the
+// files have zero leading silence. Peaks are normalized so all sounds play
+// at the same level: accent 0.9, normal 0.7 of full scale. Cowbell and Bell
+// are ports of the voices chosen by ear in
+// docs/design/sounds/click_prototypes.py (cowbell_d, bell_a).
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -15,15 +17,6 @@ const _sampleRate = 44100;
 typedef _Voice = double Function(double t);
 
 void main() {
-  _pair('classic', (accent) {
-    final f = accent ? 1800.0 : 1200.0;
-    final decay = accent ? 0.006 : 0.005;
-    return (
-      _ms(30),
-      (t) => exp(-t / decay) * (cos(_w(f) * t) + 0.3 * cos(_w(2 * f) * t)),
-    );
-  });
-
   // Inharmonic partials (wood bars ring near 1 : 2.76) plus a short noise
   // tick for the strike.
   _pair('woodblock', (accent) {
@@ -45,29 +38,89 @@ void main() {
     return (_ms(35), (t) => cos(_w(f) * t) * min(1.0, (length - t) / release));
   });
 
-  // Two detuned squares (the classic drum-machine cowbell), quick drop then
-  // a ringing tail, softened by a low-pass.
-  _pair('cowbell', (accent) {
-    final f = accent ? 680.0 : 540.0;
-    return (
-      _ms(250),
-      (t) =>
-          (0.7 * exp(-t / 0.015) + 0.3 * exp(-t / 0.12)) *
-          (_square(f, t) + _square(f * 1.48, t)),
+  // Agogo-style high metal bell: three inharmonic partials and a short
+  // noise strike, then a 400 Hz high-pass for a thin, cutting tone.
+  _write('cowbell', (accent) {
+    final x = _modal(
+      accent ? 1480 : 1180,
+      const [(1.0, 1.0, 0.09), (2.32, 0.35, 0.04), (4.1, 0.15, 0.015)],
+      0.22,
+      noiseAmount: 0.4,
+      noiseDecay: 0.0015,
+      noiseLowPassHz: 8000,
+      fade: 0.03,
     );
-  }, lowPassHz: 4000);
+    return _highPass(x, 400);
+  });
+
+  // Small bright ding: a long fundamental with an octave and two
+  // inharmonic partials, a faint strike, and an 80 ms fade at the end.
+  _write(
+    'bell',
+    (accent) => _modal(
+      accent ? 2637 : 2093,
+      const [
+        (1.0, 1.0, 0.35),
+        (2.0, 0.35, 0.2),
+        (2.76, 0.25, 0.08),
+        (5.4, 0.12, 0.03),
+      ],
+      0.5,
+      noiseAmount: 0.15,
+      noiseDecay: 0.001,
+      noiseLowPassHz: 9000,
+      fade: 0.08,
+    ),
+  );
 }
 
-/// Writes `<name>_accent.wav` and `<name>_normal.wav`.
-void _pair(
-  String name,
-  (int, _Voice) Function(bool accent) voice, {
-  double? lowPassHz,
+/// Exponentially decaying cosines (ratio, amplitude, decay in s) at
+/// [f0], plus a short low-passed noise strike, with a linear fade to zero
+/// over the last [fade] seconds.
+List<double> _modal(
+  double f0,
+  List<(double, double, double)> partials,
+  double seconds, {
+  double noiseAmount = 0,
+  double noiseDecay = 0.002,
+  double noiseLowPassHz = 6000,
+  double fade = 0.03,
 }) {
+  final frames = (_sampleRate * seconds).round();
+  final random = Random(1);
+  final noise = _lowPass([
+    for (var i = 0; i < frames; i++) random.nextDouble() * 2 - 1,
+  ], noiseLowPassHz);
+  final x = [
+    for (var i = 0; i < frames; i++)
+      () {
+        final t = i / _sampleRate;
+        var v = noiseAmount * exp(-t / noiseDecay) * noise[i];
+        for (final (ratio, amp, decay) in partials) {
+          v += amp * exp(-t / decay) * cos(_w(f0 * ratio) * t);
+        }
+        return v;
+      }(),
+  ];
+  final k = (_sampleRate * fade).round();
+  for (var j = 0; j < k; j++) {
+    x[frames - k + j] *= 1 - j / (k - 1);
+  }
+  return x;
+}
+
+/// Writes `<name>_accent.wav` and `<name>_normal.wav` from a voice given
+/// as a time function (see [_write] for whole sample lists).
+void _pair(String name, (int, _Voice) Function(bool accent) voice) =>
+    _write(name, (accent) {
+      final (frames, fn) = voice(accent);
+      return [for (var i = 0; i < frames; i++) fn(i / _sampleRate)];
+    });
+
+/// Writes `<name>_accent.wav` and `<name>_normal.wav`, peak-normalized.
+void _write(String name, List<double> Function(bool accent) voice) {
   for (final accent in [true, false]) {
-    final (frames, fn) = voice(accent);
-    final raw = [for (var i = 0; i < frames; i++) fn(i / _sampleRate)];
-    final shaped = lowPassHz == null ? raw : _lowPass(raw, lowPassHz);
+    final shaped = voice(accent);
     final peak = shaped.map((x) => x.abs()).reduce(max);
     final target = accent ? 0.9 : 0.7;
     final samples = Int16List.fromList([
@@ -87,9 +140,17 @@ List<double> _lowPass(List<double> x, double hz) {
   return [for (final v in x) y = (1 - a) * v + a * y];
 }
 
+/// One-pole high-pass (the input minus its low-pass). The low-pass starts
+/// from 0, not primed: primed with the first sample, the output's first
+/// sample would be exactly 0 and the attack would be lost.
+List<double> _highPass(List<double> x, double hz) {
+  final a = exp(-2 * pi * hz / _sampleRate);
+  var y = 0.0;
+  return [for (final v in x) v - (y = (1 - a) * v + a * y)];
+}
+
 double _w(double hz) => 2 * pi * hz;
 int _ms(int ms) => _sampleRate * ms ~/ 1000;
-double _square(double hz, double t) => (t * hz) % 1 < 0.5 ? 1 : -1;
 
 Uint8List _wav(Int16List samples) {
   final dataBytes = samples.lengthInBytes;

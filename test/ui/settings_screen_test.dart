@@ -307,6 +307,17 @@ void main() {
 
   testWidgets('theme and click sound apply at once', (tester) async {
     await openSettingsScreen(tester);
+    // Woodblock · Beep / Cowbell · Bell, Woodblock selected by default.
+    final grid = [
+      for (final name in ['woodblock', 'beep', 'cowbell', 'bell'])
+        tester.getRect(find.byKey(ValueKey('sound-$name'))),
+    ];
+    expect(grid[0].top, grid[1].top);
+    expect(grid[2].top, grid[3].top);
+    expect(grid[2].top, greaterThan(grid[0].top));
+    expect(grid[0].left, lessThan(grid[1].left));
+    expect(find.text('Classic'), findsNothing);
+    expect(metronome.clickSound, ClickSound.woodblock);
     await tester.tap(find.text('Dark'));
     await tester.pump();
     expect(library.themeMode, ThemeMode.dark);

@@ -27,7 +27,7 @@ class FakeClickOutput implements ClickOutput {
   Object? deviceError;
   int recoverCount = 0;
   final failures = StreamController<void>.broadcast();
-  ClickSound currentSound = ClickSound.classic;
+  ClickSound currentSound = ClickSound.woodblock;
   int previewCount = 0;
 
   List<FakeClick> get live => clicks.where((c) => !c.cancelled).toList();

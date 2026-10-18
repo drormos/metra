@@ -118,9 +118,15 @@ void main() {
     final cowbell = Library.empty.copyWith(clickSound: ClickSound.cowbell);
     expect(roundTrip(cowbell).clickSound, ClickSound.cowbell);
     final old = Library.empty.toJson()..remove('clickSound');
-    expect(Library.fromJson(old).clickSound, ClickSound.classic);
+    expect(Library.fromJson(old).clickSound, ClickSound.woodblock);
     final odd = Library.empty.toJson()..['clickSound'] = 'kazoo';
-    expect(Library.fromJson(odd).clickSound, ClickSound.classic);
+    expect(Library.fromJson(odd).clickSound, ClickSound.woodblock);
+    final classic = Library.empty.toJson()..['clickSound'] = 'classic';
+    expect(
+      Library.fromJson(classic).clickSound,
+      ClickSound.woodblock,
+      reason: 'Classic was removed',
+    );
   });
 
   test('theme mode survives JSON; missing falls back to system', () {

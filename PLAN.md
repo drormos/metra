@@ -96,7 +96,7 @@ Decisions made with the user that the spec doesn't state (or states differently)
 
 ## Phase 3: Audio Assets & Polish
 1. **Click Sounds:** Selectable click profiles (e.g. woodblock, digital beep, cowbell), all with zero leading silence.
-   - Classic, Woodblock, Beep, Cowbell: synthesized by `tool/generate_clicks.dart` (no licensing), peak-normalized (accent 0.9, normal 0.7), first sample at full level; a test checks every file.
+   - Woodblock, Beep, Cowbell, Bell (was Classic, Woodblock, Beep, Cowbell; see Phase 5z): synthesized by `tool/generate_clicks.dart` (no licensing), peak-normalized (accent 0.9, normal 0.7), first sample at full level; a test checks every file.
    - Picked in the settings sheet (plays a sample while stopped), saved with the library, applies to clicks scheduled from then on.
 2. **UI Polish:** Superseded by Phase 4.
 
@@ -277,6 +277,12 @@ Decisions made with the user that the spec doesn't state (or states differently)
 - ☰ opens `MenuPanel` (`showMenuPanel`): a see-through route sliding in from the right, 304px, `sheet` color with a 1px `border` left edge, over the `dim` barrier. Tap outside (barrier), a swipe right (60px or a fling), or back closes it; the click is untouched. Rows: Your music (Song library, Setlists, with counts; hidden without storage), then Settings (gear, "Sound, volume, theme"), Send feedback, About Metra, rows without an icon keep the 22px icon column; the version line at the bottom (long-press copies).
 - A row pops the panel first, then opens its page from the main screen's context, so back from any of them lands on the main screen. "What to play" ‹ now always goes to the main screen too (`BackBar.onBack` → pop to the first route).
 - The old Menu page is now "Settings" (`SettingsScreen`, `openSettings`): Theme, Click sound, Vibration, Volume (four sliders), Visual offset. Your music and About moved to the panel. The click sound list is unchanged for now (a separate change replaces Classic with Bell).
+
+## Phase 5z: Click sounds (done)
+- `ClickSound`: woodblock, beep, cowbell, bell (the Settings 2×2 order); Classic removed (it sounded almost like Woodblock). Default Woodblock in the controller, the SoLoud output and the library; a saved "classic" (or any unknown name) loads as Woodblock.
+- `tool/generate_clicks.dart`: Woodblock and Beep unchanged (byte-identical output). Cowbell is now a port of `cowbell_d` and Bell of `bell_a` from `docs/design/sounds/click_prototypes.py` (chosen by ear): decaying cosine partials plus a low-passed noise strike (`_modal`), a linear end fade (30 ms cowbell, 80 ms bell); the cowbell then goes through a 400 Hz high-pass. Noise uses Dart's `Random(1)`, so it isn't bit-identical to numpy, only the same recipe.
+- The prototype's high-pass primed its low-pass with the first sample, which zeroes output sample 0 and loses the attack; the port starts that state at 0, so sample 0 keeps ~94% and, after normalizing, every new sample peaks on sample 0 (zero leading silence; the asset test covers all four).
+- Bell samples are 0.5 s; the 128-voice limit still covers them (pulses at 1.5× speed ring shorter).
 
 ## Pre-release review fixes (done)
 - Voice limit 128 (`SoloudClickOutput.maxVoices`, was 32): scheduled clicks hold a voice from `playScheduled` until they finish, and at the limit flutter_soloud silently stops the oldest of the same sound. The 2 s background lookahead at 300 bpm in 16ths holds ~45. A test checks the worst case fits.

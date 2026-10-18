@@ -48,7 +48,7 @@ class MetronomeController extends ChangeNotifier {
   Object? _audioError;
   bool _disposed = false;
   Duration _visualOffset = defaultVisualOffset;
-  ClickSound _clickSound = ClickSound.classic;
+  ClickSound _clickSound = ClickSound.woodblock;
   ClickVolumes _volumes = ClickVolumes.defaults;
   EngineClockSmoother _smoother = EngineClockSmoother();
   final _tapClock = Stopwatch()..start();

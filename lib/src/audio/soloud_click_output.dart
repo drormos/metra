@@ -35,7 +35,7 @@ class SoloudClickOutput implements ClickOutput {
   static const _defaultIdleTimeout = Duration(milliseconds: 500);
 
   final Map<ClickSound, ({AudioSource accent, AudioSource normal})> _sources;
-  var _sound = ClickSound.classic;
+  var _sound = ClickSound.woodblock;
   var _volumes = ClickVolumes.defaults;
 
   // The samples peak at 0.9 (accent) and 0.7 (normal) of full scale. This
