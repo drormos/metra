@@ -56,6 +56,17 @@ class FakeClickOutput implements ClickOutput {
     return click;
   }
 
+  /// Polyrhythm pulses, apart from [clicks].
+  final pulses = <FakeClick>[];
+  List<FakeClick> get livePulses => pulses.where((c) => !c.cancelled).toList();
+
+  @override
+  ClickHandle schedulePulse(StepLevel level, Duration at) {
+    final pulse = FakeClick(pulses.length, level, at);
+    pulses.add(pulse);
+    return pulse;
+  }
+
   @override
   void cancel(ClickHandle handle) => (handle as FakeClick).cancelled = true;
 

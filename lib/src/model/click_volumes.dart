@@ -9,15 +9,19 @@ class ClickVolumes {
     this.accent = 1,
     this.beat = 0.8,
     this.subdivision = 0.45,
+    this.polyrhythm = 0.7,
   });
 
-  /// Accent 100%, Beat 80%, Subdivision 45% (ui-spec.md); "Reset" restores
-  /// these.
+  /// Accent 100%, Beat 80%, Subdivision 45%, Polyrhythm 70% (ui-spec.md);
+  /// "Reset" restores these.
   static const defaults = ClickVolumes();
 
   final double accent;
   final double beat;
   final double subdivision;
+
+  /// The polyrhythm pulses (accented ones louder).
+  final double polyrhythm;
 
   double forLevel(StepLevel level) => switch (level) {
     StepLevel.accent => accent,
@@ -26,17 +30,23 @@ class ClickVolumes {
     StepLevel.silent => 0,
   };
 
-  ClickVolumes copyWith({double? accent, double? beat, double? subdivision}) =>
-      ClickVolumes(
-        accent: accent ?? this.accent,
-        beat: beat ?? this.beat,
-        subdivision: subdivision ?? this.subdivision,
-      );
+  ClickVolumes copyWith({
+    double? accent,
+    double? beat,
+    double? subdivision,
+    double? polyrhythm,
+  }) => ClickVolumes(
+    accent: accent ?? this.accent,
+    beat: beat ?? this.beat,
+    subdivision: subdivision ?? this.subdivision,
+    polyrhythm: polyrhythm ?? this.polyrhythm,
+  );
 
   Map<String, Object?> toJson() => {
     'accent': accent,
     'beat': beat,
     'subdivision': subdivision,
+    'polyrhythm': polyrhythm,
   };
 
   /// Missing or out-of-range values fall back or clamp rather than fail.
@@ -47,6 +57,7 @@ class ClickVolumes {
       accent: read('accent', defaults.accent),
       beat: read('beat', defaults.beat),
       subdivision: read('subdivision', defaults.subdivision),
+      polyrhythm: read('polyrhythm', defaults.polyrhythm),
     );
   }
 
@@ -55,8 +66,9 @@ class ClickVolumes {
       other is ClickVolumes &&
       other.accent == accent &&
       other.beat == beat &&
-      other.subdivision == subdivision;
+      other.subdivision == subdivision &&
+      other.polyrhythm == polyrhythm;
 
   @override
-  int get hashCode => Object.hash(accent, beat, subdivision);
+  int get hashCode => Object.hash(accent, beat, subdivision, polyrhythm);
 }

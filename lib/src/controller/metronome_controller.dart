@@ -105,11 +105,19 @@ class MetronomeController extends ChangeNotifier {
   }
 
   /// The step the beat indicator should show at [frameTime] (a monotonic
-  /// local time, e.g. a Ticker's elapsed time), or null.
+  /// local time shared by every caller, e.g. the frame timestamp), or null.
   ScheduledStep? visualStepAt(Duration frameTime) {
     if (!_playing) return null;
     final engineTime = _smoother.estimate(_output.now(), frameTime);
     return _scheduler.stepAt(engineTime - _visualOffset);
+  }
+
+  /// The polyrhythm pulse the lane should light at [frameTime] (same clock
+  /// and visual offset as [visualStepAt]), or null.
+  ScheduledPulse? visualPulseAt(Duration frameTime) {
+    if (!_playing) return null;
+    final engineTime = _smoother.estimate(_output.now(), frameTime);
+    return _scheduler.pulseAt(engineTime - _visualOffset);
   }
 
   /// Call when the frame-time source restarts (e.g. a new Ticker).
@@ -144,6 +152,30 @@ class MetronomeController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Polyrhythm pulses per bar (0 = off; not the beat count). While
+  /// playing, a new number starts at the next beat 1; Off stops at once.
+  void setPolyrhythm(int n) {
+    if (n == _pattern.polyrhythm) return;
+    _applyPolyrhythm(_pattern.withPolyrhythm(n));
+  }
+
+  void _applyPolyrhythm(MetronomePattern pattern) {
+    _pattern = pattern;
+    if (pattern.polyrhythm == 0) {
+      _scheduler.replaceLevels(pattern);
+    } else {
+      _scheduler.switchAtNextBar(bpm: _bpm.toDouble(), pattern: pattern);
+    }
+    notifyListeners();
+  }
+
+  /// Pulse cell tap: normal → accent → silent. Heard from the next pulse.
+  void cyclePulse(int k) {
+    _pattern = _pattern.cyclePulse(k);
+    _scheduler.replaceLevels(_pattern);
+    notifyListeners();
+  }
+
   /// Clicks per beat; while playing, from the next beat, bar kept.
   void setSubdivision(int stepsPerBeat) {
     if (stepsPerBeat == _pattern.stepsPerBeat) return;
@@ -169,7 +201,8 @@ class MetronomeController extends ChangeNotifier {
   /// effect as it would on the main screen, without restarting the bar.
   /// Tempo from the next step; accents and cells from the next click;
   /// subdivision from the next beat; a new time signature starts a bar on
-  /// the next beat. Nothing changed: nothing happens.
+  /// the next beat; a polyrhythm as [setPolyrhythm]. Nothing changed:
+  /// nothing happens.
   void applyEdit({required int bpm, required MetronomePattern pattern}) {
     setBpm(bpm);
     if (pattern == _pattern) return;
@@ -178,6 +211,8 @@ class MetronomeController extends ChangeNotifier {
       _switchAtNextBeat(pattern, restartBar: true);
     } else if (pattern.stepsPerBeat != _pattern.stepsPerBeat) {
       _switchAtNextBeat(pattern, restartBar: false);
+    } else if (pattern.polyrhythm != _pattern.polyrhythm) {
+      _applyPolyrhythm(pattern);
     } else {
       _pattern = pattern;
       _scheduler.replaceLevels(pattern);

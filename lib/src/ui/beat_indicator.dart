@@ -48,7 +48,7 @@ class _BeatIndicatorState extends State<BeatIndicator>
   void _sync() {
     if (_controller.isPlaying) {
       if (!_ticker.isActive) {
-        _controller.resetVisualClock(); // ticker elapsed restarts at zero
+        _controller.resetVisualClock();
         _ticker.start();
       }
     } else {
@@ -57,8 +57,12 @@ class _BeatIndicatorState extends State<BeatIndicator>
     }
   }
 
-  void _onTick(Duration elapsed) {
-    final step = _controller.visualStepAt(elapsed);
+  // The frame timestamp, not the ticker's elapsed time: one clock shared
+  // with the polyrhythm lane, which feeds the same smoother.
+  void _onTick(Duration _) {
+    final step = _controller.visualStepAt(
+      SchedulerBinding.instance.currentFrameTimeStamp,
+    );
     if (step?.index != _step?.index) setState(() => _step = step);
   }
 

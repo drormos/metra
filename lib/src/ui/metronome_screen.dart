@@ -9,6 +9,7 @@ import '../model/tempo_name.dart';
 import 'beat_indicator.dart';
 import 'fit_text.dart';
 import 'haptics.dart';
+import 'poly_lane.dart';
 import 'setlist_group.dart';
 import 'setlist_picker.dart';
 import 'save_as_new_dialog.dart';
@@ -54,6 +55,9 @@ class MetronomeScreen extends StatelessWidget {
   static const saveToSongKey = Key('save-to-song');
   static const saveAsNewKey = Key('save-as-new');
   static const subtitleKey = Key('subtitle');
+
+  // The polyrhythm lane plus its gap, kept free above the BPM.
+  static const _laneSpace = PolyLane.height + 2;
 
   /// The most the main screen's text grows with the system font size.
   static const maxTextScale = 1.3;
@@ -160,9 +164,13 @@ class MetronomeScreen extends StatelessWidget {
             builder: (context, box) {
               // Small phones: the BPM shrinks first; the empty twin gives
               // way before the number drops under ~60px, and a last-resort
-              // scale-down keeps the tempo line from overflowing.
-              final twin = (box.maxHeight - 44 - 60).clamp(0.0, 44.0);
-              return Center(
+              // scale-down keeps the tempo line from overflowing. The twin
+              // never goes below the polyrhythm lane's height, so the lane
+              // (drawn over it) never moves the BPM, on or off.
+              final twin = (box.maxHeight - 44 - 60)
+                  .clamp(_laneSpace, 44.0)
+                  .toDouble();
+              final bpmArea = Center(
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   child: SizedBox(
@@ -190,6 +198,21 @@ class MetronomeScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+              );
+              // The lane hangs 2px under the subdivision strip (the beat
+              // row's tap padding is 4px), over the empty twin.
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned.fill(child: bpmArea),
+                  if (controller.pattern.polyrhythm > 0)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: -2,
+                      child: PolyLane(controller: controller),
+                    ),
+                ],
               );
             },
           ),
@@ -440,7 +463,7 @@ class MetronomeScreen extends StatelessWidget {
               ),
               onPressed: () => showTimeSignatureSheet(context, controller),
               child: Text(
-                pattern.timeSignature,
+                pattern.meterLabel,
                 style: const TextStyle(
                   fontFamily: MetraFonts.condensed,
                   fontSize: 22,

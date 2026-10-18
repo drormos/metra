@@ -23,6 +23,10 @@ abstract interface class ClickOutput {
   /// [StepLevel.silent].
   ClickHandle schedule(StepLevel level, Duration at);
 
+  /// Play a polyrhythm pulse of [level] (accent or normal) at engine time
+  /// [at]: the current click sound, higher, so it's a separate voice.
+  ClickHandle schedulePulse(StepLevel level, Duration at);
+
   /// Cancel a click that has not started yet.
   void cancel(ClickHandle handle);
 

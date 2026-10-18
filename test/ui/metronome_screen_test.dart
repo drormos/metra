@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
+import 'package:metra/src/ui/poly_lane.dart';
 import 'package:metra/src/ui/tabular_text.dart';
 import 'package:metra/src/ui/theme.dart';
 import 'package:metra/src/ui/repeat_button.dart';
@@ -166,6 +167,56 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    testWidgets('Polyrhythm row: Off · 2–7, beat count dimmed, live', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      await tester.tap(find.byKey(MetronomeScreen.meterKey));
+      await tester.pumpAndSettle();
+      expect(find.text('Add a second pulse across each bar'), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const ValueKey('poly-4')));
+      await tester.tap(find.byKey(const ValueKey('poly-4')));
+      await tester.pump();
+      expect(controller.pattern.polyrhythm, 0, reason: '4 against 4');
+      await tester.tap(find.byKey(const ValueKey('poly-3')));
+      await tester.pumpAndSettle();
+      expect(controller.pattern.polyrhythm, 3);
+      expect(
+        find.text('3 against 4: three even clicks per bar, in their own sound'),
+        findsOneWidget,
+      );
+      expect(find.byType(BottomSheet), findsOneWidget, reason: 'stays open');
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+      expect(find.text('4/4 · 3'), findsOneWidget);
+    });
+
+    testWidgets('lane: cells by time, cell 1 under beat 1; taps cycle; '
+        'the BPM never moves', (tester) async {
+      await pumpScreen(tester);
+      final bpm = tester.getRect(find.byKey(MetronomeScreen.bpmKey));
+      expect(find.byType(PolyLane), findsNothing, reason: 'off: no lane');
+      controller.setPolyrhythm(3);
+      await tester.pump();
+      expect(tester.getRect(find.byKey(MetronomeScreen.bpmKey)), bpm);
+      final cells = [
+        for (var k = 0; k < 3; k++)
+          tester.getRect(find.byKey(ValueKey('pulse-$k-off'))),
+      ];
+      final beat1 = tester.getRect(find.byKey(const ValueKey('beat-0-off')));
+      final beat4 = tester.getRect(find.byKey(const ValueKey('beat-3-off')));
+      expect(cells.first.left, beat1.left);
+      expect(cells.last.right, closeTo(beat4.right, 0.01));
+      expect(cells[1].left - cells[0].right, closeTo(6, 0.01));
+      expect(cells.first.height, PolyLane.height);
+      expect(
+        cells.first.top - beat1.bottom,
+        closeTo(2, 0.5),
+        reason: 'subdivision 1 hides the strip: 2px under the blocks',
+      );
+      await tester.tap(find.byKey(const ValueKey('pulse-1-off')));
+      expect(controller.pattern.polyStates[1], StepLevel.accent);
+    });
     testWidgets('time signature picker sets the meter', (tester) async {
       await pumpScreen(tester);
       await pick(tester, MetronomeScreen.meterKey, '7/8');

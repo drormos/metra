@@ -140,6 +140,9 @@ void main() {
       ClickVolumes.fromJson({'accent': 3, 'beat': -1}),
       const ClickVolumes(accent: 1, beat: 0, subdivision: 0.45),
     );
+    expect(ClickVolumes.defaults.polyrhythm, 0.7);
+    const loud = ClickVolumes(polyrhythm: 0.9);
+    expect(roundTrip(Library.empty.copyWith(volumes: loud)).volumes, loud);
   });
 
   test('"Vibrate on touch" survives JSON; missing means on', () {

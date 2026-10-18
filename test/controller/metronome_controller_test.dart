@@ -185,25 +185,30 @@ void main() {
       );
     });
 
-    test('background clicks fit in the engine voice limit', () async {
-      controller
-        ..setBpm(MetronomeController.maxBpm)
-        ..setSubdivision(4)
-        ..didChangeAppLifecycleState(AppLifecycleState.hidden);
-      await controller.play();
-      var most = 0;
-      for (var i = 0; i < 400; i++) {
-        output.time += _ms * 25;
-        controller.didChangeAppLifecycleState(AppLifecycleState.hidden);
-        // Pending or still ringing (the longest sample is 0.25 s).
-        final held = output.live
-            .where((c) => c.at > output.time - _ms * 250)
-            .length;
-        most = max(most, held);
-      }
-      expect(most, greaterThan(32)); // the old limit was too small
-      expect(most, lessThanOrEqualTo(SoloudClickOutput.maxVoices));
-    });
+    test(
+      'background clicks and pulses fit in the engine voice limit',
+      () async {
+        controller
+          ..setBpm(MetronomeController.maxBpm)
+          ..setSubdivision(4)
+          ..setPolyrhythm(7)
+          ..didChangeAppLifecycleState(AppLifecycleState.hidden);
+        await controller.play();
+        var most = 0;
+        for (var i = 0; i < 400; i++) {
+          output.time += _ms * 25;
+          controller.didChangeAppLifecycleState(AppLifecycleState.hidden);
+          // Pending or still ringing (the longest sample is 0.25 s).
+          final held = [
+            ...output.live,
+            ...output.livePulses,
+          ].where((c) => c.at > output.time - _ms * 250).length;
+          most = max(most, held);
+        }
+        expect(most, greaterThan(32)); // the old limit was too small
+        expect(most, lessThanOrEqualTo(SoloudClickOutput.maxVoices));
+      },
+    );
   });
 
   group('device failures', () {

@@ -219,6 +219,9 @@ void main() {
     await tester.pump();
     expect(metronome.volumes.accent, lessThan(1));
     expect(output.currentVolumes, metronome.volumes);
+    expect(find.byType(Slider), findsNWidgets(4));
+    expect(find.text('Polyrhythm'), findsOneWidget);
+    metronome.setVolumes(metronome.volumes.copyWith(polyrhythm: 0.2));
     library.setThemeMode(ThemeMode.dark);
     await tapVisible(tester, find.byKey(SettingsScreen.resetKey));
     expect(metronome.volumes, ClickVolumes.defaults);

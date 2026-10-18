@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controller/metronome_controller.dart';
+import '../model/metronome_pattern.dart';
 import 'haptics.dart';
 import 'meter_control.dart';
 import 'theme.dart';
@@ -92,6 +93,15 @@ class TimeSignatureSheet extends StatelessWidget {
                     metronome.setMeter(beats, unit);
                   },
                 ),
+                const SizedBox(height: 24),
+                Text('Polyrhythm', style: label),
+                const SizedBox(height: 8),
+                _polyrhythm(colors, pattern.polyrhythm, pattern.beatsPerBar),
+                const SizedBox(height: 8),
+                Text(
+                  polyrhythmHint(pattern.polyrhythm, pattern.beatsPerBar),
+                  style: label.copyWith(height: 1.4),
+                ),
               ],
             );
           },
@@ -99,6 +109,94 @@ class TimeSignatureSheet extends StatelessWidget {
       ),
     );
   }
+
+  /// The muted line under the Polyrhythm row, in plain words.
+  static String polyrhythmHint(int n, int beats) => n == 0
+      ? 'Add a second pulse across each bar'
+      : '$n against $beats: ${_words[n]} even clicks per bar, in their own '
+            'sound';
+
+  static const _words = [
+    '',
+    '',
+    'two',
+    'three',
+    'four',
+    'five',
+    'six',
+    'seven',
+  ];
+
+  /// "Off · 2 … 7" in one frame; the beat count itself is dimmed and can't
+  /// be chosen (n against n is just the beat). Applies at once (while
+  /// playing, from the next beat 1; Off stops at once); the sheet stays.
+  Widget _polyrhythm(MetraColors colors, int selected, int beats) => Container(
+    decoration: BoxDecoration(
+      border: Border.all(color: colors.border, width: 2),
+      borderRadius: BorderRadius.circular(4),
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(2),
+      child: Row(
+        children: [
+          for (var n = 0; n <= MetronomePattern.maxPolyrhythm; n++)
+            if (n != 1)
+              Expanded(
+                flex: n == 0 ? 14 : 10,
+                child: _polySegment(
+                  colors,
+                  n,
+                  selected: n == selected,
+                  enabled: n != beats,
+                ),
+              ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _polySegment(
+    MetraColors colors,
+    int n, {
+    required bool selected,
+    required bool enabled,
+  }) => Semantics(
+    button: true,
+    selected: selected,
+    enabled: enabled,
+    label: n == 0 ? 'Polyrhythm off' : 'Polyrhythm $n',
+    excludeSemantics: true,
+    child: Material(
+      color: selected ? colors.text : colors.background,
+      child: InkWell(
+        key: ValueKey('poly-$n'),
+        onTap: enabled
+            ? () {
+                Haptics.tick();
+                metronome.setPolyrhythm(n);
+              }
+            : null,
+        child: SizedBox(
+          height: 48,
+          child: Center(
+            child: Text(
+              n == 0 ? 'Off' : '$n',
+              style: TextStyle(
+                fontFamily: n == 0 ? null : MetraFonts.condensed,
+                fontSize: n == 0 ? 15 : 24,
+                fontWeight: n == 0 ? FontWeight.w600 : FontWeight.w700,
+                color: selected
+                    ? colors.background
+                    : enabled
+                    ? colors.text
+                    : colors.beatResting,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 
   Widget _commonButton(
     BuildContext context,

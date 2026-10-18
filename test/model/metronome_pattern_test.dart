@@ -200,4 +200,47 @@ void main() {
       expect(sixteenths.cycleBeat(1).isDefault, isFalse);
     });
   });
+
+  group('polyrhythm', () {
+    final four = MetronomePattern.simple(beatsPerBar: 4, stepsPerBeat: 2);
+
+    test('off by default; on with all pulses regular', () {
+      expect(four.polyrhythm, 0);
+      final three = four.withPolyrhythm(3);
+      expect(three.polyStates, List.filled(3, StepLevel.normal));
+      expect(three.meterLabel, '4/4 · 3');
+      expect(four.meterLabel, '4/4');
+      expect(three.pulseOffset(1), 8 / 3, reason: '4/3 beats, in steps');
+    });
+
+    test('the beat count itself is not a choice', () {
+      expect(() => four.withPolyrhythm(4), throwsArgumentError);
+      expect(() => four.withPolyrhythm(8), throwsArgumentError);
+    });
+
+    test('beats changed to equal the pulse count turn it off', () {
+      final three = four.withPolyrhythm(3);
+      expect(three.withBeats(3).polyrhythm, 0);
+      expect(three.withBeats(5).polyrhythm, 3);
+      expect(three.withSubdivision(3).polyrhythm, 3);
+      expect(three.cycleBeat(1).polyrhythm, 3);
+    });
+
+    test('pulse taps cycle regular → accent → muted', () {
+      final three = four.withPolyrhythm(3);
+      expect(three.cyclePulse(1).polyStates[1], StepLevel.accent);
+      expect(three.cyclePulse(1).cyclePulse(1).polyStates[1], StepLevel.silent);
+      expect(three.cyclePulse(1).cyclePulse(1).cyclePulse(1), three);
+    });
+
+    test('survives JSON; older patterns load as off', () {
+      final p = four.withPolyrhythm(5).cyclePulse(2);
+      expect(MetronomePattern.fromJson(p.toJson()), p);
+      final old = four.toJson()
+        ..remove('polyrhythm')
+        ..remove('polyStates');
+      expect(MetronomePattern.fromJson(old).polyrhythm, 0);
+      expect(MetronomePattern.fromJson(old), four);
+    });
+  });
 }

@@ -35,6 +35,37 @@ class ScheduledStep {
   final ClickHandle? handle;
 }
 
+/// One polyrhythm pulse that has been handed to the engine.
+@immutable
+class ScheduledPulse {
+  const ScheduledPulse({
+    required this.pulse,
+    required this.count,
+    required this.step,
+    required this.time,
+    required this.end,
+    required this.level,
+    required this.handle,
+  });
+
+  /// Pulse [pulse] (0-based) of [count] in its bar.
+  final int pulse;
+  final int count;
+
+  /// The step the pulse falls in (it plays at or after that step).
+  final int step;
+
+  /// Engine time the pulse plays at, and when the next pulse would start
+  /// (the length the lane lights it for).
+  final Duration time;
+  final Duration end;
+
+  final StepLevel level;
+
+  /// Null for silent (muted) pulses.
+  final ClickHandle? handle;
+}
+
 /// Lookahead scheduler: a Dart timer tops up the engine with every step
 /// inside the next [lookahead] of engine time. Click timing comes only from
 /// the engine clock; timer jitter just changes how early a step is handed
@@ -67,6 +98,7 @@ class ClickScheduler {
   static const retention = Duration(seconds: 1);
 
   final List<ScheduledStep> _steps = [];
+  final List<ScheduledPulse> _pulses = [];
   MetronomePattern _pattern = const MetronomePattern.standard();
   BeatGrid? _grid;
   // Step where the current pattern's bar 1 starts.
@@ -90,6 +122,15 @@ class ClickScheduler {
   ScheduledStep? stepAt(Duration time) {
     for (final step in _steps.reversed) {
       if (step.time <= time) return step;
+    }
+    return null;
+  }
+
+  /// The latest polyrhythm pulse at or before engine time [time] that is
+  /// still sounding (before the next pulse's start), or null.
+  ScheduledPulse? pulseAt(Duration time) {
+    for (final pulse in _pulses.reversed) {
+      if (pulse.time <= time) return time < pulse.end ? pulse : null;
     }
     return null;
   }
@@ -125,12 +166,14 @@ class ClickScheduler {
     _timer?.cancel();
     _timer = null;
     _grid = null;
-    if (_steps.isNotEmpty) {
+    if (_steps.isNotEmpty || _pulses.isNotEmpty) {
       final now = _output.now();
       for (final step in _steps) {
         if (step.time > now) _cancel(step);
       }
       _steps.clear();
+      _cancelPulses((p) => p.time > now);
+      _pulses.clear();
     }
     if (_prepared) {
       _prepared = false;
@@ -163,6 +206,7 @@ class ClickScheduler {
       _cancel(step);
       return true;
     });
+    _cancelPulses((p) => p.time > cutoff);
 
     // Before anything is committed in this segment, its anchor step keeps
     // its time; otherwise the last committed step does.
@@ -175,6 +219,9 @@ class ClickScheduler {
       next = next.reanchor(step: _nextStep, at: cutoff);
     }
     _grid = next;
+    // Pulses between the last committed step and the next one follow the
+    // new tempo too.
+    _reemitTail(lastCommitted, after: cutoff);
     refill();
   }
 
@@ -234,6 +281,7 @@ class ClickScheduler {
     if (grid == null) return;
     final firstOpen = _firstOpenStep(grid);
     _cancelFrom(firstOpen);
+    _cancelPulses((p) => p.time > _output.now() + guard); // the old bar's
     _switchAt = null;
     _nextGrid = null;
     _nextPattern = null;
@@ -266,8 +314,12 @@ class ClickScheduler {
     );
     final firstOpen = _firstOpenStep(grid);
     _cancelFrom(firstOpen);
+    final cutoff = _output.now() + guard;
+    _cancelPulses((p) => p.time > cutoff);
     _pattern = pattern;
     _nextStep = firstOpen;
+    // Pulse states (and a polyrhythm turned off) apply from the next pulse.
+    _reemitTail(firstOpen - 1, after: cutoff, pattern: pattern);
     refill();
   }
 
@@ -281,6 +333,72 @@ class ClickScheduler {
     return true;
   });
 
+  void _cancelPulses(bool Function(ScheduledPulse) test) =>
+      _pulses.removeWhere((p) {
+        if (!test(p)) return false;
+        final handle = p.handle;
+        if (handle != null) _output.cancel(handle);
+        return true;
+      });
+
+  /// Hands over the polyrhythm pulses that fall within [step] (bar
+  /// position [barPosition] of [pattern]), on [grid]: pulse k sits at
+  /// k × stepsPerBar ÷ n steps into the bar. With [after], only those
+  /// later than it.
+  void _emitPulses(
+    int step,
+    int barPosition,
+    MetronomePattern pattern,
+    BeatGrid grid, {
+    Duration? after,
+  }) {
+    final n = pattern.polyrhythm;
+    if (n == 0) return;
+    final perBar = pattern.stepsPerBar;
+    final barStart = step - barPosition;
+    // Pulses k with barPosition <= k * perBar / n < barPosition + 1.
+    final first = (barPosition * n + perBar - 1) ~/ perBar;
+    final last = ((barPosition + 1) * n + perBar - 1) ~/ perBar - 1;
+    for (var k = first; k <= last; k++) {
+      final time = grid.timeAt(barStart + pattern.pulseOffset(k));
+      if (after != null && time <= after) continue;
+      final level = pattern.polyStates[k];
+      _pulses.add(
+        ScheduledPulse(
+          pulse: k,
+          count: n,
+          step: step,
+          time: time,
+          end: grid.timeAt(barStart + pattern.pulseOffset(k + 1)),
+          level: level,
+          handle: level == StepLevel.silent
+              ? null
+              : _output.schedulePulse(level, time),
+        ),
+      );
+    }
+  }
+
+  /// Re-places the pulses of the committed [step] that are still ahead
+  /// (after [after]) on the current grid, with [pattern] if given.
+  void _reemitTail(
+    int step, {
+    required Duration after,
+    MetronomePattern? pattern,
+  }) {
+    for (final s in _steps.reversed) {
+      if (s.index != step) continue;
+      _emitPulses(
+        step,
+        s.barPosition,
+        pattern ?? s.pattern,
+        _grid!,
+        after: after,
+      );
+      return;
+    }
+  }
+
   void _scheduleSwitch(
     BeatGrid grid,
     int at, {
@@ -289,6 +407,7 @@ class ClickScheduler {
     required int barStart,
   }) {
     _cancelFrom(at);
+    _cancelPulses((p) => p.step >= at);
     _nextStep = min(_nextStep, at);
     _switchAt = at;
     _nextPattern = pattern;
@@ -317,6 +436,7 @@ class ClickScheduler {
 
     final now = _output.now();
     _steps.removeWhere((step) => step.time <= now - retention);
+    _pulses.removeWhere((pulse) => pulse.end <= now - retention);
 
     // A stalled timer must not play steps late (they would be off-grid):
     // skip to the first step that can still be placed exactly.
@@ -348,6 +468,7 @@ class ClickScheduler {
           barPosition: barPosition,
         ),
       );
+      _emitPulses(_nextStep, barPosition, _pattern, _grid!);
       _nextStep++;
     }
   }

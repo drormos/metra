@@ -743,6 +743,18 @@ void main() {
       expect(metronome.bpm, 77);
     });
   });
+
+  test('a polyrhythm change is an unsaved change to the loaded song', () {
+    final metronome = MetronomeController(FakeClickOutput());
+    addTearDown(metronome.dispose);
+    final song = library.addSong(name: 'S', bpm: 100, pattern: waltz);
+    library.playSingleSong(song, metronome);
+    metronome.setPolyrhythm(2);
+    expect(library.songChanged(metronome), isTrue);
+    library.revertSong(metronome);
+    expect(metronome.pattern.polyrhythm, 0);
+    expect(library.songChanged(metronome), isFalse);
+  });
 }
 
 class _CountingStore extends LibraryStore {

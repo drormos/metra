@@ -27,6 +27,9 @@ class MetraColors extends ThemeExtension<MetraColors> {
     required this.mutedLine,
     required this.tickResting,
     required this.tickSounding,
+    required this.pulseResting,
+    required this.pulseAccentResting,
+    required this.pulseMutedLine,
     required this.accent,
     required this.primary,
     required this.onPrimary,
@@ -54,6 +57,9 @@ class MetraColors extends ThemeExtension<MetraColors> {
     mutedLine: Color(0xFF7A7A7A),
     tickResting: Color(0xFF2A2A2A),
     tickSounding: Color(0xFFD0D0D0),
+    pulseResting: Color(0xFF262626),
+    pulseAccentResting: Color(0xFF5A1A16),
+    pulseMutedLine: Color(0xFF3A3A3A),
     accent: Color(0xFFFF3B30),
     primary: Color(0xFFFF3B30),
     onPrimary: Color(0xFF000000),
@@ -81,6 +87,9 @@ class MetraColors extends ThemeExtension<MetraColors> {
     mutedLine: Color(0xFF8A857C),
     tickResting: Color(0xFFD8D3C9),
     tickSounding: Color(0xFF5E5A52),
+    pulseResting: Color(0xFFD8D3C9),
+    pulseAccentResting: Color(0xFFF0CCC8),
+    pulseMutedLine: Color(0xFFB9B4AA),
     accent: Color(0xFFD7261E),
     primary: Color(0xFF111111),
     onPrimary: Color(0xFFF3F1EC),
@@ -127,6 +136,12 @@ class MetraColors extends ThemeExtension<MetraColors> {
   /// Subdivision strip under each beat block.
   final Color tickResting;
   final Color tickSounding;
+
+  /// Polyrhythm lane cells at rest, quieter than beat blocks; muted cells
+  /// are a dashed outline. Sounding: [beatSounding] / [accent].
+  final Color pulseResting;
+  final Color pulseAccentResting;
+  final Color pulseMutedLine;
 
   /// Tempo needle, current-song marker, checkmarks.
   final Color accent;

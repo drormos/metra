@@ -77,6 +77,25 @@ class SoloudClickOutput implements ClickOutput {
     ),
   );
 
+  /// Polyrhythm pulses: the same samples ~a fifth up (1.5× speed, by ear).
+  static const pulseSpeed = 1.5;
+
+  @override
+  ClickHandle schedulePulse(StepLevel level, Duration at) {
+    final accent = level == StepLevel.accent;
+    final source = accent ? _sources[_sound]!.accent : _sources[_sound]!.normal;
+    // Accented pulses at the polyrhythm volume, regular ones softer.
+    final gain = _volumes.polyrhythm * (accent ? 1 : 0.75 * _normalBoost);
+    return _Click(
+      SoLoud.instance.playScheduled(
+        source,
+        at,
+        volume: gain,
+        scale: pulseSpeed,
+      ),
+    );
+  }
+
   double _gain(StepLevel level) =>
       _volumes.forLevel(level) * (level == StepLevel.accent ? 1 : _normalBoost);
 

@@ -366,6 +366,11 @@ class SettingsScreen extends StatelessWidget {
             volumes.subdivision,
             (v) => volumes.copyWith(subdivision: v),
           ),
+          slider(
+            'Polyrhythm',
+            volumes.polyrhythm,
+            (v) => volumes.copyWith(polyrhythm: v),
+          ),
         ],
       ),
       action: TextButton(
@@ -375,7 +380,7 @@ class SettingsScreen extends StatelessWidget {
           minimumSize: const Size(0, 44),
           padding: const EdgeInsets.symmetric(horizontal: 4),
         ),
-        // Only the three volumes.
+        // Only the four volumes.
         onPressed: () => metronome.setVolumes(ClickVolumes.defaults),
         child: const Text(
           'Reset',

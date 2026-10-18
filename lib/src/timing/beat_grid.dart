@@ -34,7 +34,11 @@ class BeatGrid {
 
   Duration get stepInterval => Duration(microseconds: _stepMicros.round());
 
-  Duration stepTime(int step) {
+  Duration stepTime(int step) => timeAt(step.toDouble());
+
+  /// Engine time of a fractional step position too (a polyrhythm pulse
+  /// between steps).
+  Duration timeAt(double step) {
     final offset =
         (step - anchorStep) *
         Duration.microsecondsPerMinute /
