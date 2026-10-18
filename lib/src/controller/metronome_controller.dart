@@ -153,7 +153,8 @@ class MetronomeController extends ChangeNotifier {
   }
 
   /// Polyrhythm pulses per bar (0 = off; not the beat count). While
-  /// playing, a new number starts at the next beat 1; Off stops at once.
+  /// playing, a new number starts at the next beat (with the rest of the
+  /// bar's pulses); Off stops at once.
   void setPolyrhythm(int n) {
     if (n == _pattern.polyrhythm) return;
     _applyPolyrhythm(_pattern.withPolyrhythm(n));
@@ -164,7 +165,13 @@ class MetronomeController extends ChangeNotifier {
     if (pattern.polyrhythm == 0) {
       _scheduler.replaceLevels(pattern);
     } else {
-      _scheduler.switchAtNextBar(bpm: _bpm.toDouble(), pattern: pattern);
+      // From the next beat, bar kept: the pulses are tied to the bar, so
+      // the rest of this bar's pulses play in time; no waiting for beat 1.
+      _scheduler.switchAtNextBeat(
+        bpm: _bpm.toDouble(),
+        pattern: pattern,
+        restartBar: false,
+      );
     }
     notifyListeners();
   }

@@ -129,7 +129,7 @@ class TimeSignatureSheet extends StatelessWidget {
 
   /// "Off · 2 … 7" in one frame; the beat count itself is dimmed and can't
   /// be chosen (n against n is just the beat). Applies at once (while
-  /// playing, from the next beat 1; Off stops at once); the sheet stays.
+  /// playing, from the next beat; Off stops at once); the sheet stays.
   Widget _polyrhythm(MetraColors colors, int selected, int beats) => Container(
     decoration: BoxDecoration(
       border: Border.all(color: colors.border, width: 2),

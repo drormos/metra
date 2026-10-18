@@ -134,12 +134,16 @@ void main() {
       }
     }
 
-    test('turning it on starts at the next beat 1', () async {
-      await controller.play(); // beat 1 at 1120, bar 2 at 3120
-      play(_ms * 600);
+    test('turning it on starts at the next beat, in the bar\'s grid', () async {
+      await controller.play(); // beats at 1120, 1620, 2120…; bar 2 at 3120
+      play(_ms * 600); // now 1600: beat 2 (1620) is already committed
       controller.setPolyrhythm(3);
       play(_ms * 3000);
-      expect(output.livePulses.first.at, _ms * 3120);
+      // From beat 3 on: the bar's last pulse (2 ⅔ beats in), then bar 2.
+      expect(
+        [for (final p in output.livePulses.take(2)) p.at.inMicroseconds],
+        [1120000 + 1333333, 3120000],
+      );
     });
 
     test('Off stops the pulses at once', () async {
