@@ -250,6 +250,14 @@ Decisions made with the user that the spec doesn't state (or states differently)
 ## Phase 5v: Unsaved-change actions as plain text (done)
 - "Revert · Save · Save as new" under the BPM: plain `TextButton`s, muted Saira 15/500, 44px tall, separated by dim dots (`beatResting`, #3A3A3A). "Save" is Save to song (same key, `saveToSongKey`); actions unchanged.
 
+## Phase 5w: Mode tabs and context row (done)
+- The source bar is replaced by a context row (64px) over mode tabs (58px), both in `SetlistGroup` (name kept). The bar sits outside the screen's 24px side padding so the tabs run edge to edge (12px inner padding, 12px below); the context row pads itself back to the content width. Total 150px (64 + 16 + 58 + 12), the same in every mode.
+- Tabs: Songs · Free play · Setlists (single note, metronome, note-queue icons over 12px labels). Active: text color, w600, 2px accent line on its top edge drawn over the bar's 1px divider; others muted. Free play detaches at once (medium haptic, nothing if already there); Songs / Setlists open their dropdowns, also when already active.
+- Context row: setlist mode unchanged; Single song previous | next through the library A–Z (`LibraryController.songBefore` / `songAfter`, `nextSong` stays in Single song, stops at the ends); Free play "+ New song from this" (muted text button, opens the New song dialog). The title block is empty in Free play.
+- Keyboard / pedal previous-next follow the context row (setlist, or library A–Z in Single song). The media card's skip actions stay setlist-only: in Single song headphone double-press does nothing (spec "Media controls").
+- Dropdowns: no "Free play" rows. The panel opens 18px above the context row at content width; the dim cuts out the whole bar (context row and tabs).
+- Small phones: the bar is 66px taller than the old one, so on short screens the BPM area gives way first: the empty 44px twin above the number collapses, then the number shrinks, with a last-resort scale-down (still tested at 360×640 and 320×568).
+
 ## Pre-release review fixes (done)
 - Voice limit 128 (`SoloudClickOutput.maxVoices`, was 32): scheduled clicks hold a voice from `playScheduled` until they finish, and at the limit flutter_soloud silently stops the oldest of the same sound. The 2 s background lookahead at 300 bpm in 16ths holds ~45. A test checks the worst case fits.
 - A tempo or pattern change while the device starts (between Start and the anchor) restarts on beat 1 with it once started; before, the scheduler wasn't running to take it and the click played the old values.

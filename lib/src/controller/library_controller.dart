@@ -127,11 +127,28 @@ class LibraryController extends ChangeNotifier {
     return songs.indexWhere((s) => s.id == id);
   }
 
-  /// Only inside a setlist (hands-free needs an order). With no current
-  /// song in the set, "next" is its first song.
+  /// What next/previous step through: the set in setlist mode, the whole
+  /// library A–Z in Single song mode, nothing in Free play.
+  List<Song> get _stepSongs => activeSetlist != null
+      ? visibleSongs
+      : singleSong
+      ? songsAZ
+      : const [];
+
+  int get _stepIndex => activeSetlist != null
+      ? currentIndex
+      : _stepSongs.indexWhere((s) => s.id == _library.currentSongId);
+
+  /// With no current song in the set, "next" is its first song.
   bool get hasNext =>
-      activeSetlist != null && currentIndex < visibleSongs.length - 1;
-  bool get hasPrevious => activeSetlist != null && currentIndex > 0;
+      (activeSetlist != null || singleSong) &&
+      _stepIndex < _stepSongs.length - 1;
+  bool get hasPrevious =>
+      (activeSetlist != null || singleSong) && _stepIndex > 0;
+
+  /// The song next/previous would load, or null at the ends.
+  Song? get songAfter => hasNext ? _stepSongs[_stepIndex + 1] : null;
+  Song? get songBefore => hasPrevious ? _stepSongs[_stepIndex - 1] : null;
 
   /// Load [song] ([index] = its position in [visibleSongs], if known);
   /// while playing it restarts on beat 1 at the song's tempo.
@@ -156,18 +173,18 @@ class LibraryController extends ChangeNotifier {
     );
   }
 
-  /// Steps through [visibleSongs]; stops at the ends instead of wrapping,
-  /// so an extra press on stage can't jump back to the first song.
-  void nextSong(MetronomeController metronome) {
-    if (!hasNext) return;
-    final i = currentIndex + 1;
-    playSong(visibleSongs[i], metronome, index: i);
-  }
+  /// Steps through the set, or the library A–Z in Single song mode (it
+  /// stays Single song); stops at the ends instead of wrapping, so an
+  /// extra press on stage can't jump back to the first song.
+  void nextSong(MetronomeController metronome) => _stepBy(1, metronome);
 
-  void previousSong(MetronomeController metronome) {
-    if (!hasPrevious) return;
-    final i = currentIndex - 1;
-    playSong(visibleSongs[i], metronome, index: i);
+  void previousSong(MetronomeController metronome) => _stepBy(-1, metronome);
+
+  void _stepBy(int delta, MetronomeController metronome) {
+    final song = delta > 0 ? songAfter : songBefore;
+    if (song == null) return;
+    if (activeSetlist == null) return playSingleSong(song, metronome);
+    playSong(song, metronome, index: _stepIndex + delta);
   }
 
   /// Saves the metronome's tempo and pattern as a new song, added to the

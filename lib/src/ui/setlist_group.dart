@@ -7,15 +7,19 @@ import 'fit_text.dart';
 import 'haptics.dart';
 import 'icons.dart';
 import 'quick_pick.dart';
+import 'save_as_new_dialog.dart';
 import 'setlist_picker.dart';
 import 'subdivision_icon.dart';
 import 'tabular_text.dart';
 import 'theme.dart';
 
-/// The source bar at the bottom of the main screen (ui-spec.md "Source
-/// bar"): one 68px row, no frame, the same height and place in every mode,
-/// so no control ever moves. Setlist mode: previous | the set's "4/12 ⌄" |
-/// next. Free play and Single song: "Setlists ⌄" | "Songs ⌄".
+/// The bottom of the main screen (ui-spec.md "Mode tabs and context row"):
+/// the context row (64px) over the mode tabs (58px, edge to edge), the
+/// same height in every mode, so Start/Tap never move. Context row:
+/// setlist mode previous | the set's "4/12 ⌄" | next; Single song
+/// previous | next through the library A–Z; Free play a quiet "+ New song
+/// from this". Tabs: Songs · Free play · Setlists. Placed outside the
+/// screen's side padding; the context row adds its own.
 class SetlistGroup extends StatelessWidget {
   const SetlistGroup({
     super.key,
@@ -26,103 +30,198 @@ class SetlistGroup extends StatelessWidget {
   final LibraryController library;
   final MetronomeController metronome;
 
-  static const height = 68.0;
+  static const rowHeight = 64.0;
+  static const tabsHeight = 58.0;
+
+  /// The context row's side padding: the main screen's content width.
+  static const sidePadding = 24.0;
 
   /// The center "4/12 ⌄" button: the set dropdown.
   static const headerKey = Key('setlist-header');
   static const previousKey = Key('previous-song');
   static const nextKey = Key('next-song');
-  static const setlistsKey = Key('free-play-setlists');
-  static const songsKey = Key('free-play-songs');
+  static const newSongKey = Key('new-song');
+  static const songsTabKey = Key('tab-songs');
+  static const freePlayTabKey = Key('tab-free-play');
+  static const setlistsTabKey = Key('tab-setlists');
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final setlist = library.activeSetlist;
-    // Each ⌄ opens its dropdown just above this bar.
+    final single = library.singleSong;
+    // Each dropdown opens just above the context row; the row and the
+    // tabs stay clear of the dim.
     void pick(QuickPickKind kind) => showQuickPick(
       context,
       kind: kind,
       library: library,
       metronome: metronome,
+      inset: sidePadding,
     );
-    return SizedBox(
-      height: height,
-      child: setlist == null
-          ? _pickRow(colors, pick)
-          : _stepRow(context, colors, setlist, pick),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: sidePadding),
+          child: SizedBox(
+            height: rowHeight,
+            child: setlist != null
+                ? _setRow(context, setlist, pick)
+                : single
+                ? _songRow(context)
+                : _freePlayRow(context),
+          ),
+        ),
+        const SizedBox(height: 16),
+        _tabs(context, pick, setlist: setlist != null, single: single),
+      ],
     );
   }
 
-  /// Two equal outlined buttons, the same in Free play and Single song.
-  Widget _pickRow(MetraColors colors, void Function(QuickPickKind) pick) => Row(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Expanded(
-        child: _pickButton(
-          colors,
-          key: setlistsKey,
-          icon: const SetlistIcon(),
-          label: 'Setlists',
-          onPressed: () => pick(QuickPickKind.sets),
+  Widget _tabs(
+    BuildContext context,
+    void Function(QuickPickKind) pick, {
+    required bool setlist,
+    required bool single,
+  }) {
+    final colors = context.colors;
+    final freePlay = !setlist && !single;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: colors.divider)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: SizedBox(
+          height: tabsHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _tab(
+                colors,
+                key: songsTabKey,
+                icon: const SubdivisionIcon(1, size: 20),
+                label: 'Songs',
+                active: single,
+                onTap: () => pick(QuickPickKind.songs),
+              ),
+              _tab(
+                colors,
+                key: freePlayTabKey,
+                icon: const MetronomeIcon(size: 18),
+                label: 'Free play',
+                active: freePlay,
+                onTap: () {
+                  if (freePlay) return;
+                  Haptics.medium(); // the song detached
+                  library.detachSong();
+                },
+              ),
+              _tab(
+                colors,
+                key: setlistsTabKey,
+                icon: const SetlistIcon(),
+                label: 'Setlists',
+                active: setlist,
+                onTap: () => pick(QuickPickKind.sets),
+              ),
+            ],
+          ),
         ),
       ),
-      const SizedBox(width: 8),
-      Expanded(
-        child: _pickButton(
-          colors,
-          key: songsKey,
-          icon: const SubdivisionIcon(1, size: 18),
-          label: 'Songs',
-          onPressed: () => pick(QuickPickKind.songs),
-        ),
-      ),
-    ],
-  );
+    );
+  }
 
-  Widget _pickButton(
+  /// An icon over a 12px label; the current mode white with a 2px red
+  /// line on its top edge (over the bar's 1px line), the others muted.
+  Widget _tab(
     MetraColors colors, {
     required Key key,
     required Widget icon,
     required String label,
-    required VoidCallback onPressed,
-  }) => OutlinedButton(
-    key: key,
-    style: OutlinedButton.styleFrom(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-    ),
-    onPressed: onPressed,
-    child: Row(
-      children: [
-        icon,
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+    required bool active,
+    required VoidCallback onTap,
+  }) {
+    final color = active ? colors.text : colors.muted;
+    return Expanded(
+      // The bar's 1px line is drawn over the tabs' top edge, so the active
+      // tab's red line covers it.
+      child: Semantics(
+        button: true,
+        selected: active,
+        child: InkWell(
+          key: key,
+          onTap: onTap,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(
+                  color: active ? colors.accent : colors.accent.withAlpha(0),
+                  width: 2,
+                ),
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconTheme(
+                  data: IconThemeData(color: color),
+                  child: SizedBox.square(
+                    dimension: 20,
+                    child: Center(child: icon),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        Icon(Icons.expand_more, size: 18, color: colors.muted),
-      ],
+      ),
+    );
+  }
+
+  /// Free play: a quiet centered text button that saves what's sounding
+  /// as a new song.
+  Widget _freePlayRow(BuildContext context) => Center(
+    child: TextButton.icon(
+      key: newSongKey,
+      style: TextButton.styleFrom(
+        foregroundColor: context.colors.muted,
+        minimumSize: const Size(0, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+      ),
+      onPressed: () => showSaveAsNewSong(context, library, metronome),
+      icon: const Icon(Icons.add, size: 14),
+      label: const Text(
+        'New song from this',
+        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+      ),
     ),
   );
 
-  /// Previous | the set's position | next. Previous and next show the
-  /// neighbouring song (no words), filled, disabled at the ends.
-  Widget _stepRow(
-    BuildContext context,
-    MetraColors colors,
-    Setlist setlist,
-    void Function(QuickPickKind) pick,
-  ) {
-    final songs = library.visibleSongs;
-    final index = library.currentIndex;
-    // With no current song in the set, "next" is its first song.
-    final previous = library.hasPrevious ? songs[index - 1] : null;
-    final next = library.hasNext ? songs[index + 1] : null;
-    final position = '${index < 0 ? '–' : index + 1}/${songs.length}';
+  void _previous() {
+    Haptics.medium();
+    library.previousSong(metronome);
+  }
+
+  void _next() {
+    Haptics.medium();
+    library.nextSong(metronome);
+  }
+
+  /// Single song: previous | next through the library A–Z, no center.
+  Widget _songRow(BuildContext context) {
+    final colors = context.colors;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -130,12 +229,46 @@ class SetlistGroup extends StatelessWidget {
           child: _stepButton(
             key: previousKey,
             colors: colors,
-            song: previous,
+            song: library.songBefore,
             forward: false,
-            onPressed: () {
-              Haptics.medium();
-              library.previousSong(metronome);
-            },
+            onPressed: _previous,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: _stepButton(
+            key: nextKey,
+            colors: colors,
+            song: library.songAfter,
+            forward: true,
+            onPressed: _next,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Previous | the set's position | next. Previous and next show the
+  /// neighbouring song (no words), filled, disabled at the ends.
+  Widget _setRow(
+    BuildContext context,
+    Setlist setlist,
+    void Function(QuickPickKind) pick,
+  ) {
+    final colors = context.colors;
+    final index = library.currentIndex;
+    final position =
+        '${index < 0 ? '–' : index + 1}/${library.visibleSongs.length}';
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: _stepButton(
+            key: previousKey,
+            colors: colors,
+            song: library.songBefore,
+            forward: false,
+            onPressed: _previous,
           ),
         ),
         const SizedBox(width: 6),
@@ -195,12 +328,9 @@ class SetlistGroup extends StatelessWidget {
           child: _stepButton(
             key: nextKey,
             colors: colors,
-            song: next,
+            song: library.songAfter,
             forward: true,
-            onPressed: () {
-              Haptics.medium();
-              library.nextSong(metronome);
-            },
+            onPressed: _next,
           ),
         ),
       ],

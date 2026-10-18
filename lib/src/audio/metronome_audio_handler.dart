@@ -78,11 +78,17 @@ class MetronomeAudioHandler extends BaseAudioHandler {
     _publish();
   }
 
+  // Setlist mode only: in Free play and Single song, headphone
+  // double/triple-press does nothing (ui-spec.md "Media controls").
   @override
-  Future<void> skipToNext() async => _library?.nextSong(_controller);
+  Future<void> skipToNext() async {
+    if (_library?.activeSetlist != null) _library!.nextSong(_controller);
+  }
 
   @override
-  Future<void> skipToPrevious() async => _library?.previousSong(_controller);
+  Future<void> skipToPrevious() async {
+    if (_library?.activeSetlist != null) _library!.previousSong(_controller);
+  }
 
   /// Swiping the app away from recents stops the click and removes the
   /// card.

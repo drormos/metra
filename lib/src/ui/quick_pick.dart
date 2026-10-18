@@ -14,14 +14,16 @@ import 'song_editor.dart';
 import 'song_library.dart';
 import 'theme.dart';
 
-/// Which dropdown: the Songs ⌄ or Setlists ⌄ button (Free play / Single
-/// song), or the set header ⌄ (setlist mode).
+/// Which dropdown: the Songs or Setlists mode tab, or the set's "4/12 ⌄"
+/// (setlist mode).
 enum QuickPickKind { songs, sets, set }
 
 /// Opens a quick-pick dropdown (ui-spec.md "Quick-pick dropdowns",
 /// `drop-songs` / `drop-sets` / `drop-set` references) just above the
-/// setlist group that [context] belongs to, which stays visible above the
-/// dim. Tap outside or back closes it; choosing a row loads and closes.
+/// bottom bar that [context] belongs to (context row and mode tabs), which
+/// stays clear of the dim. The panel is [inset] narrower on each side than
+/// the bar (the content width). Tap outside or back closes it; choosing a
+/// row loads and closes.
 /// Pages it opens are pushed from [context], so back from them returns to
 /// the main screen.
 Future<void> showQuickPick(
@@ -29,6 +31,7 @@ Future<void> showQuickPick(
   required QuickPickKind kind,
   required LibraryController library,
   required MetronomeController metronome,
+  double inset = 0,
 }) {
   final box = context.findRenderObject()! as RenderBox;
   final anchor = box.localToGlobal(Offset.zero) & box.size;
@@ -40,6 +43,7 @@ Future<void> showQuickPick(
       reverseTransitionDuration: const Duration(milliseconds: 100),
       pageBuilder: (_, _, _) => _QuickPickLayer(
         anchor: anchor,
+        inset: inset,
         child: QuickPick(
           kind: kind,
           library: library,
@@ -53,11 +57,16 @@ Future<void> showQuickPick(
   );
 }
 
-/// The dim (with the group cut out of it) and the panel above [anchor].
+/// The dim (with the bar cut out of it) and the panel above [anchor].
 class _QuickPickLayer extends StatelessWidget {
-  const _QuickPickLayer({required this.anchor, required this.child});
+  const _QuickPickLayer({
+    required this.anchor,
+    required this.inset,
+    required this.child,
+  });
 
   final Rect anchor;
+  final double inset;
   final Widget child;
 
   @override
@@ -65,7 +74,7 @@ class _QuickPickLayer extends StatelessWidget {
     final colors = context.colors;
     final size = MediaQuery.sizeOf(context);
     final padding = MediaQuery.paddingOf(context);
-    // Above the group, or above the keyboard while searching.
+    // Above the bar, or above the keyboard while searching.
     final bottom = max(
       size.height - anchor.top + 18,
       MediaQuery.viewInsetsOf(context).bottom + 8,
@@ -86,8 +95,8 @@ class _QuickPickLayer extends StatelessWidget {
           ),
         ),
         Positioned(
-          left: anchor.left,
-          right: size.width - anchor.right,
+          left: anchor.left + inset,
+          right: size.width - anchor.right + inset,
           bottom: bottom,
           child: ConstrainedBox(
             constraints: BoxConstraints(maxHeight: max(0, maxHeight)),
@@ -107,7 +116,7 @@ class _QuickPickLayer extends StatelessWidget {
   }
 }
 
-/// Dims everything except [hole] (the setlist group).
+/// Dims everything except [hole] (the bottom bar).
 class _Dim extends CustomPainter {
   _Dim(this.color, this.hole);
 
@@ -149,7 +158,6 @@ class QuickPick extends StatefulWidget {
   static const outsideKey = Key('quick-pick-outside');
   static const songLibraryKey = Key('quick-pick-song-library');
   static const manageSetlistsKey = Key('quick-pick-manage-setlists');
-  static const freePlayKey = Key('quick-pick-free-play');
   static const otherSetlistsKey = Key('quick-pick-other-setlists');
   static const setHeaderKey = Key('quick-pick-set-header');
   static const newSongKey = Key('quick-pick-new-song');
@@ -218,18 +226,6 @@ class _QuickPickState extends State<QuickPick> {
     QuickPickKind.set => _setPanel(),
   };
 
-  /// Unless already in Free play, every panel ends with it, the last
-  /// pinned row, always in the same place ("tap any ⌄, tap Free play").
-  List<Widget> _freePlay() => [
-    if (_library.activeSetlist != null || _library.singleSong)
-      _action(
-        key: QuickPick.freePlayKey,
-        icon: const MetronomeIcon(size: 16),
-        label: 'Free play',
-        onTap: () => _choose(_library.detachSong),
-      ),
-  ];
-
   Widget _songsPanel() {
     final colors = context.colors;
     final all = _library.songsAZ;
@@ -286,7 +282,6 @@ class _QuickPickState extends State<QuickPick> {
                   (pages) => openSongLibrary(pages, _library, widget.metronome),
                 ),
               ),
-        ..._freePlay(),
       ],
     );
   }
@@ -329,7 +324,6 @@ class _QuickPickState extends State<QuickPick> {
                   ),
                 ),
               ),
-        ..._freePlay(),
       ],
     );
   }
@@ -399,7 +393,6 @@ class _QuickPickState extends State<QuickPick> {
           opens: true,
           onTap: () => setState(() => _kind = QuickPickKind.sets),
         ),
-        ..._freePlay(),
       ],
     );
   }

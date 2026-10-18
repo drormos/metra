@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 /// One line that never wraps: starts at [style]'s font size and shrinks to
 /// fit, down to [minFontSize]; only then does it end in an ellipsis
-/// (ui-spec.md "Top row", "Source bar").
+/// (ui-spec.md "Top row", "Mode tabs and context row").
 class FitText extends StatelessWidget {
   const FitText(
     this.text, {

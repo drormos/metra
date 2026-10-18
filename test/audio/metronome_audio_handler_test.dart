@@ -207,5 +207,22 @@ void main() {
       expect(handler.mediaItem.value?.title, 'One');
       expect(handler.mediaItem.value?.artist, '100 bpm · 4/4 · Gig 1/2');
     });
+
+    test('headphone skips do nothing in Single song', () async {
+      final a = library.addSong(
+        name: 'A',
+        bpm: 100,
+        pattern: const MetronomePattern.standard(),
+      );
+      library
+        ..addSong(
+          name: 'B',
+          bpm: 110,
+          pattern: const MetronomePattern.standard(),
+        )
+        ..playSingleSong(a, controller);
+      await handler.skipToNext();
+      expect(library.currentSong?.name, 'A');
+    });
   });
 }

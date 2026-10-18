@@ -99,7 +99,7 @@ void main() {
     final handle = tester.ensureSemantics();
     await pump(tester, loaded: false);
     await expectLabeled(tester);
-    await tester.tap(find.byKey(SetlistGroup.songsKey));
+    await tester.tap(find.byKey(SetlistGroup.songsTabKey));
     await tester.pumpAndSettle();
     await expectLabeled(tester);
     handle.dispose();

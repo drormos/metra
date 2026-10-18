@@ -51,7 +51,6 @@ class MetronomeScreen extends StatelessWidget {
   static const revertKey = Key('revert');
   static const saveToSongKey = Key('save-to-song');
   static const saveAsNewKey = Key('save-as-new');
-  static const newSongKey = Key('new-song');
   static const subtitleKey = Key('subtitle');
 
   /// The most the main screen's text grows with the system font size.
@@ -64,15 +63,33 @@ class MetronomeScreen extends StatelessWidget {
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-            // Large system fonts grow the text only so far: the stage
-            // layout (fixed-height buttons, the group) must stay intact.
-            child: MediaQuery.withClampedTextScaling(
-              maxScaleFactor: maxTextScale,
-              child: ListenableBuilder(
-                listenable: Listenable.merge([controller, ?library]),
-                builder: (context, _) => _content(context),
+          // Large system fonts grow the text only so far: the stage
+          // layout (fixed-height buttons, the bottom bar) must stay intact.
+          child: MediaQuery.withClampedTextScaling(
+            maxScaleFactor: maxTextScale,
+            child: ListenableBuilder(
+              listenable: Listenable.merge([controller, ?library]),
+              builder: (context, _) => Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        24,
+                        8,
+                        24,
+                        library == null ? 16 : 0,
+                      ),
+                      child: _content(context),
+                    ),
+                  ),
+                  // Edge to edge (the mode tabs); the context row pads
+                  // itself to the content width.
+                  if (library != null) ...[
+                    const SizedBox(height: 12),
+                    SetlistGroup(library: library, metronome: controller),
+                  ],
+                ],
               ),
             ),
           ),
@@ -130,29 +147,41 @@ class MetronomeScreen extends StatelessWidget {
         // controls, at fixed spacing.
         Expanded(
           child: LayoutBuilder(
-            builder: (context, box) => Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(height: 44),
-                  // Sized for three digits from the area, never the value;
-                  // the number is large already, so no text scaling.
-                  MediaQuery.withNoTextScaling(
-                    child: BpmReadout(
-                      bpm: bpm,
-                      fontSize: BpmReadout.fit(
-                        context,
-                        Size(box.maxWidth, box.maxHeight - 88),
-                      ),
-                      unitSize: 18,
-                      numberKey: bpmKey,
+            builder: (context, box) {
+              // Small phones: the BPM shrinks first; the empty twin gives
+              // way before the number drops under ~60px, and a last-resort
+              // scale-down keeps the tempo line from overflowing.
+              final twin = (box.maxHeight - 44 - 60).clamp(0.0, 44.0);
+              return Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: SizedBox(
+                    width: box.maxWidth,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(height: twin),
+                        // Sized for three digits from the area, never the value;
+                        // the number is large already, so no text scaling.
+                        MediaQuery.withNoTextScaling(
+                          child: BpmReadout(
+                            bpm: bpm,
+                            fontSize: BpmReadout.fit(
+                              context,
+                              Size(box.maxWidth, box.maxHeight - twin - 44),
+                            ),
+                            unitSize: 18,
+                            numberKey: bpmKey,
+                          ),
+                        ),
+                        // Fixed height: the tempo name, or Revert / Save to song.
+                        SizedBox(height: 44, child: _tempoLine(colors, bpm)),
+                      ],
                     ),
                   ),
-                  // Fixed height: the tempo name, or Revert / Save to song.
-                  SizedBox(height: 44, child: _tempoLine(colors, bpm)),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
         ),
         TempoRuler(bpm: bpm, onChanged: controller.setBpm),
@@ -201,10 +230,6 @@ class MetronomeScreen extends StatelessWidget {
             ],
           ),
         ),
-        if (library case final library?) ...[
-          const SizedBox(height: 12),
-          SetlistGroup(library: library, metronome: controller),
-        ],
         for (final notice in [
           if (error != null) 'Audio problem: $error',
           ?libraryProblem,
@@ -288,35 +313,16 @@ class MetronomeScreen extends StatelessWidget {
   }
 
   /// Fixed 54px in every mode, so nothing shifts: the song title over the
-  /// set's name (an empty line in Single song), or "+ New song" in Free
-  /// play. Taps do nothing, so a stray touch on stage never leaves the
+  /// set's name (an empty line in Single song); empty in Free play. Taps do nothing, so a stray touch on stage never leaves the
   /// main screen; long-presses are shortcuts (Long-press rule).
   Widget _titleBlock(BuildContext context) {
     final colors = context.colors;
     final library = this.library;
     final song = library?.currentSong;
+    // Free play: empty (saving is the context row's "+ New song from
+    // this").
     if (library != null && song == null && library.activeSetlist == null) {
-      // Free play: quiet, one tap, makes a song of what's sounding now.
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: Transform.translate(
-          offset: const Offset(-8, 0),
-          child: TextButton.icon(
-            key: newSongKey,
-            style: TextButton.styleFrom(
-              foregroundColor: colors.muted,
-              minimumSize: const Size(0, 44),
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-            ),
-            onPressed: () => showSaveAsNewSong(context, library, controller),
-            icon: const Icon(Icons.add, size: 16),
-            label: const Text(
-              'New song',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-            ),
-          ),
-        ),
-      );
+      return const SizedBox.shrink();
     }
     final set = library?.activeSetlist;
     void longPress(VoidCallback open) {

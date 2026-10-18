@@ -252,7 +252,7 @@ void main() {
     bool freePlay = false,
   }) async {
     if (freePlay) {
-      await tester.tap(find.byKey(SetlistGroup.songsKey));
+      await tester.tap(find.byKey(SetlistGroup.songsTabKey));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(QuickPick.songLibraryKey));
     } else {
@@ -433,7 +433,7 @@ void main() {
     expect(library.activeSetlist, isNull);
     expect(metronome.isPlaying, isTrue);
     expect(metronome.bpm, 100);
-    expect(find.byKey(SetlistGroup.setlistsKey), findsOneWidget);
+    expect(find.byKey(SetlistGroup.setlistsTabKey), findsOneWidget);
     metronome.stop();
   });
 

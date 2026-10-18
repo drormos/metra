@@ -637,6 +637,28 @@ void main() {
     expect(library.saveFailed, isFalse);
     expect(notified, 4); // two changes, failed, recovered
   });
+
+  test('Single song steps through the library A–Z; Free play does not', () {
+    final metronome = MetronomeController(FakeClickOutput());
+    addTearDown(metronome.dispose);
+    final b = library.addSong(name: 'b', bpm: 100, pattern: waltz);
+    library
+      ..addSong(name: 'A', bpm: 90, pattern: waltz)
+      ..addSong(name: 'C', bpm: 120, pattern: waltz);
+    expect(library.hasNext, isFalse, reason: 'Free play');
+    library.playSingleSong(b, metronome);
+    expect([library.songBefore?.name, library.songAfter?.name], ['A', 'C']);
+    library.nextSong(metronome);
+    expect(library.currentSong?.name, 'C');
+    expect(library.singleSong, isTrue);
+    expect(library.hasNext, isFalse, reason: 'stops at the end');
+    library
+      ..previousSong(metronome)
+      ..previousSong(metronome)
+      ..previousSong(metronome);
+    expect(library.currentSong?.name, 'A');
+    expect(metronome.bpm, 90);
+  });
 }
 
 class _CountingStore extends LibraryStore {
