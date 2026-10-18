@@ -2,6 +2,9 @@
 
 See `PLAN.md` for phases and scope. Work one step at a time and stop for review when asked. Make technical decisions yourself and record them in `PLAN.md`; ask the user only about product behavior, in plain terms.
 
+## Design Principles (CRITICAL)
+- Before designing or building any feature, read the Principles section of `docs/design/ui-spec.md` and follow it. If a request conflicts with a principle, flag it instead of building it.
+
 ## Core Audio Rules (CRITICAL)
 - **SOURCE OF TRUTH:** Click timing comes only from the `flutter_soloud` engine clock. Never trigger a click directly from a Dart Timer, `Future.delayed`, or the event loop.
 - **SCHEDULING:** Use `playScheduled` against `getEngineTime()`; do not use `playClocked`. A Dart Timer may drive the scheduler's refill loop (wake every ~25 ms and schedule any steps that fall inside the next ~150 ms of engine time). Jitter in this refill loop must not affect click timing.
