@@ -21,6 +21,14 @@ class LibraryController extends ChangeNotifier {
   int _idCounter = 0;
   bool _saveFailed = false;
 
+  // This session only (a fresh launch starts in Free play): where the
+  // Setlists and Songs tabs return to.
+  ({String id, String? songId, int position})? _sessionSet;
+  String? _sessionSongId;
+
+  // A tab shown with nothing to load (no songs / no sets yet).
+  ModeTab? _emptyTab;
+
   /// The last save failed; cleared by the next one that works.
   bool get saveFailed => _saveFailed;
 
@@ -55,14 +63,81 @@ class LibraryController extends ChangeNotifier {
   /// Free play: unloads the song (and any setlist). The click keeps
   /// exactly what it sounds like, unsaved changes included; the song in
   /// the library is untouched.
-  void detachSong() => _update(
-    _library.withSession(setlistId: null, songId: null, position: -1),
-  );
+  void detachSong() {
+    _emptyTab = null;
+    _update(_library.withSession(setlistId: null, songId: null, position: -1));
+  }
+
+  /// The mode tab that is current. An empty Songs / Setlists tab (nothing
+  /// to load yet) is Free play underneath: no song, the click unchanged.
+  ModeTab get tab {
+    if (activeSetlist != null) return ModeTab.setlists;
+    if (singleSong) return ModeTab.songs;
+    return switch (_emptyTab) {
+      ModeTab.songs when songs.isEmpty => ModeTab.songs,
+      ModeTab.setlists when setlists.isEmpty => ModeTab.setlists,
+      _ => ModeTab.freePlay,
+    };
+  }
+
+  /// The Setlists tab: back to the set used this session, at the same
+  /// song; otherwise the most recently used set (or the first) at song 1.
+  /// No sets: the tab shows its empty state. Already there: nothing.
+  void openSetlistsTab(MetronomeController metronome) {
+    if (tab == ModeTab.setlists) return;
+    final session = _sessionSet;
+    if (session != null && setlists.any((l) => l.id == session.id)) {
+      setActiveSetlist(session.id);
+      final songs = visibleSongs;
+      final p = session.position;
+      final index = p >= 0 && p < songs.length && songs[p].id == session.songId
+          ? p
+          : songs.indexWhere((s) => s.id == session.songId);
+      if (index >= 0) return playSong(songs[index], metronome, index: index);
+      if (songs.isNotEmpty) playSong(songs.first, metronome, index: 0);
+      return;
+    }
+    final recent = setlistsRecentlyPlayed;
+    if (recent.isEmpty) return _showEmpty(ModeTab.setlists);
+    loadSetlist(recent.first.id, metronome);
+  }
+
+  /// The Songs tab: back to the song used this session; otherwise the
+  /// most recently played song (or the first A–Z). No songs: the tab shows
+  /// its empty state. Already there: nothing.
+  void openSongsTab(MetronomeController metronome) {
+    if (tab == ModeTab.songs) return;
+    final session = _sessionSongId;
+    final song =
+        (session == null ? null : songById(session)) ??
+        _mostRecentlyPlayed ??
+        (songs.isEmpty ? null : songsAZ.first);
+    if (song == null) return _showEmpty(ModeTab.songs);
+    playSingleSong(song, metronome);
+  }
+
+  Song? get _mostRecentlyPlayed {
+    Song? latest;
+    for (final song in songs) {
+      final at = song.playedAt;
+      if (at != null && (latest == null || at.isAfter(latest.playedAt!))) {
+        latest = song;
+      }
+    }
+    return latest;
+  }
+
+  void _showEmpty(ModeTab tab) {
+    detachSong();
+    _emptyTab = tab;
+    notifyListeners();
+  }
 
   /// Loads a setlist, or Free play with null (which detaches the song).
   /// Only the mode changes: the click keeps going as it is.
   void setActiveSetlist(String? id) {
     if (id == null) return detachSong();
+    _emptyTab = null;
     final list = setlists.firstWhere((l) => l.id == id);
     _update(
       _library
@@ -154,8 +229,9 @@ class LibraryController extends ChangeNotifier {
   /// while playing it restarts on beat 1 at the song's tempo.
   void playSong(Song song, MetronomeController metronome, {int? index}) {
     metronome.loadSong(bpm: song.bpm, pattern: song.pattern);
+    _emptyTab = null;
     _update(
-      _library.withSession(
+      _played(song.id).withSession(
         setlistId: _library.activeSetlistId,
         songId: song.id,
         position: index ?? visibleSongs.indexWhere((s) => s.id == song.id),
@@ -168,8 +244,20 @@ class LibraryController extends ChangeNotifier {
   /// playing it restarts on beat 1 at the song's tempo.
   void playSingleSong(Song song, MetronomeController metronome) {
     metronome.loadSong(bpm: song.bpm, pattern: song.pattern);
+    _emptyTab = null;
     _update(
-      _library.withSession(setlistId: null, songId: song.id, position: -1),
+      _played(song.id)
+          .withSession(setlistId: null, songId: song.id, position: -1),
+    );
+  }
+
+  /// The library with [songId] marked as just loaded.
+  Library _played(String songId) {
+    final now = DateTime.now();
+    return _library.copyWith(
+      songs: [
+        for (final s in songs) s.id == songId ? s.copyWith(playedAt: now) : s,
+      ],
     );
   }
 
@@ -524,7 +612,25 @@ class LibraryController extends ChangeNotifier {
   Future<void> flush() => _writing ?? Future.value();
 
   void _update(Library library) {
+    final before = _library;
     _library = library;
+    // Only a change of mode or song counts: the session stored by the last
+    // run (until main detaches it) is not this session's.
+    final moved =
+        library.activeSetlistId != before.activeSetlistId ||
+        library.currentSongId != before.currentSongId ||
+        library.currentPosition != before.currentPosition;
+    if (moved) {
+      if (activeSetlist case final set?) {
+        _sessionSet = (
+          id: set.id,
+          songId: library.currentSongId,
+          position: library.currentPosition,
+        );
+      } else if (singleSong) {
+        _sessionSongId = library.currentSongId;
+      }
+    }
     notifyListeners();
     _unsaved = library;
     _writing ??= _writeAll();
@@ -569,3 +675,6 @@ enum SongPlacement {
   /// Not in the set: the app leaves it (Single song mode).
   none,
 }
+
+/// The main screen's mode tabs (ui-spec.md "Mode tabs").
+enum ModeTab { songs, freePlay, setlists }

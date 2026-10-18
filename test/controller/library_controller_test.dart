@@ -659,6 +659,90 @@ void main() {
     expect(library.currentSong?.name, 'A');
     expect(metronome.bpm, 90);
   });
+
+  group('mode tabs', () {
+    late MetronomeController metronome;
+
+    setUp(() => metronome = MetronomeController(FakeClickOutput()));
+    tearDown(() => metronome.dispose());
+
+    test('Setlists: the set used this session, at the same song', () {
+      final a = library.addSong(name: 'A', bpm: 90, pattern: waltz);
+      final b = library.addSong(name: 'B', bpm: 100, pattern: waltz);
+      final set = library.saveSetlist(name: 'Gig', songIds: [a.id, b.id]);
+      library
+        ..loadSetlist(set.id, metronome)
+        ..nextSong(metronome) // B
+        ..detachSong();
+      metronome.setBpm(140);
+      library.openSetlistsTab(metronome);
+      expect(library.activeSetlist?.id, set.id);
+      expect(library.currentSong?.name, 'B');
+      expect(metronome.bpm, 100);
+      expect(library.tab, ModeTab.setlists);
+    });
+
+    test('Setlists: otherwise the most recently used set at song 1', () {
+      final a = library.addSong(name: 'A', bpm: 90, pattern: waltz);
+      final b = library.addSong(name: 'B', bpm: 100, pattern: waltz);
+      library.saveSetlist(name: 'Old', songIds: [b.id]);
+      final recent = library.saveSetlist(name: 'Recent', songIds: [a.id, b.id]);
+      library.updateSetlist(recent.copyWith(playedAt: DateTime.now()));
+      library.openSetlistsTab(metronome);
+      expect(library.activeSetlist?.name, 'Recent');
+      expect(library.currentSong?.name, 'A');
+    });
+
+    test('Songs: the song used this session, else the latest played', () {
+      final a = library.addSong(name: 'A', bpm: 90, pattern: waltz);
+      final b = library.addSong(name: 'B', bpm: 100, pattern: waltz);
+      final set = library.saveSetlist(name: 'Gig', songIds: [b.id]);
+      library.openSongsTab(metronome);
+      expect(library.currentSong?.name, 'A', reason: 'none played: first A–Z');
+      library
+        ..playSingleSong(b, metronome)
+        ..playSingleSong(a, metronome)
+        ..loadSetlist(set.id, metronome) // plays B, in the set
+        ..openSongsTab(metronome);
+      expect(library.currentSong?.name, 'A', reason: "this session's song");
+      expect(library.singleSong, isTrue);
+    });
+
+    test(
+      'a fresh launch has no session; the latest played song counts',
+      () async {
+        final a = library.addSong(name: 'A', bpm: 90, pattern: waltz);
+        final b = library.addSong(name: 'B', bpm: 100, pattern: waltz);
+        final set = library.saveSetlist(name: 'Gig', songIds: [a.id, b.id]);
+        library
+          ..playSingleSong(a, metronome)
+          ..loadSetlist(set.id, metronome); // A again
+        // Saved to the millisecond: keep the two loads apart.
+        await Future<void>.delayed(const Duration(milliseconds: 2));
+        library.nextSong(metronome); // B, played last
+        final next = await reload();
+        next
+          ..attach(metronome)
+          ..detachSong() // as main does
+          ..openSongsTab(metronome);
+        expect(next.currentSong?.name, 'B', reason: 'latest played, saved');
+        next.openSetlistsTab(metronome);
+        expect(next.currentSong?.name, 'A', reason: 'no session set: song 1');
+        await next.flush();
+      },
+    );
+
+    test('empty tabs: nothing to load, the tab shows; the click is kept', () {
+      metronome.setBpm(77);
+      library.openSongsTab(metronome);
+      expect(library.tab, ModeTab.songs);
+      library.openSetlistsTab(metronome);
+      expect(library.tab, ModeTab.setlists);
+      library.detachSong();
+      expect(library.tab, ModeTab.freePlay);
+      expect(metronome.bpm, 77);
+    });
+  });
 }
 
 class _CountingStore extends LibraryStore {

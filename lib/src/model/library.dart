@@ -12,12 +12,17 @@ class Song {
     required this.bpm,
     required this.pattern,
     this.editedAt,
+    this.playedAt,
   });
 
   final String id;
   final String name;
   final int bpm;
   final MetronomePattern pattern;
+
+  /// When the song was last loaded into the click (any mode), for the
+  /// Songs tab's "most recently played"; null if never or an older file.
+  final DateTime? playedAt;
 
   /// When the song was last created or saved; null for songs from before
   /// this was recorded (they sort as oldest in "Recently edited").
@@ -28,12 +33,14 @@ class Song {
     int? bpm,
     MetronomePattern? pattern,
     DateTime? editedAt,
+    DateTime? playedAt,
   }) => Song(
     id: id,
     name: name ?? this.name,
     bpm: bpm ?? this.bpm,
     pattern: pattern ?? this.pattern,
     editedAt: editedAt ?? this.editedAt,
+    playedAt: playedAt ?? this.playedAt,
   );
 
   Map<String, Object?> toJson() => {
@@ -42,6 +49,7 @@ class Song {
     'bpm': bpm,
     'pattern': pattern.toJson(),
     'editedAt': editedAt?.millisecondsSinceEpoch,
+    'playedAt': playedAt?.millisecondsSinceEpoch,
   };
 
   factory Song.fromJson(Map<String, Object?> json) => Song(
@@ -52,6 +60,10 @@ class Song {
     editedAt: switch (json['editedAt']) {
       final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
       _ => null,
+    },
+    playedAt: switch (json['playedAt']) {
+      final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
+      _ => null, // never played, or an older file
     },
   );
 }

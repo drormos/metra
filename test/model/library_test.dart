@@ -176,6 +176,19 @@ void main() {
     expect(fromOld.currentPosition, -1);
   });
 
+  test('a song keeps when it was last played; older files: null', () {
+    final at = DateTime.fromMillisecondsSinceEpoch(1700000000000);
+    final song = Song(
+      id: 'a',
+      name: 'A',
+      bpm: 90,
+      pattern: waltz,
+      playedAt: at,
+    );
+    expect(Song.fromJson(song.toJson()).playedAt, at);
+    expect(Song.fromJson(song.toJson()..remove('playedAt')).playedAt, isNull);
+  });
+
   test('a song without editedAt (older file) loads with null', () {
     final json = const Song(
       id: 'x',

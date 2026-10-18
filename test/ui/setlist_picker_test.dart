@@ -10,7 +10,6 @@ import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/library_pick.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/play_marker.dart';
-import 'package:metra/src/ui/quick_pick.dart';
 import 'package:metra/src/ui/setlist_group.dart';
 import 'package:metra/src/ui/setlist_picker.dart';
 import 'package:metra/src/ui/song_editor.dart';
@@ -246,20 +245,10 @@ void main() {
 
   /// Opens the library (in Free play via "Songs", else via Settings) and
   /// taps [name]'s row.
-  Future<void> loadFromLibrary(
-    WidgetTester tester,
-    String name, {
-    bool freePlay = false,
-  }) async {
-    if (freePlay) {
-      await tester.tap(find.byKey(SetlistGroup.songsTabKey));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(QuickPick.songLibraryKey));
-    } else {
-      await tester.tap(find.byTooltip('Menu'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Song library'));
-    }
+  Future<void> loadFromLibrary(WidgetTester tester, String name) async {
+    await tester.tap(find.byTooltip('Menu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Song library'));
     await tester.pumpAndSettle();
     final song = library.songs.firstWhere((s) => s.name == name);
     await tester.tap(find.byKey(ValueKey('library-${song.id}')));
@@ -272,7 +261,7 @@ void main() {
     tester,
   ) async {
     await pumpWithSets(tester, loaded: false);
-    await loadFromLibrary(tester, 'Two', freePlay: true);
+    await loadFromLibrary(tester, 'Two');
     expect(library.activeSetlist, isNull);
     expect(library.singleSong, isTrue);
     expect(library.singleSong, isTrue);

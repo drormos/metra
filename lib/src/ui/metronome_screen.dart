@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -59,6 +61,13 @@ class MetronomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final library = this.library;
+    // The tabs sit above the system navigation / gesture area: where the
+    // home gesture reaches past the safe area, keep the tabs clear of it.
+    final gestureGap = math.max(
+      0.0,
+      MediaQuery.systemGestureInsetsOf(context).bottom -
+          MediaQuery.viewPaddingOf(context).bottom,
+    );
     final metronome = SafeArea(
       child: Center(
         child: ConstrainedBox(
@@ -88,6 +97,7 @@ class MetronomeScreen extends StatelessWidget {
                   if (library != null) ...[
                     const SizedBox(height: 12),
                     SetlistGroup(library: library, metronome: controller),
+                    SizedBox(height: gestureGap),
                   ],
                 ],
               ),

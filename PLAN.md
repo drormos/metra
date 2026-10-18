@@ -250,12 +250,17 @@ Decisions made with the user that the spec doesn't state (or states differently)
 ## Phase 5v: Unsaved-change actions as plain text (done)
 - "Revert · Save · Save as new" under the BPM: plain `TextButton`s, muted Saira 15/500, 44px tall, separated by dim dots (`beatResting`, #3A3A3A). "Save" is Save to song (same key, `saveToSongKey`); actions unchanged.
 
-## Phase 5w: Mode tabs and context row (done)
+## Phase 5w: Mode tabs and context row (done; tabs final per the updated spec)
 - The source bar is replaced by a context row (64px) over mode tabs (58px), both in `SetlistGroup` (name kept). The bar sits outside the screen's 24px side padding so the tabs run edge to edge (12px inner padding, 12px below); the context row pads itself back to the content width. Total 150px (64 + 16 + 58 + 12), the same in every mode.
-- Tabs: Songs · Free play · Setlists (single note, metronome, note-queue icons over 12px labels). Active: text color, w600, 2px accent line on its top edge drawn over the bar's 1px divider; others muted. Free play detaches at once (medium haptic, nothing if already there); Songs / Setlists open their dropdowns, also when already active.
-- Context row: setlist mode unchanged; Single song previous | next through the library A–Z (`LibraryController.songBefore` / `songAfter`, `nextSong` stays in Single song, stops at the ends); Free play "+ New song from this" (muted text button, opens the New song dialog). The title block is empty in Free play.
+- Tabs: Songs · Free play · Setlists (single note, metronome, note-queue icons over 12px labels). Active: text color, w600, 2px accent line on its top edge drawn over the bar's 1px divider; others muted. Tabs switch at once and never open a list; the tab you're on does nothing (medium haptic on a switch).
+  - Setlists: back to the set used this session at the same song (by saved position, else by id; song 1 if it's gone); otherwise the most recently played set at song 1 (`setlistsRecentlyPlayed`, never-played sets after).
+  - Songs: back to the Single song used this session; otherwise the most recently played song (new optional `Song.playedAt`, set whenever a song is loaded in any mode, saved; older files load with null), else the first A–Z.
+  - Session memory lives in `LibraryController` and isn't saved; it only records real changes of mode or song, so the last run's stored session (before `main` detaches it) never counts.
+  - Nothing to load: the tab still becomes current (`LibraryController.tab`, Free play underneath: no song, the click unchanged) and the context row shows "No songs yet" + "+ New song" (song editor; the new song is then loaded) or "No setlists yet" + "+ New setlist" (a new set's page; back on the main screen the Setlists tab loads a set if one exists).
+- Context row: setlist mode unchanged; Single song previous | "Songs ⌄" (76px outlined, note over "Songs ⌄"; long-press = song library, medium haptic) | next through the library A–Z (`songBefore` / `songAfter`; `nextSong` stays Single song, stops at the ends); Free play "+ New song from this". The center button is the only way lists open. The title block is empty in Free play.
 - Keyboard / pedal previous-next follow the context row (setlist, or library A–Z in Single song). The media card's skip actions stay setlist-only: in Single song headphone double-press does nothing (spec "Media controls").
-- Dropdowns: no "Free play" rows. The panel opens 18px above the context row at content width; the dim cuts out the whole bar (context row and tabs).
+- Dropdowns: no "Free play" rows. The panel opens 18px above the context row at content width; the dim cuts out the whole bar (context row and tabs). The Setlists list is reached only through "Other setlists ›".
+- System insets: the screen's `SafeArea` keeps the bar above the navigation bar; where the system gesture inset reaches higher than the safe area, an extra gap keeps the tabs out of it.
 - Small phones: the bar is 66px taller than the old one, so on short screens the BPM area gives way first: the empty 44px twin above the number collapses, then the number shrinks, with a last-resort scale-down (still tested at 360×640 and 320×568).
 
 ## Pre-release review fixes (done)

@@ -9,17 +9,21 @@ import 'icons.dart';
 import 'quick_pick.dart';
 import 'save_as_new_dialog.dart';
 import 'setlist_picker.dart';
+import 'song_editor.dart';
+import 'song_library.dart';
 import 'subdivision_icon.dart';
 import 'tabular_text.dart';
 import 'theme.dart';
 
 /// The bottom of the main screen (ui-spec.md "Mode tabs and context row"):
 /// the context row (64px) over the mode tabs (58px, edge to edge), the
-/// same height in every mode, so Start/Tap never move. Context row:
-/// setlist mode previous | the set's "4/12 ⌄" | next; Single song
-/// previous | next through the library A–Z; Free play a quiet "+ New song
-/// from this". Tabs: Songs · Free play · Setlists. Placed outside the
-/// screen's side padding; the context row adds its own.
+/// same height in every mode, so Start/Tap never move. Tabs switch at once
+/// and never open a list; lists open only from the context row's center
+/// button. Context row: setlist mode previous | the set's "4/12 ⌄" | next;
+/// Single song previous | "Songs ⌄" | next through the library A–Z; Free
+/// play a quiet "+ New song from this"; an empty Songs / Setlists tab
+/// "No songs yet" / "No setlists yet" with a "+ New" button. Placed
+/// outside the screen's side padding; the context row adds its own.
 class SetlistGroup extends StatelessWidget {
   const SetlistGroup({
     super.key,
@@ -38,9 +42,14 @@ class SetlistGroup extends StatelessWidget {
 
   /// The center "4/12 ⌄" button: the set dropdown.
   static const headerKey = Key('setlist-header');
+
+  /// The center "Songs ⌄" button (Single song): the Songs list.
+  static const songsKey = Key('songs-list');
   static const previousKey = Key('previous-song');
   static const nextKey = Key('next-song');
   static const newSongKey = Key('new-song');
+  static const firstSongKey = Key('first-song');
+  static const firstSetlistKey = Key('first-setlist');
   static const songsTabKey = Key('tab-songs');
   static const freePlayTabKey = Key('tab-free-play');
   static const setlistsTabKey = Key('tab-setlists');
@@ -48,9 +57,9 @@ class SetlistGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final setlist = library.activeSetlist;
-    final single = library.singleSong;
-    // Each dropdown opens just above the context row; the row and the
-    // tabs stay clear of the dim.
+    final tab = library.tab;
+    // Each list opens just above the context row; the row and the tabs
+    // stay clear of the dim.
     void pick(QuickPickKind kind) => showQuickPick(
       context,
       kind: kind,
@@ -66,27 +75,46 @@ class SetlistGroup extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: sidePadding),
           child: SizedBox(
             height: rowHeight,
-            child: setlist != null
-                ? _setRow(context, setlist, pick)
-                : single
-                ? _songRow(context)
-                : _freePlayRow(context),
+            child: switch (tab) {
+              ModeTab.setlists when setlist != null => _setRow(
+                context,
+                setlist,
+                pick,
+              ),
+              ModeTab.setlists => _emptyRow(
+                context,
+                key: firstSetlistKey,
+                message: 'No setlists yet',
+                action: 'New setlist',
+                onPressed: () => _newSetlist(context),
+              ),
+              ModeTab.songs when library.singleSong => _songRow(context, pick),
+              ModeTab.songs => _emptyRow(
+                context,
+                key: firstSongKey,
+                message: 'No songs yet',
+                action: 'New song',
+                onPressed: () => _newSong(context),
+              ),
+              ModeTab.freePlay => _freePlayRow(context),
+            },
           ),
         ),
         const SizedBox(height: 16),
-        _tabs(context, pick, setlist: setlist != null, single: single),
+        _tabs(context, tab),
       ],
     );
   }
 
-  Widget _tabs(
-    BuildContext context,
-    void Function(QuickPickKind) pick, {
-    required bool setlist,
-    required bool single,
-  }) {
+  Widget _tabs(BuildContext context, ModeTab current) {
     final colors = context.colors;
-    final freePlay = !setlist && !single;
+    // Tap = you're there; the tab you're on does nothing.
+    void go(ModeTab tab, VoidCallback open) {
+      if (tab == current) return;
+      Haptics.medium(); // the song changed or detached
+      open();
+    }
+
     return DecoratedBox(
       decoration: BoxDecoration(
         border: Border(top: BorderSide(color: colors.divider)),
@@ -103,34 +131,89 @@ class SetlistGroup extends StatelessWidget {
                 key: songsTabKey,
                 icon: const SubdivisionIcon(1, size: 20),
                 label: 'Songs',
-                active: single,
-                onTap: () => pick(QuickPickKind.songs),
+                active: current == ModeTab.songs,
+                onTap: () =>
+                    go(ModeTab.songs, () => library.openSongsTab(metronome)),
               ),
               _tab(
                 colors,
                 key: freePlayTabKey,
                 icon: const MetronomeIcon(size: 18),
                 label: 'Free play',
-                active: freePlay,
-                onTap: () {
-                  if (freePlay) return;
-                  Haptics.medium(); // the song detached
-                  library.detachSong();
-                },
+                active: current == ModeTab.freePlay,
+                onTap: () => go(ModeTab.freePlay, library.detachSong),
               ),
               _tab(
                 colors,
                 key: setlistsTabKey,
                 icon: const SetlistIcon(),
                 label: 'Setlists',
-                active: setlist,
-                onTap: () => pick(QuickPickKind.sets),
+                active: current == ModeTab.setlists,
+                onTap: () => go(
+                  ModeTab.setlists,
+                  () => library.openSetlistsTab(metronome),
+                ),
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  /// An empty Songs / Setlists tab: what's missing, and the way to add it.
+  Widget _emptyRow(
+    BuildContext context, {
+    required Key key,
+    required String message,
+    required String action,
+    required VoidCallback onPressed,
+  }) => Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      Flexible(
+        child: Text(
+          message,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 15, color: context.colors.muted),
+        ),
+      ),
+      const SizedBox(width: 8),
+      TextButton.icon(
+        key: key,
+        style: TextButton.styleFrom(
+          minimumSize: const Size(0, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+        ),
+        onPressed: onPressed,
+        icon: const Icon(Icons.add, size: 14),
+        label: Text(
+          action,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
+      ),
+    ],
+  );
+
+  /// The new song is then the loaded song (Single song).
+  Future<void> _newSong(BuildContext context) async {
+    final song = await openSongEditor(context, library, metronome);
+    if (song != null) library.playSingleSong(song, metronome);
+  }
+
+  /// Back from the new set's page (unless a set was loaded there), the
+  /// Setlists tab loads a set as if just tapped.
+  Future<void> _newSetlist(BuildContext context) async {
+    await openSetlists(
+      context,
+      library: library,
+      metronome: metronome,
+      newSet: true,
+    );
+    if (library.activeSetlist == null && library.setlists.isNotEmpty) {
+      library.openSetlistsTab(metronome);
+    }
   }
 
   /// An icon over a 12px label; the current mode white with a 2px red
@@ -219,8 +302,9 @@ class SetlistGroup extends StatelessWidget {
     library.nextSong(metronome);
   }
 
-  /// Single song: previous | next through the library A–Z, no center.
-  Widget _songRow(BuildContext context) {
+  /// Single song: previous | "Songs ⌄" | next through the library A–Z,
+  /// the same shape as in a set.
+  Widget _songRow(BuildContext context, void Function(QuickPickKind) pick) {
     final colors = context.colors;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -232,6 +316,52 @@ class SetlistGroup extends StatelessWidget {
             song: library.songBefore,
             forward: false,
             onPressed: _previous,
+          ),
+        ),
+        const SizedBox(width: 6),
+        SizedBox(
+          width: 76,
+          child: OutlinedButton(
+            key: songsKey,
+            style: OutlinedButton.styleFrom(
+              padding: EdgeInsets.zero,
+              // Our own haptic on long-press, gated by "Vibrate on touch".
+              enableFeedback: false,
+            ),
+            onPressed: () => pick(QuickPickKind.songs),
+            // Long-press = the song library page, like "4/12" opens the
+            // set's page; back returns here.
+            onLongPress: () {
+              Haptics.medium();
+              openSongLibrary(context, library, metronome);
+            },
+            child: Semantics(
+              label: 'All songs',
+              excludeSemantics: true,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SubdivisionIcon(1, size: 18),
+                  const SizedBox(height: 3),
+                  FittedBox(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Text(
+                          'Songs',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(width: 3),
+                        Icon(Icons.expand_more, size: 16),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
         const SizedBox(width: 6),
