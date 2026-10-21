@@ -18,7 +18,7 @@ abstract final class RowGestures {
   static const swipeRatio = 2.0;
 
   /// How long a finger rests to lift a set's song for reordering.
-  static const liftPress = Duration(milliseconds: 250);
+  static const liftPress = Duration(milliseconds: 200);
 
   /// How long a finger rests to rename (Songs list, sets view): longer,
   /// since an accidental one opens the keyboard.

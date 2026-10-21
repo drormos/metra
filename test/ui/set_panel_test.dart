@@ -633,15 +633,15 @@ void main() {
   });
 
   group('timings and never waiting', () {
-    testWidgets('a set\'s song lifts after 250ms; rename waits 400ms', (
+    testWidgets('a set\'s song lifts after 200ms; rename waits 400ms', (
       tester,
     ) async {
       await pump(tester);
       await openPanel(tester);
       var gesture = await tester.startGesture(tester.getCenter(row(0)));
-      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump(const Duration(milliseconds: 180));
       expect(haptics, isEmpty, reason: 'not yet');
-      await tester.pump(const Duration(milliseconds: 60));
+      await tester.pump(const Duration(milliseconds: 30));
       expect(haptics, ['HapticFeedbackType.mediumImpact'], reason: 'lifted');
       await gesture.up();
       await tester.pumpAndSettle();
