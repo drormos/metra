@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart' show kLongPressTimeout;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/semantics.dart';
 import 'package:metra/src/controller/library_controller.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
@@ -13,6 +14,8 @@ import 'package:metra/src/ui/library_pick.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/quick_pick.dart';
 import 'package:metra/src/ui/setlist_group.dart';
+import 'package:metra/src/ui/theme.dart';
+import 'package:metra/src/ui/swipe_row.dart';
 
 import '../audio/fake_click_output.dart';
 import 'test_theme.dart';
@@ -718,6 +721,165 @@ void main() {
       expect(tester.getTopLeft(row(0)).dx, x, reason: 'caught up');
       await touch.up();
       await tester.pumpAndSettle();
+    });
+  });
+
+  group('swipe feel', () {
+    // The revealed background, while a row is moved sideways.
+    Color? behindColor(WidgetTester tester) {
+      final box = find.byWidgetPredicate(
+        (w) => w is AnimatedContainer && w.alignment != null,
+      );
+      if (box.evaluate().isEmpty) return null;
+      final container = tester.widget<AnimatedContainer>(box.first);
+      return (container.decoration as BoxDecoration?)?.color;
+    }
+
+    testWidgets('follows 1:1 after 32dp; crossing 40% ticks, deepens the '
+        'red and grows the label; going back reverses it', (tester) async {
+      await pump(tester);
+      await openPanel(tester);
+      final x = tester.getTopLeft(row(0)).dx;
+      final width = tester.getSize(row(0)).width;
+      final gesture = await tester.startGesture(tester.getCenter(row(0)));
+      await gesture.moveBy(const Offset(-40, 0)); // starts the swipe
+      await gesture.moveBy(const Offset(-42, 0));
+      await tester.pump();
+      expect(tester.getTopLeft(row(0)).dx, closeTo(x - 50, 0.5), reason: '1:1');
+      expect(haptics, isEmpty);
+      expect(behindColor(tester), MetraColors.stageBlack.accentResting);
+      expect(
+        tester.getTopLeft(find.byIcon(Icons.delete_outline)).dx,
+        greaterThan(x + width / 2),
+        reason: 'swiping left: on the right',
+      );
+      await gesture.moveBy(Offset(-width * 0.4, 0));
+      await tester.pump(RowGestures.armTransition);
+      expect(haptics, ['HapticFeedbackType.lightImpact'], reason: 'one tick');
+      expect(behindColor(tester), MetraColors.stageBlack.accent);
+      expect(
+        tester.widget<AnimatedScale>(find.byType(AnimatedScale).first).scale,
+        RowGestures.armedScale,
+      );
+      await gesture.moveBy(Offset(width * 0.4, 0));
+      await tester.pump(RowGestures.armTransition);
+      expect(haptics, hasLength(2), reason: 'a second tick going back');
+      expect(behindColor(tester), MetraColors.stageBlack.accentResting);
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(friday(), hasLength(3), reason: 'released short: springs back');
+      expect(haptics, hasLength(2), reason: 'nothing on release');
+    });
+
+    testWidgets('a quick flick commits even short; a flick back cancels', (
+      tester,
+    ) async {
+      await pump(tester);
+      await openPanel(tester);
+      await tester.fling(row(0), const Offset(-70, 0), 1500);
+      await tester.pumpAndSettle();
+      expect(friday(), ['Two', 'Three'], reason: 'flicked off');
+      final width = tester.getSize(row(1)).width;
+      final gesture = await tester.startGesture(tester.getCenter(row(1)));
+      for (var i = 0; i < 8; i++) {
+        await gesture.moveBy(Offset(-width * 0.08, 0));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      for (var i = 0; i < 3; i++) {
+        await gesture.moveBy(const Offset(30, 0)); // fast, back
+        await tester.pump(const Duration(milliseconds: 8));
+      }
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(friday(), ['Two', 'Three'], reason: 'the flick back cancelled');
+    });
+
+    testWidgets('commit: the change is immediate, the row slides off, then '
+        'the rows below close the gap', (tester) async {
+      await pump(tester);
+      await openPanel(tester);
+      final second = tester.getTopLeft(row(1)).dy;
+      await tester.drag(row(0), const Offset(-260, 0));
+      await tester.pump();
+      expect(friday(), ['Two', 'Three'], reason: 'immediate');
+      // The old second row is now row 0 (in the list, not the sliding
+      // copy), still drawn in its old place.
+      final listed = find.descendant(
+        of: find.byType(ExitShift),
+        matching: row(0),
+      );
+      expect(tester.getTopLeft(listed).dy, closeTo(second, 0.5));
+      await tester.pump(RowGestures.slideOff + RowGestures.collapse);
+      await tester.pump();
+      expect(tester.getTopLeft(listed).dy, lessThan(second), reason: 'closed');
+    });
+
+    testWidgets('a delete holds the row open at 40% while it asks', (
+      tester,
+    ) async {
+      await pump(tester);
+      await openPanel(tester);
+      await tester.tap(find.byKey(QuickPick.changeSetKey));
+      await tester.pumpAndSettle();
+      final saturday = find.byKey(
+        ValueKey('quick-set-${library.setlists.last.id}'),
+      );
+      final x = tester.getTopLeft(saturday).dx;
+      final width = tester.getSize(saturday).width;
+      await tester.drag(saturday, Offset(-width * 0.9, 0));
+      await tester.pumpAndSettle();
+      expect(find.byKey(deleteConfirmKey), findsOneWidget);
+      expect(
+        tester.getTopLeft(saturday).dx,
+        closeTo(x - width * RowGestures.swipeCommit, 1),
+      );
+      await tester.tap(find.byKey(deleteCancelKey));
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(saturday).dx, x, reason: 'sprang back');
+    });
+
+    testWidgets('no swiping while a row is in rename', (tester) async {
+      await pump(tester);
+      await openPanel(tester);
+      await tester.tap(find.byKey(QuickPick.changeSetKey));
+      await tester.pumpAndSettle();
+      Finder set(int i) =>
+          find.byKey(ValueKey('quick-set-${library.setlists[i].id}'));
+      await tester.longPress(set(1));
+      await tester.pumpAndSettle();
+      expect(find.byKey(QuickPick.renameFieldKey), findsOneWidget);
+      await tester.drag(set(0), const Offset(-300, 0));
+      await tester.pumpAndSettle();
+      expect(find.byKey(deleteConfirmKey), findsNothing);
+      expect(library.setlists, hasLength(2));
+    });
+
+    testWidgets('each row offers its action to TalkBack', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pump(tester);
+      await openPanel(tester);
+      List<String> actions(Finder f) => [
+        for (final id
+            in tester
+                    .getSemantics(f)
+                    .getSemanticsData()
+                    .customSemanticsActionIds ??
+                <int>[])
+          CustomSemanticsAction.getAction(id)!.label!,
+      ];
+      expect(actions(find.byType(SwipeRow).first), ['Remove from set']);
+      final node = tester.getSemantics(find.byType(SwipeRow).first);
+      final id = node.getSemanticsData().customSemanticsActionIds!.single;
+      // A screen reader's custom action, as TalkBack sends it.
+      // ignore: deprecated_member_use
+      tester.binding.pipelineOwner.semanticsOwner!.performAction(
+        node.id,
+        SemanticsAction.customAction,
+        id,
+      );
+      await tester.pumpAndSettle();
+      expect(friday(), ['Two', 'Three'], reason: 'removed, as by a swipe');
+      handle.dispose();
     });
   });
 }

@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 
 import 'haptics.dart';
 import 'theme.dart';
@@ -28,9 +29,24 @@ abstract final class RowGestures {
   /// (the lists' scroll slop; Android's normal touch slop).
   static const scrollSlop = 8.0;
 
-  /// A dropped row settling into its slot; a swipe springing back.
+  /// A dropped row settling into its slot; a cancelled swipe springing
+  /// back (ease-out, no bounce).
   static const settle = Duration(milliseconds: 150);
-  static const springBack = Duration(milliseconds: 200);
+  static const springBack = Duration(milliseconds: 180);
+
+  /// A committed swipe: the row slides the rest of the way off, then the
+  /// gap closes as the rows below move up.
+  static const slideOff = Duration(milliseconds: 120);
+  static const collapse = Duration(milliseconds: 150);
+
+  /// A release faster than this (dp/s) commits in its direction even short
+  /// of [swipeCommit]; one back toward the start cancels.
+  static const flickVelocity = 1000.0;
+
+  /// Past [swipeCommit] the label and trash icon grow to this, and the
+  /// red deepens, over [armTransition].
+  static const armedScale = 1.1;
+  static const armTransition = Duration(milliseconds: 100);
 
   /// A new touch finishes a running animation this fast, then is handled.
   static const catchUp = Duration(milliseconds: 80);
@@ -238,27 +254,195 @@ class HoldToReorder extends ReorderableDelayedDragStartListener {
   );
 }
 
-/// A list row that swipes either way to act ([onSwiped], light haptic),
-/// with a red [label] behind it. With [ask] (a delete), the row stays open
-/// while it asks;
-/// no = it slides back. [onHold] is the row's long-press. [hint] drives
-/// the one-time hint (0 → 1: out and back).
+/// Where a committed row leaves the list (ui-spec.md "Swipe feel"): the
+/// data has already changed, so the row is gone from the list; the host
+/// draws a copy sliding the rest of the way off ([RowGestures.slideOff])
+/// while the rows below ([ExitShift]) keep the gap, then closes it
+/// ([RowGestures.collapse]). A new touch finishes it all in
+/// [RowGestures.catchUp].
+class RowExitHost extends StatefulWidget {
+  const RowExitHost({super.key, required this.child});
+
+  final Widget child;
+
+  static RowExitHostState? of(BuildContext context) =>
+      context.findAncestorStateOfType<RowExitHostState>();
+
+  @override
+  State<RowExitHost> createState() => RowExitHostState();
+}
+
+class RowExitHostState extends State<RowExitHost>
+    with SingleTickerProviderStateMixin {
+  static final _total = RowGestures.slideOff + RowGestures.collapse;
+  late final _exit = AnimationController(
+    vsync: this,
+    duration: _total,
+    value: 1,
+  );
+  ({int index, Rect rect, Widget ghost, double from, double to})? _leaving;
+  CatchUp? _catchUp;
+
+  /// How far the gap has closed (0 → 1), after the slide.
+  double get _closed => Curves.easeOut.transform(
+    ((_exit.value * _total.inMicroseconds -
+                RowGestures.slideOff.inMicroseconds) /
+            RowGestures.collapse.inMicroseconds)
+        .clamp(0.0, 1.0),
+  );
+
+  /// The row at list position [index] (drawn as [ghost], in [box], [from]
+  /// pixels sideways) was just removed from the data: show it leaving.
+  void leave({
+    required int index,
+    required RenderBox box,
+    required Widget ghost,
+    required double from,
+  }) {
+    final host = context.findRenderObject() as RenderBox?;
+    if (host == null || !box.attached) return;
+    final topLeft = box.localToGlobal(Offset.zero, ancestor: host);
+    setState(
+      () => _leaving = (
+        index: index,
+        rect: topLeft & box.size,
+        ghost: ghost,
+        from: from,
+        to: from.sign * box.size.width,
+      ),
+    );
+    final catchUp = _catchUp = CatchUpScope.of(context);
+    catchUp?.add(this, () => _exit.animateTo(1, duration: RowGestures.catchUp));
+    _exit.forward(from: 0).whenCompleteOrCancel(() {
+      catchUp?.remove(this);
+      if (mounted) setState(() => _leaving = null);
+    });
+  }
+
+  @override
+  void dispose() {
+    _catchUp?.remove(this);
+    _exit.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final leaving = _leaving;
+    return _RowExitScope(
+      host: this,
+      leaving: leaving == null
+          ? null
+          : (index: leaving.index, height: leaving.rect.height),
+      child: Stack(
+        children: [
+          widget.child,
+          if (leaving != null)
+            Positioned.fromRect(
+              rect: leaving.rect,
+              child: IgnorePointer(
+                child: ExcludeSemantics(
+                  child: AnimatedBuilder(
+                    animation: _exit,
+                    builder: (context, child) {
+                      final slid =
+                          (_exit.value *
+                                  _total.inMicroseconds /
+                                  RowGestures.slideOff.inMicroseconds)
+                              .clamp(0.0, 1.0);
+                      if (slid >= 1) return const SizedBox.shrink();
+                      final x =
+                          leaving.from + (leaving.to - leaving.from) * slid;
+                      return Transform.translate(
+                        offset: Offset(x, 0),
+                        child: child,
+                      );
+                    },
+                    child: leaving.ghost,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RowExitScope extends InheritedWidget {
+  const _RowExitScope({
+    required this.host,
+    required this.leaving,
+    required super.child,
+  });
+
+  final RowExitHostState host;
+  final ({int index, double height})? leaving;
+
+  @override
+  bool updateShouldNotify(_RowExitScope old) => old.leaving != leaving;
+}
+
+/// A list row at position [index]: while a row above it is leaving, it
+/// holds the gap and then moves up with the others.
+class ExitShift extends StatelessWidget {
+  const ExitShift({super.key, required this.index, required this.child});
+
+  final int index;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = context.dependOnInheritedWidgetOfExactType<_RowExitScope>();
+    final leaving = scope?.leaving;
+    if (scope == null || leaving == null || index < leaving.index) {
+      return child;
+    }
+    final host = scope.host;
+    return AnimatedBuilder(
+      animation: host._exit,
+      builder: (context, child) => Transform.translate(
+        offset: Offset(0, leaving.height * (1 - host._closed)),
+        child: child,
+      ),
+      child: child,
+    );
+  }
+}
+
+/// A list row that swipes either way to act (ui-spec.md "Swipe feel"):
+/// it follows the finger 1:1 after the 32dp start; past
+/// [RowGestures.swipeCommit] it arms (one light tick, deeper red, the
+/// label and trash icon grow) and disarms going back (another tick).
+/// Release armed, or flick faster than [RowGestures.flickVelocity] in the
+/// swipe's direction, to commit; a flick back cancels. Commit: [onSwiped]
+/// at once and the row leaves via [RowExitHost] (as list position
+/// [index]). With [ask] (a delete) the row holds open at the threshold
+/// while it asks; no = it springs back. Off unless [enabled] (a reorder
+/// drag, a rename). [actionLabel] is the same action for TalkBack.
+/// [onHold] is the row's long-press; [hint] drives the one-time hint.
 class SwipeRow extends StatefulWidget {
   const SwipeRow({
     super.key,
+    required this.index,
     required this.label,
+    required this.actionLabel,
     required this.onSwiped,
     required this.child,
     this.ask,
     this.onHold,
     this.hint,
+    this.enabled = true,
   });
 
+  final int index;
   final String label;
+  final String actionLabel;
   final VoidCallback onSwiped;
   final Future<bool> Function()? ask;
   final VoidCallback? onHold;
   final Animation<double>? hint;
+  final bool enabled;
   final Widget child;
 
   @override
@@ -270,7 +454,8 @@ class _SwipeRowState extends State<SwipeRow>
   // The row's sideways offset in pixels, following the finger.
   late final _offset = AnimationController.unbounded(vsync: this);
   double _width = 0;
-  bool _busy = false; // asking, or sliding out
+  bool _busy = false; // asking, or gone
+  bool _armed = false;
 
   // The first [RowGestures.swipeStart] of a swipe doesn't move the row, so
   // it doesn't jump when the swipe starts.
@@ -286,8 +471,23 @@ class _SwipeRowState extends State<SwipeRow>
     super.dispose();
   }
 
+  double get _threshold => RowGestures.swipeCommit * _width;
+
+  void _move(double delta) {
+    if (_busy) return;
+    final skipped = min(_skip, delta.abs());
+    _skip -= skipped;
+    _offset.value += delta - delta.sign * skipped;
+    final armed = _offset.value.abs() > _threshold;
+    if (armed != _armed) {
+      Haptics.tick(); // the only haptic of a swipe
+      setState(() => _armed = armed);
+    }
+  }
+
   /// Springs back; a new touch anywhere in the list finishes it quickly.
   void _back() {
+    if (_armed) setState(() => _armed = false);
     final catchUp = _catchUp = CatchUpScope.of(context);
     catchUp?.add(
       this,
@@ -298,94 +498,161 @@ class _SwipeRowState extends State<SwipeRow>
         .whenCompleteOrCancel(() => catchUp?.remove(this));
   }
 
-  Future<void> _end() async {
-    final past = _offset.value.abs() > RowGestures.swipeCommit * _width;
-    if (!past) return _back();
-    _busy = true;
+  Future<void> _end(double velocity) async {
+    final offset = _offset.value;
+    final flick = velocity.abs() > RowGestures.flickVelocity;
+    final commit = flick
+        ? velocity.sign == offset.sign && offset != 0
+        : offset.abs() > _threshold;
+    if (!commit) return _back();
     final ask = widget.ask;
-    if (ask != null && !await ask()) {
+    if (ask != null) {
+      _busy = true;
+      // Held open at the threshold while the dialog is up.
+      if (!_armed) setState(() => _armed = true);
+      _offset.animateTo(
+        offset.sign * _threshold,
+        duration: RowGestures.springBack,
+        curve: Curves.easeOut,
+      );
+      final ok = await ask();
+      if (!mounted) return;
       _busy = false;
-      if (mounted) _back();
-      return;
+      if (!ok) return _back();
     }
-    if (!mounted) return;
-    // The change happens now; the row leaves the list at once rather than
-    // finishing a slide that would hold up the next touch.
-    Haptics.tick();
+    _commit();
+  }
+
+  /// The change happens now; the row leaves through the host.
+  void _commit() {
+    _busy = true;
+    final box = context.findRenderObject() as RenderBox?;
+    if (box != null && box.attached) {
+      RowExitHost.of(context)?.leave(
+        index: widget.index,
+        box: box,
+        ghost: _surface(context),
+        from: _offset.value,
+      );
+    }
     widget.onSwiped();
   }
 
-  @override
-  Widget build(BuildContext context) {
+  /// TalkBack's custom action: the same, without the swipe.
+  Future<void> _act() async {
+    final ask = widget.ask;
+    if (ask != null && !await ask()) return;
+    if (mounted) widget.onSwiped();
+  }
+
+  /// What's behind the row: red, with the trash icon and label on the
+  /// revealed side; deeper and slightly larger once armed.
+  Widget _behind(BuildContext context, double offset) {
     final colors = context.colors;
-    final onHold = widget.onHold;
-    final hint = widget.hint;
-    Widget behind(double offset) => Container(
-      color: colors.accentResting,
+    return AnimatedContainer(
+      duration: RowGestures.armTransition,
+      color: _armed ? colors.accent : colors.accentResting,
       alignment: offset > 0 ? Alignment.centerLeft : Alignment.centerRight,
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Text(
-        widget.label,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: colors.text,
+      child: AnimatedScale(
+        duration: RowGestures.armTransition,
+        scale: _armed ? RowGestures.armedScale : 1,
+        alignment: offset > 0 ? Alignment.centerLeft : Alignment.centerRight,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.delete_outline, size: 18, color: colors.text),
+            const SizedBox(width: 6),
+            Text(
+              widget.label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: colors.text,
+              ),
+            ),
+          ],
         ),
       ),
     );
-    return LayoutBuilder(
-      builder: (context, box) {
-        _width = box.maxWidth;
-        return RawGestureDetector(
-          gestures: {
-            SwipeGestureRecognizer:
-                GestureRecognizerFactoryWithHandlers<SwipeGestureRecognizer>(
-                  () => SwipeGestureRecognizer(debugOwner: this),
-                  (r) => r
-                    ..onStart = (_) {
-                      _skip = RowGestures.swipeStart;
-                    }
-                    ..onUpdate = (d) {
-                      if (_busy) return;
-                      var delta = d.primaryDelta ?? 0;
-                      final skipped = min(_skip, delta.abs());
-                      _skip -= skipped;
-                      delta -= delta.sign * skipped;
-                      _offset.value += delta;
-                    }
-                    ..onEnd = (_) {
-                      if (!_busy) _end();
-                    }
-                    ..onCancel = () {
-                      if (!_busy) _back();
-                    },
-                ),
-            if (onHold != null)
-              HoldGestureRecognizer:
-                  GestureRecognizerFactoryWithHandlers<HoldGestureRecognizer>(
-                    () => HoldGestureRecognizer(debugOwner: this),
-                    (r) => r.onHold = onHold,
-                  ),
-          },
-          child: AnimatedBuilder(
-            animation: Listenable.merge([_offset, ?hint]),
-            builder: (context, child) {
-              final slide = hint == null
-                  ? 0.0
-                  : -RowGestures.hintSlide * sin(pi * hint.value);
-              final offset = _offset.value + slide;
-              return Stack(
-                children: [
-                  if (offset != 0 || hint != null)
-                    Positioned.fill(child: behind(offset == 0 ? -1 : offset)),
-                  Transform.translate(offset: Offset(offset, 0), child: child),
-                ],
-              );
-            },
-            child: widget.child,
-          ),
-        );
+  }
+
+  /// The row with its revealed background, as it sits now (also the ghost
+  /// that slides off).
+  Widget _surface(BuildContext context) => Stack(
+    children: [
+      Positioned.fill(child: _behind(context, _offset.value)),
+      widget.child,
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final onHold = widget.onHold;
+    final hint = widget.hint;
+    return Semantics(
+      customSemanticsActions: {
+        CustomSemanticsAction(label: widget.actionLabel): _act,
       },
+      child: LayoutBuilder(
+        builder: (context, box) {
+          _width = box.maxWidth;
+          return RawGestureDetector(
+            gestures: {
+              if (widget.enabled)
+                SwipeGestureRecognizer:
+                    GestureRecognizerFactoryWithHandlers<
+                      SwipeGestureRecognizer
+                    >(
+                      () => SwipeGestureRecognizer(debugOwner: this),
+                      (r) => r
+                        ..onStart = (_) {
+                          _skip = RowGestures.swipeStart;
+                          // One row in motion: others settle now.
+                          CatchUpScope.of(context)?.now();
+                        }
+                        ..onUpdate = (d) {
+                          _move(d.primaryDelta ?? 0);
+                        }
+                        ..onEnd = (d) {
+                          if (!_busy) _end(d.primaryVelocity ?? 0);
+                        }
+                        ..onCancel = () {
+                          if (!_busy) _back();
+                        },
+                    ),
+              if (onHold != null)
+                HoldGestureRecognizer:
+                    GestureRecognizerFactoryWithHandlers<HoldGestureRecognizer>(
+                      () => HoldGestureRecognizer(debugOwner: this),
+                      (r) => r.onHold = onHold,
+                    ),
+            },
+            child: AnimatedBuilder(
+              animation: Listenable.merge([_offset, ?hint]),
+              builder: (context, child) {
+                final slide = hint == null
+                    ? 0.0
+                    : -RowGestures.hintSlide * sin(pi * hint.value);
+                final offset = _offset.value + slide;
+                return Stack(
+                  children: [
+                    if (offset != 0 || hint != null)
+                      Positioned.fill(
+                        child: _behind(context, offset == 0 ? -1 : offset),
+                      ),
+                    Transform.translate(
+                      offset: Offset(offset, 0),
+                      child: child,
+                    ),
+                  ],
+                );
+              },
+              child: widget.child,
+            ),
+          );
+        },
+      ),
     );
   }
 }

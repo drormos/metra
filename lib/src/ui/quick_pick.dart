@@ -217,6 +217,7 @@ class _QuickPickState extends State<QuickPick>
   final _reorderKey = GlobalKey<ReorderableListState>();
   final _proxyKey = GlobalKey();
   int? _dragFrom;
+  bool _reordering = false;
   ({int index, double fromTop})? _settle;
   final _catchUp = CatchUp();
 
@@ -402,32 +403,38 @@ class _QuickPickState extends State<QuickPick>
                           colors,
                           leading: PlayMarker(current: song.id == current),
                         )
-                      : SwipeRow(
-                          key: ValueKey('song-${song.id}-$_generation'),
-                          onHold: () =>
-                              _startRename(song.id, song.name, _Rename.song),
-                          label: 'Delete song',
-                          ask: () => confirmDelete(
-                            context,
-                            title: 'Delete ${song.name}?',
-                            body: switch (_library.setlistsUsing(song.id)) {
-                              final sets when sets.isEmpty => null,
-                              final sets =>
-                                'It will also be removed from '
-                                    '${SongLibrary.whereUsed(sets)}.',
-                            },
-                          ),
-                          onSwiped: () => _deleteSong(song),
-                          hint: i == _hintRow && query.isEmpty ? _hint : null,
-                          child: _songRow(
-                            colors,
-                            song,
-                            key: ValueKey('quick-song-${song.id}'),
-                            current: song.id == current,
-                            onTap: () => _choose(
-                              () => _library.playSingleSong(
-                                song,
-                                widget.metronome,
+                      : ExitShift(
+                          index: i,
+                          child: SwipeRow(
+                            key: ValueKey('song-${song.id}-$_generation'),
+                            index: i,
+                            enabled: _renaming == null,
+                            onHold: () =>
+                                _startRename(song.id, song.name, _Rename.song),
+                            label: 'Delete song',
+                            actionLabel: 'Delete song',
+                            ask: () => confirmDelete(
+                              context,
+                              title: 'Delete ${song.name}?',
+                              body: switch (_library.setlistsUsing(song.id)) {
+                                final sets when sets.isEmpty => null,
+                                final sets =>
+                                  'It will also be removed from '
+                                      '${SongLibrary.whereUsed(sets)}.',
+                              },
+                            ),
+                            onSwiped: () => _deleteSong(song),
+                            hint: i == _hintRow && query.isEmpty ? _hint : null,
+                            child: _songRow(
+                              colors,
+                              song,
+                              key: ValueKey('quick-song-${song.id}'),
+                              current: song.id == current,
+                              onTap: () => _choose(
+                                () => _library.playSingleSong(
+                                  song,
+                                  widget.metronome,
+                                ),
                               ),
                             ),
                           ),
@@ -511,28 +518,38 @@ class _QuickPickState extends State<QuickPick>
               shrinkWrap: true,
               padding: EdgeInsets.zero,
               children: [
-                for (final set in sets)
+                for (final (i, set) in sets.indexed)
                   set.id == _renaming
                       ? _renameRow(
                           colors,
                           leading: SetlistIcon(size: 16, color: colors.muted),
                         )
-                      : SwipeRow(
-                          key: ValueKey('set-${set.id}-$_generation'),
-                          onHold: () =>
-                              _startRename(set.id, set.name, _Rename.set),
-                          label: 'Delete set',
-                          ask: () => confirmDelete(
-                            context,
-                            title: 'Delete ${set.name}?',
-                            body: switch (set.songIds.length) {
-                              0 => null,
-                              1 => 'Its 1 song stays in your library.',
-                              final n => 'Its $n songs stay in your library.',
-                            },
+                      : ExitShift(
+                          index: i,
+                          child: SwipeRow(
+                            key: ValueKey('set-${set.id}-$_generation'),
+                            index: i,
+                            enabled: _renaming == null,
+                            onHold: () =>
+                                _startRename(set.id, set.name, _Rename.set),
+                            label: 'Delete set',
+                            actionLabel: 'Delete set',
+                            ask: () => confirmDelete(
+                              context,
+                              title: 'Delete ${set.name}?',
+                              body: switch (set.songIds.length) {
+                                0 => null,
+                                1 => 'Its 1 song stays in your library.',
+                                final n => 'Its $n songs stay in your library.',
+                              },
+                            ),
+                            onSwiped: () => _deleteSet(set),
+                            child: _setRow(
+                              colors,
+                              set,
+                              loaded: set.id == loaded,
+                            ),
                           ),
-                          onSwiped: () => _deleteSet(set),
-                          child: _setRow(colors, set, loaded: set.id == loaded),
                         ),
               ],
             ),
@@ -567,6 +584,8 @@ class _QuickPickState extends State<QuickPick>
         itemCount: songs.length,
         onReorderStart: (i) {
           _dragFrom = i;
+          // No swiping while a row is being dragged.
+          setState(() => _reordering = true);
           Haptics.medium();
         },
         // The new order applies the moment the finger lifts (see _drop);
@@ -594,18 +613,24 @@ class _QuickPickState extends State<QuickPick>
           return HoldToReorder(
             key: ValueKey('entry-${songs[i].id}-$i-$_generation'),
             index: i,
-            child: SettleIn(
-              fromTop: settle?.fromTop,
-              child: SwipeRow(
-                label: 'Remove',
-                onSwiped: () => _removeSong(setlist, i, songs[i]),
-                hint: i == _hintRow ? _hint : null,
-                child: _entryRow(
-                  colors,
-                  setlist,
-                  songs[i],
-                  i,
-                  current: i == current,
+            child: ExitShift(
+              index: i,
+              child: SettleIn(
+                fromTop: settle?.fromTop,
+                child: SwipeRow(
+                  index: i,
+                  enabled: !_reordering,
+                  label: 'Remove',
+                  actionLabel: 'Remove from set',
+                  onSwiped: () => _removeSong(setlist, i, songs[i]),
+                  hint: i == _hintRow ? _hint : null,
+                  child: _entryRow(
+                    colors,
+                    setlist,
+                    songs[i],
+                    i,
+                    current: i == current,
+                  ),
                 ),
               ),
             ),
@@ -630,6 +655,7 @@ class _QuickPickState extends State<QuickPick>
   void _drop(Setlist setlist, int insert) {
     final from = _dragFrom;
     _dragFrom = null;
+    _reordering = false;
     if (from == null) return;
     final to = insert > from ? insert - 1 : insert;
     final proxy = _proxyKey.currentContext?.findRenderObject() as RenderBox?;
@@ -1152,10 +1178,13 @@ class _Panel extends StatelessWidget {
         // The lists' scroll slop: past it, vertical movement scrolls and a
         // pending long-press is off.
         Flexible(
-          child: MediaQuery(
-            data: MediaQuery.of(context)
-                .copyWith(gestureSettings: RowGestures.listSettings),
-            child: list,
+          // Where committed rows slide off and the gap closes.
+          child: RowExitHost(
+            child: MediaQuery(
+              data: MediaQuery.of(context)
+                  .copyWith(gestureSettings: RowGestures.listSettings),
+              child: list,
+            ),
           ),
         ),
         ?bar,
