@@ -462,4 +462,112 @@ void main() {
       expect(inPanel('Delete song'), findsNothing, reason: 'never again');
     });
   });
+
+  group('long-press vs swipe', () {
+    Future<void> openSets(WidgetTester tester) async {
+      await openPanel(tester);
+      await tester.tap(find.byKey(QuickPick.changeSetKey));
+      await tester.pumpAndSettle();
+    }
+
+    Finder setRow(String name) => find.byKey(
+      ValueKey(
+        'quick-set-${library.setlists.firstWhere((l) => l.name == name).id}',
+      ),
+    );
+
+    const hold = Duration(milliseconds: 450);
+
+    testWidgets('under 32dp the row stays put and the long-press still fires', (
+      tester,
+    ) async {
+      await pump(tester);
+      await openSets(tester);
+      final start = tester.getTopLeft(setRow('Saturday set'));
+      final gesture = await tester.startGesture(
+        tester.getCenter(setRow('Saturday set')),
+      );
+      await gesture.moveBy(const Offset(28, 0));
+      await tester.pump();
+      expect(tester.getTopLeft(setRow('Saturday set')), start);
+      await tester.pump(hold);
+      expect(find.byKey(QuickPick.renameFieldKey), findsOneWidget);
+      // Swiping is off for this touch now.
+      await gesture.moveBy(const Offset(-250, 0));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(find.byKey(deleteConfirmKey), findsNothing);
+      expect(library.setlists, hasLength(2));
+    });
+
+    testWidgets('once a swipe starts, long-press is off', (tester) async {
+      await pump(tester);
+      await openSets(tester);
+      final gesture = await tester.startGesture(
+        tester.getCenter(setRow('Saturday set')),
+      );
+      await gesture.moveBy(const Offset(-40, 0));
+      await tester.pump();
+      expect(
+        tester.getTopLeft(setRow('Saturday set')).dx,
+        lessThan(tester.getTopLeft(setRow('Friday set')).dx),
+        reason: 'swiping',
+      );
+      await tester.pump(hold);
+      expect(find.byKey(QuickPick.renameFieldKey), findsNothing);
+      await gesture.moveBy(const Offset(40, 0));
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('mostly-vertical movement never swipes', (tester) async {
+      await pump(tester);
+      await openSets(tester);
+      final start = tester.getTopLeft(setRow('Saturday set'));
+      final gesture = await tester.startGesture(
+        tester.getCenter(setRow('Saturday set')),
+      );
+      await gesture.moveBy(const Offset(-40, 25)); // |dx| < 2 × |dy|
+      await tester.pump();
+      expect(tester.getTopLeft(setRow('Saturday set')).dx, start.dx);
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('vertical movement past the scroll slop scrolls and cancels '
+        'both', (tester) async {
+      await pump(tester);
+      for (var i = 0; i < 12; i++) {
+        library.addSetlist('Extra $i');
+      }
+      await openSets(tester);
+      final row = setRow('Saturday set');
+      final gesture = await tester.startGesture(tester.getCenter(row));
+      await gesture.moveBy(const Offset(0, -30));
+      await tester.pump(hold);
+      expect(find.byKey(QuickPick.renameFieldKey), findsNothing);
+      await gesture.moveBy(const Offset(-200, 0));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(find.byKey(deleteConfirmKey), findsNothing);
+      expect(library.setlists, hasLength(14));
+    });
+
+    testWidgets('a set\'s songs: a slightly moving long-press still lifts the '
+        'row', (tester) async {
+      await pump(tester);
+      await openPanel(tester);
+      final gesture = await tester.startGesture(tester.getCenter(row(2)));
+      await gesture.moveBy(const Offset(20, 4));
+      await tester.pump(hold);
+      expect(haptics, ['HapticFeedbackType.mediumImpact'], reason: 'lifted');
+      for (var i = 0; i < 10; i++) {
+        await gesture.moveBy(const Offset(0, -12));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(friday(), ['Three', 'One', 'Two'], reason: 'moved, not removed');
+    });
+  });
 }

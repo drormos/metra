@@ -15,6 +15,7 @@ import 'play_marker.dart';
 import 'setlist_picker.dart';
 import 'song_editor.dart';
 import 'song_library.dart';
+import 'swipe_row.dart';
 import 'theme.dart';
 
 /// Which dropdown: the Songs or Setlists mode tab, or the set's "4/12 ⌄"
@@ -389,9 +390,10 @@ class _QuickPickState extends State<QuickPick>
                           colors,
                           leading: PlayMarker(current: song.id == current),
                         )
-                      : _swipeable(
-                          colors,
+                      : SwipeRow(
                           key: ValueKey('song-${song.id}-$_generation'),
+                          onHold: () =>
+                              _startRename(song.id, song.name, _Rename.song),
                           label: 'Delete song',
                           // The loaded song springs back, no dialog.
                           allowed: song.id != current,
@@ -406,7 +408,7 @@ class _QuickPickState extends State<QuickPick>
                             },
                           ),
                           onSwiped: () => _deleteSong(song),
-                          hint: i == _hintRow && query.isEmpty,
+                          hint: i == _hintRow && query.isEmpty ? _hint : null,
                           child: _songRow(
                             colors,
                             song,
@@ -505,9 +507,10 @@ class _QuickPickState extends State<QuickPick>
                           colors,
                           leading: SetlistIcon(size: 16, color: colors.muted),
                         )
-                      : _swipeable(
-                          colors,
+                      : SwipeRow(
                           key: ValueKey('set-${set.id}-$_generation'),
+                          onHold: () =>
+                              _startRename(set.id, set.name, _Rename.set),
                           label: 'Delete set',
                           // The loaded set springs back, no dialog.
                           allowed: set.id != loaded,
@@ -553,6 +556,8 @@ class _QuickPickState extends State<QuickPick>
         scrollController: _scroll,
         padding: EdgeInsets.zero,
         itemCount: songs.length,
+        // Lifted by [HoldToReorder]: the same long-press as every list.
+        buildDefaultDragHandles: false,
         onReorderStart: (_) => Haptics.medium(),
         onReorderItem: (from, to) {
           _library.reorderSetlist(setlist.id, from, to);
@@ -569,14 +574,22 @@ class _QuickPickState extends State<QuickPick>
             lifted: true,
           ),
         ),
-        itemBuilder: (context, i) => _swipeable(
-          colors,
+        itemBuilder: (context, i) => HoldToReorder(
           key: ValueKey('entry-${songs[i].id}-$i-$_generation'),
-          label: 'Remove',
-          allowed: i != current,
-          onSwiped: () => _removeSong(setlist, i, songs[i]),
-          hint: i == _hintRow,
-          child: _entryRow(colors, setlist, songs[i], i, current: i == current),
+          index: i,
+          child: SwipeRow(
+            label: 'Remove',
+            allowed: i != current,
+            onSwiped: () => _removeSong(setlist, i, songs[i]),
+            hint: i == _hintRow ? _hint : null,
+            child: _entryRow(
+              colors,
+              setlist,
+              songs[i],
+              i,
+              current: i == current,
+            ),
+          ),
         ),
       ),
       bar: _undoBar(colors),
@@ -750,66 +763,8 @@ class _QuickPickState extends State<QuickPick>
     ),
   );
 
-  /// Swipe left or right past 40% = [onSwiped] (light haptic); a red
-  /// [label] shows behind. Not [allowed]: springs back. With [ask] (a
-  /// delete), the row stays open while it asks; no = it slides back. With
-  /// [hint], the row slides out ~56px and back once (the one-time hint).
-  Widget _swipeable(
-    MetraColors colors, {
-    required Key key,
-    required String label,
-    required bool allowed,
-    required VoidCallback onSwiped,
-    required Widget child,
-    Future<bool> Function()? ask,
-    bool hint = false,
-  }) {
-    Widget behind(Alignment alignment) => Container(
-      color: colors.accentResting,
-      alignment: alignment,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: colors.text,
-        ),
-      ),
-    );
-    final row = hint
-        ? Stack(
-            children: [
-              Positioned.fill(child: behind(Alignment.centerRight)),
-              AnimatedBuilder(
-                animation: _hint,
-                builder: (context, child) => Transform.translate(
-                  offset: Offset(-56 * sin(pi * _hint.value), 0),
-                  child: child,
-                ),
-                child: child,
-              ),
-            ],
-          )
-        : child;
-    return Dismissible(
-      key: key,
-      direction: DismissDirection.horizontal,
-      dismissThresholds: const {
-        DismissDirection.startToEnd: 0.4,
-        DismissDirection.endToStart: 0.4,
-      },
-      confirmDismiss: (_) async => allowed && (ask == null || await ask()),
-      background: behind(Alignment.centerLeft),
-      secondaryBackground: behind(Alignment.centerRight),
-      onDismissed: (_) => onSwiped(),
-      child: row,
-    );
-  }
-
   void _removeSong(Setlist setlist, int i, Song song) {
     if (!_library.removeSongAt(setlist.id, i)) return;
-    Haptics.tick();
     setState(() => _generation++);
     _showUndo(
       'Removed from ${setlist.name}',
@@ -820,7 +775,6 @@ class _QuickPickState extends State<QuickPick>
   void _deleteSet(Setlist setlist) {
     final deleted = _library.deleteSetlistAt(setlist.id);
     if (deleted == null) return;
-    Haptics.tick();
     setState(() => _generation++);
     _showUndo(
       'Deleted set "${setlist.name}"',
@@ -831,7 +785,6 @@ class _QuickPickState extends State<QuickPick>
   void _deleteSong(Song song) {
     final deleted = _library.deleteSongForUndo(song.id);
     if (deleted == null) return;
-    Haptics.tick();
     setState(() => _generation++);
     _showUndo('Deleted "${song.name}"', () => _library.restoreSong(deleted));
   }
@@ -986,7 +939,7 @@ class _QuickPickState extends State<QuickPick>
     );
   }
 
-  /// Tap = play; long-press = rename in place.
+  /// Tap = play (long-press renames: see its [SwipeRow]).
   Widget _songRow(
     MetraColors colors,
     Song song, {
@@ -998,7 +951,6 @@ class _QuickPickState extends State<QuickPick>
     key: key,
     selected: current,
     onTap: onTap,
-    onLongPress: () => _startRename(song.id, song.name, _Rename.song),
     children: [
       SizedBox(width: 16, child: PlayMarker(current: current)),
       const SizedBox(width: 12),
@@ -1034,7 +986,7 @@ class _QuickPickState extends State<QuickPick>
     ],
   );
 
-  /// Tap = load at song 1; long-press = rename it here. The loaded set is
+  /// Tap = load at song 1 (long-press renames: see its [SwipeRow]). The loaded set is
   /// marked like the current song.
   Widget _setRow(MetraColors colors, Setlist setlist, {required bool loaded}) =>
       _row(
@@ -1043,7 +995,6 @@ class _QuickPickState extends State<QuickPick>
         selected: loaded,
         onTap: () =>
             _choose(() => _library.loadSetlist(setlist.id, widget.metronome)),
-        onLongPress: () => _startRename(setlist.id, setlist.name, _Rename.set),
         children: [
           loaded
               ? const SizedBox(width: 16, child: PlayMarker(current: true))
@@ -1072,8 +1023,8 @@ class _QuickPickState extends State<QuickPick>
     required Key key,
     required bool selected,
     required VoidCallback onTap,
-    required VoidCallback onLongPress,
     required List<Widget> children,
+    VoidCallback? onLongPress,
   }) => Material(
     color: selected ? colors.selectedRow : colors.sheet,
     child: InkWell(
