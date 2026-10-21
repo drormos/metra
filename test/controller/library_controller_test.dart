@@ -178,7 +178,7 @@ void main() {
       expect(library.songById(a.id)!.pattern, waltz);
     });
 
-    test('reorder and remove setlist entries', () {
+    test('reorder and remove setlist entries; saved at once', () async {
       final a = library.addSong(name: 'A', bpm: 100, pattern: waltz);
       final b = library.addSong(name: 'B', bpm: 110, pattern: waltz);
       final c = library.addSong(name: 'C', bpm: 120, pattern: waltz);
@@ -188,6 +188,7 @@ void main() {
       }
       library.reorderSetlist(gig.id, 0, 2); // A to the end
       expect(library.setlists.single.songIds, [b.id, c.id, a.id]);
+      expect((await reload()).setlists.single.songIds, [b.id, c.id, a.id]);
       library.reorderSetlist(gig.id, 2, 0); // A back to the front
       expect(library.setlists.single.songIds, [a.id, b.id, c.id]);
       library.removeFromSetlist(gig.id, 1);
