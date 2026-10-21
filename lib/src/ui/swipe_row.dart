@@ -7,7 +7,8 @@ import 'haptics.dart';
 import 'theme.dart';
 
 /// Long-press vs swipe in every list (ui-spec.md "Long-press vs swipe (all
-/// lists)"), in one place.
+/// lists)", "Never wait for an animation"): every timing and threshold, in
+/// one place.
 abstract final class RowGestures {
   /// A swipe starts only after this much horizontal movement; below it,
   /// the row doesn't move and a pending long-press survives.
@@ -16,8 +17,23 @@ abstract final class RowGestures {
   /// ...and only when mostly sideways: |dx| ≥ this × |dy|.
   static const swipeRatio = 2.0;
 
-  /// How long a finger rests for a long-press (rename, or lift to reorder).
-  static const longPress = Duration(milliseconds: 400);
+  /// How long a finger rests to lift a set's song for reordering.
+  static const liftPress = Duration(milliseconds: 250);
+
+  /// How long a finger rests to rename (Songs list, sets view): longer,
+  /// since an accidental one opens the keyboard.
+  static const renamePress = Duration(milliseconds: 400);
+
+  /// Vertical movement past this before a long-press fires is a scroll
+  /// (the lists' scroll slop; Android's normal touch slop).
+  static const scrollSlop = 8.0;
+
+  /// A dropped row settling into its slot; a swipe springing back.
+  static const settle = Duration(milliseconds: 150);
+  static const springBack = Duration(milliseconds: 200);
+
+  /// A new touch finishes a running animation this fast, then is handled.
+  static const catchUp = Duration(milliseconds: 80);
 
   /// Released past this share of the row's width, a swipe acts; earlier,
   /// the row springs back.
@@ -29,6 +45,108 @@ abstract final class RowGestures {
   /// The long-press tolerance for the reorder lift too (see
   /// [HoldToReorder]).
   static const settings = DeviceGestureSettings(touchSlop: swipeStart);
+
+  /// The lists' own scroll slop.
+  static const listSettings = DeviceGestureSettings(touchSlop: scrollSlop);
+}
+
+/// Running row animations that a new touch hurries along: each registers a
+/// catch-up while it runs ([RowGestures.catchUp]). A list calls [now] on
+/// every pointer down, so no animation ever holds up a touch.
+class CatchUp {
+  final _running = <Object, VoidCallback>{};
+
+  void add(Object owner, VoidCallback hurry) => _running[owner] = hurry;
+  void remove(Object owner) => _running.remove(owner);
+
+  void now() {
+    for (final hurry in [..._running.values]) {
+      hurry();
+    }
+  }
+}
+
+/// Makes a [CatchUp] available to the rows below, and calls it on every
+/// touch that lands in [child].
+class CatchUpScope extends InheritedWidget {
+  CatchUpScope({super.key, required this.catchUp, required Widget child})
+    : super(
+        child: Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: (_) => catchUp.now(),
+          child: child,
+        ),
+      );
+
+  final CatchUp catchUp;
+
+  static CatchUp? of(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<CatchUpScope>()?.catchUp;
+
+  @override
+  bool updateShouldNotify(CatchUpScope old) => old.catchUp != catchUp;
+}
+
+/// A dropped row settling into its slot: from the global top it was let go
+/// at ([fromTop]) to where it now sits, in [RowGestures.settle]. The order
+/// changed already; this only shows it.
+class SettleIn extends StatefulWidget {
+  const SettleIn({super.key, this.fromTop, required this.child});
+
+  final double? fromTop;
+  final Widget child;
+
+  @override
+  State<SettleIn> createState() => _SettleInState();
+}
+
+class _SettleInState extends State<SettleIn>
+    with SingleTickerProviderStateMixin {
+  late final _settle = AnimationController(
+    vsync: this,
+    duration: RowGestures.settle,
+    value: 1,
+  );
+  double _from = 0;
+  CatchUp? _catchUp;
+
+  @override
+  void initState() {
+    super.initState();
+    final fromTop = widget.fromTop;
+    if (fromTop == null) return;
+    _settle.value = 0;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final box = context.findRenderObject() as RenderBox?;
+      if (!mounted || box == null || !box.attached) return;
+      setState(() => _from = fromTop - box.localToGlobal(Offset.zero).dy);
+      final catchUp = _catchUp = CatchUpScope.of(context);
+      catchUp?.add(
+        this,
+        () => _settle.animateTo(1, duration: RowGestures.catchUp),
+      );
+      _settle
+          .animateTo(1, curve: Curves.easeOut)
+          .whenCompleteOrCancel(() => catchUp?.remove(this));
+    });
+  }
+
+  @override
+  void dispose() {
+    _catchUp?.remove(this);
+    _settle.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _settle,
+    builder: (context, child) => Transform.translate(
+      offset: Offset(0, _from * (1 - _settle.value)),
+      child: child,
+    ),
+    child: widget.child,
+  );
 }
 
 /// A horizontal drag that accepts only past [RowGestures.swipeStart] of
@@ -64,13 +182,13 @@ class SwipeGestureRecognizer extends HorizontalDragGestureRecognizer {
       _moved.dx.abs() >= RowGestures.swipeRatio * _moved.dy.abs();
 }
 
-/// A long-press after [RowGestures.longPress] that movement under
+/// A long-press (rename) after [RowGestures.renamePress] that movement under
 /// [RowGestures.swipeStart] doesn't cancel. Once it fires it owns the
 /// touch (no swipe, no tap); lifting earlier leaves the tap to the row.
 class HoldGestureRecognizer extends PrimaryPointerGestureRecognizer {
   HoldGestureRecognizer({super.debugOwner})
     : super(
-        deadline: RowGestures.longPress,
+        deadline: RowGestures.renamePress,
         preAcceptSlopTolerance: RowGestures.swipeStart,
         postAcceptSlopTolerance: null,
       );
@@ -97,8 +215,9 @@ class HoldGestureRecognizer extends PrimaryPointerGestureRecognizer {
   String get debugDescription => 'hold';
 }
 
-/// The reorder lift for a set's songs: the list's long-press drag, with
-/// the same [RowGestures.longPress] and 32dp tolerance as everything else.
+/// The reorder lift for a set's songs: the list's long-press drag after
+/// [RowGestures.liftPress], tolerating 32dp sideways like everything else
+/// (vertical movement past the scroll slop goes to the list's scroll).
 class HoldToReorder extends ReorderableDelayedDragStartListener {
   const HoldToReorder({super.key, required super.index, required super.child});
 
@@ -106,7 +225,7 @@ class HoldToReorder extends ReorderableDelayedDragStartListener {
   MultiDragGestureRecognizer createRecognizer() =>
       DelayedMultiDragGestureRecognizer(
         debugOwner: this,
-        delay: RowGestures.longPress,
+        delay: RowGestures.liftPress,
       );
 
   // The list hands the recognizer the gesture settings found above the
@@ -157,17 +276,27 @@ class _SwipeRowState extends State<SwipeRow>
   // it doesn't jump when the swipe starts.
   double _skip = 0;
 
+  // Held, since the scope can't be looked up while disposing.
+  CatchUp? _catchUp;
+
   @override
   void dispose() {
+    _catchUp?.remove(this);
     _offset.dispose();
     super.dispose();
   }
 
-  void _back() => _offset.animateTo(
-    0,
-    duration: const Duration(milliseconds: 200),
-    curve: Curves.easeOut,
-  );
+  /// Springs back; a new touch anywhere in the list finishes it quickly.
+  void _back() {
+    final catchUp = _catchUp = CatchUpScope.of(context);
+    catchUp?.add(
+      this,
+      () => _offset.animateTo(0, duration: RowGestures.catchUp),
+    );
+    _offset
+        .animateTo(0, duration: RowGestures.springBack, curve: Curves.easeOut)
+        .whenCompleteOrCancel(() => catchUp?.remove(this));
+  }
 
   Future<void> _end() async {
     final past = _offset.value.abs() > RowGestures.swipeCommit * _width;
@@ -180,11 +309,8 @@ class _SwipeRowState extends State<SwipeRow>
       return;
     }
     if (!mounted) return;
-    await _offset.animateTo(
-      _offset.value.sign * _width,
-      duration: const Duration(milliseconds: 150),
-    );
-    if (!mounted) return;
+    // The change happens now; the row leaves the list at once rather than
+    // finishing a slide that would hold up the next touch.
     Haptics.tick();
     widget.onSwiped();
   }

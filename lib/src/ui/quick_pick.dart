@@ -212,6 +212,14 @@ class _QuickPickState extends State<QuickPick>
   static const _newSongId = '\u0000new-song';
   final _rename = TextEditingController();
 
+  // Reordering a set's songs: the list (to end its drag at release), the
+  // lifted row (where it was let go), the row's start, and the settle.
+  final _reorderKey = GlobalKey<ReorderableListState>();
+  final _proxyKey = GlobalKey();
+  int? _dragFrom;
+  ({int index, double fromTop})? _settle;
+  final _catchUp = CatchUp();
+
   // The one-time swipe hint: [_hintRow] slides out and back.
   int? _hintRow;
   late final _hint = AnimationController(
@@ -340,13 +348,17 @@ class _QuickPickState extends State<QuickPick>
       if (!didPop) _back();
     },
     // Edits here (reorder, remove, rename) change the library under it.
-    child: ListenableBuilder(
-      listenable: _library,
-      builder: (context, _) => switch (_kind) {
-        QuickPickKind.songs => _songsPanel(),
-        QuickPickKind.sets => _setsPanel(),
-        QuickPickKind.set => _setPanel(),
-      },
+    // Every touch hurries running row animations along (never wait).
+    child: CatchUpScope(
+      catchUp: _catchUp,
+      child: ListenableBuilder(
+        listenable: _library,
+        builder: (context, _) => switch (_kind) {
+          QuickPickKind.songs => _songsPanel(),
+          QuickPickKind.sets => _setsPanel(),
+          QuickPickKind.set => _setPanel(),
+        },
+      ),
     ),
   );
 
@@ -547,45 +559,58 @@ class _QuickPickState extends State<QuickPick>
     final current = _library.currentIndex;
     return _Panel(
       top: _setHeader(colors, setlist, songs.length, current),
-      list: ReorderableListView.builder(
+      list: ReorderableList(
+        key: _reorderKey,
         shrinkWrap: true,
-        scrollController: _scroll,
+        controller: _scroll,
         padding: EdgeInsets.zero,
         itemCount: songs.length,
-        // Lifted by [HoldToReorder]: the same long-press as every list.
-        buildDefaultDragHandles: false,
-        onReorderStart: (_) => Haptics.medium(),
-        onReorderItem: (from, to) {
-          _library.reorderSetlist(setlist.id, from, to);
-          setState(() => _generation++);
+        onReorderStart: (i) {
+          _dragFrom = i;
+          Haptics.medium();
         },
-        proxyDecorator: (_, i, animation) => _lifted(
-          animation,
-          _entryRow(
-            colors,
-            setlist,
-            songs[i],
-            i,
-            current: i == current,
-            lifted: true,
-          ),
-        ),
-        itemBuilder: (context, i) => HoldToReorder(
-          key: ValueKey('entry-${songs[i].id}-$i-$_generation'),
-          index: i,
-          child: SwipeRow(
-            label: 'Remove',
-            onSwiped: () => _removeSong(setlist, i, songs[i]),
-            hint: i == _hintRow ? _hint : null,
-            child: _entryRow(
+        // The new order applies the moment the finger lifts (see _drop);
+        // the list's own drop animation would hold the next touch.
+        onReorderEnd: (insert) => _drop(setlist, insert),
+        onReorderItem: (_, _) {},
+        proxyDecorator: (_, i, animation) => KeyedSubtree(
+          key: _proxyKey,
+          child: _lifted(
+            animation,
+            _entryRow(
               colors,
               setlist,
               songs[i],
               i,
               current: i == current,
+              lifted: true,
             ),
           ),
         ),
+        itemBuilder: (context, i) {
+          // The dropped row settles from where it was let go, once.
+          final settle = _settle?.index == i ? _settle : null;
+          if (settle != null) _settle = null;
+          return HoldToReorder(
+            key: ValueKey('entry-${songs[i].id}-$i-$_generation'),
+            index: i,
+            child: SettleIn(
+              fromTop: settle?.fromTop,
+              child: SwipeRow(
+                label: 'Remove',
+                onSwiped: () => _removeSong(setlist, i, songs[i]),
+                hint: i == _hintRow ? _hint : null,
+                child: _entryRow(
+                  colors,
+                  setlist,
+                  songs[i],
+                  i,
+                  current: i == current,
+                ),
+              ),
+            ),
+          );
+        },
       ),
       bar: _undoBar(colors),
       actions: [
@@ -597,6 +622,26 @@ class _QuickPickState extends State<QuickPick>
         ),
       ],
     );
+  }
+
+  /// The finger lifted a dragged row at list position [insert]: the new
+  /// order is saved now, the list's drag ends at once (no waiting for its
+  /// drop animation), and the row settles in from where it was let go.
+  void _drop(Setlist setlist, int insert) {
+    final from = _dragFrom;
+    _dragFrom = null;
+    if (from == null) return;
+    final to = insert > from ? insert - 1 : insert;
+    final proxy = _proxyKey.currentContext?.findRenderObject() as RenderBox?;
+    final top = proxy != null && proxy.attached
+        ? proxy.localToGlobal(Offset.zero).dy
+        : null;
+    _reorderKey.currentState?.cancelReorder();
+    if (to != from) _library.reorderSetlist(setlist.id, from, to);
+    setState(() {
+      _generation++;
+      _settle = top == null ? null : (index: to, fromTop: top);
+    });
   }
 
   /// 56px: the set name with "Song 4 of 12" under it (long-press = the
@@ -1104,7 +1149,15 @@ class _Panel extends StatelessWidget {
           top,
           Divider(height: 1, thickness: 1, color: colors.divider),
         ],
-        Flexible(child: list),
+        // The lists' scroll slop: past it, vertical movement scrolls and a
+        // pending long-press is off.
+        Flexible(
+          child: MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(gestureSettings: RowGestures.listSettings),
+            child: list,
+          ),
+        ),
         ?bar,
         Container(
           decoration: BoxDecoration(

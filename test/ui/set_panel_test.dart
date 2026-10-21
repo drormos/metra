@@ -631,4 +631,93 @@ void main() {
       expect(friday(), ['Three', 'One', 'Two'], reason: 'moved, not removed');
     });
   });
+
+  group('timings and never waiting', () {
+    testWidgets('a set\'s song lifts after 250ms; rename waits 400ms', (
+      tester,
+    ) async {
+      await pump(tester);
+      await openPanel(tester);
+      var gesture = await tester.startGesture(tester.getCenter(row(0)));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(haptics, isEmpty, reason: 'not yet');
+      await tester.pump(const Duration(milliseconds: 60));
+      expect(haptics, ['HapticFeedbackType.mediumImpact'], reason: 'lifted');
+      await gesture.up();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(QuickPick.changeSetKey));
+      await tester.pumpAndSettle();
+      final set = find.byKey(ValueKey('quick-set-${library.setlists.last.id}'));
+      gesture = await tester.startGesture(tester.getCenter(set));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.byKey(QuickPick.renameFieldKey), findsNothing);
+      await tester.pump(const Duration(milliseconds: 120));
+      expect(find.byKey(QuickPick.renameFieldKey), findsOneWidget);
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('vertical movement before the lift scrolls instead', (
+      tester,
+    ) async {
+      await pump(tester);
+      final set = library.activeSetlist!;
+      library.updateSetlist(
+        set.copyWith(songIds: [for (var i = 0; i < 4; i++) ...set.songIds]),
+      );
+      await openPanel(tester);
+      final before = tester.getTopLeft(row(0)).dy;
+      final gesture = await tester.startGesture(tester.getCenter(row(3)));
+      await gesture.moveBy(const Offset(0, -12)); // past the 8dp slop
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(haptics, isEmpty, reason: 'no lift');
+      for (var i = 0; i < 5; i++) {
+        await gesture.moveBy(const Offset(0, -20));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await gesture.up();
+      await tester.pumpAndSettle();
+      final first = row(0);
+      expect(
+        first.evaluate().isEmpty || tester.getTopLeft(first).dy < before,
+        isTrue,
+        reason: 'scrolled',
+      );
+    });
+
+    testWidgets('a drop applies at once; the next swipe needs no wait', (
+      tester,
+    ) async {
+      await pump(tester);
+      await openPanel(tester);
+      final gesture = await tester.startGesture(tester.getCenter(row(0)));
+      await tester.pump(const Duration(milliseconds: 300));
+      for (var i = 0; i < 10; i++) {
+        await gesture.moveBy(const Offset(0, 12));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await gesture.up();
+      await tester.pump(); // one frame
+      expect(friday(), ['Two', 'Three', 'One'], reason: 'saved at release');
+      // Right away, mid-settle: a swipe on another row works.
+      await tester.drag(row(1), const Offset(-250, 0));
+      await tester.pump();
+      expect(friday(), ['Two', 'One']);
+    });
+
+    testWidgets('a new touch finishes a spring-back in ~80ms', (tester) async {
+      await pump(tester);
+      await openPanel(tester);
+      final x = tester.getTopLeft(row(0)).dx;
+      await tester.drag(row(0), const Offset(-80, 0)); // short: springs back
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(tester.getTopLeft(row(0)).dx, lessThan(x), reason: 'moving');
+      final touch = await tester.startGesture(tester.getCenter(row(2)));
+      await tester.pump(); // the catch-up starts on this frame
+      await tester.pump(const Duration(milliseconds: 85));
+      expect(tester.getTopLeft(row(0)).dx, x, reason: 'caught up');
+      await touch.up();
+      await tester.pumpAndSettle();
+    });
+  });
 }
