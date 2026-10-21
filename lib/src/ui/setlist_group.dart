@@ -6,6 +6,7 @@ import '../model/library.dart';
 import 'fit_text.dart';
 import 'haptics.dart';
 import 'icons.dart';
+import 'library_pick.dart';
 import 'quick_pick.dart';
 import 'save_as_new_dialog.dart';
 import 'setlist_picker.dart';
@@ -50,6 +51,7 @@ class SetlistGroup extends StatelessWidget {
   static const newSongKey = Key('new-song');
   static const firstSongKey = Key('first-song');
   static const firstSetlistKey = Key('first-setlist');
+  static const emptySetKey = Key('empty-set-add-songs');
   static const songsTabKey = Key('tab-songs');
   static const freePlayTabKey = Key('tab-free-play');
   static const setlistsTabKey = Key('tab-setlists');
@@ -76,6 +78,16 @@ class SetlistGroup extends StatelessWidget {
           child: SizedBox(
             height: rowHeight,
             child: switch (tab) {
+              ModeTab.setlists
+                  when setlist != null && library.visibleSongs.isEmpty =>
+                _emptyRow(
+                  context,
+                  key: emptySetKey,
+                  message: 'No songs in this set',
+                  action: 'Add songs',
+                  onPressed: () =>
+                      addSongsToSet(context, library, metronome, setlist.id),
+                ),
               ModeTab.setlists when setlist != null => _setRow(
                 context,
                 setlist,

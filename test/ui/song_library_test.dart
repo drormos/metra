@@ -209,7 +209,7 @@ void main() {
     await pumpLibrary(tester);
     final delta = library.songs.firstWhere((s) => s.name == 'Delta');
     library.playSingleSong(delta, metronome);
-    metronome.setBpm(133); // an unsaved change, kept as Free play
+    metronome.setBpm(133); // an unsaved change, discarded
     await tester.tap(find.byKey(SongLibrary.deleteSongsKey));
     await tester.pump();
     expect(find.byType(MarkCircle), findsNWidgets(4));
@@ -231,8 +231,13 @@ void main() {
     expect(library.setlists.firstWhere((l) => l.name == 'Gig').songIds, [
       library.songs.firstWhere((s) => s.name == 'alpha').id,
     ]);
-    expect(library.currentSong, isNull, reason: 'Free play');
-    expect(metronome.bpm, 133, reason: 'the click is unchanged');
+    // Delta was loaded and last A–Z; Charlie went too: Bravo takes over.
+    expect(library.currentSong?.name, 'Bravo');
+    expect(library.singleSong, isTrue, reason: 'never Free play');
+    expect(
+      metronome.bpm,
+      library.songs.firstWhere((s) => s.name == 'Bravo').bpm,
+    );
     expect(find.byKey(SongLibrary.deleteSongsKey), findsOneWidget);
   });
 
@@ -255,7 +260,7 @@ void main() {
 
   testWidgets('an empty library offers New song in the middle', (tester) async {
     await pumpLibrary(tester);
-    library.deleteSongs({for (final s in library.songs) s.id});
+    library.deleteSongs({for (final s in library.songs) s.id}, metronome);
     await tester.pump();
     expect(find.text('No songs yet'), findsOneWidget);
     expect(find.byKey(SongLibrary.deleteSongsKey), findsNothing);

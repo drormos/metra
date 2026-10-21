@@ -395,8 +395,6 @@ class _QuickPickState extends State<QuickPick>
                           onHold: () =>
                               _startRename(song.id, song.name, _Rename.song),
                           label: 'Delete song',
-                          // The loaded song springs back, no dialog.
-                          allowed: song.id != current,
                           ask: () => confirmDelete(
                             context,
                             title: 'Delete ${song.name}?',
@@ -512,8 +510,6 @@ class _QuickPickState extends State<QuickPick>
                           onHold: () =>
                               _startRename(set.id, set.name, _Rename.set),
                           label: 'Delete set',
-                          // The loaded set springs back, no dialog.
-                          allowed: set.id != loaded,
                           ask: () => confirmDelete(
                             context,
                             title: 'Delete ${set.name}?',
@@ -579,7 +575,6 @@ class _QuickPickState extends State<QuickPick>
           index: i,
           child: SwipeRow(
             label: 'Remove',
-            allowed: i != current,
             onSwiped: () => _removeSong(setlist, i, songs[i]),
             hint: i == _hintRow ? _hint : null,
             child: _entryRow(
@@ -764,29 +759,40 @@ class _QuickPickState extends State<QuickPick>
   );
 
   void _removeSong(Setlist setlist, int i, Song song) {
-    if (!_library.removeSongAt(setlist.id, i)) return;
+    final wasCurrent =
+        setlist.id == _library.activeSetlist?.id && i == _library.currentIndex;
+    _library.removeSongAt(setlist.id, i, widget.metronome);
     setState(() => _generation++);
     _showUndo(
       'Removed from ${setlist.name}',
-      () => _library.insertSongAt(setlist.id, i, song.id),
+      () => _library.insertSongAt(
+        setlist.id,
+        i,
+        song.id,
+        widget.metronome,
+        wasCurrent: wasCurrent,
+      ),
     );
   }
 
   void _deleteSet(Setlist setlist) {
-    final deleted = _library.deleteSetlistAt(setlist.id);
+    final deleted = _library.deleteSetlistAt(setlist.id, widget.metronome);
     if (deleted == null) return;
     setState(() => _generation++);
     _showUndo(
       'Deleted set "${setlist.name}"',
-      () => _library.restoreSetlist(deleted.setlist, deleted.index),
+      () => _library.restoreSetlist(deleted, widget.metronome),
     );
   }
 
   void _deleteSong(Song song) {
-    final deleted = _library.deleteSongForUndo(song.id);
+    final deleted = _library.deleteSongForUndo(song.id, widget.metronome);
     if (deleted == null) return;
     setState(() => _generation++);
-    _showUndo('Deleted "${song.name}"', () => _library.restoreSong(deleted));
+    _showUndo(
+      'Deleted "${song.name}"',
+      () => _library.restoreSong(deleted, widget.metronome),
+    );
   }
 
   /// A row's name becomes a field, selected, keyboard up.
@@ -850,23 +856,8 @@ class _QuickPickState extends State<QuickPick>
       _startRename(_newSongId, _library.newSongName(), _Rename.newSong);
 
   /// The library in pick mode for the set; back here after.
-  Future<void> _addSongsTo(String id) async {
-    final list = _library.setlists.where((s) => s.id == id).firstOrNull;
-    if (list == null) return;
-    final ids = await pickSongs(
-      context,
-      _library,
-      setName: list.name,
-      inSet: list.songIds.toSet(),
-      newSong: (context) async =>
-          (await openSongEditor(context, _library, widget.metronome))?.id,
-    );
-    final latest = _library.setlists.where((s) => s.id == id).firstOrNull;
-    if (ids == null || ids.isEmpty || latest == null) return;
-    _library.updateSetlist(
-      latest.copyWith(songIds: [...latest.songIds, ...ids]),
-    );
-  }
+  Future<void> _addSongsTo(String id) =>
+      addSongsToSet(context, _library, widget.metronome, id);
 
   /// The row being renamed: a field with the name selected, and "Done".
   Widget _renameRow(MetraColors colors, {required Widget leading}) => Container(

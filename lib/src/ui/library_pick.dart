@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'song_editor.dart';
+
+import '../controller/metronome_controller.dart';
+
 import '../controller/library_controller.dart';
 import '../model/library.dart';
 import 'editor_scaffold.dart';
@@ -25,6 +29,29 @@ Future<List<String>?> pickSongs(
     ),
   ),
 );
+
+/// The library in pick mode for set [setId] (the set panel, an empty set's
+/// context row); the picked songs go to the end of the set.
+Future<void> addSongsToSet(
+  BuildContext context,
+  LibraryController library,
+  MetronomeController metronome,
+  String setId,
+) async {
+  final list = library.setlists.where((s) => s.id == setId).firstOrNull;
+  if (list == null) return;
+  final ids = await pickSongs(
+    context,
+    library,
+    setName: list.name,
+    inSet: list.songIds.toSet(),
+    newSong: (context) async =>
+        (await openSongEditor(context, library, metronome))?.id,
+  );
+  final latest = library.setlists.where((s) => s.id == setId).firstOrNull;
+  if (ids == null || ids.isEmpty || latest == null) return;
+  library.updateSetlist(latest.copyWith(songIds: [...latest.songIds, ...ids]));
+}
 
 class LibraryPick extends StatefulWidget {
   const LibraryPick({

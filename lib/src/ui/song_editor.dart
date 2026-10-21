@@ -160,7 +160,7 @@ class _SongEditorState extends State<SongEditor> {
       'Delete',
     );
     if (!ok || !mounted) return;
-    _library.deleteSong(song.id);
+    _library.deleteSong(song.id, widget.metronome);
     Navigator.pop(context);
   }
 

@@ -120,15 +120,14 @@ class HoldToReorder extends ReorderableDelayedDragStartListener {
 }
 
 /// A list row that swipes either way to act ([onSwiped], light haptic),
-/// with a red [label] behind it. Not [allowed]: it follows the finger, then
-/// springs back. With [ask] (a delete), the row stays open while it asks;
+/// with a red [label] behind it. With [ask] (a delete), the row stays open
+/// while it asks;
 /// no = it slides back. [onHold] is the row's long-press. [hint] drives
 /// the one-time hint (0 → 1: out and back).
 class SwipeRow extends StatefulWidget {
   const SwipeRow({
     super.key,
     required this.label,
-    required this.allowed,
     required this.onSwiped,
     required this.child,
     this.ask,
@@ -137,7 +136,6 @@ class SwipeRow extends StatefulWidget {
   });
 
   final String label;
-  final bool allowed;
   final VoidCallback onSwiped;
   final Future<bool> Function()? ask;
   final VoidCallback? onHold;
@@ -173,7 +171,7 @@ class _SwipeRowState extends State<SwipeRow>
 
   Future<void> _end() async {
     final past = _offset.value.abs() > RowGestures.swipeCommit * _width;
-    if (!past || !widget.allowed) return _back();
+    if (!past) return _back();
     _busy = true;
     final ask = widget.ask;
     if (ask != null && !await ask()) {

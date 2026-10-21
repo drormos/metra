@@ -126,7 +126,7 @@ class _SongLibraryState extends State<SongLibrary> {
       'Delete',
     );
     if (!ok || !mounted) return;
-    _library.deleteSongs(ids);
+    _library.deleteSongs(ids, widget.metronome);
     setState(_endMarking);
   }
 

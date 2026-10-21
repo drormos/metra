@@ -50,7 +50,9 @@ void main() {
     expect(loaded.songs.map((s) => '${s.name}:${s.bpm}'), ['A:104', 'B:140']);
     expect(loaded.songById(a.id)?.pattern, waltz);
 
-    library.deleteSong(a.id);
+    final metronome = MetronomeController(FakeClickOutput());
+    addTearDown(metronome.dispose);
+    library.deleteSong(a.id, metronome);
     loaded = await reload();
     expect(loaded.songs.map((s) => s.name), ['B']);
   });
@@ -76,7 +78,9 @@ void main() {
     final b = library.addSong(name: 'B', bpm: 110, pattern: waltz);
     final gig = library.addSetlist('Gig');
     library.updateSetlist(gig.copyWith(songIds: [a.id, b.id, a.id]));
-    library.deleteSong(a.id);
+    final metronome = MetronomeController(FakeClickOutput());
+    addTearDown(metronome.dispose);
+    library.deleteSong(a.id, metronome);
     expect(library.setlists.single.songIds, [b.id]);
   });
 
@@ -439,7 +443,7 @@ void main() {
 
     test('nothing loaded, or just loaded: no changes', () {
       expect(library.songChanged(metronome), isFalse);
-      library.deleteSong(song.id);
+      library.deleteSong(song.id, metronome);
       metronome.nudge(1);
       expect(library.songChanged(metronome), isFalse, reason: 'no song');
     });
@@ -764,8 +768,8 @@ void main() {
     setUp(() {
       metronome = MetronomeController(FakeClickOutput());
       final ids = [
-        for (final n in ['A', 'B', 'C', 'D'])
-          library.addSong(name: n, bpm: 100, pattern: waltz).id,
+        for (final (i, n) in ['A', 'B', 'C', 'D'].indexed)
+          library.addSong(name: n, bpm: 100 + i, pattern: waltz).id,
       ];
       gig = library.saveSetlist(name: 'Gig', songIds: ids);
       library
@@ -777,17 +781,53 @@ void main() {
 
     test('removing before the current song shifts the position', () {
       final b = library.visibleSongs[1].id;
-      expect(library.removeSongAt(gig.id, 1), isTrue);
+      library.removeSongAt(gig.id, 1, metronome);
       expect(library.currentSong?.name, 'C');
       expect(library.currentIndex, 1);
-      library.insertSongAt(gig.id, 1, b);
+      library.insertSongAt(gig.id, 1, b, metronome);
       expect(library.currentIndex, 2, reason: 'undo restores it');
       expect(library.visibleSongs.map((s) => s.name), ['A', 'B', 'C', 'D']);
     });
 
-    test('the playing song can\'t be removed', () {
-      expect(library.removeSongAt(gig.id, 2), isFalse);
-      expect(library.visibleSongs, hasLength(4));
+    test('removing the current song: the one now in its place loads; '
+        'Undo makes it current again', () {
+      metronome.nudge(5); // an unsaved change, discarded
+      final c = library.currentSong!.id;
+      library.removeSongAt(gig.id, 2, metronome);
+      expect(library.currentSong?.name, 'D', reason: '3/4 → D as 3/3');
+      expect(library.currentIndex, 2);
+      expect(metronome.bpm, 103, reason: "D's tempo");
+      library.insertSongAt(gig.id, 2, c, metronome, wasCurrent: true);
+      expect(library.currentSong?.name, 'C');
+      expect(library.currentIndex, 2);
+      expect(library.visibleSongs.map((s) => s.name), ['A', 'B', 'C', 'D']);
+    });
+
+    test('the last song removed: the new last loads; an empty set stays '
+        'loaded with no song and the click as it is', () {
+      library.nextSong(metronome); // D, 4/4
+      library.removeSongAt(gig.id, 3, metronome);
+      expect(library.currentSong?.name, 'C', reason: 'the new last');
+      for (var i = 0; i < 3; i++) {
+        library.removeSongAt(gig.id, library.currentIndex, metronome);
+      }
+      expect(library.activeSetlist?.id, gig.id, reason: 'still setlist mode');
+      expect(library.visibleSongs, isEmpty);
+      expect(library.currentSong, isNull);
+      expect(library.tab, ModeTab.setlists);
+      expect(metronome.bpm, 100, reason: 'the click keeps A\'s tempo');
+    });
+
+    test('while playing the replacement restarts on beat 1; stopped it just '
+        'loads', () async {
+      await metronome.play();
+      library.removeSongAt(gig.id, 2, metronome);
+      expect(metronome.isPlaying, isTrue);
+      expect(metronome.bpm, 103);
+      metronome.stop();
+      library.removeSongAt(gig.id, 2, metronome); // D, the last
+      expect(metronome.isPlaying, isFalse);
+      expect(library.currentSong?.name, 'B');
     });
 
     test('rename: an empty name keeps the old one', () {
@@ -797,21 +837,78 @@ void main() {
       expect(library.activeSetlist?.name, 'Tour');
     });
 
-    test('delete: never the loaded set; Undo restores it in place; the '
-        'Setlists tab falls back', () {
+    test('deleting another set: Undo restores it in place; the Setlists '
+        'tab falls back from a deleted session set', () {
       final other = library.saveSetlist(name: 'Other', songIds: const []);
-      expect(library.deleteSetlistAt(gig.id), isNull, reason: 'loaded');
-      final deleted = library.deleteSetlistAt(other.id)!;
+      final deleted = library.deleteSetlistAt(other.id, metronome)!;
       expect(deleted.index, 1);
-      library.restoreSetlist(deleted.setlist, deleted.index);
+      expect(library.activeSetlist?.id, gig.id, reason: 'unchanged');
+      library.restoreSetlist(deleted, metronome);
       expect(library.setlists.map((l) => l.id), [gig.id, other.id]);
-      // The tab would return to Other (used last); deleted, it falls back.
       library
         ..loadSetlist(other.id, metronome)
-        ..detachSong();
-      library.deleteSetlistAt(other.id);
-      library.openSetlistsTab(metronome);
+        ..detachSong()
+        ..deleteSetlistAt(other.id, metronome)
+        ..openSetlistsTab(metronome);
       expect(library.activeSetlist?.id, gig.id);
+    });
+
+    test('deleting the loaded set: the most recently used other set loads '
+        'at song 1; Undo brings it back at the same song', () {
+      final tour = library.saveSetlist(
+        name: 'Tour',
+        songIds: [library.songs[3].id, library.songs[0].id],
+      );
+      final quiet = library.saveSetlist(name: 'Quiet', songIds: const []);
+      library
+        ..loadSetlist(tour.id, metronome)
+        ..loadSetlist(gig.id, metronome)
+        ..nextSong(metronome); // Gig at B; Tour used most recently before
+      final deleted = library.deleteSetlistAt(gig.id, metronome)!;
+      expect(library.activeSetlist?.id, tour.id);
+      expect(library.currentSong?.name, 'D', reason: 'song 1');
+      library.restoreSetlist(deleted, metronome);
+      expect(library.activeSetlist?.id, gig.id);
+      expect(library.currentSong?.name, 'B');
+      // The last set goes: setlist mode with no set, click unchanged.
+      library
+        ..deleteSetlistAt(quiet.id, metronome)
+        ..deleteSetlistAt(tour.id, metronome)
+        ..deleteSetlistAt(gig.id, metronome);
+      expect(library.setlists, isEmpty);
+      expect(library.tab, ModeTab.setlists);
+      expect(metronome.bpm, 101, reason: "B's tempo stays");
+    });
+
+    test('deleting the loaded song in a set: it leaves the set and the next '
+        'takes over; Undo restores it everywhere, current', () {
+      final deleted = library.deleteSongForUndo(
+        library.currentSong!.id,
+        metronome,
+      )!;
+      expect(library.currentSong?.name, 'D');
+      expect(library.visibleSongs.map((s) => s.name), ['A', 'B', 'D']);
+      library.restoreSong(deleted, metronome);
+      expect(library.currentSong?.name, 'C');
+      expect(library.currentIndex, 2);
+    });
+
+    test('deleting the loaded single song: the next A–Z, else the previous; '
+        'an empty library stays in Single song', () {
+      final songs = library.songsAZ; // A B C D
+      library.playSingleSong(songs[1], metronome);
+      final deleted = library.deleteSongForUndo(songs[1].id, metronome)!;
+      expect(library.currentSong?.name, 'C', reason: 'next A–Z');
+      expect(library.singleSong, isTrue);
+      library.restoreSong(deleted, metronome);
+      expect(library.currentSong?.name, 'B', reason: 'Undo: current again');
+      library.playSingleSong(songs[3], metronome);
+      library.deleteSongForUndo(songs[3].id, metronome);
+      expect(library.currentSong?.name, 'C', reason: 'last: the previous');
+      library.deleteSongs({for (final s in library.songs) s.id}, metronome);
+      expect(library.songs, isEmpty);
+      expect(library.tab, ModeTab.songs);
+      expect(metronome.bpm, 102, reason: "C's tempo stays");
     });
 
     test('the swipe hint flag is saved', () async {

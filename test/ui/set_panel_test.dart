@@ -168,18 +168,44 @@ void main() {
       expect(find.byKey(QuickPick.undoKey), findsNothing);
     });
 
-    testWidgets('the playing song springs back; Undo goes after ~6 s', (
-      tester,
-    ) async {
+    testWidgets('removing the playing song: the next takes its place; Undo '
+        'makes it current again; Undo goes after ~6 s', (tester) async {
       await pump(tester);
       await openPanel(tester);
+      // Stopped here (playing vs stopped is in the controller tests).
       await swipe(tester, row(1), 250);
-      expect(friday(), ['One', 'Two', 'Three'], reason: 'Two is playing');
+      expect(friday(), ['One', 'Three'], reason: 'Two removed');
+      expect(library.currentSong?.name, 'Three', reason: 'now in its place');
+      expect(metronome.bpm, 120);
+      expect(inPanel('Song 2 of 2'), findsOneWidget);
+      await tester.tap(find.byKey(QuickPick.undoKey));
+      await tester.pumpAndSettle();
+      expect(friday(), ['One', 'Two', 'Three']);
+      expect(library.currentSong?.name, 'Two');
+      expect(metronome.bpm, 110);
       await swipe(tester, row(2), 250);
       expect(friday(), ['One', 'Two']);
       expect(find.byKey(QuickPick.undoKey), findsOneWidget);
       await tester.pump(QuickPick.undoFor + const Duration(seconds: 1));
       expect(find.byKey(QuickPick.undoKey), findsNothing);
+    });
+
+    testWidgets('an emptied set stays loaded: "No songs in this set" and '
+        '"+ Add songs" in the context row', (tester) async {
+      await pump(tester);
+      for (var i = 0; i < 3; i++) {
+        library.removeSongAt(
+          library.activeSetlist!.id,
+          library.currentIndex,
+          metronome,
+        );
+      }
+      await tester.pumpAndSettle();
+      expect(library.activeSetlist?.name, 'Friday set');
+      expect(find.text('No songs in this set'), findsOneWidget);
+      await tester.tap(find.byKey(SetlistGroup.emptySetKey));
+      await tester.pumpAndSettle();
+      expect(find.byType(LibraryPick), findsOneWidget);
     });
 
     testWidgets('the one-time hint: a row slides to show "Remove", once', (
@@ -222,13 +248,34 @@ void main() {
       ),
     );
 
-    testWidgets('the loaded set is marked and can\'t be deleted; another '
-        'can, with Undo in place', (tester) async {
+    testWidgets('deleting the loaded set: the other loads at song 1, the '
+        'sets view stays; Undo brings it back at the same song', (
+      tester,
+    ) async {
       await pump(tester);
       await openSets(tester);
       await swipe(tester, setRow('Friday set'), -250);
-      expect(library.setlists, hasLength(2), reason: 'loaded: springs back');
-      expect(find.byKey(deleteConfirmKey), findsNothing, reason: 'no dialog');
+      expect(find.text('Delete Friday set?'), findsOneWidget);
+      await tester.tap(find.byKey(deleteConfirmKey));
+      await tester.pumpAndSettle();
+      expect(library.activeSetlist?.name, 'Saturday set');
+      expect(library.currentSong?.name, 'Three', reason: 'song 1');
+      expect(
+        find.byKey(QuickPick.newSetlistKey),
+        findsOneWidget,
+        reason: 'the sets view stays open',
+      );
+      await tester.tap(find.byKey(QuickPick.undoKey));
+      await tester.pumpAndSettle();
+      expect(library.activeSetlist?.name, 'Friday set');
+      expect(library.currentSong?.name, 'Two');
+    });
+
+    testWidgets('another set: asks, Cancel or Delete, Undo in place', (
+      tester,
+    ) async {
+      await pump(tester);
+      await openSets(tester);
       final order = [for (final l in library.setlists) l.id];
       await swipe(tester, setRow('Saturday set'), -250);
       expect(find.text('Delete Saturday set?'), findsOneWidget);
@@ -345,9 +392,6 @@ void main() {
         'the song and its place in each set', (tester) async {
       await pump(tester);
       await openSongs(tester);
-      await swipe(tester, songRow('Two'), -250);
-      expect(find.byKey(deleteConfirmKey), findsNothing, reason: 'loaded');
-      expect(library.songs, hasLength(3));
       await swipe(tester, songRow('Three'), -250);
       expect(find.text('Delete Three?'), findsOneWidget);
       expect(
@@ -370,6 +414,23 @@ void main() {
       expect(names('Friday set'), ['One', 'Two', 'Three']);
       expect(names('Saturday set'), ['Three']);
       expect(songRow('Three'), findsOneWidget);
+    });
+
+    testWidgets('deleting the loaded song: the previous A–Z loads (it was '
+        'last); Undo makes it current again', (tester) async {
+      await pump(tester);
+      await openSongs(tester); // A–Z: One, Three, Two (loaded)
+      await swipe(tester, songRow('Two'), -250);
+      expect(find.text('Delete Two?'), findsOneWidget);
+      await tester.tap(find.byKey(deleteConfirmKey));
+      await tester.pumpAndSettle();
+      expect(library.currentSong?.name, 'Three');
+      expect(library.singleSong, isTrue, reason: 'never Free play');
+      expect(metronome.bpm, 120);
+      await tester.tap(find.byKey(QuickPick.undoKey));
+      await tester.pumpAndSettle();
+      expect(library.currentSong?.name, 'Two');
+      expect(library.singleSong, isTrue);
     });
 
     testWidgets('a song in no set: the dialog has no second line', (

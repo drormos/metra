@@ -388,25 +388,41 @@ class LibraryController extends ChangeNotifier {
   }
 
   /// The set panel's swipe-to-remove: the entry at [index] leaves the set
-  /// (never the library). The playing song can't be removed (false). In
-  /// the active set, removing an entry before the current one moves the
-  /// position back ("4/12" → "3/11"); the playing song never changes.
-  bool removeSongAt(String setlistId, int index) {
+  /// (never the library). In the active set, removing an entry before the
+  /// current one moves the position back ("4/12" → "3/11"). Removing the
+  /// current song itself hands over (ui-spec.md "Removing what's loaded"):
+  /// the song now at that position, else the new last, loads; an empty set
+  /// stays loaded with no song and the click as it is.
+  void removeSongAt(
+    String setlistId,
+    int index,
+    MetronomeController metronome,
+  ) {
     final active = setlistId == _library.activeSetlistId;
     final current = active ? currentIndex : -1;
-    if (index == current) return false;
     final list = setlists.firstWhere((s) => s.id == setlistId);
-    _updateEntries(
-      list,
-      [...list.songIds]..removeAt(index),
-      position: current > index ? current - 1 : current,
-    );
-    return true;
+    final ids = [...list.songIds]..removeAt(index);
+    if (index != current) {
+      _updateEntries(
+        list,
+        ids,
+        position: current > index ? current - 1 : current,
+      );
+      return;
+    }
+    _updateEntries(list, ids, position: -1);
+    _takeOverInSet(index, metronome);
   }
 
   /// Undo of [removeSongAt]: [songId] back at [index], the position
-  /// following it.
-  void insertSongAt(String setlistId, int index, String songId) {
+  /// following it. [wasCurrent]: it loads again (normal loading rules).
+  void insertSongAt(
+    String setlistId,
+    int index,
+    String songId,
+    MetronomeController metronome, {
+    bool wasCurrent = false,
+  }) {
     final active = setlistId == _library.activeSetlistId;
     final current = active ? currentIndex : -1;
     final list = setlists.firstWhere((s) => s.id == setlistId);
@@ -415,6 +431,45 @@ class LibraryController extends ChangeNotifier {
       [...list.songIds]..insert(min(index, list.songIds.length), songId),
       position: current >= index ? current + 1 : current,
     );
+    if (wasCurrent) _loadAgain(setlistId, songId, index, metronome);
+  }
+
+  /// The current song of the active set is gone: the song now at
+  /// [position] loads, else the last one; with none left the set stays
+  /// loaded, empty, and the click keeps what it sounds like.
+  void _takeOverInSet(int position, MetronomeController metronome) {
+    final list = activeSetlist;
+    if (list == null) return;
+    final songs = visibleSongs;
+    if (songs.isEmpty) {
+      _update(
+        _library.withSession(setlistId: list.id, songId: null, position: -1),
+      );
+      return;
+    }
+    final i = min(position, songs.length - 1);
+    playSong(songs[i], metronome, index: i);
+  }
+
+  /// Undo makes [songId] current again: in its set at [position], or as
+  /// Single song (null [setlistId]).
+  void _loadAgain(
+    String? setlistId,
+    String songId,
+    int position,
+    MetronomeController metronome,
+  ) {
+    final song = songById(songId);
+    if (song == null) return;
+    if (setlistId == null) return playSingleSong(song, metronome);
+    if (!setlists.any((l) => l.id == setlistId)) return;
+    if (_library.activeSetlistId != setlistId) setActiveSetlist(setlistId);
+    final songs = visibleSongs;
+    final index =
+        position >= 0 && position < songs.length && songs[position].id == songId
+        ? position
+        : songs.indexWhere((s) => s.id == songId);
+    playSong(song, metronome, index: index < 0 ? null : index);
   }
 
   void _updateEntries(Setlist list, List<String> ids, {required int position}) {
@@ -455,25 +510,49 @@ class LibraryController extends ChangeNotifier {
     return setlist;
   }
 
-  /// The set panel's swipe-to-delete. The loaded set can't be deleted
-  /// (null). Returns the set and where it was, for [restoreSetlist].
-  ({Setlist setlist, int index})? deleteSetlistAt(String id) {
-    if (id == _library.activeSetlistId) return null;
+  /// The sets view's swipe-to-delete. Deleting the loaded set hands over
+  /// (ui-spec.md "Removing what's loaded"): the most recently used other
+  /// set loads at song 1; with none left, setlist mode stays with no set
+  /// and the click as it is. Returns what [restoreSetlist] needs.
+  DeletedSetlist? deleteSetlistAt(String id, MetronomeController metronome) {
     final index = setlists.indexWhere((s) => s.id == id);
     if (index < 0) return null;
-    final setlist = setlists[index];
+    final loaded = id == _library.activeSetlistId;
+    final deleted = (
+      setlist: setlists[index],
+      index: index,
+      loaded: loaded
+          ? (songId: _library.currentSongId, position: _library.currentPosition)
+          : null,
+    );
     deleteSetlists({id});
-    return (setlist: setlist, index: index);
+    if (loaded) {
+      final others = setlistsRecentlyPlayed;
+      others.isEmpty
+          ? _showEmpty(ModeTab.setlists)
+          : loadSetlist(others.first.id, metronome);
+    }
+    return deleted;
   }
 
-  /// Undo of [deleteSetlistAt]: the set back in place, as it was.
-  void restoreSetlist(Setlist setlist, int index) {
+  /// Undo of [deleteSetlistAt]: the set back in place, as it was; if it
+  /// was loaded, loaded again at the same song.
+  void restoreSetlist(DeletedSetlist deleted, MetronomeController metronome) {
+    final setlist = deleted.setlist;
     if (setlists.any((s) => s.id == setlist.id)) return;
     _update(
       _library.copyWith(
-        setlists: [...setlists]..insert(min(index, setlists.length), setlist),
+        setlists: [...setlists]
+          ..insert(min(deleted.index, setlists.length), setlist),
       ),
     );
+    final loaded = deleted.loaded;
+    if (loaded == null) return;
+    final songId = loaded.songId;
+    if (songId == null || !setlist.songIds.contains(songId)) {
+      return setActiveSetlist(setlist.id);
+    }
+    _loadAgain(setlist.id, songId, loaded.position, metronome);
   }
 
   /// The set panel's one-time swipe hint (stored, never repeats).
@@ -499,10 +578,9 @@ class LibraryController extends ChangeNotifier {
   }
 
   /// The Songs list's swipe-to-delete (after its dialog): the song leaves
-  /// the library and every set. The loaded song can't be deleted (null).
-  /// Returns what [restoreSong] needs to put it all back.
-  DeletedSong? deleteSongForUndo(String id) {
-    if (id == _library.currentSongId) return null;
+  /// the library and every set, handing over if it was loaded (see
+  /// [deleteSongs]). Returns what [restoreSong] needs to put it all back.
+  DeletedSong? deleteSongForUndo(String id, MetronomeController metronome) {
     final index = songs.indexWhere((s) => s.id == id);
     if (index < 0) return null;
     final places = {
@@ -513,14 +591,24 @@ class LibraryController extends ChangeNotifier {
               if (s == id) i,
           ],
     };
-    final deleted = (song: songs[index], index: index, places: places);
-    deleteSongs({id});
+    final deleted = (
+      song: songs[index],
+      index: index,
+      places: places,
+      current: currentSong?.id == id
+          ? (
+              setlistId: _library.activeSetlistId,
+              position: _library.currentPosition,
+            )
+          : null,
+    );
+    deleteSongs({id}, metronome);
     return deleted;
   }
 
   /// Undo of [deleteSongForUndo]: the song back in the library and in each
-  /// set at its old positions.
-  void restoreSong(DeletedSong deleted) {
+  /// set at its old positions; if it was loaded, loaded again.
+  void restoreSong(DeletedSong deleted, MetronomeController metronome) {
     if (songById(deleted.song.id) != null) return;
     List<String> withSong(List<String> ids, List<int> positions) {
       final restored = [...ids];
@@ -545,6 +633,15 @@ class LibraryController extends ChangeNotifier {
         ],
       ),
     );
+    final current = deleted.current;
+    if (current != null) {
+      _loadAgain(
+        current.setlistId,
+        deleted.song.id,
+        current.position,
+        metronome,
+      );
+    }
   }
 
   /// Removes the entry at [index] (a song may appear more than once).
@@ -656,8 +753,33 @@ class LibraryController extends ChangeNotifier {
   }
 
   /// Deletes songs from the library and every set. Deleting the loaded
-  /// song switches to Free play; the click keeps going as it is.
-  void deleteSongs(Set<String> ids) {
+  /// song hands over and keeps the mode (ui-spec.md "Removing what's
+  /// loaded"): Single song loads the next song A–Z (else the previous); in
+  /// a set the entry now in its place (else the last) loads; with nothing
+  /// left the mode stays, empty, with the click as it is.
+  void deleteSongs(Set<String> ids, MetronomeController metronome) {
+    final set = activeSetlist;
+    final current = currentSong;
+    final hit = current != null && ids.contains(current.id);
+    // The replacement, chosen before anything goes: Single song, the next
+    // song A–Z still there, else the previous; in a set, the entry that
+    // will sit where the current one was.
+    Song? next;
+    var position = -1;
+    if (hit && set == null) {
+      final az = songsAZ;
+      final at = az.indexWhere((s) => s.id == current.id);
+      bool kept(Song s) => !ids.contains(s.id);
+      next =
+          az.skip(at + 1).where(kept).firstOrNull ??
+          az.take(at).toList().reversed.where(kept).firstOrNull;
+    } else if (hit) {
+      final songs = visibleSongs;
+      position = [
+        for (final s in songs.take(currentIndex))
+          if (!ids.contains(s.id)) s,
+      ].length;
+    }
     final deleted = _library.copyWith(
       songs: [
         for (final s in songs)
@@ -673,14 +795,26 @@ class LibraryController extends ChangeNotifier {
           ),
       ],
     );
+    // A loaded song that isn't current any more (taken out of the active
+    // set earlier) just goes.
     _update(
-      ids.contains(_library.currentSongId)
-          ? deleted.withSession(setlistId: null, songId: null, position: -1)
+      !hit && ids.contains(_library.currentSongId)
+          ? deleted.withSession(
+              setlistId: _library.activeSetlistId,
+              songId: null,
+              position: -1,
+            )
           : deleted,
     );
+    if (!hit) return;
+    // Hand over (ui-spec.md "Removing what's loaded"); the mode stays.
+    if (set != null) return _takeOverInSet(position, metronome);
+    if (next != null) return playSingleSong(next, metronome);
+    _showEmpty(ModeTab.songs);
   }
 
-  void deleteSong(String id) => deleteSongs({id});
+  void deleteSong(String id, MetronomeController metronome) =>
+      deleteSongs({id}, metronome);
 
   /// Every song, A–Z by name (case-insensitive): the library's order.
   List<Song> get songsAZ =>
@@ -843,4 +977,17 @@ enum ModeTab { songs, freePlay, setlists }
 
 /// A song taken out by [LibraryController.deleteSongForUndo]: the song,
 /// its place in the library, and its positions in each set (by set id).
-typedef DeletedSong = ({Song song, int index, Map<String, List<int>> places});
+typedef DeletedSong = ({
+  Song song,
+  int index,
+  Map<String, List<int>> places,
+  ({String? setlistId, int position})? current,
+});
+
+/// A set taken out by [LibraryController.deleteSetlistAt]: the set, its
+/// place, and the song it was on if it was the loaded one.
+typedef DeletedSetlist = ({
+  Setlist setlist,
+  int index,
+  ({String? songId, int position})? loaded,
+});
