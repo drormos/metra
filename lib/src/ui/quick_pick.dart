@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,8 @@ import '../model/library.dart';
 import 'editor_scaffold.dart';
 import 'haptics.dart';
 import 'icons.dart';
+import 'library_pick.dart';
+import 'metronome_screen.dart';
 import 'play_marker.dart';
 import 'setlist_picker.dart';
 import 'song_editor.dart';
@@ -44,11 +47,16 @@ Future<void> showQuickPick(
       pageBuilder: (_, _, _) => _QuickPickLayer(
         anchor: anchor,
         inset: inset,
-        child: QuickPick(
-          kind: kind,
-          library: library,
-          metronome: metronome,
-          pages: context,
+        // Text grows with the system font only as far as on the main
+        // screen it opens over, so the rows and the header keep their shape.
+        child: MediaQuery.withClampedTextScaling(
+          maxScaleFactor: MetronomeScreen.maxTextScale,
+          child: QuickPick(
+            kind: kind,
+            library: library,
+            metronome: metronome,
+            pages: context,
+          ),
         ),
       ),
       transitionsBuilder: (_, animation, _, child) =>
@@ -157,9 +165,17 @@ class QuickPick extends StatefulWidget {
   static const searchAbove = 8;
   static const outsideKey = Key('quick-pick-outside');
   static const songLibraryKey = Key('quick-pick-song-library');
-  static const manageSetlistsKey = Key('quick-pick-manage-setlists');
-  static const otherSetlistsKey = Key('quick-pick-other-setlists');
   static const setHeaderKey = Key('quick-pick-set-header');
+  static const changeSetKey = Key('quick-pick-change-set');
+  static const setSearchKey = Key('quick-pick-set-search');
+  static const backKey = Key('quick-pick-back');
+  static const addSongsKey = Key('quick-pick-add-songs');
+  static const undoKey = Key('quick-pick-undo');
+  static const renameFieldKey = Key('quick-pick-rename');
+  static const renameDoneKey = Key('quick-pick-rename-done');
+
+  /// How long the Undo bar stays.
+  static const undoFor = Duration(seconds: 6);
   static const newSongKey = Key('quick-pick-new-song');
   static const newSetlistKey = Key('quick-pick-new-setlist');
 
@@ -167,13 +183,40 @@ class QuickPick extends StatefulWidget {
   State<QuickPick> createState() => _QuickPickState();
 }
 
-class _QuickPickState extends State<QuickPick> {
+class _QuickPickState extends State<QuickPick>
+    with SingleTickerProviderStateMixin {
   static const _rowHeight = 52.0;
 
-  // "Other setlists ›" swaps the set's songs for the sets list, in place.
+  // The set panel's rows (the reference's denser 48px).
+  static const _entryHeight = 48.0;
+
+  // "Change set" swaps the set's songs for the sets view, in place.
   late QuickPickKind _kind = widget.kind;
   final _search = TextEditingController();
+  final _setSearch = TextEditingController();
   late final _scroll = ScrollController();
+
+  // The Undo bar: the last removal or deletion, for [QuickPick.undoFor].
+  ({String message, VoidCallback undo})? _undo;
+  Timer? _undoTimer;
+
+  // Bumped by every removal and undo, so a swiped row's key never comes
+  // back while the list rebuilds.
+  int _generation = 0;
+
+  // The row being renamed in place (a set or song id, or [_newSongId]),
+  // and what Done does with it.
+  String? _renaming;
+  _Rename? _renameKind;
+  static const _newSongId = '\u0000new-song';
+  final _rename = TextEditingController();
+
+  // The one-time swipe hint: [_hintRow] slides out and back.
+  int? _hintRow;
+  late final _hint = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 800),
+  );
 
   LibraryController get _library => widget.library;
 
@@ -187,17 +230,72 @@ class _QuickPickState extends State<QuickPick> {
         if (!_scroll.hasClients) return;
         final position = _scroll.position;
         _scroll.jumpTo(
-          min((index - 1.5) * _rowHeight, position.maxScrollExtent),
+          min((index - 1.5) * _entryHeight, position.maxScrollExtent),
         );
       });
     }
+    _maybeHint();
+  }
+
+  /// The first time ever the set panel (or, with its own flag, the Songs
+  /// list) opens on 2+ songs, a row that isn't playing slides out to show
+  /// what a swipe does, then springs back. No haptic.
+  void _maybeHint() {
+    final List<Song> songs;
+    final int current;
+    final VoidCallback seen;
+    switch (widget.kind) {
+      case QuickPickKind.set when !_library.swipeHintSeen:
+        songs = _library.visibleSongs;
+        current = _library.currentIndex;
+        seen = _library.markSwipeHintSeen;
+      case QuickPickKind.songs when !_library.songsHintSeen:
+        songs = _library.songsAZ;
+        current = songs.indexWhere((s) => s.id == _library.currentSong?.id);
+        seen = _library.markSongsHintSeen;
+      default:
+        return;
+    }
+    if (songs.length < 2) return;
+    _hintRow = current == 0 ? 1 : 0;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      seen();
+      _hint.forward().whenComplete(() {
+        if (mounted) setState(() => _hintRow = null);
+      });
+    });
   }
 
   @override
   void dispose() {
+    _undoTimer?.cancel();
+    _hint.dispose();
+    _rename.dispose();
     _search.dispose();
+    _setSearch.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  /// Shows the Undo bar, replacing any earlier one.
+  void _showUndo(String message, VoidCallback undo) {
+    _undoTimer?.cancel();
+    setState(() => _undo = (message: message, undo: undo));
+    _undoTimer = Timer(QuickPick.undoFor, () {
+      if (mounted) setState(() => _undo = null);
+    });
+  }
+
+  void _runUndo() {
+    final undo = _undo;
+    if (undo == null) return;
+    _undoTimer?.cancel();
+    undo.undo();
+    setState(() {
+      _undo = null;
+      _generation++;
+    });
   }
 
   /// Applies a choice and closes, with the song-change haptic.
@@ -219,20 +317,51 @@ class _QuickPickState extends State<QuickPick> {
     _open(open);
   }
 
-  @override
-  Widget build(BuildContext context) => switch (_kind) {
-    QuickPickKind.songs => _songsPanel(),
-    QuickPickKind.sets => _setsPanel(),
-    QuickPickKind.set => _setPanel(),
-  };
+  // Back from the sets view returns to the set's songs; Back while
+  // renaming cancels the rename. Otherwise Back closes the panel.
+  bool get _backStaysOpen =>
+      _renaming != null ||
+      (_kind == QuickPickKind.sets && _library.activeSetlist != null);
 
+  void _back() => setState(() {
+    if (_renaming != null) {
+      _renaming = null;
+      _renameKind = null;
+    } else {
+      _kind = QuickPickKind.set;
+    }
+  });
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: !_backStaysOpen,
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop) _back();
+    },
+    // Edits here (reorder, remove, rename) change the library under it.
+    child: ListenableBuilder(
+      listenable: _library,
+      builder: (context, _) => switch (_kind) {
+        QuickPickKind.songs => _songsPanel(),
+        QuickPickKind.sets => _setsPanel(),
+        QuickPickKind.set => _setPanel(),
+      },
+    ),
+  );
+
+  /// The Songs list, A–Z: tap = load (Single song); long-press renames in
+  /// place; swipe deletes after a dialog (not the loaded song), with
+  /// Undo; "+ New song ›" names a song made from the click as it is now.
   Widget _songsPanel() {
     final colors = context.colors;
     final all = _library.songsAZ;
     final query = _search.text.trim().toLowerCase();
     final songs = [
       for (final song in all)
-        if (query.isEmpty || song.name.toLowerCase().contains(query)) song,
+        if (query.isEmpty ||
+            song.id == _renaming ||
+            song.name.toLowerCase().contains(query))
+          song,
     ];
     final current = _library.currentSong?.id;
     return _Panel(
@@ -245,25 +374,55 @@ class _QuickPickState extends State<QuickPick> {
               ),
             )
           : null,
-      list: all.isEmpty
+      list: all.isEmpty && _renaming == null
           ? _empty('No songs yet')
           : ListView(
               shrinkWrap: true,
               controller: _scroll,
               padding: EdgeInsets.zero,
               children: [
-                for (final song in songs)
-                  _songRow(
-                    colors,
-                    song,
-                    key: ValueKey('quick-song-${song.id}'),
-                    current: song.id == current,
-                    onTap: () => _choose(
-                      () => _library.playSingleSong(song, widget.metronome),
-                    ),
-                  ),
+                if (_renaming == _newSongId)
+                  _renameRow(colors, leading: const PlayMarker(current: false)),
+                for (final (i, song) in songs.indexed)
+                  song.id == _renaming
+                      ? _renameRow(
+                          colors,
+                          leading: PlayMarker(current: song.id == current),
+                        )
+                      : _swipeable(
+                          colors,
+                          key: ValueKey('song-${song.id}-$_generation'),
+                          label: 'Delete song',
+                          // The loaded song springs back, no dialog.
+                          allowed: song.id != current,
+                          ask: () => confirmDelete(
+                            context,
+                            title: 'Delete ${song.name}?',
+                            body: switch (_library.setlistsUsing(song.id)) {
+                              final sets when sets.isEmpty => null,
+                              final sets =>
+                                'It will also be removed from '
+                                    '${SongLibrary.whereUsed(sets)}.',
+                            },
+                          ),
+                          onSwiped: () => _deleteSong(song),
+                          hint: i == _hintRow && query.isEmpty,
+                          child: _songRow(
+                            colors,
+                            song,
+                            key: ValueKey('quick-song-${song.id}'),
+                            current: song.id == current,
+                            onTap: () => _choose(
+                              () => _library.playSingleSong(
+                                song,
+                                widget.metronome,
+                              ),
+                            ),
+                          ),
+                        ),
               ],
             ),
+      bar: _undoBar(colors),
       actions: [
         all.isEmpty
             ? _action(
@@ -275,72 +434,181 @@ class _QuickPickState extends State<QuickPick> {
                 ),
               )
             : _action(
-                key: QuickPick.songLibraryKey,
-                label: 'Song library',
+                key: QuickPick.newSongKey,
+                label: '+ New song',
                 opens: true,
-                onTap: () => _open(
-                  (pages) => openSongLibrary(pages, _library, widget.metronome),
-                ),
+                onTap: _newSong,
               ),
       ],
     );
   }
 
+  /// The sets view: "‹ Back" (with a set loaded) and, with more than
+  /// [QuickPick.searchAbove] sets, "Search setlists" pinned under it; the
+  /// sets most recently played first (the loaded one marked), tap = load
+  /// at song 1; long-press renames in place; swipe deletes (not the loaded
+  /// set); "+ New setlist ›" pinned.
   Widget _setsPanel() {
     final colors = context.colors;
-    final sets = _library.setlistsRecentlyPlayed;
+    final all = _library.setlistsRecentlyPlayed;
+    final query = _setSearch.text.trim().toLowerCase();
+    final sets = [
+      for (final set in all)
+        if (query.isEmpty ||
+            set.id == _renaming ||
+            set.name.toLowerCase().contains(query))
+          set,
+    ];
+    final loaded = _library.activeSetlist?.id;
+    final back = loaded == null
+        ? null
+        : Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              key: QuickPick.backKey,
+              style: TextButton.styleFrom(
+                foregroundColor: colors.muted,
+                minimumSize: const Size(0, 44),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              onPressed: _back,
+              child: const Text('‹ Back', style: TextStyle(fontSize: 14)),
+            ),
+          );
+    final search = all.length > QuickPick.searchAbove
+        ? Padding(
+            padding: EdgeInsets.fromLTRB(10, back == null ? 10 : 0, 10, 6),
+            child: SearchField(
+              key: QuickPick.setSearchKey,
+              controller: _setSearch,
+              hint: 'Search setlists',
+              onChanged: (_) => setState(() {}),
+            ),
+          )
+        : null;
     return _Panel(
-      list: sets.isEmpty
+      top: back == null && search == null
+          ? null
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [?back, ?search],
+            ),
+      list: all.isEmpty
           ? _empty('No setlists yet')
           : ListView(
               shrinkWrap: true,
               padding: EdgeInsets.zero,
-              children: [for (final set in sets) _setRow(colors, set)],
+              children: [
+                for (final set in sets)
+                  set.id == _renaming
+                      ? _renameRow(
+                          colors,
+                          leading: SetlistIcon(size: 16, color: colors.muted),
+                        )
+                      : _swipeable(
+                          colors,
+                          key: ValueKey('set-${set.id}-$_generation'),
+                          label: 'Delete set',
+                          // The loaded set springs back, no dialog.
+                          allowed: set.id != loaded,
+                          ask: () => confirmDelete(
+                            context,
+                            title: 'Delete ${set.name}?',
+                            body: switch (set.songIds.length) {
+                              0 => null,
+                              1 => 'Its 1 song stays in your library.',
+                              final n => 'Its $n songs stay in your library.',
+                            },
+                          ),
+                          onSwiped: () => _deleteSet(set),
+                          child: _setRow(colors, set, loaded: set.id == loaded),
+                        ),
+              ],
             ),
+      bar: _undoBar(colors),
       actions: [
-        sets.isEmpty
-            ? _action(
-                key: QuickPick.newSetlistKey,
-                label: 'New setlist',
-                opens: true,
-                onTap: () => _open(
-                  (pages) => openSetlists(
-                    pages,
-                    library: _library,
-                    metronome: widget.metronome,
-                    newSet: true,
-                  ),
-                ),
-              )
-            : _action(
-                key: QuickPick.manageSetlistsKey,
-                label: 'Manage setlists',
-                opens: true,
-                onTap: () => _open(
-                  (pages) => openSetlists(
-                    pages,
-                    library: _library,
-                    metronome: widget.metronome,
-                  ),
-                ),
-              ),
+        _action(
+          key: QuickPick.newSetlistKey,
+          label: '+ New setlist',
+          opens: true,
+          onTap: _newSetlist,
+        ),
       ],
     );
   }
 
+  /// The set's songs: a header (name, "Song 4 of 12", "Change set"), the
+  /// songs in order (tap = jump; long-press lifts to reorder; swipe
+  /// removes, never the playing song), the Undo bar, "+ Add songs ›".
   Widget _setPanel() {
     final colors = context.colors;
     final setlist = _library.activeSetlist;
+    if (setlist == null) return _setsPanel();
     final songs = _library.visibleSongs;
     final current = _library.currentIndex;
     return _Panel(
-      // Long-press the set itself = its page, like its rows.
-      top: InkWell(
-        key: QuickPick.setHeaderKey,
-        enableFeedback: false, // Our own haptic, gated by the setting.
-        onLongPress: setlist == null
-            ? null
-            : () => _edit(
+      top: _setHeader(colors, setlist, songs.length, current),
+      list: ReorderableListView.builder(
+        shrinkWrap: true,
+        scrollController: _scroll,
+        padding: EdgeInsets.zero,
+        itemCount: songs.length,
+        onReorderStart: (_) => Haptics.medium(),
+        onReorderItem: (from, to) {
+          _library.reorderSetlist(setlist.id, from, to);
+          setState(() => _generation++);
+        },
+        proxyDecorator: (_, i, animation) => _lifted(
+          animation,
+          _entryRow(
+            colors,
+            setlist,
+            songs[i],
+            i,
+            current: i == current,
+            lifted: true,
+          ),
+        ),
+        itemBuilder: (context, i) => _swipeable(
+          colors,
+          key: ValueKey('entry-${songs[i].id}-$i-$_generation'),
+          label: 'Remove',
+          allowed: i != current,
+          onSwiped: () => _removeSong(setlist, i, songs[i]),
+          hint: i == _hintRow,
+          child: _entryRow(colors, setlist, songs[i], i, current: i == current),
+        ),
+      ),
+      bar: _undoBar(colors),
+      actions: [
+        _action(
+          key: QuickPick.addSongsKey,
+          label: '+ Add songs',
+          opens: true,
+          onTap: () => _addSongsTo(setlist.id),
+        ),
+      ],
+    );
+  }
+
+  /// 56px: the set name with "Song 4 of 12" under it (long-press = the
+  /// set's page), and "Change set" on the right.
+  Widget _setHeader(
+    MetraColors colors,
+    Setlist setlist,
+    int count,
+    int current,
+  ) => SizedBox(
+    height: 56,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 8, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              key: QuickPick.setHeaderKey,
+              enableFeedback: false, // Our own haptic, gated by the setting.
+              onLongPress: () => _edit(
                 (pages) => openSetlists(
                   pages,
                   library: _library,
@@ -348,56 +616,377 @@ class _QuickPickState extends State<QuickPick> {
                   setId: setlist.id,
                 ),
               ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  setlist?.name ?? '',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13, color: colors.muted),
-                ),
-              ),
-              if (current >= 0)
-                Text(
-                  '${current + 1} of ${songs.length}',
-                  style: TextStyle(fontSize: 13, color: colors.muted),
-                ),
-            ],
-          ),
-        ),
-      ),
-      list: ListView(
-        shrinkWrap: true,
-        controller: _scroll,
-        padding: EdgeInsets.zero,
-        children: [
-          for (final (i, song) in songs.indexed)
-            _songRow(
-              colors,
-              song,
-              key: ValueKey('quick-set-song-$i'),
-              current: i == current,
-              onTap: () => _choose(
-                () => _library.playSong(song, widget.metronome, index: i),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    setlist.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    current < 0
+                        ? (count == 1 ? '1 song' : '$count songs')
+                        : 'Song ${current + 1} of $count',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: colors.muted),
+                  ),
+                ],
               ),
             ),
+          ),
+          const SizedBox(width: 8),
+          // Large system text: the button gives way before the name does.
+          Flexible(
+            child: SizedBox(
+              height: 40,
+              child: OutlinedButton.icon(
+                key: QuickPick.changeSetKey,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                onPressed: () => setState(() => _kind = QuickPickKind.sets),
+                icon: const SetlistIcon(size: 16),
+                label: const Text(
+                  'Change set',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
-      actions: [
-        _action(
-          key: QuickPick.otherSetlistsKey,
-          label: 'Other setlists',
-          opens: true,
-          onTap: () => setState(() => _kind = QuickPickKind.sets),
+    ),
+  );
+
+  /// One of the set's songs, 48px: its position (the red play marker for
+  /// the current one, on the selected background), name and tempo.
+  Widget _entryRow(
+    MetraColors colors,
+    Setlist setlist,
+    Song song,
+    int i, {
+    required bool current,
+    bool lifted = false,
+  }) => Material(
+    color: lifted
+        ? colors.lifted
+        : current
+        ? colors.selectedRow
+        : colors.sheet,
+    child: InkWell(
+      key: ValueKey('quick-set-song-$i'),
+      enableFeedback: false,
+      onTap: () =>
+          _choose(() => _library.playSong(song, widget.metronome, index: i)),
+      child: Container(
+        height: _entryHeight,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: colors.divider)),
         ),
-      ],
+        child: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              child: current
+                  ? const PlayMarker(current: true)
+                  : Text(
+                      '${i + 1}',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(fontSize: 13, color: colors.slot),
+                    ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                song.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: current ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              '${song.bpm}',
+              style: TextStyle(fontSize: 13, color: colors.muted),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  /// The row being dragged: lifted (lighter, shadow, slightly larger).
+  Widget _lifted(Animation<double> animation, Widget row) => AnimatedBuilder(
+    animation: animation,
+    builder: (context, child) => Transform.scale(
+      scale: 1 + 0.02 * Curves.easeOut.transform(animation.value),
+      child: child,
+    ),
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(4),
+        boxShadow: [
+          BoxShadow(
+            color: context.colors.shadow,
+            offset: const Offset(0, 6),
+            blurRadius: 16,
+          ),
+        ],
+      ),
+      child: ClipRRect(borderRadius: BorderRadius.circular(4), child: row),
+    ),
+  );
+
+  /// Swipe left or right past 40% = [onSwiped] (light haptic); a red
+  /// [label] shows behind. Not [allowed]: springs back. With [ask] (a
+  /// delete), the row stays open while it asks; no = it slides back. With
+  /// [hint], the row slides out ~56px and back once (the one-time hint).
+  Widget _swipeable(
+    MetraColors colors, {
+    required Key key,
+    required String label,
+    required bool allowed,
+    required VoidCallback onSwiped,
+    required Widget child,
+    Future<bool> Function()? ask,
+    bool hint = false,
+  }) {
+    Widget behind(Alignment alignment) => Container(
+      color: colors.accentResting,
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: colors.text,
+        ),
+      ),
+    );
+    final row = hint
+        ? Stack(
+            children: [
+              Positioned.fill(child: behind(Alignment.centerRight)),
+              AnimatedBuilder(
+                animation: _hint,
+                builder: (context, child) => Transform.translate(
+                  offset: Offset(-56 * sin(pi * _hint.value), 0),
+                  child: child,
+                ),
+                child: child,
+              ),
+            ],
+          )
+        : child;
+    return Dismissible(
+      key: key,
+      direction: DismissDirection.horizontal,
+      dismissThresholds: const {
+        DismissDirection.startToEnd: 0.4,
+        DismissDirection.endToStart: 0.4,
+      },
+      confirmDismiss: (_) async => allowed && (ask == null || await ask()),
+      background: behind(Alignment.centerLeft),
+      secondaryBackground: behind(Alignment.centerRight),
+      onDismissed: (_) => onSwiped(),
+      child: row,
     );
   }
 
-  /// Tap = play; long-press = edit in the song editor.
+  void _removeSong(Setlist setlist, int i, Song song) {
+    if (!_library.removeSongAt(setlist.id, i)) return;
+    Haptics.tick();
+    setState(() => _generation++);
+    _showUndo(
+      'Removed from ${setlist.name}',
+      () => _library.insertSongAt(setlist.id, i, song.id),
+    );
+  }
+
+  void _deleteSet(Setlist setlist) {
+    final deleted = _library.deleteSetlistAt(setlist.id);
+    if (deleted == null) return;
+    Haptics.tick();
+    setState(() => _generation++);
+    _showUndo(
+      'Deleted set "${setlist.name}"',
+      () => _library.restoreSetlist(deleted.setlist, deleted.index),
+    );
+  }
+
+  void _deleteSong(Song song) {
+    final deleted = _library.deleteSongForUndo(song.id);
+    if (deleted == null) return;
+    Haptics.tick();
+    setState(() => _generation++);
+    _showUndo('Deleted "${song.name}"', () => _library.restoreSong(deleted));
+  }
+
+  /// A row's name becomes a field, selected, keyboard up.
+  void _startRename(String id, String name, _Rename kind) {
+    if (kind == _Rename.set || kind == _Rename.song) Haptics.medium();
+    _rename
+      ..text = name
+      ..selection = TextSelection(baseOffset: 0, extentOffset: name.length);
+    setState(() {
+      _renaming = id;
+      _renameKind = kind;
+    });
+  }
+
+  /// Done / Enter: saves (an empty name keeps the old or default one). A
+  /// new set then gets its songs from the library and comes back here; a
+  /// new song is made from the click, loaded (Single song), and the panel
+  /// closes.
+  void _finishRename() {
+    final id = _renaming;
+    final kind = _renameKind;
+    if (id == null || kind == null) return;
+    setState(() {
+      _renaming = null;
+      _renameKind = null;
+    });
+    switch (kind) {
+      case _Rename.set:
+        _library.renameSetlist(id, _rename.text);
+      case _Rename.newSet:
+        _library.renameSetlist(id, _rename.text);
+        _addSongsTo(id);
+      case _Rename.song:
+        _library.renameSong(id, _rename.text);
+      case _Rename.newSong:
+        final name = _rename.text.trim();
+        _choose(
+          () => _library.saveAsNewSong(
+            name.isEmpty ? _library.newSongName() : name,
+            widget.metronome,
+          ),
+        );
+    }
+  }
+
+  /// Outside / Back: nothing changes (a new song isn't made; a new set
+  /// keeps its default name).
+  void _cancelRename() => setState(() {
+    _renaming = null;
+    _renameKind = null;
+  });
+
+  /// "+ New setlist ›": a new set on top, already being named.
+  void _newSetlist() {
+    final set = _library.createSetlist();
+    _startRename(set.id, set.name, _Rename.newSet);
+  }
+
+  /// "+ New song ›": a row on top, being named "Song N".
+  void _newSong() =>
+      _startRename(_newSongId, _library.newSongName(), _Rename.newSong);
+
+  /// The library in pick mode for the set; back here after.
+  Future<void> _addSongsTo(String id) async {
+    final list = _library.setlists.where((s) => s.id == id).firstOrNull;
+    if (list == null) return;
+    final ids = await pickSongs(
+      context,
+      _library,
+      setName: list.name,
+      inSet: list.songIds.toSet(),
+      newSong: (context) async =>
+          (await openSongEditor(context, _library, widget.metronome))?.id,
+    );
+    final latest = _library.setlists.where((s) => s.id == id).firstOrNull;
+    if (ids == null || ids.isEmpty || latest == null) return;
+    _library.updateSetlist(
+      latest.copyWith(songIds: [...latest.songIds, ...ids]),
+    );
+  }
+
+  /// The row being renamed: a field with the name selected, and "Done".
+  Widget _renameRow(MetraColors colors, {required Widget leading}) => Container(
+    height: _rowHeight,
+    color: colors.selectedRow,
+    padding: const EdgeInsets.only(left: 14, right: 4),
+    child: Row(
+      children: [
+        SizedBox(width: 16, child: Center(child: leading)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: TextField(
+            key: QuickPick.renameFieldKey,
+            controller: _rename,
+            autofocus: true,
+            textInputAction: TextInputAction.done,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            decoration: const InputDecoration.collapsed(hintText: ''),
+            onSubmitted: (_) => _finishRename(),
+            onTapOutside: (_) => _cancelRename(),
+          ),
+        ),
+        // Inside the field's tap region: tapping Done isn't "outside".
+        TextFieldTapRegion(
+          child: TextButton(
+            key: QuickPick.renameDoneKey,
+            onPressed: _finishRename,
+            child: const Text(
+              'Done',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  /// After a removal or deletion: what happened, and "Undo".
+  Widget? _undoBar(MetraColors colors) {
+    final undo = _undo;
+    if (undo == null) return null;
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.only(left: 12, right: 4),
+      decoration: BoxDecoration(
+        color: colors.divider,
+        border: Border(top: BorderSide(color: colors.border)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              undo.message,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 14, color: colors.tickSounding),
+            ),
+          ),
+          TextButton(
+            key: QuickPick.undoKey,
+            style: TextButton.styleFrom(foregroundColor: colors.text),
+            onPressed: _runUndo,
+            child: const Text(
+              'Undo',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Tap = play; long-press = rename in place.
   Widget _songRow(
     MetraColors colors,
     Song song, {
@@ -409,9 +998,7 @@ class _QuickPickState extends State<QuickPick> {
     key: key,
     selected: current,
     onTap: onTap,
-    onLongPress: () => _edit(
-      (pages) => openSongEditor(pages, _library, widget.metronome, song: song),
-    ),
+    onLongPress: () => _startRename(song.id, song.name, _Rename.song),
     children: [
       SizedBox(width: 16, child: PlayMarker(current: current)),
       const SizedBox(width: 12),
@@ -447,41 +1034,38 @@ class _QuickPickState extends State<QuickPick> {
     ],
   );
 
-  /// Tap = load at song 1; long-press = that set's page.
-  Widget _setRow(MetraColors colors, Setlist setlist) => _row(
-    colors,
-    key: ValueKey('quick-set-${setlist.id}'),
-    selected: false,
-    onTap: () =>
-        _choose(() => _library.loadSetlist(setlist.id, widget.metronome)),
-    onLongPress: () => _edit(
-      (pages) => openSetlists(
-        pages,
-        library: _library,
-        metronome: widget.metronome,
-        setId: setlist.id,
-      ),
-    ),
-    children: [
-      SetlistIcon(size: 16, color: colors.muted),
-      const SizedBox(width: 12),
-      Expanded(
-        child: Text(
-          setlist.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-        ),
-      ),
-      const SizedBox(width: 12),
-      Text(
-        setlist.songIds.length == 1
-            ? '1 song'
-            : '${setlist.songIds.length} songs',
-        style: TextStyle(fontSize: 13, color: colors.muted),
-      ),
-    ],
-  );
+  /// Tap = load at song 1; long-press = rename it here. The loaded set is
+  /// marked like the current song.
+  Widget _setRow(MetraColors colors, Setlist setlist, {required bool loaded}) =>
+      _row(
+        colors,
+        key: ValueKey('quick-set-${setlist.id}'),
+        selected: loaded,
+        onTap: () =>
+            _choose(() => _library.loadSetlist(setlist.id, widget.metronome)),
+        onLongPress: () => _startRename(setlist.id, setlist.name, _Rename.set),
+        children: [
+          loaded
+              ? const SizedBox(width: 16, child: PlayMarker(current: true))
+              : SetlistIcon(size: 16, color: colors.muted),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              setlist.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            setlist.songIds.length == 1
+                ? '1 song'
+                : '${setlist.songIds.length} songs',
+            style: TextStyle(fontSize: 13, color: colors.muted),
+          ),
+        ],
+      );
 
   Widget _row(
     MetraColors colors, {
@@ -558,11 +1142,14 @@ class _QuickPickState extends State<QuickPick> {
 /// Pinned [top], the scrolling [list], then the pinned [actions] under a
 /// 2px line, with 1px lines between them, so they never read as rows.
 class _Panel extends StatelessWidget {
-  const _Panel({this.top, required this.list, required this.actions});
+  const _Panel({this.top, required this.list, required this.actions, this.bar});
 
   final Widget? top;
   final Widget list;
   final List<Widget> actions;
+
+  /// Just above the pinned actions (the Undo bar).
+  final Widget? bar;
 
   @override
   Widget build(BuildContext context) {
@@ -576,6 +1163,7 @@ class _Panel extends StatelessWidget {
           Divider(height: 1, thickness: 1, color: colors.divider),
         ],
         Flexible(child: list),
+        ?bar,
         Container(
           decoration: BoxDecoration(
             border: Border(top: BorderSide(color: colors.border, width: 2)),
@@ -595,3 +1183,6 @@ class _Panel extends StatelessWidget {
     );
   }
 }
+
+/// What Done does with the row being renamed.
+enum _Rename { set, newSet, song, newSong }

@@ -50,6 +50,11 @@ class SongLibrary extends StatefulWidget {
     final n => '$n setlists',
   };
 
+  /// "Friday set and Rehearsal", or "5 setlists".
+  static String whereUsed(List<Setlist> sets) => sets.length <= 2
+      ? sets.map((l) => l.name).join(' and ')
+      : '${sets.length} setlists';
+
   /// The delete confirmation, naming the sets it affects, since songs are
   /// shared.
   static String deleteMessage(List<Song> songs, List<Setlist> sets) {
@@ -57,9 +62,7 @@ class SongLibrary extends StatefulWidget {
         ? 'Delete ${songs.single.name}?'
         : 'Delete ${songs.length} songs?';
     if (sets.isEmpty) return what;
-    final where = sets.length <= 2
-        ? sets.map((l) => l.name).join(' and ')
-        : '${sets.length} setlists';
+    final where = whereUsed(sets);
     return songs.length == 1
         ? '$what It will also be removed from $where.'
         : '$what They will also be removed from $where.';

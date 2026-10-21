@@ -525,7 +525,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.byKey(SetlistGroup.headerKey));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(QuickPick.otherSetlistsKey));
+      await tester.tap(find.byKey(QuickPick.changeSetKey));
       await tester.pumpAndSettle();
     }
 
@@ -566,7 +566,7 @@ void main() {
       expect(metronome.bpm, 120);
     });
 
-    testWidgets('Songs ⌄: search above 8 songs; "Song library ›"', (
+    testWidgets('Songs ⌄: search above 8 songs; "+ New song ›" pinned', (
       tester,
     ) async {
       await withLibrary(tester);
@@ -582,12 +582,8 @@ void main() {
       await tester.enterText(find.byType(TextField), 'thr');
       await tester.pump();
       expect(rows(tester, 'quick-song-'), hasLength(1));
-      await tester.tap(find.byKey(QuickPick.songLibraryKey));
-      await tester.pumpAndSettle();
-      expect(find.byType(SongLibrary), findsOneWidget);
-      await tester.tap(find.byTooltip('Back'));
-      await tester.pumpAndSettle();
-      expect(find.byType(QuickPick), findsNothing, reason: 'main screen');
+      expect(find.byKey(QuickPick.songLibraryKey), findsNothing);
+      expect(find.byKey(QuickPick.newSongKey), findsOneWidget, reason: '+ New');
     });
 
     testWidgets('Setlists ⌄: recently played first; a tap loads song 1', (
@@ -608,18 +604,30 @@ void main() {
       expect(library.currentSong?.name, 'One');
     });
 
-    testWidgets('"Manage setlists ›" opens What to play; ‹ returns', (
+    testWidgets('"Change set" swaps in place; ‹ Back and Android Back return', (
       tester,
     ) async {
       await withLibrary(tester);
       await openSetlistsList(tester);
-      await tester.tap(find.byKey(QuickPick.manageSetlistsKey));
+      expect(find.byType(QuickPick), findsOneWidget);
+      expect(find.byKey(QuickPick.newSetlistKey), findsOneWidget);
+      expect(find.byKey(QuickPick.changeSetKey), findsNothing, reason: 'sets');
+      await tester.tap(find.byKey(QuickPick.backKey));
       await tester.pumpAndSettle();
-      expect(find.text('What to play'), findsOneWidget);
-      await tester.tap(find.byTooltip('Back'));
+      expect(
+        find.byKey(QuickPick.changeSetKey),
+        findsOneWidget,
+        reason: 'songs',
+      );
+      await tester.tap(find.byKey(QuickPick.changeSetKey));
       await tester.pumpAndSettle();
-      expect(find.byType(SetlistPicker), findsNothing);
-      expect(find.byType(QuickPick), findsNothing);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(QuickPick), findsOneWidget, reason: 'still open');
+      expect(find.byKey(QuickPick.changeSetKey), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(QuickPick), findsNothing, reason: 'then it closes');
     });
 
     testWidgets('tap outside closes; nothing changes', (tester) async {
@@ -671,7 +679,7 @@ void main() {
       await tester.pumpAndSettle();
       final panel = find.byType(QuickPick);
       expect(
-        find.descendant(of: panel, matching: find.text('2 of 3')),
+        find.descendant(of: panel, matching: find.text('Song 2 of 3')),
         findsOneWidget,
       );
       expect(rows(tester, 'quick-set-song-'), hasLength(3));
@@ -690,16 +698,16 @@ void main() {
       expect(find.byType(QuickPick), findsNothing);
     });
 
-    testWidgets('Free play tab detaches a set; "Other setlists ›" swaps', (
+    testWidgets('Free play tab detaches a set; "Change set" swaps', (
       tester,
     ) async {
       await withLibrary(tester, loaded: true);
       await tester.tap(find.byKey(SetlistGroup.headerKey));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(QuickPick.otherSetlistsKey));
+      await tester.tap(find.byKey(QuickPick.changeSetKey));
       await tester.pumpAndSettle();
       expect(rows(tester, 'quick-set-song-'), isEmpty);
-      expect(find.byKey(QuickPick.manageSetlistsKey), findsOneWidget);
+      expect(find.byKey(QuickPick.newSetlistKey), findsOneWidget);
       await tester.tapAt(const Offset(200, 60));
       await tester.pumpAndSettle();
 
@@ -781,39 +789,44 @@ void main() {
       final firstSong = tester.getRect(
         find.byKey(const ValueKey('quick-set-song-0')),
       );
-      final other = tester.getRect(find.byKey(QuickPick.otherSetlistsKey));
-      expect(other.top, greaterThan(firstSong.bottom), reason: 'footer');
+      final add = tester.getRect(find.byKey(QuickPick.addSongsKey));
+      expect(add.top, greaterThan(firstSong.bottom), reason: 'footer');
     });
 
-    testWidgets('long-press a song edits it; back returns to main', (
-      tester,
-    ) async {
-      await withLibrary(tester);
-      await openSongsList(tester);
-      await tester.longPress(inPanel('Two'));
-      await tester.pumpAndSettle();
-      expect(find.byType(SongEditor), findsOneWidget);
-      expect(find.widgetWithText(TextField, 'Two'), findsOneWidget);
-      expect(library.currentSong?.name, 'One', reason: 'nothing loaded');
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(find.byType(SongEditor), findsNothing);
-      expect(find.byType(QuickPick), findsNothing);
-    });
-
-    testWidgets("long-press a set opens its page; back returns to main", (
+    testWidgets('long-press a set renames it in place: Done, cancel, empty', (
       tester,
     ) async {
       await withLibrary(tester);
       await openSetlistsList(tester);
-      await tester.longPress(inPanel('Friday set'));
+      Future<void> rename(String to) async {
+        await tester.longPress(inPanel('Friday set'));
+        await tester.pumpAndSettle();
+        expect(find.byKey(QuickPick.renameFieldKey), findsOneWidget);
+        await tester.enterText(find.byKey(QuickPick.renameFieldKey), to);
+      }
+
+      await rename('');
+      await tester.tap(find.byKey(QuickPick.renameDoneKey));
       await tester.pumpAndSettle();
-      expect(find.byKey(SetlistPicker.backToSetlistsKey), findsOneWidget);
-      expect(find.text('3 songs'), findsOneWidget);
+      expect(
+        library.setlists.any((l) => l.name == 'Friday set'),
+        isTrue,
+        reason: 'empty keeps the old name',
+      );
+      await rename('Gig');
+      await tester.binding.handlePopRoute(); // Back cancels, panel stays
+      await tester.pumpAndSettle();
+      expect(find.byType(QuickPick), findsOneWidget);
+      expect(library.setlists.any((l) => l.name == 'Friday set'), isTrue);
+      await rename('Saturday set');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(
+        library.setlists.where((l) => l.name == 'Saturday set'),
+        hasLength(2),
+        reason: 'duplicates allowed',
+      );
       expect(library.activeSetlist?.name, 'Saturday set', reason: 'not loaded');
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(find.byType(SetlistPicker), findsNothing);
     });
   });
 }

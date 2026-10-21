@@ -755,6 +755,70 @@ void main() {
     expect(metronome.pattern.polyrhythm, 0);
     expect(library.songChanged(metronome), isFalse);
   });
+
+  group('set panel edits', () {
+    late MetronomeController metronome;
+    late Setlist gig;
+
+    setUp(() {
+      metronome = MetronomeController(FakeClickOutput());
+      final ids = [
+        for (final n in ['A', 'B', 'C', 'D'])
+          library.addSong(name: n, bpm: 100, pattern: waltz).id,
+      ];
+      gig = library.saveSetlist(name: 'Gig', songIds: ids);
+      library
+        ..loadSetlist(gig.id, metronome)
+        ..nextSong(metronome)
+        ..nextSong(metronome); // C, 3 of 4
+    });
+    tearDown(() => metronome.dispose());
+
+    test('removing before the current song shifts the position', () {
+      final b = library.visibleSongs[1].id;
+      expect(library.removeSongAt(gig.id, 1), isTrue);
+      expect(library.currentSong?.name, 'C');
+      expect(library.currentIndex, 1);
+      library.insertSongAt(gig.id, 1, b);
+      expect(library.currentIndex, 2, reason: 'undo restores it');
+      expect(library.visibleSongs.map((s) => s.name), ['A', 'B', 'C', 'D']);
+    });
+
+    test('the playing song can\'t be removed', () {
+      expect(library.removeSongAt(gig.id, 2), isFalse);
+      expect(library.visibleSongs, hasLength(4));
+    });
+
+    test('rename: an empty name keeps the old one', () {
+      library.renameSetlist(gig.id, '  ');
+      expect(library.activeSetlist?.name, 'Gig');
+      library.renameSetlist(gig.id, ' Tour ');
+      expect(library.activeSetlist?.name, 'Tour');
+    });
+
+    test('delete: never the loaded set; Undo restores it in place; the '
+        'Setlists tab falls back', () {
+      final other = library.saveSetlist(name: 'Other', songIds: const []);
+      expect(library.deleteSetlistAt(gig.id), isNull, reason: 'loaded');
+      final deleted = library.deleteSetlistAt(other.id)!;
+      expect(deleted.index, 1);
+      library.restoreSetlist(deleted.setlist, deleted.index);
+      expect(library.setlists.map((l) => l.id), [gig.id, other.id]);
+      // The tab would return to Other (used last); deleted, it falls back.
+      library
+        ..loadSetlist(other.id, metronome)
+        ..detachSong();
+      library.deleteSetlistAt(other.id);
+      library.openSetlistsTab(metronome);
+      expect(library.activeSetlist?.id, gig.id);
+    });
+
+    test('the swipe hint flag is saved', () async {
+      expect(library.swipeHintSeen, isFalse);
+      library.markSwipeHintSeen();
+      expect((await reload()).swipeHintSeen, isTrue);
+    });
+  });
 }
 
 class _CountingStore extends LibraryStore {

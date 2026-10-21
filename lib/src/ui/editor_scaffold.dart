@@ -148,6 +148,102 @@ Future<bool> confirm(
     ) ??
     false;
 
+/// "Delete …?" before a swipe deletes your own work (ui-spec.md "Delete
+/// asks, remove undoes", `delete-confirm.reference.html`): the title, an
+/// optional muted line, Cancel (outlined) and Delete (red, filled). True
+/// when Delete was chosen.
+Future<bool> confirmDelete(
+  BuildContext context, {
+  required String title,
+  String? body,
+}) async =>
+    await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final colors = context.colors;
+        return Dialog(
+          backgroundColor: colors.surface,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(color: colors.border),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    height: 1.25,
+                  ),
+                ),
+                if (body != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    body,
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.45,
+                      color: colors.muted,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 18),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    SizedBox(
+                      height: 48,
+                      child: OutlinedButton(
+                        key: deleteCancelKey,
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      height: 48,
+                      child: FilledButton(
+                        key: deleteConfirmKey,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: colors.accent,
+                          foregroundColor: colors.background,
+                          padding: const EdgeInsets.symmetric(horizontal: 22),
+                        ),
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text(
+                          'Delete',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    ) ??
+    false;
+
+const deleteCancelKey = Key('delete-cancel');
+const deleteConfirmKey = Key('delete-confirm');
+
 /// An outlined text field with a small muted label above it.
 class LabeledField extends StatelessWidget {
   const LabeledField({
@@ -211,7 +307,8 @@ class LabeledField extends StatelessWidget {
   }
 }
 
-/// The outlined search field of the song library and What to play.
+/// The outlined search field (song library, What to play, the dropdown
+/// lists): a white border while focused, × clears what's typed.
 class SearchField extends StatelessWidget {
   const SearchField({
     super.key,
@@ -224,6 +321,8 @@ class SearchField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final String hint;
 
+  static const clearKey = Key('search-clear');
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -231,15 +330,32 @@ class SearchField extends StatelessWidget {
       borderRadius: BorderRadius.circular(4),
       borderSide: BorderSide(color: colors.border, width: 2),
     );
-    return TextField(
-      controller: controller,
-      onChanged: onChanged,
-      decoration: InputDecoration(
-        hintText: hint,
-        prefixIcon: Icon(Icons.search, color: colors.muted),
-        contentPadding: const EdgeInsets.symmetric(vertical: 12),
-        border: border,
-        enabledBorder: border,
+    return ValueListenableBuilder(
+      valueListenable: controller,
+      builder: (context, value, _) => TextField(
+        controller: controller,
+        onChanged: onChanged,
+        decoration: InputDecoration(
+          hintText: hint,
+          prefixIcon: Icon(Icons.search, color: colors.muted),
+          suffixIcon: value.text.isEmpty
+              ? null
+              : IconButton(
+                  key: clearKey,
+                  tooltip: 'Clear',
+                  icon: Icon(Icons.close, color: colors.muted),
+                  onPressed: () {
+                    controller.clear();
+                    onChanged?.call('');
+                  },
+                ),
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          border: border,
+          enabledBorder: border,
+          focusedBorder: border.copyWith(
+            borderSide: BorderSide(color: colors.text, width: 2),
+          ),
+        ),
       ),
     );
   }

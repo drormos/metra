@@ -128,6 +128,8 @@ class Library {
     this.activeSetlistId,
     this.currentSongId,
     this.currentPosition = -1,
+    this.swipeHintSeen = false,
+    this.songsHintSeen = false,
   });
 
   static const empty = Library(
@@ -165,6 +167,12 @@ class Library {
   final String? currentSongId;
   final int currentPosition;
 
+  /// The set panel's one-time swipe hint has been shown (never again).
+  final bool swipeHintSeen;
+
+  /// The same, for the Songs list (its own flag).
+  final bool songsHintSeen;
+
   Library copyWith({
     List<Song>? songs,
     List<Setlist>? setlists,
@@ -175,6 +183,8 @@ class Library {
     ThemeMode? themeMode,
     bool? vibrate,
     ClickVolumes? volumes,
+    bool? swipeHintSeen,
+    bool? songsHintSeen,
   }) => Library(
     songs: songs ?? this.songs,
     setlists: setlists ?? this.setlists,
@@ -188,6 +198,8 @@ class Library {
     activeSetlistId: activeSetlistId,
     currentSongId: currentSongId,
     currentPosition: currentPosition,
+    swipeHintSeen: swipeHintSeen ?? this.swipeHintSeen,
+    songsHintSeen: songsHintSeen ?? this.songsHintSeen,
   );
 
   /// The mode and current song; nulls here are meaningful (Free play, no
@@ -209,6 +221,8 @@ class Library {
     activeSetlistId: setlistId,
     currentSongId: songId,
     currentPosition: position,
+    swipeHintSeen: swipeHintSeen,
+    songsHintSeen: songsHintSeen,
   );
 
   Map<String, Object?> toJson() => {
@@ -223,6 +237,8 @@ class Library {
     'activeSetlistId': activeSetlistId,
     'currentSongId': currentSongId,
     'currentPosition': currentPosition,
+    'swipeHintSeen': swipeHintSeen,
+    'songsHintSeen': songsHintSeen,
     'songs': [for (final song in songs) song.toJson()],
     'setlists': [for (final setlist in setlists) setlist.toJson()],
   };
@@ -261,6 +277,8 @@ class Library {
       activeSetlistId: json['activeSetlistId'] as String?,
       currentSongId: json['currentSongId'] as String?,
       currentPosition: json['currentPosition'] as int? ?? -1,
+      swipeHintSeen: json['swipeHintSeen'] as bool? ?? false,
+      songsHintSeen: json['songsHintSeen'] as bool? ?? false,
       songs: [
         for (final song in songs)
           ?_orNull(() => Song.fromJson(song as Map<String, Object?>)),

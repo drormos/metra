@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart'
     show ChangeNotifier, ThemeMode, debugPrint, visibleForTesting;
 
@@ -385,6 +387,166 @@ class LibraryController extends ChangeNotifier {
     return list;
   }
 
+  /// The set panel's swipe-to-remove: the entry at [index] leaves the set
+  /// (never the library). The playing song can't be removed (false). In
+  /// the active set, removing an entry before the current one moves the
+  /// position back ("4/12" → "3/11"); the playing song never changes.
+  bool removeSongAt(String setlistId, int index) {
+    final active = setlistId == _library.activeSetlistId;
+    final current = active ? currentIndex : -1;
+    if (index == current) return false;
+    final list = setlists.firstWhere((s) => s.id == setlistId);
+    _updateEntries(
+      list,
+      [...list.songIds]..removeAt(index),
+      position: current > index ? current - 1 : current,
+    );
+    return true;
+  }
+
+  /// Undo of [removeSongAt]: [songId] back at [index], the position
+  /// following it.
+  void insertSongAt(String setlistId, int index, String songId) {
+    final active = setlistId == _library.activeSetlistId;
+    final current = active ? currentIndex : -1;
+    final list = setlists.firstWhere((s) => s.id == setlistId);
+    _updateEntries(
+      list,
+      [...list.songIds]..insert(min(index, list.songIds.length), songId),
+      position: current >= index ? current + 1 : current,
+    );
+  }
+
+  void _updateEntries(Setlist list, List<String> ids, {required int position}) {
+    final updated = _library.copyWith(
+      setlists: [
+        for (final s in setlists)
+          s.id == list.id ? s.copyWith(songIds: ids) : s,
+      ],
+    );
+    _update(
+      list.id == _library.activeSetlistId && position >= 0
+          ? updated.withSession(
+              setlistId: list.id,
+              songId: _library.currentSongId,
+              position: position,
+            )
+          : updated,
+    );
+  }
+
+  /// Renames a set; an empty name keeps the old one. Duplicates allowed.
+  void renameSetlist(String id, String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    final list = setlists.firstWhere((s) => s.id == id);
+    if (list.name != trimmed) updateSetlist(list.copyWith(name: trimmed));
+  }
+
+  /// A new set ("Setlist N") at the top of the recently played order.
+  Setlist createSetlist() {
+    final setlist = Setlist(
+      id: _newId(),
+      name: newSetlistName(),
+      songIds: const [],
+      playedAt: DateTime.now(),
+    );
+    _update(_library.copyWith(setlists: [...setlists, setlist]));
+    return setlist;
+  }
+
+  /// The set panel's swipe-to-delete. The loaded set can't be deleted
+  /// (null). Returns the set and where it was, for [restoreSetlist].
+  ({Setlist setlist, int index})? deleteSetlistAt(String id) {
+    if (id == _library.activeSetlistId) return null;
+    final index = setlists.indexWhere((s) => s.id == id);
+    if (index < 0) return null;
+    final setlist = setlists[index];
+    deleteSetlists({id});
+    return (setlist: setlist, index: index);
+  }
+
+  /// Undo of [deleteSetlistAt]: the set back in place, as it was.
+  void restoreSetlist(Setlist setlist, int index) {
+    if (setlists.any((s) => s.id == setlist.id)) return;
+    _update(
+      _library.copyWith(
+        setlists: [...setlists]..insert(min(index, setlists.length), setlist),
+      ),
+    );
+  }
+
+  /// The set panel's one-time swipe hint (stored, never repeats).
+  bool get swipeHintSeen => _library.swipeHintSeen;
+
+  void markSwipeHintSeen() {
+    if (!swipeHintSeen) _update(_library.copyWith(swipeHintSeen: true));
+  }
+
+  /// The Songs list's own one-time swipe hint.
+  bool get songsHintSeen => _library.songsHintSeen;
+
+  void markSongsHintSeen() {
+    if (!songsHintSeen) _update(_library.copyWith(songsHintSeen: true));
+  }
+
+  /// Renames a song; an empty name keeps the old one. Duplicates allowed.
+  void renameSong(String id, String name) {
+    final trimmed = name.trim();
+    final song = songById(id);
+    if (trimmed.isEmpty || song == null || song.name == trimmed) return;
+    updateSong(song.copyWith(name: trimmed));
+  }
+
+  /// The Songs list's swipe-to-delete (after its dialog): the song leaves
+  /// the library and every set. The loaded song can't be deleted (null).
+  /// Returns what [restoreSong] needs to put it all back.
+  DeletedSong? deleteSongForUndo(String id) {
+    if (id == _library.currentSongId) return null;
+    final index = songs.indexWhere((s) => s.id == id);
+    if (index < 0) return null;
+    final places = {
+      for (final list in setlists)
+        if (list.songIds.contains(id))
+          list.id: [
+            for (final (i, s) in list.songIds.indexed)
+              if (s == id) i,
+          ],
+    };
+    final deleted = (song: songs[index], index: index, places: places);
+    deleteSongs({id});
+    return deleted;
+  }
+
+  /// Undo of [deleteSongForUndo]: the song back in the library and in each
+  /// set at its old positions.
+  void restoreSong(DeletedSong deleted) {
+    if (songById(deleted.song.id) != null) return;
+    List<String> withSong(List<String> ids, List<int> positions) {
+      final restored = [...ids];
+      for (final p in positions) {
+        restored.insert(min(p, restored.length), deleted.song.id);
+      }
+      return restored;
+    }
+
+    _update(
+      _library.copyWith(
+        songs: [...songs]
+          ..insert(min(deleted.index, songs.length), deleted.song),
+        setlists: [
+          for (final list in setlists)
+            switch (deleted.places[list.id]) {
+              final positions? => list.copyWith(
+                songIds: withSong(list.songIds, positions),
+              ),
+              _ => list,
+            },
+        ],
+      ),
+    );
+  }
+
   /// Removes the entry at [index] (a song may appear more than once).
   void removeFromSetlist(String setlistId, int index) {
     final list = setlists.firstWhere((s) => s.id == setlistId);
@@ -678,3 +840,7 @@ enum SongPlacement {
 
 /// The main screen's mode tabs (ui-spec.md "Mode tabs").
 enum ModeTab { songs, freePlay, setlists }
+
+/// A song taken out by [LibraryController.deleteSongForUndo]: the song,
+/// its place in the library, and its positions in each set (by set id).
+typedef DeletedSong = ({Song song, int index, Map<String, List<int>> places});
