@@ -364,7 +364,7 @@ void main() {
         }
         await tester.pump();
         await tester.pump();
-        await tester.pump(MetraMotion.dissolve); // the new name is in
+        await tester.pump(MetraMotion.brighten); // the new name is at full
         expect(
           tester
               .widget<Text>(find.byKey(MetronomeScreen.titleKey))
@@ -532,7 +532,7 @@ void main() {
       await tester.tap(find.byKey(SetlistGroup.nextKey));
       await tester.pump();
       await tester.pump();
-      await tester.pump(MetraMotion.dissolve); // the new name is in
+      await tester.pump(MetraMotion.brighten); // the new name is at full
       expect(title(tester), 'One');
       expect(metronome.bpm, 100);
       expect(position('1/3'), findsOneWidget);
@@ -543,14 +543,14 @@ void main() {
       await tester.tap(find.byKey(SetlistGroup.nextKey));
       await tester.pump();
       await tester.pump();
-      await tester.pump(MetraMotion.dissolve); // the new name is in
+      await tester.pump(MetraMotion.brighten); // the new name is at full
       expect(title(tester), 'Three');
       expect(enabled(tester, SetlistGroup.nextKey), isFalse);
 
       await tester.tap(find.byKey(SetlistGroup.previousKey));
       await tester.pump();
       await tester.pump();
-      await tester.pump(MetraMotion.dissolve); // the new name is in
+      await tester.pump(MetraMotion.brighten); // the new name is at full
       expect(title(tester), 'Two');
       expect(
         find.bySemanticsLabel('Previous song: One, 100 BPM'),

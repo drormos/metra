@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import 'motion.dart';
 import 'theme.dart';
 
 /// One line that never wraps: starts at [style]'s font size and shrinks to
@@ -67,21 +68,21 @@ class FitText extends StatelessWidget {
   );
 }
 
-/// A name that changes in place (ui-spec.md "Motion", steady dissolve):
-/// the title and set name. On a real change of [text], old and new are
-/// drawn in the same place and the new leads ([MetraMotion.dissolveAt]),
-/// so strokes they share never dim. At the same size, the characters
-/// they share at the start stay still at full opacity and only the rest
-/// dissolves; at a different size (sized to fit first, down to
-/// [minFontSize]) the whole name dissolves. Both sit on [baseline] (from
-/// the top) at the left edge, so nothing moves.
-class DissolveText extends StatefulWidget {
-  const DissolveText(
+/// Text that changes in place (ui-spec.md "Text that changes in place"):
+/// names and tempos. On a real change only the characters that changed are
+/// touched: the old text is gone at once and the changed part snaps in at
+/// ~60%, brightening to full ([BrightenGate]); the unchanged start (or end,
+/// for end-aligned text) stays at full opacity. Sized to fit first, down to
+/// [minFontSize]: a new size counts as all changed. With [baseline], it
+/// sits on that baseline (from the top), so sizes never move it.
+class BrightenText extends StatefulWidget {
+  const BrightenText(
     this.text, {
     super.key,
     required this.style,
     this.minFontSize,
     this.baseline,
+    this.textAlign,
     this.textKey,
   });
 
@@ -91,64 +92,61 @@ class DissolveText extends StatefulWidget {
   /// Null: never shrinks.
   final double? minFontSize;
   final double? baseline;
+  final TextAlign? textAlign;
 
-  /// The current [Text]'s key (tests read it).
+  /// The [Text]'s key (tests read it).
   final Key? textKey;
 
   @override
-  State<DissolveText> createState() => _DissolveTextState();
+  State<BrightenText> createState() => _BrightenTextState();
 }
 
-class _DissolveTextState extends State<DissolveText>
+class _BrightenTextState extends State<BrightenText>
     with SingleTickerProviderStateMixin {
-  late final _dissolve = AnimationController(
-    vsync: this,
-    duration: MetraMotion.dissolve,
-    value: 1,
-  );
+  late final _brighten = AnimationController(vsync: this, value: 1);
+  final _gate = BrightenGate();
   String? _old;
   double? _oldSize;
   double? _size; // as last laid out
 
   @override
-  void didUpdateWidget(DissolveText old) {
+  void didUpdateWidget(BrightenText old) {
     super.didUpdateWidget(old);
     if (old.text == widget.text) return;
-    if (MetraMotion.reduced(context)) {
-      _dissolve.value = 1;
-      _old = null;
+    final duration = _gate.next(context);
+    if (duration == Duration.zero) {
+      _brighten.value = 1;
       return;
     }
     _old = old.text;
     _oldSize = _size;
-    _dissolve.forward(from: 0);
+    _brighten
+      ..duration = duration
+      ..forward(from: 0);
   }
 
   @override
   void dispose() {
-    _dissolve.dispose();
+    _brighten.dispose();
     super.dispose();
   }
 
-  Widget _layer(Widget text) {
-    final baseline = widget.baseline;
-    return baseline == null
-        ? text
-        : Baseline(
-            baseline: baseline,
-            baselineType: TextBaseline.alphabetic,
-            child: text,
-          );
-  }
+  bool get _endAligned =>
+      widget.textAlign == TextAlign.right || widget.textAlign == TextAlign.end;
 
-  Text _line(InlineSpan span, TextStyle style, {Key? key}) => Text.rich(
-    span,
-    key: key,
-    maxLines: 1,
-    softWrap: false,
-    overflow: TextOverflow.ellipsis,
-    style: style,
-  );
+  /// How many characters at the anchored side are the same.
+  int _same(String old, String text) {
+    var n = 0;
+    final max = old.length < text.length ? old.length : text.length;
+    while (n < max &&
+        (_endAligned
+            ? old.codeUnitAt(old.length - 1 - n) ==
+                  text.codeUnitAt(text.length - 1 - n)
+            : old.codeUnitAt(n) == text.codeUnitAt(n))) {
+      n++;
+    }
+    return n;
+  }
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -160,91 +158,64 @@ class _DissolveTextState extends State<DissolveText>
           : FitText.fitSize(context, widget.text, resolved, min, box.maxWidth);
       final style = resolved.copyWith(fontSize: size);
       return AnimatedBuilder(
-        animation: _dissolve,
+        animation: _brighten,
         builder: (context, _) {
+          final text = widget.text;
+          final t = _brighten.value;
           final old = _old;
-          final t = _dissolve.value;
-          final o = MetraMotion.dissolveAt(MetraMotion.dissolve * t);
-          final current = Text(
-            widget.text,
+          Widget line = Text(
+            text,
             key: widget.textKey,
             maxLines: 1,
             softWrap: false,
             overflow: TextOverflow.ellipsis,
+            textAlign: widget.textAlign,
             style: style,
           );
-          if (old == null || t >= 1) return _layer(current);
-          final oldSize = _oldSize ?? size;
-          if (oldSize != size) {
-            return Stack(
-              children: [
-                _layer(
-                  ExcludeSemantics(
-                    child: Opacity(
-                      opacity: o.old,
-                      child: _line(
-                        TextSpan(text: old),
-                        resolved.copyWith(fontSize: oldSize),
+          if (t < 1 && old != null) {
+            final same = _oldSize == size ? _same(old, text) : 0;
+            final color = style.color ?? context.colors.text;
+            final fresh = TextStyle(
+              color: color.withValues(alpha: color.a * BrightenGate.opacity(t)),
+            );
+            final span = _endAligned
+                ? TextSpan(
+                    children: [
+                      TextSpan(
+                        text: text.substring(0, text.length - same),
+                        style: fresh,
                       ),
-                    ),
-                  ),
-                ),
-                _layer(Opacity(opacity: o.next, child: current)),
-              ],
+                      TextSpan(text: text.substring(text.length - same)),
+                    ],
+                  )
+                : TextSpan(
+                    children: [
+                      TextSpan(text: text.substring(0, same)),
+                      TextSpan(text: text.substring(same), style: fresh),
+                    ],
+                  );
+            line = Semantics(
+              label: text,
+              excludeSemantics: true,
+              child: Text.rich(
+                span,
+                key: widget.textKey,
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
+                textAlign: widget.textAlign,
+                style: style,
+              ),
             );
           }
-          // Same size: the shared start is drawn once, at full opacity.
-          var shared = 0;
-          final text = widget.text;
-          while (shared < old.length &&
-              shared < text.length &&
-              old.codeUnitAt(shared) == text.codeUnitAt(shared)) {
-            shared++;
-          }
-          final color = style.color ?? context.colors.text;
-          Color alpha(double a) => color.withValues(alpha: color.a * a);
-          return Stack(
-            children: [
-              _layer(
-                ExcludeSemantics(
-                  child: _line(
-                    TextSpan(
-                      children: [
-                        TextSpan(text: old.substring(0, shared)),
-                        TextSpan(
-                          text: old.substring(shared),
-                          style: TextStyle(color: alpha(o.old)),
-                        ),
-                      ],
-                    ),
-                    style,
-                  ),
-                ),
-              ),
-              _layer(
-                Semantics(
-                  label: text,
-                  excludeSemantics: true,
-                  child: _line(
-                    TextSpan(
-                      children: [
-                        TextSpan(
-                          text: text.substring(0, shared),
-                          style: TextStyle(color: alpha(0)),
-                        ),
-                        TextSpan(
-                          text: text.substring(shared),
-                          style: TextStyle(color: alpha(o.next)),
-                        ),
-                      ],
-                    ),
-                    style,
-                    key: widget.textKey,
-                  ),
-                ),
-              ),
-            ],
-          );
+          final baseline = widget.baseline;
+          return baseline == null
+              ? line
+              : Baseline(
+                  baseline: baseline,
+                  baselineType: TextBaseline.alphabetic,
+                  child: line,
+                );
         },
       );
     },

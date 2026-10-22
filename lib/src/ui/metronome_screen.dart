@@ -354,12 +354,12 @@ class MetronomeScreen extends StatelessWidget {
           // never moves the subtitle.
           SizedBox(
             height: 34,
-            // A new name dissolves in place (only what changed), sized to
-            // fit first; every size sits on one baseline at the left edge,
-            // where the full-size name's baseline is.
+            // A new name snaps in and brightens (only what changed), sized
+            // to fit first; every size sits on one baseline at the left
+            // edge, where the full-size name's baseline is.
             child: Align(
               alignment: Alignment.topLeft,
-              child: DissolveText(
+              child: BrightenText(
                 song?.name ?? '',
                 textKey: titleKey,
                 minFontSize: 22,
@@ -375,7 +375,7 @@ class MetronomeScreen extends StatelessWidget {
             height: 17,
             child: Align(
               alignment: Alignment.centerLeft,
-              child: DissolveText(
+              child: BrightenText(
                 set?.name ?? '',
                 textKey: subtitleKey,
                 style: TextStyle(
@@ -750,16 +750,16 @@ class _TempoLineState extends State<_TempoLine> {
     final colors = context.colors;
     final library = widget.library;
     final controller = widget.controller;
-    // One state at a time, cross-fading in place (the "swap" motion):
-    // the tempo name, A, "✓ Saved ...", or the actions.
+    // One state at a time, snapping in and brightening: the tempo name,
+    // A, "✓ Saved ...", or the actions.
     if (library == null || !library.songChanged(controller)) {
       final saved = _saved;
-      return Swap(
+      return BrightenSwap(
         value: saved ?? (_firstLoad ? 'first-load' : tempoName(widget.bpm)),
         child: _quiet(colors),
       );
     }
-    return Swap(value: 'actions', child: _actions(colors, library));
+    return BrightenSwap(value: 'actions', child: _actions(colors, library));
   }
 
   /// The tempo name, A's line, or C's confirmation.

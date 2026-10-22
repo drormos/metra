@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import 'motion.dart';
 import 'theme.dart';
 
 /// Text whose digits each sit in a fixed slot, as wide as the widest digit
@@ -9,21 +10,15 @@ import 'theme.dart';
 /// (ui-spec.md "No jitter"). Saira Extra Condensed has no tabular figures
 /// (`FontFeature.tabularFigures()` changes nothing), so the slots are laid
 /// out here. Other characters keep their own width.
-class TabularText extends StatelessWidget {
-  const TabularText(
-    this.text, {
-    super.key,
-    this.style,
-    this.brighten = Duration.zero,
-  });
+class TabularText extends StatefulWidget {
+  const TabularText(this.text, {super.key, this.style, this.brightens = false});
 
   final String text;
   final TextStyle? style;
 
-  /// A digit that changes snaps in and brightens to full over this long
-  /// ([MetraMotion.brighten]); the others are untouched. Zero: instant at
-  /// full opacity.
-  final Duration brighten;
+  /// Changed digits snap in and brighten ([BrightenGate]); the others are
+  /// untouched. False: always instant.
+  final bool brightens;
 
   static final _slots = <TextStyle, double>{};
 
@@ -48,7 +43,28 @@ class TabularText extends StatelessWidget {
   static bool isDigit(String c) => '0123456789'.contains(c);
 
   @override
+  State<TabularText> createState() => _TabularTextState();
+}
+
+class _TabularTextState extends State<TabularText> {
+  final _gate = BrightenGate();
+  // How the latest change shows (decided once per change).
+  Duration _brighten = Duration.zero;
+
+  @override
+  void didUpdateWidget(TabularText old) {
+    super.didUpdateWidget(old);
+    if (old.text != widget.text) {
+      _brighten = widget.brightens ? _gate.next(context) : Duration.zero;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final text = widget.text;
+    final style = widget.style;
+    final slotWidth = TabularText.slotWidth;
+    final isDigit = TabularText.isDigit;
     final resolved = DefaultTextStyle.of(context).style.merge(style);
     final slot = MediaQuery.textScalerOf(context).scale(slotWidth(resolved));
     return Semantics(
@@ -68,7 +84,7 @@ class TabularText extends StatelessWidget {
                     child: _BrightenDigit(
                       c,
                       style: resolved,
-                      duration: brighten,
+                      duration: _brighten,
                     ),
                   )
                 : Text(c, style: resolved),

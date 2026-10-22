@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 
 import '../controller/metronome_controller.dart';
 import 'haptics.dart';
@@ -69,21 +68,6 @@ class BpmReadout extends StatefulWidget {
 }
 
 class _BpmReadoutState extends State<BpmReadout> {
-  // When the number last changed (frame time), so a quick run of changes
-  // shows at full at once instead of pulsing.
-  Duration? _changedAt;
-  bool _quick = false;
-
-  @override
-  void didUpdateWidget(BpmReadout old) {
-    super.didUpdateWidget(old);
-    if (old.bpm == widget.bpm) return;
-    final now = SchedulerBinding.instance.currentFrameTimeStamp;
-    final last = _changedAt;
-    _quick = last != null && now - last < MetraMotion.brightenSkip;
-    _changedAt = now;
-  }
-
   @override
   Widget build(BuildContext context) {
     final unitSize = widget.unitSize;
@@ -108,16 +92,11 @@ class _BpmReadoutState extends State<BpmReadout> {
         // Changed digits snap in and brighten (single steps, Tap tempo, a
         // song load); instant at full in a quick run of changes and while
         // the tempo is being dragged or held, never behind the finger.
-        ValueListenableBuilder(
-          valueListenable: MetraMotion.tempoMoving,
-          builder: (context, moving, _) => TabularText(
-            '${widget.bpm}',
-            key: widget.numberKey,
-            style: BpmReadout.numberStyle(widget.fontSize),
-            brighten: moving > 0 || _quick
-                ? Duration.zero
-                : MetraMotion.of(context, MetraMotion.brighten),
-          ),
+        TabularText(
+          '${widget.bpm}',
+          key: widget.numberKey,
+          style: BpmReadout.numberStyle(widget.fontSize),
+          brightens: true,
         ),
         SizedBox(width: gap),
         Text('bpm', style: unit),

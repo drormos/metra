@@ -1,33 +1,81 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import 'theme.dart';
 
-/// Text that changes in place (ui-spec.md "Motion", swap): the old fades
-/// out while the new fades in, aligned the same way, with no slide and no
-/// size change. A change of [value] starts it.
-class Swap extends StatelessWidget {
-  const Swap({
-    super.key,
-    required this.value,
-    required this.child,
-    this.alignment = Alignment.center,
-  });
+/// Decides how a change of text in place shows (ui-spec.md "Text that
+/// changes in place"): brightening from ~60% over [MetraMotion.brighten],
+/// or at full at once when it comes within [MetraMotion.brightenSkip] of
+/// the last change (fast tapping never pulses), while a ±button is held
+/// or the ruler moves, or with "Remove animations" on. Call [next] once
+/// per real change.
+class BrightenGate {
+  Duration? _last;
+
+  Duration next(BuildContext context) {
+    final now = SchedulerBinding.instance.currentFrameTimeStamp;
+    final last = _last;
+    _last = now;
+    if (last != null && now - last < MetraMotion.brightenSkip) {
+      return Duration.zero;
+    }
+    if (MetraMotion.tempoMoving.value > 0) return Duration.zero;
+    return MetraMotion.of(context, MetraMotion.brighten);
+  }
+
+  /// The new text's opacity [t] (0 → 1) into its brightening.
+  static double opacity(double t) =>
+      MetraMotion.brightenFrom +
+      (1 - MetraMotion.brightenFrom) * MetraMotion.brightenCurve.transform(t);
+}
+
+/// A whole state that replaces another in place (the line under the BPM:
+/// tempo name ↔ Revert · Save · Save as new ↔ hints ↔ "✓ Saved"): the
+/// old is gone at once and the new snaps in at ~60%, brightening to full
+/// ([BrightenGate]). A change of [value] plays it.
+class BrightenSwap extends StatefulWidget {
+  const BrightenSwap({super.key, required this.value, required this.child});
 
   final Object? value;
   final Widget child;
-  final AlignmentGeometry alignment;
 
   @override
-  Widget build(BuildContext context) => MetraMotion.reduced(context)
-      ? child
-      : AnimatedSwitcher(
-          duration: MetraMotion.swap,
-          switchInCurve: MetraMotion.swapCurve,
-          switchOutCurve: MetraMotion.swapCurve,
-          layoutBuilder: (current, previous) =>
-              Stack(alignment: alignment, children: [...previous, ?current]),
-          child: KeyedSubtree(key: ValueKey(value), child: child),
-        );
+  State<BrightenSwap> createState() => _BrightenSwapState();
+}
+
+class _BrightenSwapState extends State<BrightenSwap>
+    with SingleTickerProviderStateMixin {
+  late final _brighten = AnimationController(vsync: this, value: 1);
+  final _gate = BrightenGate();
+
+  @override
+  void didUpdateWidget(BrightenSwap old) {
+    super.didUpdateWidget(old);
+    if (old.value == widget.value) return;
+    final duration = _gate.next(context);
+    if (duration == Duration.zero) {
+      _brighten.value = 1;
+    } else {
+      _brighten
+        ..duration = duration
+        ..forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _brighten.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _brighten,
+    child: widget.child,
+    builder: (context, child) => _brighten.value >= 1
+        ? child!
+        : Opacity(opacity: BrightenGate.opacity(_brighten.value), child: child),
+  );
 }
 
 /// Something that appears and goes away (ui-spec.md "Motion"): it

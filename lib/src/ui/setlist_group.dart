@@ -423,8 +423,10 @@ class SetlistGroup extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // Changed digits snap in and brighten.
                         TabularText(
                           position,
+                          brightens: true,
                           style: const TextStyle(
                             fontFamily: MetraFonts.condensed,
                             fontSize: 18,
@@ -469,11 +471,11 @@ class SetlistGroup extends StatelessWidget {
       painter: _Chevron(color: colors.muted, forward: forward),
     );
     // One grey bold unit with the chevron: "‹ 98 BPM" / "168 BPM ›".
+    // Names and tempos that change snap in and brighten (only what changed).
     final bpm = Flexible(
-      child: Text(
+      child: BrightenText(
         '${song?.bpm} BPM',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+        textAlign: forward ? TextAlign.right : TextAlign.left,
         style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w700,
@@ -512,7 +514,7 @@ class SetlistGroup extends StatelessWidget {
                       alignment: forward
                           ? Alignment.bottomRight
                           : Alignment.bottomLeft,
-                      child: FitText(
+                      child: BrightenText(
                         song.name,
                         minFontSize: 13,
                         textAlign: forward ? TextAlign.right : TextAlign.left,
