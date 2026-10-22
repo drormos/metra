@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
+import '../model/whats_new.dart';
 import 'about.dart';
 import 'settings_screen.dart';
 import 'swipe_row.dart';
@@ -17,26 +18,30 @@ Future<void> showMenuPanel(
   BuildContext context, {
   required MetronomeController metronome,
   LibraryController? library,
-}) => Navigator.push(
-  context,
-  PageRouteBuilder<void>(
-    opaque: false,
-    barrierDismissible: true,
-    barrierLabel: 'Close menu',
-    barrierColor: context.colors.dim,
-    transitionDuration: RowGestures.motion(context, MetraMotion.arrive),
-    reverseTransitionDuration: RowGestures.motion(context, MetraMotion.leave),
-    pageBuilder: (_, _, _) =>
-        MenuPanel(metronome: metronome, library: library, pages: context),
-    transitionsBuilder: (_, animation, _, child) => SlideTransition(
-      position: Tween(
-        begin: const Offset(1, 0),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut)),
-      child: child,
+}) {
+  // Opening the Menu clears the ☰ dot (ui-spec.md "What's new").
+  WhatsNew.menuOpened(library);
+  return Navigator.push(
+    context,
+    PageRouteBuilder<void>(
+      opaque: false,
+      barrierDismissible: true,
+      barrierLabel: 'Close menu',
+      barrierColor: context.colors.dim,
+      transitionDuration: RowGestures.motion(context, MetraMotion.arrive),
+      reverseTransitionDuration: RowGestures.motion(context, MetraMotion.leave),
+      pageBuilder: (_, _, _) =>
+          MenuPanel(metronome: metronome, library: library, pages: context),
+      transitionsBuilder: (_, animation, _, child) => SlideTransition(
+        position: Tween(
+          begin: const Offset(1, 0),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut)),
+        child: child,
+      ),
     ),
-  ),
-);
+  );
+}
 
 class MenuPanel extends StatefulWidget {
   const MenuPanel({
@@ -62,6 +67,9 @@ class MenuPanel extends StatefulWidget {
   static const feedbackKey = Key('menu-feedback');
   static const aboutKey = Key('menu-about');
   static const versionKey = Key('menu-version');
+  static const whatsNewKey = Key('menu-whats-new');
+  static const allUpdatesKey = Key('menu-all-updates');
+  static const gotItKey = Key('menu-got-it');
 
   @override
   State<MenuPanel> createState() => _MenuPanelState();
@@ -127,6 +135,9 @@ class _MenuPanelState extends State<MenuPanel> {
                       child: ListView(
                         padding: EdgeInsets.zero,
                         children: [
+                          if (WhatsNew.showBlock(library))
+                            if (WhatsNew.latest case final latest?)
+                              _whatsNew(latest),
                           _row(
                             key: MenuPanel.settingsKey,
                             icon: const Icon(Icons.settings_outlined, size: 20),
@@ -169,6 +180,68 @@ class _MenuPanelState extends State<MenuPanel> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// After an update, above Settings: "New in 1.4.0", up to 3 lines, and
+  /// two quiet buttons, "All updates ›" and "Got it" (hides it, and the
+  /// dot, until the next update).
+  Widget _whatsNew(Release latest) {
+    final colors = context.colors;
+    final library = widget.library!;
+    final quiet = TextButton.styleFrom(
+      foregroundColor: colors.muted,
+      minimumSize: const Size(0, 48),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+    );
+    return Container(
+      key: MenuPanel.whatsNewKey,
+      margin: const EdgeInsets.only(top: 8, bottom: 8),
+      padding: const EdgeInsets.fromLTRB(14, 12, 6, 2),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'New in ${latest.version}',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: colors.muted,
+            ),
+          ),
+          const SizedBox(height: 4),
+          for (final line in latest.lines.take(3))
+            Padding(
+              padding: const EdgeInsets.only(top: 2, right: 8),
+              child: Text(
+                line,
+                style: TextStyle(fontSize: 14, color: colors.muted),
+              ),
+            ),
+          // Wraps rather than overflowing with large text.
+          Wrap(
+            alignment: WrapAlignment.end,
+            children: [
+              TextButton(
+                key: MenuPanel.allUpdatesKey,
+                style: quiet,
+                onPressed: () => _go(openAllUpdates),
+                child: const Text('All updates ›'),
+              ),
+              TextButton(
+                key: MenuPanel.gotItKey,
+                style: quiet,
+                onPressed: () => setState(() => WhatsNew.markSeen(library)),
+                child: const Text('Got it'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

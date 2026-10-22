@@ -921,6 +921,61 @@ void main() {
       expect(loaded.tipSeen('edit-first-change'), isFalse);
     });
   });
+
+  group('example content (fresh install)', () {
+    test('a fresh install is noticed; a saved library is not', () async {
+      expect(library.freshInstall, isTrue);
+      library.addSong(name: 'A', bpm: 100, pattern: waltz);
+      expect((await reload()).freshInstall, isFalse);
+    });
+
+    test('4 example songs and "Try me" with all four, in order', () async {
+      library.addExamples();
+      expect(library.songs.map((s) => (s.name, s.bpm)), [
+        ('Example · Rock', 120),
+        ('Example · Waltz', 90),
+        ('Example · Shuffle', 100),
+        ('Example · Odd', 140),
+      ]);
+      final [rock, waltz3, shuffle, odd] = library.songs;
+      expect(rock.pattern.timeSignature, '4/4');
+      expect(rock.pattern.beatLevels.first, StepLevel.accent);
+      expect(waltz3.pattern.timeSignature, '3/4');
+      expect(shuffle.pattern.stepsPerBeat, 3);
+      expect(odd.pattern.timeSignature, '7/8');
+      expect(
+        [
+          for (final (i, l) in odd.pattern.beatLevels.indexed)
+            if (l == StepLevel.accent) i + 1,
+        ],
+        [1, 3, 5],
+      );
+      expect(library.setlists.single.name, 'Try me');
+      expect(library.setlists.single.songIds, [
+        for (final s in library.songs) s.id,
+      ]);
+      expect(library.activeSetlist, isNull, reason: 'still Free play');
+    });
+
+    test('never re-created after deletion (stored flag)', () async {
+      final metronome = MetronomeController(FakeClickOutput());
+      addTearDown(metronome.dispose);
+      library.addExamples();
+      library.deleteSongs({for (final s in library.songs) s.id}, metronome);
+      library.deleteSetlist(library.setlists.single.id);
+      final loaded = await reload();
+      loaded.addExamples();
+      expect(loaded.songs, isEmpty);
+      expect(loaded.setlists, isEmpty);
+    });
+
+    test('never added to a library that already has songs', () {
+      library.addSong(name: 'Mine', bpm: 100, pattern: waltz);
+      library.addExamples();
+      expect(library.songs.map((s) => s.name), ['Mine']);
+      expect(library.setlists, isEmpty);
+    });
+  });
 }
 
 class _CountingStore extends LibraryStore {

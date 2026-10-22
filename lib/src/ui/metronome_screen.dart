@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/tempo_name.dart';
+import '../model/whats_new.dart';
 import 'beat_indicator.dart';
 import 'fit_text.dart';
 import 'haptics.dart';
@@ -55,6 +56,8 @@ class MetronomeScreen extends StatelessWidget {
   static const subdivisionKey = Key('subdivision');
   static const revertKey = Key('revert');
   static const firstChangeKey = Key('first-change-line');
+  static const menuKey = Key('menu-button');
+  static const menuDotKey = Key('menu-dot');
   static const saveToSongKey = Key('save-to-song');
   static const saveAsNewKey = Key('save-as-new');
   static const subtitleKey = Key('subtitle');
@@ -468,9 +471,13 @@ class MetronomeScreen extends StatelessWidget {
         const SizedBox(width: 4),
         Builder(
           builder: (context) => _squareButton(
-            tooltip: 'Menu',
+            key: menuKey,
+            tooltip: WhatsNew.showDot(library) ? 'Menu, new update' : 'Menu',
             onPressed: () =>
                 showMenuPanel(context, metronome: controller, library: library),
+            // After an update, until the Menu is opened (ui-spec.md
+            // "What's new").
+            dot: WhatsNew.showDot(library),
             child: const MenuIcon(),
           ),
         ),
@@ -483,6 +490,7 @@ class MetronomeScreen extends StatelessWidget {
     required String tooltip,
     required VoidCallback onPressed,
     required Widget child,
+    bool dot = false,
   }) => Tooltip(
     message: tooltip,
     // Read once, as the button's own label.
@@ -491,17 +499,51 @@ class MetronomeScreen extends StatelessWidget {
     // tap target (the row's gaps are 4px narrower to match).
     child: SizedBox.square(
       dimension: 48,
-      child: OutlinedButton(
-        key: key,
-        style: OutlinedButton.styleFrom(
-          padding: EdgeInsets.zero,
-          minimumSize: const Size.square(44),
-          fixedSize: const Size.square(44),
-          tapTargetSize: MaterialTapTargetSize.padded,
-        ),
-        onPressed: onPressed,
-        child: Semantics(label: tooltip, child: child),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: _squareButtonBody(key, tooltip, onPressed, child),
+          ),
+          // An 8px red dot in the drawn button's top-right corner.
+          if (dot)
+            Positioned(
+              key: menuDotKey,
+              top: 5,
+              right: 5,
+              child: IgnorePointer(
+                child: Builder(
+                  builder: (context) => Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: context.colors.accent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
+    ),
+  );
+
+  Widget _squareButtonBody(
+    Key? key,
+    String tooltip,
+    VoidCallback onPressed,
+    Widget child,
+  ) => Center(
+    child: OutlinedButton(
+      key: key,
+      style: OutlinedButton.styleFrom(
+        padding: EdgeInsets.zero,
+        minimumSize: const Size.square(44),
+        fixedSize: const Size.square(44),
+        tapTargetSize: MaterialTapTargetSize.padded,
+      ),
+      onPressed: onPressed,
+      child: Semantics(label: tooltip, child: child),
     ),
   );
 

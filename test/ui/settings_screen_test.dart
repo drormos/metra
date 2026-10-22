@@ -9,6 +9,7 @@ import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/click_sound.dart';
 import 'package:metra/src/model/click_volumes.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
+import 'package:metra/src/model/whats_new.dart';
 import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/about.dart';
 import 'package:metra/src/ui/menu_panel.dart';
@@ -46,6 +47,7 @@ void main() {
   Future<void> openMenu(
     WidgetTester tester, {
     Size size = const Size(400, 900),
+    bool open = true,
   }) async {
     tester.view
       ..physicalSize = size
@@ -76,7 +78,8 @@ void main() {
         home: MetronomeScreen(controller: metronome, library: library),
       ),
     );
-    await tester.tap(find.byTooltip('Menu'));
+    if (!open) return;
+    await tester.tap(find.byKey(MetronomeScreen.menuKey));
     await tester.pumpAndSettle();
   }
 
@@ -352,5 +355,80 @@ void main() {
     expect(metronome.isPlaying, isTrue);
     metronome.stop();
     await tester.pump();
+  });
+
+  group("What's new", () {
+    setUp(
+      () => WhatsNew.releases = WhatsNew.parse('''
+## 1.4.0 · Oct 2026
+- One
+- Two
+- Three
+- Four
+
+## 1.0–1.3 · Sep–Oct 2026
+- Test builds
+'''),
+    );
+    tearDown(() => WhatsNew.releases = const []);
+
+    testWidgets('after an update: a dot on ☰; the Menu shows the block '
+        '(3 lines); opening clears the dot; "Got it" hides the block', (
+      tester,
+    ) async {
+      await openMenu(tester, open: false);
+      expect(find.byKey(MetronomeScreen.menuDotKey), findsOneWidget);
+      await tester.tap(find.byKey(MetronomeScreen.menuKey));
+      await tester.pumpAndSettle();
+      expect(find.byKey(MetronomeScreen.menuDotKey), findsNothing);
+      expect(find.text('New in 1.4.0'), findsOneWidget);
+      expect(find.text('Three'), findsOneWidget);
+      expect(find.text('Four'), findsNothing, reason: 'up to 3 lines');
+      expect(
+        tester.getTopLeft(find.byKey(MenuPanel.whatsNewKey)).dy,
+        lessThan(tester.getTopLeft(find.byKey(MenuPanel.settingsKey)).dy),
+        reason: 'above Settings',
+      );
+      await tester.tap(find.byKey(MenuPanel.gotItKey));
+      await tester.pumpAndSettle();
+      expect(find.byKey(MenuPanel.whatsNewKey), findsNothing);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(MetronomeScreen.menuKey));
+      await tester.pumpAndSettle();
+      expect(find.byKey(MenuPanel.whatsNewKey), findsNothing, reason: 'gone');
+    });
+
+    testWidgets('"All updates ›": every version, newest first; also from '
+        'About', (tester) async {
+      await openMenu(tester);
+      await tester.tap(find.byKey(MenuPanel.allUpdatesKey));
+      await tester.pumpAndSettle();
+      expect(find.byType(AllUpdatesScreen), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('1.4.0 · Oct 2026')).dy,
+        lessThan(tester.getTopLeft(find.text('1.0–1.3 · Sep–Oct 2026')).dy),
+      );
+      expect(find.text('·  Four'), findsOneWidget, reason: 'all lines');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(MetronomeScreen.menuKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(MenuPanel.aboutKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(AboutScreen.allUpdatesKey));
+      await tester.pumpAndSettle();
+      expect(find.byType(AllUpdatesScreen), findsOneWidget);
+    });
+
+    testWidgets('a fresh install: no dot, no block', (tester) async {
+      await openMenu(tester, open: false);
+      WhatsNew.markSeen(library);
+      await tester.pump();
+      expect(find.byKey(MetronomeScreen.menuDotKey), findsNothing);
+      await tester.tap(find.byKey(MetronomeScreen.menuKey));
+      await tester.pumpAndSettle();
+      expect(find.byKey(MenuPanel.whatsNewKey), findsNothing);
+    });
   });
 }

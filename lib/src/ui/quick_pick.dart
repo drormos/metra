@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
@@ -66,7 +67,7 @@ Future<void> showQuickPick(
 }
 
 /// The dim (with the bar cut out of it) and the panel above [anchor].
-class _QuickPickLayer extends StatelessWidget {
+class _QuickPickLayer extends StatefulWidget {
   const _QuickPickLayer({
     required this.anchor,
     required this.inset,
@@ -78,16 +79,121 @@ class _QuickPickLayer extends StatelessWidget {
   final Widget child;
 
   @override
+  State<_QuickPickLayer> createState() => _QuickPickLayerState();
+}
+
+/// ui-spec.md "Taller panel": the handle drags the panel up to the full
+/// space above the context row and snaps to normal or tall (nearer, or by
+/// flick); dragged down from normal it follows and closes. It always
+/// opens normal; with the keyboard up the handle does nothing.
+class _QuickPickLayerState extends State<_QuickPickLayer>
+    with SingleTickerProviderStateMixin {
+  final _panel = GlobalKey();
+  // The panel's height while dragged or tall; null = normal (its own).
+  late final _height = AnimationController.unbounded(vsync: this)
+    ..addListener(() => setState(() {}));
+  double? _normal; // measured when a drag starts
+  bool _sized = false; // [_height] is in use
+  double _down = 0; // dragged down from normal (closing)
+
+  @override
+  void dispose() {
+    _height.dispose();
+    super.dispose();
+  }
+
+  double get _tallHeight {
+    final size = MediaQuery.sizeOf(context);
+    final padding = MediaQuery.paddingOf(context);
+    return max(0, size.height - _bottom - padding.top - 8);
+  }
+
+  // Above the bar, or above the keyboard while searching.
+  double get _bottom => max(
+    MediaQuery.sizeOf(context).height - widget.anchor.top + 18,
+    MediaQuery.viewInsetsOf(context).bottom + 8,
+  );
+
+  bool get _keyboard => MediaQuery.viewInsetsOf(context).bottom > 0;
+
+  void _start(DragStartDetails _) {
+    _height.stop();
+    if (!_sized) {
+      final box = _panel.currentContext?.findRenderObject() as RenderBox?;
+      _normal = box?.size.height ?? 0;
+      _height.value = _normal!;
+    }
+  }
+
+  void _update(DragUpdateDetails d) {
+    final normal = _normal ?? 0;
+    final next = _height.value - d.delta.dy;
+    setState(() {
+      if (next >= normal) {
+        _sized = true;
+        _down = 0;
+        _height.value = min(next, _tallHeight);
+      } else {
+        // Below normal: the panel follows the finger down, to close.
+        _height.value = normal;
+        _sized = false;
+        _down = max(0, _down + d.delta.dy);
+      }
+    });
+  }
+
+  void _end(DragEndDetails d) {
+    final v = d.primaryVelocity ?? 0;
+    final normal = _normal ?? 0;
+    if (_down > 0) {
+      if (_down > QuickPick.closeDrag || v > QuickPick.flick) {
+        return Navigator.pop(context);
+      }
+      return setState(() => _down = 0);
+    }
+    final tall =
+        v < -QuickPick.flick ||
+        (v <= QuickPick.flick &&
+            _height.value - normal > (_tallHeight - normal) / 2);
+    _snap(tall ? _tallHeight : normal, tall: tall);
+  }
+
+  void _snap(double target, {required bool tall}) {
+    void done() {
+      if (mounted && !tall) setState(() => _sized = false);
+    }
+
+    if (MetraMotion.reduced(context)) {
+      _height.value = target;
+      return done();
+    }
+    _height
+        .animateTo(
+          target,
+          duration: MetraMotion.arrive,
+          curve: MetraMotion.arriveCurve,
+        )
+        .whenCompleteOrCancel(done);
+  }
+
+  /// TalkBack and a tap: switch between normal and tall.
+  void _toggle() {
+    if (_keyboard) return;
+    _start(DragStartDetails());
+    final tall = !(_sized && _height.value >= _tallHeight - 1);
+    if (tall) _sized = true;
+    _snap(tall ? _tallHeight : _normal ?? 0, tall: tall);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final size = MediaQuery.sizeOf(context);
-    final padding = MediaQuery.paddingOf(context);
-    // Above the bar, or above the keyboard while searching.
-    final bottom = max(
-      size.height - anchor.top + 18,
-      MediaQuery.viewInsetsOf(context).bottom + 8,
-    );
-    final maxHeight = min(470.0, size.height - bottom - padding.top - 16);
+    final anchor = widget.anchor;
+    final bottom = _bottom;
+    final normalMax = min(470.0, _tallHeight);
+    final tall = _sized && _height.value > (_normal ?? 0) + 0.5;
+    final height = _sized ? _height.value : null;
     return Stack(
       children: [
         Positioned.fill(
@@ -103,25 +209,92 @@ class _QuickPickLayer extends StatelessWidget {
           ),
         ),
         Positioned(
-          left: anchor.left + inset,
-          right: size.width - anchor.right + inset,
-          bottom: bottom,
+          left: anchor.left + widget.inset,
+          right: size.width - anchor.right + widget.inset,
+          bottom: bottom - _down,
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: max(0, maxHeight)),
-            child: Material(
-              color: colors.sheet,
-              clipBehavior: Clip.antiAlias,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: colors.border),
+            key: _panel,
+            constraints: height == null
+                ? BoxConstraints(maxHeight: max(0, normalMax))
+                : BoxConstraints.tightFor(height: max(0, height)),
+            child: Semantics(
+              customSemanticsActions: _keyboard
+                  ? null
+                  : {
+                      CustomSemanticsAction(
+                        label: tall
+                            ? 'Make the list shorter'
+                            : 'Make the list taller',
+                      ): _toggle,
+                    },
+              child: Material(
+                color: colors.sheet,
+                clipBehavior: Clip.antiAlias,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(color: colors.border),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _handle(colors),
+                    Flexible(
+                      fit: height == null ? FlexFit.loose : FlexFit.tight,
+                      child: _FillsPanel(
+                        fills: height != null,
+                        child: widget.child,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: child,
             ),
           ),
         ),
       ],
     );
   }
+
+  /// 36×4 in a 24px drag area, centered at the panel's top edge.
+  /// Screen readers get it as an action on the panel ([build]).
+  Widget _handle(MetraColors colors) => ExcludeSemantics(
+    child: GestureDetector(
+      key: QuickPick.handleKey,
+      behavior: HitTestBehavior.opaque,
+      onVerticalDragStart: _keyboard ? null : _start,
+      onVerticalDragUpdate: _keyboard ? null : _update,
+      onVerticalDragEnd: _keyboard ? null : _end,
+      child: SizedBox(
+        height: QuickPick.handleArea,
+        child: Center(
+          child: Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              // The resting-beat grey (#3A3A3A).
+              color: colors.beatResting,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// Tells the panel's list whether to fill a set height (tall, or while
+/// dragged) or size to its rows.
+class _FillsPanel extends InheritedWidget {
+  const _FillsPanel({required this.fills, required super.child});
+
+  final bool fills;
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_FillsPanel>()?.fills ?? false;
+
+  @override
+  bool updateShouldNotify(_FillsPanel old) => old.fills != fills;
 }
 
 /// Dims everything except [hole] (the bottom bar).
@@ -163,6 +336,13 @@ class QuickPick extends StatefulWidget {
 
   static const searchAbove = 8;
   static const outsideKey = Key('quick-pick-outside');
+  static const handleKey = Key('quick-pick-handle');
+
+  /// The handle's drag area; a drag down from normal past [closeDrag], or
+  /// a flick faster than [flick] (dp/s), closes or snaps.
+  static const handleArea = 24.0;
+  static const closeDrag = 80.0;
+  static const flick = 700.0;
   static const songLibraryKey = Key('quick-pick-song-library');
   static const setHeaderKey = Key('quick-pick-set-header');
   static const changeSetKey = Key('quick-pick-change-set');
@@ -1591,6 +1771,7 @@ class _Panel extends StatelessWidget {
         // The lists' scroll slop: past it, vertical movement scrolls and a
         // pending long-press is off.
         Flexible(
+          fit: _FillsPanel.of(context) ? FlexFit.tight : FlexFit.loose,
           // Where committed rows slide off and the gap closes.
           child: RowExitHost(
             child: MediaQuery(

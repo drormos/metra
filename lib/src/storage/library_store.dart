@@ -19,6 +19,9 @@ class LibraryStore {
   /// nothing, for a file from a newer app version
   /// ([NewerLibraryException]) or one that can't be kept aside: saving
   /// over it would lose it.
+  /// Whether a library was ever saved here (false on a fresh install).
+  Future<bool> exists() => file.exists();
+
   Future<Library> load() async {
     if (!await file.exists()) return Library.empty;
     try {

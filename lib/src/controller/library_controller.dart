@@ -12,8 +12,59 @@ import 'metronome_controller.dart';
 class LibraryController extends ChangeNotifier {
   LibraryController._(this._store, this._library);
 
-  static Future<LibraryController> load(LibraryStore store) async =>
-      LibraryController._(store, await store.load());
+  /// Notes whether this is a fresh install ([freshInstall]); the app then
+  /// adds the examples ([addExamples]).
+  static Future<LibraryController> load(LibraryStore store) async {
+    final fresh = !await store.exists();
+    return LibraryController._(store, await store.load())
+      .._freshInstall = fresh;
+  }
+
+  /// This launch is the first ever (nothing was saved before it).
+  bool get freshInstall => _freshInstall;
+  bool _freshInstall = false;
+
+  static const examplesTip = 'examples-added';
+
+  /// ui-spec.md "Example content": 4 songs and the set "Try me", so every
+  /// list has something to show. Only into an empty library, and only
+  /// once ever (stored flag): never re-created after deletion, never
+  /// added to a library that has songs (an update, a restored backup).
+  void addExamples() {
+    if (tipSeen(examplesTip) || songs.isNotEmpty || setlists.isNotEmpty) {
+      return;
+    }
+    const a = StepLevel.accent;
+    const n = StepLevel.normal;
+    final examples = [
+      addSong(
+        name: 'Example · Rock',
+        bpm: 120,
+        pattern: const MetronomePattern.standard(),
+      ),
+      addSong(
+        name: 'Example · Waltz',
+        bpm: 90,
+        pattern: MetronomePattern.simple(beatsPerBar: 3, stepsPerBeat: 1),
+      ),
+      addSong(
+        name: 'Example · Shuffle',
+        bpm: 100,
+        pattern: MetronomePattern.simple(beatsPerBar: 4, stepsPerBeat: 3),
+      ),
+      addSong(
+        name: 'Example · Odd',
+        bpm: 140,
+        pattern: MetronomePattern.fromBeats(
+          [a, n, a, n, a, n, n],
+          stepsPerBeat: 1,
+          beatUnit: 8,
+        ),
+      ),
+    ];
+    saveSetlist(name: 'Try me', songIds: [for (final s in examples) s.id]);
+    markTipSeen(examplesTip);
+  }
 
   final LibraryStore _store;
   Library _library;

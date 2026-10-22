@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'editor_scaffold.dart';
 import 'haptics.dart';
 import 'theme.dart';
+import '../model/whats_new.dart';
 
 /// Menu > About (ui-spec.md "Menu"): Send feedback, About Metra, and the
 /// version line.
@@ -128,6 +129,8 @@ class AboutScreen extends StatelessWidget {
       'full of ads, or missing the one thing I needed on stage.\n\n'
       'So I built my own, with everything I wanted, and made it free.';
 
+  static const allUpdatesKey = Key('about-all-updates');
+
   static const promise =
       'No ads, no account, no tracking. Your songs stay on your phone.';
 
@@ -159,6 +162,73 @@ class AboutScreen extends StatelessWidget {
                       color: colors.muted,
                     ),
                   ),
+                  const SizedBox(height: 24),
+                  // Always findable, after "Got it" too.
+                  if (WhatsNew.releases.isNotEmpty)
+                    ListTile(
+                      key: AboutScreen.allUpdatesKey,
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('All updates'),
+                      trailing: Icon(Icons.chevron_right, color: colors.muted),
+                      onTap: () => openAllUpdates(context),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> openAllUpdates(BuildContext context) => Navigator.push(
+  context,
+  MaterialPageRoute<void>(builder: (_) => const AllUpdatesScreen()),
+);
+
+/// Every version from `assets/whats_new.md`, newest first: a small
+/// heading ("1.4.0 · Oct 2026") with its lines (ui-spec.md "What's new").
+class AllUpdatesScreen extends StatelessWidget {
+  const AllUpdatesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const BackBar(title: 'All updates'),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                children: [
+                  for (final release in WhatsNew.releases) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16, bottom: 6),
+                      child: Semantics(
+                        header: true,
+                        child: Text(
+                          release.heading,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: colors.muted,
+                          ),
+                        ),
+                      ),
+                    ),
+                    for (final line in release.lines)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: Text(
+                          '·  $line',
+                          style: const TextStyle(fontSize: 16, height: 1.4),
+                        ),
+                      ),
+                  ],
                 ],
               ),
             ),

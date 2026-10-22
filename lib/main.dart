@@ -16,6 +16,7 @@ import 'src/controller/keep_awake.dart';
 import 'src/controller/library_controller.dart';
 import 'src/controller/metronome_controller.dart';
 import 'src/model/library.dart';
+import 'src/model/whats_new.dart';
 import 'src/platform/android_bridge.dart';
 import 'src/storage/library_store.dart';
 import 'src/ui/haptics.dart';
@@ -46,6 +47,13 @@ Future<void> main() async {
   }
   if (controller != null) {
     (library, libraryProblem) = await _loadLibrary();
+    // A fresh install gets the example songs and set; the What's new of
+    // the version it installed counts as seen.
+    await WhatsNew.load();
+    if (library != null && library.freshInstall) {
+      library.addExamples();
+      WhatsNew.markSeen(library);
+    }
     library?.attach(controller);
     // A fresh launch is always Free play, with the click as it last
     // sounded; the song stays as stored (ui-spec.md "Modes").

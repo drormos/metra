@@ -1217,4 +1217,82 @@ void main() {
     await tester.pump();
     expect(tester.getTopLeft(row(0)).dx, x, reason: 'instant');
   });
+
+  group('taller panel', () {
+    Finder handle() => find.byKey(QuickPick.handleKey);
+    Rect panel(WidgetTester tester) => tester.getRect(
+      find.ancestor(of: handle(), matching: find.byType(Material)).first,
+    );
+
+    testWidgets('opens normal; dragged up past half it snaps tall (up to '
+        'just under the status bar); a short drag snaps back', (tester) async {
+      await pump(tester);
+      await openPanel(tester);
+      final normal = panel(tester);
+      expect(tester.getSize(handle()).height, QuickPick.handleArea);
+      await tester.drag(handle(), const Offset(0, -40));
+      await tester.pumpAndSettle();
+      expect(panel(tester), normal, reason: 'nearer normal');
+      await tester.drag(handle(), Offset(0, -(normal.top - 8) * 0.7));
+      await tester.pumpAndSettle();
+      final tall = panel(tester);
+      expect(tall.top, closeTo(8, 1), reason: 'the full space above');
+      expect(tall.bottom, normal.bottom, reason: 'the bar stays visible');
+      // The list fills it: the pinned button sits at the bottom.
+      expect(
+        tester.getRect(find.byKey(QuickPick.addSongsKey)).bottom,
+        closeTo(tall.bottom, 16),
+      );
+      // Back from tall closes (not "back to normal").
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(QuickPick), findsNothing);
+      await openPanel(tester);
+      expect(panel(tester), normal, reason: 'always opens normal');
+    });
+
+    testWidgets('a flick up goes tall; one down from tall goes normal', (
+      tester,
+    ) async {
+      await pump(tester);
+      await openPanel(tester);
+      final normal = panel(tester);
+      await tester.fling(handle(), const Offset(0, -60), 1500);
+      await tester.pumpAndSettle();
+      expect(panel(tester).top, closeTo(8, 1));
+      await tester.fling(handle(), const Offset(0, 60), 1500);
+      await tester.pumpAndSettle();
+      expect(panel(tester), normal);
+      expect(find.byType(QuickPick), findsOneWidget);
+    });
+
+    testWidgets('dragged down from normal it follows and closes', (
+      tester,
+    ) async {
+      await pump(tester);
+      await openPanel(tester);
+      final normal = panel(tester);
+      final gesture = await tester.startGesture(tester.getCenter(handle()));
+      await gesture.moveBy(const Offset(0, 20));
+      await gesture.moveBy(const Offset(0, 40));
+      await tester.pump();
+      expect(panel(tester).top, greaterThan(normal.top), reason: 'follows');
+      await gesture.moveBy(const Offset(0, 80));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(find.byType(QuickPick), findsNothing);
+    });
+
+    testWidgets('with the keyboard up the handle does nothing', (tester) async {
+      await pump(tester);
+      await openPanel(tester);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pump();
+      final before = panel(tester);
+      await tester.drag(handle(), const Offset(0, -200));
+      await tester.pumpAndSettle();
+      expect(panel(tester), before);
+    });
+  });
 }
