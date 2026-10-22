@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -43,6 +44,7 @@ class PanelMotion extends StatefulWidget {
   static const backFade = 0.15;
   static const openScale = 0.96;
   static const settle = Duration(milliseconds: 180);
+  static const grabKey = Key('panel-grab');
 
   static PanelMotionState of(BuildContext context) =>
       context.findAncestorStateOfType<PanelMotionState>()!;
@@ -79,11 +81,27 @@ class PanelMotionState extends State<PanelMotion>
     super.dispose();
   }
 
-  Rect? get _panelRect {
+  /// The layout box: the panel and its grab strip's outside part.
+  Rect? get _boxRect {
     final box = _panelKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize) return null;
     return box.localToGlobal(Offset.zero) & box.size;
   }
+
+  Rect? get _panelRect {
+    final rect = _boxRect;
+    if (rect == null) return null;
+    // Without the grab strip's outside part.
+    return widget.edge == PanelEdge.top
+        ? Rect.fromLTRB(rect.left, rect.top, rect.right, rect.bottom - grabOut)
+        : Rect.fromLTRB(rect.left, rect.top + grabOut, rect.right, rect.bottom);
+  }
+
+  /// The grab strip (ui-spec.md "The grab handle has a generous grab
+  /// area"): the panel's full width, [grabIn] inside the handle's edge and
+  /// [grabOut] outside it, onto the dim.
+  static const grabIn = 24.0;
+  static const grabOut = 24.0;
 
   /// How far the panel still has to travel to be off its edge.
   double get _toGo {
@@ -193,14 +211,59 @@ class PanelMotionState extends State<PanelMotion>
     return (_shown * swipe.clamp(0.0, 1.0)).clamp(0.0, 1.0);
   }
 
-  /// [child] (the panel's box) with the motion applied.
-  Widget panel(Widget child) {
+  /// [child] (the panel's box) with the motion applied, and its grab
+  /// strip: a drag starting anywhere in it goes to [onGrabStart] /
+  /// [onGrabUpdate] / [onGrabEnd] (the panel's own drag: null while it
+  /// can't be dragged); a tap in its outside part closes, as the dim does.
+  /// The panel's layout box grows by [grabOut] on the handle's edge,
+  /// transparent.
+  Widget panel(
+    Widget child, {
+    GestureDragStartCallback? onGrabStart,
+    GestureDragUpdateCallback? onGrabUpdate,
+    GestureDragEndCallback? onGrabEnd,
+  }) {
+    final top = widget.edge == PanelEdge.top;
+    final grabbed = Stack(
+      children: [
+        Padding(
+          padding: top
+              ? const EdgeInsets.only(bottom: grabOut)
+              : const EdgeInsets.only(top: grabOut),
+          child: child,
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          top: top ? null : 0,
+          bottom: top ? 0 : null,
+          height: grabIn + grabOut,
+          child: GestureDetector(
+            key: PanelMotion.grabKey,
+            behavior: HitTestBehavior.opaque,
+            // 1:1 from the touch, not from where the drag was recognized.
+            dragStartBehavior: DragStartBehavior.down,
+            excludeFromSemantics: true,
+            onVerticalDragStart: onGrabStart ?? (_) {},
+            onVerticalDragUpdate: onGrabUpdate,
+            onVerticalDragEnd: onGrabEnd,
+            onTapUp: (d) {
+              final outside = top
+                  ? d.localPosition.dy > grabIn
+                  : d.localPosition.dy < grabOut;
+              final route = widget.route;
+              if (outside && route.isCurrent) route.navigator?.pop();
+            },
+          ),
+        ),
+      ],
+    );
     final shown = _shown;
     final back = _back.value;
     final scale =
         (PanelMotion.openScale + (1 - PanelMotion.openScale) * shown) *
         (1 - (1 - PanelMotion.backScale) * back);
-    final rect = _panelRect;
+    final rect = _boxRect;
     // About the button: as a fraction of the panel (the first frame, at
     // opacity 0, uses its centre).
     final alignment = rect == null || rect.isEmpty
@@ -219,7 +282,7 @@ class PanelMotionState extends State<PanelMotion>
           child: Transform.scale(
             scale: scale,
             alignment: alignment,
-            child: child,
+            child: grabbed,
           ),
         ),
       ),

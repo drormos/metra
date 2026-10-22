@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import 'panel_motion.dart';
@@ -163,29 +164,40 @@ class _TopPanelPage extends StatelessWidget {
           top: top,
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxHeight: (bottom - top).clamp(120.0, screen.height),
+              // The grab strip reaches past the panel's bottom edge.
+              maxHeight: (bottom - top + PanelMotionState.grabOut).clamp(
+                120.0,
+                screen.height,
+              ),
             ),
-            // Swiped up it follows 1:1; past a third, or on a flick, it
-            // flies off the top; otherwise it springs back.
+            // Swiped up (on the panel or its grab strip) it follows 1:1;
+            // past a third, or on a flick, it flies off the top; otherwise
+            // it springs back.
             child: GestureDetector(
+              dragStartBehavior: DragStartBehavior.down,
               onVerticalDragUpdate: (d) => motion.dragBy(d.delta.dy),
-              onVerticalDragEnd: (d) {
-                // Up is negative.
-                final v = d.velocity.pixelsPerSecond.dy;
-                motion.release(
-                  velocity: v,
-                  close:
-                      -v > RowGestures.closeFlick ||
-                      (motion.dragged >
-                              RowGestures.closeFraction * motion.panelHeight &&
-                          v <= RowGestures.closeFlick),
-                );
-              },
-              child: motion.panel(_surface(context, colors)),
+              onVerticalDragEnd: (d) => _release(motion, d),
+              child: motion.panel(
+                _surface(context, colors),
+                onGrabUpdate: (d) => motion.dragBy(d.delta.dy),
+                onGrabEnd: (d) => _release(motion, d),
+              ),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  static void _release(PanelMotionState motion, DragEndDetails d) {
+    // Up is negative.
+    final v = d.velocity.pixelsPerSecond.dy;
+    motion.release(
+      velocity: v,
+      close:
+          -v > RowGestures.closeFlick ||
+          (motion.dragged > RowGestures.closeFraction * motion.panelHeight &&
+              v <= RowGestures.closeFlick),
     );
   }
 

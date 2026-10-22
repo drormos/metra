@@ -268,6 +268,11 @@ class _QuickPickLayerState extends State<_QuickPickLayer>
                   ),
                 ),
               ),
+              // The grab strip: the handle's drag (taller, shorter, close),
+              // inert while the keyboard is up.
+              onGrabStart: _keyboard ? null : _start,
+              onGrabUpdate: _keyboard ? null : _update,
+              onGrabEnd: _keyboard ? null : _end,
             ),
           ),
         ],
@@ -275,15 +280,12 @@ class _QuickPickLayerState extends State<_QuickPickLayer>
     );
   }
 
-  /// 36×4 in a 24px drag area, centered at the panel's top edge.
-  /// Screen readers get it as an action on the panel ([build]).
+  /// 36×4 in a 24px area, centered at the panel's top edge; dragged
+  /// through the panel's grab strip ([PanelMotionState.panel]). Screen
+  /// readers get it as an action on the panel ([build]).
   Widget _handle(MetraColors colors) => ExcludeSemantics(
-    child: GestureDetector(
+    child: KeyedSubtree(
       key: QuickPick.handleKey,
-      behavior: HitTestBehavior.opaque,
-      onVerticalDragStart: _keyboard ? null : _start,
-      onVerticalDragUpdate: _keyboard ? null : _update,
-      onVerticalDragEnd: _keyboard ? null : _end,
       child: SizedBox(
         height: QuickPick.handleArea,
         child: Center(

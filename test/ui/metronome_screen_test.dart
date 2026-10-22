@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:metra/src/ui/subdivision_icon.dart';
@@ -9,6 +8,7 @@ import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/model/on_start.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/on_start_sheet.dart';
+import 'package:metra/src/ui/panel_motion.dart';
 import 'package:metra/src/ui/value_stepper.dart';
 import 'package:metra/src/ui/poly_lane.dart';
 import 'package:metra/src/ui/tabular_text.dart';
@@ -478,6 +478,49 @@ void main() {
         }
         expect(frames, lessThanOrEqualTo(14), reason: '~180ms, no extra fade');
         expect(find.byType(TimeSignatureSheet), findsNothing);
+      });
+
+      testWidgets('the grab strip: full width, 24dp either side of the '
+          'bottom edge; a drag from it (even on the dim) grabs the panel 1:1; '
+          'a tap outside closes, inside does nothing', (tester) async {
+        tester.view
+          ..physicalSize = const Size(800, 1400)
+          ..devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await pumpScreen(tester);
+        await tester.tap(find.byKey(MetronomeScreen.meterKey));
+        await tester.pumpAndSettle();
+        final rect = tester.getRect(surface());
+        // Inside, near the left edge, by the handle's edge.
+        await tester.tapAt(Offset(rect.left + 6, rect.bottom - 12));
+        await tester.pumpAndSettle();
+        expect(surface(), findsOneWidget, reason: 'an inside tap stays');
+        // Starting 20dp below the panel, on the dim: grabs it.
+        final gesture = await tester.startGesture(
+          Offset(rect.right - 10, rect.bottom + 20),
+        );
+        for (var i = 0; i < 6; i++) {
+          await gesture.moveBy(const Offset(0, -10));
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        expect(tester.getRect(surface()).top, closeTo(rect.top - 60, 1));
+        await gesture.up();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(tester.getRect(surface()).top, rect.top, reason: 'sprang back');
+        await tester.timedDrag(
+          find.byKey(PanelMotion.grabKey),
+          Offset(0, -rect.height * 0.5),
+          const Duration(milliseconds: 600),
+        );
+        await tester.pumpAndSettle();
+        expect(surface(), findsNothing, reason: 'swiped off');
+        // A tap in the outside part closes, as the dim does.
+        await tester.tap(find.byKey(MetronomeScreen.meterKey));
+        await tester.pumpAndSettle();
+        await tester.tapAt(Offset(rect.center.dx, rect.bottom + 12));
+        await tester.pumpAndSettle();
+        expect(surface(), findsNothing);
       });
 
       testWidgets('predictive back: follows the gesture (1 → 0.9 toward the '

@@ -11,6 +11,7 @@ import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/editor_scaffold.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
+import 'package:metra/src/ui/panel_motion.dart';
 import 'package:metra/src/ui/top_panel.dart';
 import 'package:metra/src/ui/quick_pick.dart';
 import 'package:metra/src/ui/setlist_group.dart';
@@ -154,6 +155,54 @@ void main() {
         top = now;
       }
       expect(frames, lessThanOrEqualTo(14));
+    });
+
+    testWidgets('the grab strip reaches 24dp above the panel: a drag from '
+        'there grabs it (down to close, up to tall); a tap there closes', (
+      tester,
+    ) async {
+      await pump(tester);
+      await openPanel(tester);
+      final panel = tester.getRect(
+        // The panel's surface (its handle sits above the list).
+        find
+            .ancestor(
+              of: find.byType(QuickPick),
+              matching: find.byType(Material),
+            )
+            .first,
+      );
+      final strip = tester.getRect(find.byKey(PanelMotion.grabKey));
+      expect(strip.width, panel.width, reason: 'full width');
+      expect(strip.top, closeTo(panel.top - 24, 1));
+      expect(strip.bottom, closeTo(panel.top + 24, 1));
+      final top = strip.top;
+      expect(top, lessThan(panel.top));
+      final above = Offset(panel.left + 8, panel.top - 16);
+      // Up from above the panel: taller.
+      await tester.dragFrom(above, const Offset(0, -300));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getRect(find.byType(QuickPick)).top,
+        lessThan(panel.top - 100),
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(QuickPick), findsNothing, reason: 'Back from tall');
+      // Down from above the panel: follows, then closes.
+      await openPanel(tester);
+      await tester.timedDrag(
+        find.byKey(PanelMotion.grabKey),
+        const Offset(0, QuickPick.closeDrag + 60),
+        const Duration(milliseconds: 600),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(QuickPick), findsNothing);
+      // A tap above the panel's edge closes, as the dim does.
+      await openPanel(tester);
+      await tester.tapAt(Offset(panel.center.dx, panel.top - 12));
+      await tester.pumpAndSettle();
+      expect(find.byType(QuickPick), findsNothing);
     });
 
     testWidgets('a touch that starts on the dim closes the panel on touch-up, '
