@@ -62,4 +62,25 @@ void main() {
     // 60000 / 461 = 130.15
     expect(tapAt([0, 461]), 130);
   });
+
+  test('slow tempos: a gap up to twice the last interval keeps going', () {
+    final tap = TapTempo(minBpm: 30, maxBpm: 300);
+    const s = Duration(milliseconds: 1000);
+    expect(tap.tap(Duration.zero), isNull);
+    expect(tap.tap(s * 1.9), 32); // interval 1.9 s
+    expect(tap.tap(s * 3.8), 32);
+    // 2.2 s later: over 2 s, but under twice 1.9 s: still the same run.
+    expect(tap.tap(s * 6.0), isNotNull);
+    // Over twice the last interval (2.2 s → 4.4 s): starts over.
+    expect(tap.tap(s * 10.5), isNull);
+  });
+
+  test('fast tempos still reset after 2 s', () {
+    final tap = TapTempo(minBpm: 30, maxBpm: 300);
+    const ms = Duration(milliseconds: 1);
+    tap
+      ..tap(Duration.zero)
+      ..tap(ms * 500);
+    expect(tap.tap(ms * 2600), isNull, reason: '2.1 s > max(2 s, 1 s)');
+  });
 }

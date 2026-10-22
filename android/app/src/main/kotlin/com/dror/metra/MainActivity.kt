@@ -2,6 +2,7 @@ package com.dror.metra
 
 import android.content.Intent
 import android.content.res.Resources
+import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 import com.ryanheise.audioservice.AudioServiceActivity
@@ -16,6 +17,9 @@ class MainActivity : AudioServiceActivity() {
         // Before the engine: Dart picks it up with "takePendingStart".
         if (intent?.action == TileBridge.ACTION_START) TileBridge.pendingStart = true
         super.onCreate(savedInstanceState)
+        // Volume keys change media volume in the app even while stopped,
+        // never the ringer.
+        volumeControlStream = AudioManager.STREAM_MUSIC
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

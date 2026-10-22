@@ -1009,4 +1009,65 @@ void main() {
       expect(library.activeSetlist?.name, 'Friday set', reason: 'not loaded');
     });
   });
+
+  group('Back, one level at a time', () {
+    testWidgets('rename → dialog → sets view → panel → main; only the bare '
+        'main screen leaves the app', (tester) async {
+      await pump(tester);
+      await openPanel(tester);
+      await tester.tap(find.byKey(QuickPick.changeSetKey));
+      await tester.pumpAndSettle();
+      Finder set(String name) => find.byKey(
+        ValueKey(
+          'quick-set-${library.setlists.firstWhere((l) => l.name == name).id}',
+        ),
+      );
+      Future<bool> back() async {
+        final handled = await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        return handled;
+      }
+
+      await tester.longPress(set('Saturday set'));
+      await tester.pumpAndSettle();
+      expect(await back(), isTrue);
+      expect(find.byKey(QuickPick.renameFieldKey), findsNothing, reason: '1');
+      expect(find.byKey(QuickPick.newSetlistKey), findsOneWidget);
+
+      await tester.drag(set('Saturday set'), const Offset(-300, 0));
+      await tester.pumpAndSettle();
+      expect(find.byKey(deleteConfirmKey), findsOneWidget);
+      expect(await back(), isTrue);
+      expect(find.byKey(deleteConfirmKey), findsNothing, reason: '2: Cancel');
+      expect(library.setlists, hasLength(2));
+      expect(find.byKey(QuickPick.newSetlistKey), findsOneWidget);
+
+      expect(await back(), isTrue);
+      expect(find.byKey(QuickPick.changeSetKey), findsOneWidget, reason: '3');
+
+      expect(await back(), isTrue);
+      expect(find.byType(QuickPick), findsNothing, reason: '4: closed');
+
+      await tester.tap(find.byKey(MetronomeScreen.meterKey));
+      await tester.pumpAndSettle();
+      expect(await back(), isTrue);
+      expect(find.byType(BottomSheet), findsNothing, reason: '5: sheet');
+
+      expect(await back(), isFalse, reason: 'the bare main screen: leave');
+    });
+
+    testWidgets('Back never stops the click', (tester) async {
+      await pump(tester);
+      await metronome.play();
+      await tester.tap(find.byKey(SetlistGroup.headerKey));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.binding.handlePopRoute();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byType(QuickPick), findsNothing);
+      expect(await tester.binding.handlePopRoute(), isFalse);
+      expect(metronome.isPlaying, isTrue);
+      metronome.stop();
+      await tester.pump();
+    });
+  });
 }

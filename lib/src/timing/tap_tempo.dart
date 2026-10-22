@@ -1,7 +1,8 @@
 /// Tap tempo from monotonic tap times (pass a `Stopwatch.elapsed`).
 ///
 /// Uses the intervals between the last 4 taps, drops any more than 30% off
-/// their median, and averages the rest. A gap over 2 s starts over.
+/// their median, and averages the rest. A gap over 2 s, or over twice the
+/// last interval if that's longer (slow tempos near 30 bpm), starts over.
 class TapTempo {
   TapTempo({required this.minBpm, required this.maxBpm});
 
@@ -14,10 +15,16 @@ class TapTempo {
 
   final List<Duration> _taps = [];
 
+  Duration get _resetWindow {
+    if (_taps.length < 2) return _resetAfter;
+    final last = _taps[_taps.length - 1] - _taps[_taps.length - 2];
+    return last * 2 > _resetAfter ? last * 2 : _resetAfter;
+  }
+
   /// Records a tap at [time]; returns the tapped tempo, or null after the
   /// first tap of a sequence.
   int? tap(Duration time) {
-    if (_taps.isNotEmpty && time - _taps.last > _resetAfter) _taps.clear();
+    if (_taps.isNotEmpty && time - _taps.last > _resetWindow) _taps.clear();
     _taps.add(time);
     if (_taps.length > _maxTaps) _taps.removeAt(0);
     if (_taps.length < 2) return null;
