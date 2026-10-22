@@ -58,6 +58,30 @@ class MetronomeScreen extends StatelessWidget {
   static const tempoNameKey = Key('tempo-name');
   static const meterKey = Key('meter');
   static const onStartKey = Key('on-start');
+  static const meterLabelKey = Key('meter-label');
+
+  /// The "4/4" label: one line exactly the font size tall, its leading
+  /// split evenly above and below.
+  static const meterLabelStyle = TextStyle(
+    fontFamily: MetraFonts.condensed,
+    fontSize: 22,
+    fontWeight: FontWeight.w700,
+    height: 1,
+    leadingDistribution: TextLeadingDistribution.even,
+  );
+  static const _meterStrut = StrutStyle(
+    fontFamily: MetraFonts.condensed,
+    fontSize: 22,
+    fontWeight: FontWeight.w700,
+    height: 1,
+    leadingDistribution: TextLeadingDistribution.even,
+    forceStrutHeight: true,
+  );
+  static const _meterLine = TextHeightBehavior(
+    applyHeightToFirstAscent: false,
+    applyHeightToLastDescent: false,
+    leadingDistribution: TextLeadingDistribution.even,
+  );
   static const countInLineKey = Key('count-in-line');
   static const revertKey = Key('revert');
   static const firstChangeKey = Key('first-change-line');
@@ -478,25 +502,33 @@ class MetronomeScreen extends StatelessWidget {
                   // that shrinks rather than growing the box.
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
-                    child: DefaultTextStyle.merge(
-                      style: const TextStyle(
-                        fontFamily: MetraFonts.condensed,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        height: 1,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(pattern.timeSignature),
-                          if (pattern.stepsPerBeat > 1) ...[
-                            const SizedBox(width: 5),
-                            SubdivisionIcon(pattern.stepsPerBeat, size: 20),
-                          ],
-                          if (pattern.polyrhythm > 0)
-                            Text(' · ${pattern.polyrhythm}'),
+                    // A symmetric line box: the font's ascent (1.135 em) is
+                    // much taller than its descent (0.439), so proportional
+                    // leading set the digits ~0.12 em above centre; even
+                    // leading centres their cap height (0.688) within
+                    // 0.004 em. The note icon is centred on the same line.
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          pattern.timeSignature,
+                          key: meterLabelKey,
+                          style: meterLabelStyle,
+                          strutStyle: _meterStrut,
+                          textHeightBehavior: _meterLine,
+                        ),
+                        if (pattern.stepsPerBeat > 1) ...[
+                          const SizedBox(width: 5),
+                          SubdivisionIcon(pattern.stepsPerBeat, size: 20),
                         ],
-                      ),
+                        if (pattern.polyrhythm > 0)
+                          Text(
+                            ' · ${pattern.polyrhythm}',
+                            style: meterLabelStyle,
+                            strutStyle: _meterStrut,
+                            textHeightBehavior: _meterLine,
+                          ),
+                      ],
                     ),
                   ),
                 ),

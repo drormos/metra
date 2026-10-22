@@ -2,6 +2,8 @@ import 'dart:ui' show SemanticsAction;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:metra/src/ui/subdivision_icon.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
@@ -549,6 +551,51 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('the 4/4 label is optically centred in its 44px box (cap '
+      'height, real font); the note icon on the same line', (tester) async {
+    await tester.runAsync(() async {
+      final loader = FontLoader(MetraFonts.condensed)
+        ..addFont(rootBundle.load('assets/fonts/SairaExtraCondensed-Bold.ttf'));
+      await loader.load();
+    });
+    controller
+      ..setPattern(MetronomePattern.simple(beatsPerBar: 4, stepsPerBeat: 2))
+      ..setPolyrhythm(3);
+    await pumpScreen(tester);
+    await tester.pump();
+    final box = tester.getRect(
+      find.descendant(
+        of: find.byKey(MetronomeScreen.meterKey),
+        matching: find.byType(Material),
+      ),
+    );
+    final label = tester.renderObject<RenderParagraph>(
+      find.descendant(
+        of: find.byKey(MetronomeScreen.meterLabelKey),
+        matching: find.byType(RichText),
+      ),
+    );
+    final top = label.localToGlobal(Offset.zero).dy;
+    final painter = TextPainter(
+      text: label.text,
+      textDirection: TextDirection.ltr,
+      strutStyle: label.strutStyle,
+      textHeightBehavior: label.textHeightBehavior,
+    )..layout();
+    expect(painter.height, label.size.height, reason: 'the same layout');
+    final baseline =
+        top + painter.computeDistanceToActualBaseline(TextBaseline.alphabetic);
+    painter.dispose();
+    // OS/2 sCapHeight of SairaExtraCondensed-Bold: 688 / 1000 em.
+    const fontSize = 22.0;
+    final capTop = baseline - 0.688 * fontSize;
+    final above = capTop - (box.top + 2); // inside the 2px border
+    final below = (box.bottom - 2) - baseline;
+    expect(above, closeTo(below, 0.5));
+    final icon = tester.getRect(find.byType(SubdivisionIcon));
+    expect(icon.center.dy, closeTo((capTop + baseline) / 2, 1));
+  });
 
   group('when I press Start', () {
     // Null: the theme's plain outline.
