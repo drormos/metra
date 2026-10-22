@@ -112,13 +112,7 @@ class MetronomeScreen extends StatelessWidget {
                   // itself to the content width.
                   if (library != null) ...[
                     const SizedBox(height: 12),
-                    KeyedSubtree(
-                      key: TopPanel.bottomKey,
-                      child: SetlistGroup(
-                        library: library,
-                        metronome: controller,
-                      ),
-                    ),
+                    SetlistGroup(library: library, metronome: controller),
                     SizedBox(height: gestureGap),
                   ],
                 ],

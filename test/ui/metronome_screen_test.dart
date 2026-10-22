@@ -299,6 +299,49 @@ void main() {
       await tester.pump();
     });
 
+    for (final (size, fits) in [
+      (const Size(412, 915), true),
+      (const Size(360, 560), false),
+    ]) {
+      testWidgets('panels fit their content down to 16px above the bottom '
+          '(over the gesture bar): ${size.width.toInt()}×'
+          '${size.height.toInt()}', (tester) async {
+        tester.view
+          ..physicalSize = size
+          ..devicePixelRatio = 1
+          ..padding = const FakeViewPadding(bottom: 24)
+          ..viewPadding = const FakeViewPadding(bottom: 24);
+        addTearDown(tester.view.reset);
+        controller.setPolyrhythm(3);
+        await pumpScreen(tester);
+        for (final button in [
+          MetronomeScreen.meterKey,
+          MetronomeScreen.onStartKey,
+        ]) {
+          await tester.tap(find.byKey(button));
+          await tester.pumpAndSettle();
+          final panel = tester.getRect(find.byKey(TopPanel.surfaceKey));
+          final scroll = tester
+              .state<ScrollableState>(
+                find.descendant(
+                  of: find.byKey(TopPanel.surfaceKey),
+                  matching: find.byType(Scrollable),
+                ),
+              )
+              .position;
+          expect(panel.bottom, lessThanOrEqualTo(size.height - 24 - 16));
+          if (fits || button == MetronomeScreen.onStartKey) {
+            expect(scroll.maxScrollExtent, 0, reason: 'opens fully');
+          } else {
+            expect(panel.bottom, size.height - 24 - 16);
+            expect(scroll.maxScrollExtent, greaterThan(0));
+          }
+          await tester.tapAt(Offset(4, size.height - 4));
+          await tester.pumpAndSettle();
+        }
+      });
+    }
+
     testWidgets('time signature picker sets the meter', (tester) async {
       await pumpScreen(tester);
       await pick(tester, MetronomeScreen.meterKey, '7/8');

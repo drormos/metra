@@ -6,15 +6,14 @@ import 'theme.dart';
 /// A panel that drops down from the top row (ui-spec.md "Top panels"):
 /// the stopwatch's "When I press Start" and the "4/4" button's Rhythm. It
 /// sits just under the top row, 12px from the screen edges, fits its
-/// content (scrolling inside when taller than the space above the context
-/// row); the screen below the top row is dimmed, the top row stays sharp
+/// content, down to 16px above the screen's bottom (over the dimmed
+/// context row; taller content scrolls inside); the screen below the top
+/// row is dimmed, the top row stays sharp
 /// and usable. Tap outside, the same button again, Back, or a swipe up
 /// closes it. The click keeps playing.
 abstract final class TopPanel {
-  /// The main screen's top row and context row, which the panel fits
-  /// between.
+  /// The main screen's top row, which the panel hangs under.
   static final topRowKey = GlobalKey(debugLabel: 'top-row');
-  static final bottomKey = GlobalKey(debugLabel: 'context-row');
 
   static const surfaceKey = Key('top-panel');
   static const handleKey = Key('top-panel-handle');
@@ -131,12 +130,16 @@ class _TopPanelPage extends StatelessWidget {
     final screen = MediaQuery.sizeOf(context);
     final padding = MediaQuery.paddingOf(context);
     final top = _edge(TopPanel.topRowKey, bottom: true) ?? padding.top + 62;
-    final bottom = [
-      _edge(TopPanel.bottomKey, bottom: false) ??
-          screen.height - padding.bottom,
-      // Above the keyboard while a value is typed.
-      screen.height - MediaQuery.viewInsetsOf(context).bottom,
-    ].reduce((a, b) => a < b ? a : b);
+    // Down to 16px above the screen's bottom (above the gesture bar),
+    // over the dimmed context row and tabs; above the keyboard while a
+    // value is typed.
+    final bottom =
+        screen.height -
+        [
+          MediaQuery.viewPaddingOf(context).bottom,
+          MediaQuery.viewInsetsOf(context).bottom,
+        ].reduce((a, b) => a > b ? a : b) -
+        16;
     return AnimatedBuilder(
       animation: animation,
       builder: (context, panel) {
@@ -171,10 +174,7 @@ class _TopPanelPage extends StatelessWidget {
                   offset: Offset(0, -MetraMotion.arriveRise * (1 - t)),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
-                      maxHeight: (bottom - top - 12).clamp(
-                        120.0,
-                        screen.height,
-                      ),
+                      maxHeight: (bottom - top).clamp(120.0, screen.height),
                     ),
                     child: panel,
                   ),
