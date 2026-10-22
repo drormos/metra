@@ -47,8 +47,9 @@ void main() {
     );
     expect(old['Dead Weight'], 1, reason: 'drawn once, never dimmed');
     expect(current['Dead Weight'], 0);
-    expect(current[' 2'], closeTo(0.25, 0.02), reason: 'linear');
-    expect(current[' 2']! + old['']!, closeTo(1, 1e-9), reason: 'sum 1');
+    // The new leads: it's on its way in while the old is still full.
+    expect(current[' 2'], inExclusiveRange(0, 1));
+    expect(old[''], 1);
     // No Opacity anywhere: nothing dims as a whole.
     expect(find.byType(Opacity), findsNothing);
     await tester.pump(MetraMotion.dissolve);
@@ -65,13 +66,26 @@ void main() {
     await tester.pump(MetraMotion.dissolve * 0.3);
     final layers = tester.widgetList<Opacity>(find.byType(Opacity)).toList();
     expect(layers, hasLength(2));
-    expect(layers[0].opacity + layers[1].opacity, closeTo(1, 1e-9));
-    expect(layers[1].opacity, closeTo(0.3, 0.02), reason: 'linear');
+    expect(layers[0].opacity, 1, reason: 'the old waits for the new');
+    expect(layers[1].opacity, inExclusiveRange(0, 1));
     final baselines = [
       for (final b in tester.widgetList<Baseline>(find.byType(Baseline)))
         b.baseline,
     ];
     expect(baselines.toSet(), {30.0});
+  });
+
+  test('the new leads: the old stays full until the new is at 80%, then '
+      'fades over 90 ms; ~160 ms in all', () {
+    expect(MetraMotion.dissolve.inMilliseconds, inInclusiveRange(140, 170));
+    for (var ms = 0; ms <= MetraMotion.dissolve.inMilliseconds; ms += 5) {
+      final o = MetraMotion.dissolveAt(Duration(milliseconds: ms));
+      if (o.old < 1) expect(o.next, greaterThanOrEqualTo(0.8), reason: '$ms');
+      // Where strokes overlap, normal blending shows at least this much.
+      expect(1 - (1 - o.next) * (1 - o.old), greaterThan(0.95), reason: '$ms');
+    }
+    final end = MetraMotion.dissolveAt(MetraMotion.dissolve);
+    expect((end.next, end.old), (1.0, 0.0));
   });
 
   testWidgets('a rebuild with the same text: no animation', (tester) async {

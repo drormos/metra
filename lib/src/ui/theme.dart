@@ -198,10 +198,37 @@ abstract final class MetraMotion {
   static const swap = Duration(milliseconds: 120);
   static const swapCurve = Curves.easeInOut;
 
-  /// The BPM, title and set name: only what changes dissolves, old and
-  /// new on the same linear curve (their opacities always add up to full,
-  /// so nothing dims or blinks).
-  static const dissolve = Duration(milliseconds: 160);
+  /// The BPM, title and set name: only what changes dissolves, and the
+  /// new leads (ui-spec.md "Shared strokes stay bright"): it fades in over
+  /// [dissolveIn] (ease-out); once it's at [dissolveLead], the old fades
+  /// out over [dissolveOut]. Strokes the two share never dim.
+  static const dissolveIn = Duration(milliseconds: 90);
+  static const dissolveOut = Duration(milliseconds: 90);
+  static const dissolveLead = 0.8;
+  static const dissolveInCurve = Curves.easeOut;
+
+  /// When the old starts to fade: the new has reached [dissolveLead].
+  static final Duration dissolveOutStart = () {
+    var ms = 0;
+    while (dissolveInCurve.transform(ms / dissolveIn.inMilliseconds) <
+        dissolveLead) {
+      ms++;
+    }
+    return Duration(milliseconds: ms);
+  }();
+
+  /// The whole dissolve (~160ms).
+  static final Duration dissolve = dissolveOutStart + dissolveOut;
+
+  /// The new's and the old's opacity [elapsed] into a dissolve.
+  static ({double next, double old}) dissolveAt(Duration elapsed) {
+    double part(Duration from, Duration length) =>
+        ((elapsed - from).inMicroseconds / length.inMicroseconds).clamp(0, 1);
+    return (
+      next: dissolveInCurve.transform(part(Duration.zero, dissolveIn)),
+      old: 1 - part(dissolveOutStart, dissolveOut),
+    );
+  }
 
   /// Things going away: fade out (ease-in) while the height closes
   /// (ease-in-out).

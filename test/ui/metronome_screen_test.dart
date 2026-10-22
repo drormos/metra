@@ -1057,7 +1057,7 @@ void main() {
 
     for (final up in [true, false]) {
       testWidgets('BPM ${up ? 'up' : 'down'}: only the changed digit '
-          'dissolves in place; the others never dim; nothing moves', (
+          'dissolves in place, the new leading; the others never dim', (
         tester,
       ) async {
         controller.setBpm(up ? 120 : 121);
@@ -1079,8 +1079,8 @@ void main() {
             )
             .toList();
         expect(layers, hasLength(2), reason: 'only the units slot');
-        expect(layers[0].opacity + layers[1].opacity, closeTo(1, 1e-9));
-        expect(layers[1].opacity, closeTo(0.25, 0.02), reason: 'linear');
+        expect(layers[0].opacity, 1, reason: 'the old waits for the new');
+        expect(layers[1].opacity, inExclusiveRange(0, 1), reason: 'leads');
         // Old and new in the very same place.
         expect(at(find.text(up ? '0' : '1').last).center, units.center);
         expect(at(find.text(up ? '1' : '0').last).center, units.center);

@@ -69,8 +69,8 @@ class FitText extends StatelessWidget {
 
 /// A name that changes in place (ui-spec.md "Motion", steady dissolve):
 /// the title and set name. On a real change of [text], old and new are
-/// drawn in the same place, the old going 1 → 0 while the new goes 0 → 1
-/// on one linear curve, so nothing dims. At the same size, the characters
+/// drawn in the same place and the new leads ([MetraMotion.dissolveAt]),
+/// so strokes they share never dim. At the same size, the characters
 /// they share at the start stay still at full opacity and only the rest
 /// dissolves; at a different size (sized to fit first, down to
 /// [minFontSize]) the whole name dissolves. Both sit on [baseline] (from
@@ -164,6 +164,7 @@ class _DissolveTextState extends State<DissolveText>
         builder: (context, _) {
           final old = _old;
           final t = _dissolve.value;
+          final o = MetraMotion.dissolveAt(MetraMotion.dissolve * t);
           final current = Text(
             widget.text,
             key: widget.textKey,
@@ -180,7 +181,7 @@ class _DissolveTextState extends State<DissolveText>
                 _layer(
                   ExcludeSemantics(
                     child: Opacity(
-                      opacity: 1 - t,
+                      opacity: o.old,
                       child: _line(
                         TextSpan(text: old),
                         resolved.copyWith(fontSize: oldSize),
@@ -188,7 +189,7 @@ class _DissolveTextState extends State<DissolveText>
                     ),
                   ),
                 ),
-                _layer(Opacity(opacity: t, child: current)),
+                _layer(Opacity(opacity: o.next, child: current)),
               ],
             );
           }
@@ -212,7 +213,7 @@ class _DissolveTextState extends State<DissolveText>
                         TextSpan(text: old.substring(0, shared)),
                         TextSpan(
                           text: old.substring(shared),
-                          style: TextStyle(color: alpha(1 - t)),
+                          style: TextStyle(color: alpha(o.old)),
                         ),
                       ],
                     ),
@@ -233,7 +234,7 @@ class _DissolveTextState extends State<DissolveText>
                         ),
                         TextSpan(
                           text: text.substring(shared),
-                          style: TextStyle(color: alpha(t)),
+                          style: TextStyle(color: alpha(o.next)),
                         ),
                       ],
                     ),

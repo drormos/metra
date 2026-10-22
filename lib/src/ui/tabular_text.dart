@@ -79,9 +79,8 @@ class TabularText extends StatelessWidget {
 }
 
 /// One digit in its slot (ui-spec.md "Motion", steady dissolve): when it
-/// changes, old and new are drawn in the same place, the old going 1 → 0
-/// while the new goes 0 → 1 on the same linear curve, so together they
-/// are always fully bright.
+/// changes, old and new are drawn in the same place and the new leads
+/// ([MetraMotion.dissolveAt]), so strokes they share never dim.
 class _DissolveDigit extends StatefulWidget {
   const _DissolveDigit(
     this.digit, {
@@ -133,11 +132,12 @@ class _DissolveDigitState extends State<_DissolveDigit>
       final old = _old;
       final t = _dissolve.value;
       if (old == null || t >= 1) return _text(widget.digit);
+      final o = MetraMotion.dissolveAt(_dissolve.duration! * t);
       return Stack(
         alignment: Alignment.center,
         children: [
-          Opacity(opacity: 1 - t, child: _text(old)),
-          Opacity(opacity: t, child: _text(widget.digit)),
+          Opacity(opacity: o.old, child: _text(old)),
+          Opacity(opacity: o.next, child: _text(widget.digit)),
         ],
       );
     },
