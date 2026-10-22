@@ -461,4 +461,43 @@ void main() {
       expect(restart.level, StepLevel.accent);
     });
   });
+
+  group('count-in', () {
+    test('off by default; set notifies; play counts in', () async {
+      expect(controller.countIn, 0);
+      controller.setCountIn(1);
+      expect(notifications, 1);
+      await controller.play();
+      expect(controller.countingIn, isTrue);
+      expect(output.live.first.level, StepLevel.accent);
+      controller.stop();
+      expect(controller.countingIn, isFalse);
+    });
+
+    test(
+      'loadSong while playing counts in only with that song\'s count-in',
+      () async {
+        final waltz = MetronomePattern.simple(beatsPerBar: 3, stepsPerBeat: 2);
+        await controller.play();
+        output.time = _ms * 1500;
+        controller.loadSong(bpm: 60, pattern: waltz, countIn: 1);
+        expect(controller.countingIn, isTrue);
+        output.time = _ms * 2000;
+        controller.loadSong(bpm: 60, pattern: waltz, countIn: 0);
+        expect(controller.countingIn, isFalse);
+        expect(controller.countIn, 0);
+      },
+    );
+
+    test('the song editor preview never counts in', () async {
+      controller.setCountIn(2);
+      await controller.preview(
+        bpm: 90,
+        pattern: const MetronomePattern.standard(),
+      );
+      expect(controller.countingIn, isFalse);
+      controller.endPreview();
+      expect(controller.countIn, 2);
+    });
+  });
 }

@@ -17,6 +17,7 @@ class ScheduledStep {
     this.handle, {
     required this.pattern,
     required this.barPosition,
+    this.countIn,
   });
 
   /// Absolute step index.
@@ -33,6 +34,9 @@ class ScheduledStep {
 
   /// Null for silent steps.
   final ClickHandle? handle;
+
+  /// For a count-in beat: its bar (1-based) of [bars]; null for the song.
+  final ({int bar, int bars})? countIn;
 }
 
 /// One polyrhythm pulse that has been handed to the engine.
@@ -109,6 +113,10 @@ class ClickScheduler {
   MetronomePattern? _nextPattern;
   int _nextBarStart = 0;
   int _nextStep = 0;
+  // Steps before this one are a count-in (null: none in progress), of
+  // [_countInBars] bars.
+  int? _countInEnd;
+  int _countInBars = 0;
   Timer? _timer;
   bool _prepared = false;
 
@@ -116,6 +124,19 @@ class ClickScheduler {
   int _session = 0;
 
   bool get isRunning => _timer != null;
+
+  /// Whether a count-in is playing, or about to (the song hasn't been
+  /// handed to the engine yet).
+  bool get countingIn => _countInEnd != null;
+
+  /// The bar a count-in plays: [song]'s beats and time signature, beats
+  /// only (no subdivisions, no polyrhythm), beat 1 accented.
+  static MetronomePattern countInPattern(MetronomePattern song) =>
+      MetronomePattern.simple(
+        beatsPerBar: song.beatsPerBar,
+        stepsPerBeat: 1,
+        beatUnit: song.beatUnit,
+      );
 
   /// The latest step at or before engine time [time], or null. Covers
   /// steps up to [retention] old, so visuals can trail the engine clock.
@@ -145,10 +166,13 @@ class ClickScheduler {
     return null;
   }
 
-  /// Start a new session: step 0 plays [startLead] after now.
+  /// Start a new session: step 0 plays [startLead] after now. With
+  /// [countInBars], that many bars of count-in come first, and [pattern]
+  /// starts on beat 1 right after them.
   Future<void> start({
     required double bpm,
     required MetronomePattern pattern,
+    int countInBars = 0,
   }) async {
     stop();
     final session = ++_session;
@@ -157,16 +181,48 @@ class ClickScheduler {
     await _output.prepare();
     if (session != _session) return;
 
-    _grid = BeatGrid(
-      anchor: _output.now() + startLead,
-      bpm: bpm,
-      stepsPerBeat: pattern.stepsPerBeat,
-    );
-    _nextStep = 0;
-    _barStart = 0;
-    _switchAt = null;
     _timer = Timer.periodic(refillInterval, (_) => refill());
-    refill();
+    _begin(
+      0,
+      _output.now() + startLead,
+      bpm: bpm,
+      pattern: pattern,
+      countInBars: countInBars,
+    );
+  }
+
+  /// A fresh bar 1 at [step], playing at [at]: the count-in's if there is
+  /// one (with the switch to [pattern] waiting at its end), else
+  /// [pattern]'s.
+  void _begin(
+    int step,
+    Duration at, {
+    required double bpm,
+    required MetronomePattern pattern,
+    required int countInBars,
+  }) {
+    final first = countInBars > 0 ? countInPattern(pattern) : pattern;
+    _switchAt = null;
+    _nextGrid = null;
+    _nextPattern = null;
+    _countInEnd = null;
+    _pattern = first;
+    _barStart = step;
+    _nextStep = step;
+    _grid = BeatGrid(
+      anchor: at,
+      anchorStep: step,
+      bpm: bpm,
+      stepsPerBeat: first.stepsPerBeat,
+    );
+    if (countInBars > 0) {
+      final end = step + countInBars * first.stepsPerBar;
+      _countInEnd = end;
+      _countInBars = countInBars;
+      _scheduleSwitch(_grid!, end, bpm: bpm, pattern: pattern, barStart: end);
+    } else {
+      refill();
+    }
   }
 
   /// Cancel every step that has not started and stop refilling. A click
@@ -176,6 +232,7 @@ class ClickScheduler {
     _timer?.cancel();
     _timer = null;
     _grid = null;
+    _countInEnd = null;
     if (_steps.isNotEmpty || _pulses.isNotEmpty) {
       final now = _output.now();
       for (final step in _steps) {
@@ -267,6 +324,16 @@ class ClickScheduler {
   }) {
     final grid = _grid;
     if (grid == null) return;
+    // A count-in plays out; the song starts with the change.
+    if (_countInEnd case final end?) {
+      return _scheduleSwitch(
+        grid,
+        end,
+        bpm: bpm,
+        pattern: pattern,
+        barStart: end,
+      );
+    }
 
     final firstOpen = _firstOpenStep(grid);
     final perBeat = _pattern.stepsPerBeat;
@@ -284,27 +351,25 @@ class ClickScheduler {
 
   /// Restart on beat 1 with [bpm] and [pattern] as soon as safely possible
   /// (a song switch): every step not yet committed is cancelled and the new
-  /// bar starts [guard] from now. Replaces any pending switch. No-op while
-  /// stopped.
-  void restartNow({required double bpm, required MetronomePattern pattern}) {
+  /// bar starts [guard] from now, after [countInBars] of count-in. Replaces
+  /// any pending switch. No-op while stopped.
+  void restartNow({
+    required double bpm,
+    required MetronomePattern pattern,
+    int countInBars = 0,
+  }) {
     final grid = _grid;
     if (grid == null) return;
     final firstOpen = _firstOpenStep(grid);
     _cancelFrom(firstOpen);
     _cancelPulses((p) => p.time > _output.now() + guard); // the old bar's
-    _switchAt = null;
-    _nextGrid = null;
-    _nextPattern = null;
-    _pattern = pattern;
-    _barStart = firstOpen;
-    _nextStep = firstOpen;
-    _grid = BeatGrid(
-      anchor: _output.now() + guard,
-      anchorStep: firstOpen,
+    _begin(
+      firstOpen,
+      _output.now() + guard,
       bpm: bpm,
-      stepsPerBeat: pattern.stepsPerBeat,
+      pattern: pattern,
+      countInBars: countInBars,
     );
-    refill();
   }
 
   /// Same shape, new levels (accents): applies from the next step that is
@@ -434,6 +499,7 @@ class ClickScheduler {
     _grid = _nextGrid;
     _pattern = _nextPattern!;
     _barStart = _nextBarStart;
+    if (_switchAt == _countInEnd) _countInEnd = null;
     _switchAt = null;
     _nextGrid = null;
     _nextPattern = null;
@@ -476,6 +542,12 @@ class ClickScheduler {
           handle,
           pattern: _pattern,
           barPosition: barPosition,
+          countIn: _countInEnd == null
+              ? null
+              : (
+                  bar: (_nextStep - _barStart) ~/ _pattern.stepsPerBar + 1,
+                  bars: _countInBars,
+                ),
         ),
       );
       _emitPulses(_nextStep, barPosition, _pattern, _grid!);

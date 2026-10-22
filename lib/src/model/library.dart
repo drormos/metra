@@ -11,6 +11,7 @@ class Song {
     required this.name,
     required this.bpm,
     required this.pattern,
+    this.countIn = 0,
     this.editedAt,
     this.playedAt,
   });
@@ -19,6 +20,10 @@ class Song {
   final String name;
   final int bpm;
   final MetronomePattern pattern;
+
+  /// Bars of count-in before the song (0 = off), like its tempo
+  /// (ui-spec.md "When I press Start").
+  final int countIn;
 
   /// When the song was last loaded into the click (any mode), for the
   /// Songs tab's "most recently played"; null if never or an older file.
@@ -32,6 +37,7 @@ class Song {
     String? name,
     int? bpm,
     MetronomePattern? pattern,
+    int? countIn,
     DateTime? editedAt,
     DateTime? playedAt,
   }) => Song(
@@ -39,6 +45,7 @@ class Song {
     name: name ?? this.name,
     bpm: bpm ?? this.bpm,
     pattern: pattern ?? this.pattern,
+    countIn: countIn ?? this.countIn,
     editedAt: editedAt ?? this.editedAt,
     playedAt: playedAt ?? this.playedAt,
   );
@@ -48,6 +55,7 @@ class Song {
     'name': name,
     'bpm': bpm,
     'pattern': pattern.toJson(),
+    'countIn': countIn,
     'editedAt': editedAt?.millisecondsSinceEpoch,
     'playedAt': playedAt?.millisecondsSinceEpoch,
   };
@@ -57,6 +65,7 @@ class Song {
     name: json['name'] as String,
     bpm: json['bpm'] as int,
     pattern: MetronomePattern.fromJson(json['pattern'] as Map<String, Object?>),
+    countIn: json['countIn'] as int? ?? 0, // older files: off
     editedAt: switch (json['editedAt']) {
       final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
       _ => null,
@@ -121,6 +130,7 @@ class Library {
     required this.lastBpm,
     required this.lastPattern,
     required this.visualOffset,
+    this.lastCountIn = 0,
     this.clickSound = ClickSound.woodblock,
     this.themeMode = ThemeMode.system,
     this.vibrate = true,
@@ -149,6 +159,9 @@ class Library {
   final List<Setlist> setlists;
   final int lastBpm;
   final MetronomePattern lastPattern;
+
+  /// The click's count-in (Free play's own after a fresh launch).
+  final int lastCountIn;
   final Duration visualOffset;
   final ClickSound clickSound;
 
@@ -187,6 +200,7 @@ class Library {
     List<Setlist>? setlists,
     int? lastBpm,
     MetronomePattern? lastPattern,
+    int? lastCountIn,
     Duration? visualOffset,
     ClickSound? clickSound,
     ThemeMode? themeMode,
@@ -201,6 +215,7 @@ class Library {
     setlists: setlists ?? this.setlists,
     lastBpm: lastBpm ?? this.lastBpm,
     lastPattern: lastPattern ?? this.lastPattern,
+    lastCountIn: lastCountIn ?? this.lastCountIn,
     visualOffset: visualOffset ?? this.visualOffset,
     clickSound: clickSound ?? this.clickSound,
     themeMode: themeMode ?? this.themeMode,
@@ -226,6 +241,7 @@ class Library {
     setlists: setlists,
     lastBpm: lastBpm,
     lastPattern: lastPattern,
+    lastCountIn: lastCountIn,
     visualOffset: visualOffset,
     clickSound: clickSound,
     themeMode: themeMode,
@@ -244,6 +260,7 @@ class Library {
     'version': version,
     'lastBpm': lastBpm,
     'lastPattern': lastPattern.toJson(),
+    'lastCountIn': lastCountIn,
     'visualOffsetMs': visualOffset.inMilliseconds,
     'clickSound': clickSound.name,
     'themeMode': themeMode.name,
@@ -277,6 +294,7 @@ class Library {
             ),
           ) ??
           empty.lastPattern,
+      lastCountIn: json['lastCountIn'] as int? ?? 0,
       visualOffset: Duration(milliseconds: json['visualOffsetMs'] as int? ?? 0),
       // Optional (older files lack it); an unknown name falls back rather
       // than discarding the whole library.

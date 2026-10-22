@@ -45,6 +45,7 @@ class MetronomeController extends ChangeNotifier {
   int _bpm = 120;
   MetronomePattern _pattern = const MetronomePattern.standard();
   bool _playing = false;
+  int _countIn = 0;
   Object? _audioError;
   bool _disposed = false;
   Duration _visualOffset = defaultVisualOffset;
@@ -55,11 +56,28 @@ class MetronomeController extends ChangeNotifier {
   final _tapTempo = TapTempo(minBpm: minBpm, maxBpm: maxBpm);
   // What the main screen was doing before a song editor preview took over.
   ({int bpm, MetronomePattern pattern, bool playing})? _beforePreview;
+
+  /// Bars of count-in (0 = off, 1 or 2) before the song, whenever playback
+  /// starts from stopped and when a song is loaded while playing
+  /// (ui-spec.md "When I press Start").
+  static const countInChoices = [0, 1, 2];
   bool _offsetTestStarted = false;
 
   int get bpm => _bpm;
   MetronomePattern get pattern => _pattern;
   bool get isPlaying => _playing;
+
+  /// See [countInChoices]. Takes effect the next time playback starts.
+  int get countIn => _countIn;
+
+  void setCountIn(int bars) {
+    if (bars == _countIn) return;
+    _countIn = bars;
+    notifyListeners();
+  }
+
+  /// Whether a count-in is playing, or about to start.
+  bool get countingIn => _playing && _scheduler.countingIn;
 
   /// Last audio device error, or null when audio is healthy.
   Object? get audioError => _audioError;
@@ -222,9 +240,14 @@ class MetronomeController extends ChangeNotifier {
   /// effect as it would on the main screen, without restarting the bar.
   /// Tempo from the next step; accents and cells from the next click;
   /// subdivision from the next beat; a new time signature starts a bar on
-  /// the next beat; a polyrhythm as [setPolyrhythm]. Nothing changed:
-  /// nothing happens.
-  void applyEdit({required int bpm, required MetronomePattern pattern}) {
+  /// the next beat; a polyrhythm as [setPolyrhythm]; a count-in from the
+  /// next start. Nothing changed: nothing happens.
+  void applyEdit({
+    required int bpm,
+    required MetronomePattern pattern,
+    int? countIn,
+  }) {
+    if (countIn != null) setCountIn(countIn);
     setBpm(bpm);
     if (pattern == _pattern) return;
     if (pattern.beatsPerBar != _pattern.beatsPerBar ||
@@ -261,12 +284,13 @@ class MetronomeController extends ChangeNotifier {
   bool get previewing => _beforePreview != null;
 
   /// Song editor preview: plays [bpm] and [pattern] from beat 1, taking
-  /// over the click. The first call remembers the main screen's state for
-  /// [endPreview]. Edits while previewing go through [applyEdit].
+  /// over the click (no count-in: it's a listen, not a take). The first
+  /// call remembers the main screen's state for [endPreview]. Edits while
+  /// previewing go through [applyEdit].
   Future<void> preview({required int bpm, required MetronomePattern pattern}) {
     _beforePreview ??= (bpm: _bpm, pattern: _pattern, playing: _playing);
-    loadSong(bpm: bpm, pattern: pattern);
-    return play();
+    _load(bpm, pattern, countIn: false);
+    return play(countIn: false);
   }
 
   /// Leaving the song editor: restores what the main screen was doing
@@ -276,8 +300,8 @@ class MetronomeController extends ChangeNotifier {
     if (before == null) return;
     _beforePreview = null;
     if (!before.playing) stop();
-    loadSong(bpm: before.bpm, pattern: before.pattern);
-    if (before.playing) play();
+    _load(before.bpm, before.pattern, countIn: false);
+    if (before.playing) play(countIn: false);
   }
 
   void _switchAtNextBeat(MetronomePattern pattern, {required bool restartBar}) {
@@ -290,13 +314,27 @@ class MetronomeController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Load a song (next/previous, or picked from a list). While playing it
-  /// restarts immediately on beat 1 at the new tempo; while stopped it only
-  /// loads.
-  void loadSong({required int bpm, required MetronomePattern pattern}) {
+  /// Load a song (next/previous, or picked from a list) with its
+  /// [countIn] (null keeps the current one). While playing it restarts
+  /// immediately on beat 1 at the new tempo, after the song's count-in;
+  /// while stopped it only loads.
+  void loadSong({
+    required int bpm,
+    required MetronomePattern pattern,
+    int? countIn,
+  }) {
+    if (countIn != null) _countIn = countIn;
+    _load(bpm, pattern, countIn: true);
+  }
+
+  void _load(int bpm, MetronomePattern pattern, {required bool countIn}) {
     _bpm = bpm.clamp(minBpm, maxBpm);
     _pattern = pattern;
-    _scheduler.restartNow(bpm: _bpm.toDouble(), pattern: pattern);
+    _scheduler.restartNow(
+      bpm: _bpm.toDouble(),
+      pattern: pattern,
+      countInBars: countIn ? _countIn : 0,
+    );
     notifyListeners();
   }
 
@@ -311,11 +349,12 @@ class MetronomeController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> play() async {
+  /// Starts on beat 1, after the count-in unless [countIn] is false.
+  Future<void> play({bool countIn = true}) async {
     if (_playing) return;
     _playing = true;
     notifyListeners();
-    await _start();
+    await _start(countIn ? _countIn : 0);
   }
 
   void stop() {
@@ -339,14 +378,22 @@ class MetronomeController extends ChangeNotifier {
   @visibleForTesting
   Duration get lookaheadForTesting => _scheduler.lookahead;
 
-  Future<void> _start() async {
+  Future<void> _start(int countInBars) async {
     try {
       final bpm = _bpm, pattern = _pattern;
-      await _scheduler.start(bpm: bpm.toDouble(), pattern: pattern);
+      await _scheduler.start(
+        bpm: bpm.toDouble(),
+        pattern: pattern,
+        countInBars: countInBars,
+      );
       // Changed while the device was starting, when the scheduler wasn't
       // running to take it: restart with what the screen shows.
       if (_bpm != bpm || _pattern != pattern) {
-        _scheduler.restartNow(bpm: _bpm.toDouble(), pattern: _pattern);
+        _scheduler.restartNow(
+          bpm: _bpm.toDouble(),
+          pattern: _pattern,
+          countInBars: countInBars,
+        );
       }
       _setAudioError(null);
     } catch (e) {

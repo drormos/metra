@@ -57,6 +57,7 @@ class _BeatIndicatorState extends State<BeatIndicator>
   // beat and by bar position (a light can rise before its click while the
   // one before it is still coming down).
   ScheduledStep? _step;
+  bool _countingIn = false;
   Map<int, double> _blocks = const {};
   Map<int, double> _ticks = const {};
 
@@ -85,9 +86,10 @@ class _BeatIndicatorState extends State<BeatIndicator>
       }
     } else {
       _ticker.stop();
-      if (_step != null) {
+      if (_step != null || _countingIn) {
         setState(() {
           _step = null;
+          _countingIn = false;
           _blocks = _ticks = const {};
         });
       }
@@ -102,6 +104,9 @@ class _BeatIndicatorState extends State<BeatIndicator>
       SchedulerBinding.instance.currentFrameTimeStamp,
     );
     final step = now == null ? null : _controller.stepAt(now);
+    // Also before the count-in's first beat has sounded.
+    final countingIn =
+        step?.countIn != null || (step == null && _controller.countingIn);
     final blocks = <int, double>{};
     final ticks = <int, double>{};
     if (now != null) {
@@ -128,7 +133,8 @@ class _BeatIndicatorState extends State<BeatIndicator>
             reduced: reduced,
           ),
         );
-        if (s.level != StepLevel.silent) {
+        // A count-in plays beats only: the strip stays dark.
+        if (s.level != StepLevel.silent && s.countIn == null) {
           light(
             ticks,
             s.barPosition,
@@ -138,10 +144,12 @@ class _BeatIndicatorState extends State<BeatIndicator>
       }
     }
     if (step?.index != _step?.index ||
+        countingIn != _countingIn ||
         !mapEquals(blocks, _blocks) ||
         !mapEquals(ticks, _ticks)) {
       setState(() {
         _step = step;
+        _countingIn = countingIn;
         _blocks = blocks;
         _ticks = ticks;
       });
@@ -156,8 +164,10 @@ class _BeatIndicatorState extends State<BeatIndicator>
     final step = _step;
     final latest = _controller.pattern;
     final heard = step?.pattern;
+    // A count-in draws the song's bar (its own has no subdivisions).
     final pattern =
-        heard == null ||
+        _countingIn ||
+            heard == null ||
             (heard.beatsPerBar == latest.beatsPerBar &&
                 heard.stepsPerBeat == latest.stepsPerBeat)
         ? latest
@@ -177,12 +187,15 @@ class _BeatIndicatorState extends State<BeatIndicator>
                 // fill to size it otherwise).
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _block(
-                    beat,
-                    level,
-                    // A muted block never lights.
-                    light: level == StepLevel.silent ? 0 : _blocks[beat] ?? 0,
-                  ),
+                  if (_countingIn)
+                    _countInBlock(beat, light: _blocks[beat] ?? 0)
+                  else
+                    _block(
+                      beat,
+                      level,
+                      // A muted block never lights.
+                      light: level == StepLevel.silent ? 0 : _blocks[beat] ?? 0,
+                    ),
                   if (perBeat > 1) ...[
                     const SizedBox(height: 5),
                     Row(
@@ -252,6 +265,39 @@ class _BeatIndicatorState extends State<BeatIndicator>
         height: 36,
         color: color,
         child: muted ? CustomPaint(painter: MutedLine(colors.mutedLine)) : null,
+      ),
+    );
+  }
+
+  /// During a count-in (ui-spec.md "When I press Start"): every beat
+  /// sounds, so each block is a plain one showing its number, muted, and
+  /// lights as it sounds (beat 1 as the accent it is).
+  Widget _countInBlock(int beat, {required double light}) {
+    final colors = context.colors;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        key: ValueKey('beat-$beat-${light > 0 ? 'on' : 'off'}'),
+        height: 36,
+        alignment: Alignment.center,
+        color: Color.lerp(
+          colors.tickResting,
+          beat == 0 ? colors.accentSounding : colors.beatSounding,
+          light,
+        ),
+        child: Text(
+          '${beat + 1}',
+          key: ValueKey('count-in-${beat + 1}'),
+          // Inside a fixed 36px block.
+          textScaler: TextScaler.noScaling,
+          style: TextStyle(
+            fontFamily: MetraFonts.condensed,
+            fontSize: 24,
+            fontWeight: FontWeight.w700,
+            height: 1,
+            color: Color.lerp(colors.muted, colors.background, light),
+          ),
+        ),
       ),
     );
   }

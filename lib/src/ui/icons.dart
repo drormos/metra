@@ -128,3 +128,42 @@ class _MetronomePainter extends CustomPainter {
   @override
   bool shouldRepaint(_MetronomePainter old) => old.color != color;
 }
+
+/// Stopwatch: "When I press Start" (the top row's left button).
+class StopwatchIcon extends StatelessWidget {
+  const StopwatchIcon({super.key, this.size = 22, this.color});
+
+  final double size;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+    size: Size.square(size),
+    painter: _StopwatchPainter(color ?? IconTheme.of(context).color!),
+  );
+}
+
+class _StopwatchPainter extends CustomPainter {
+  _StopwatchPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 24);
+    final stroke = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round;
+    canvas
+      ..drawCircle(const Offset(12, 14), 7.5, stroke)
+      ..drawLine(const Offset(12, 14), const Offset(12, 10), stroke)
+      ..drawLine(const Offset(10, 2.8), const Offset(14, 2.8), stroke)
+      ..drawLine(const Offset(12, 2.8), const Offset(12, 6.5), stroke)
+      ..drawLine(const Offset(18.5, 6.8), const Offset(20, 5.3), stroke);
+  }
+
+  @override
+  bool shouldRepaint(_StopwatchPainter old) => old.color != color;
+}

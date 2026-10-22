@@ -4,17 +4,34 @@ import '../controller/metronome_controller.dart';
 import '../model/metronome_pattern.dart';
 import 'haptics.dart';
 import 'meter_control.dart';
+import 'segmented.dart';
+import 'subdivision_icon.dart';
 import 'swipe_row.dart';
 import 'theme.dart';
 
-/// The time signature sheet (ui-spec.md, `time-signature.reference.html`):
-/// "Common" meters apply with one tap and close it; "Custom" applies as
-/// it changes and keeps it open. Through [MetronomeController.setMeter], so
-/// beat states are kept and, while playing, the next beat starts a bar.
+/// The Rhythm sheet (ui-spec.md, `on-start.reference.html`): "Common"
+/// meters apply with one tap and close it; "Custom", Subdivision and
+/// Polyrhythm apply as they change and keep it open. Through
+/// [MetronomeController.setMeter], so beat states are kept and, while
+/// playing, the next beat starts a bar; a subdivision lands on the next
+/// beat.
 Future<void> showTimeSignatureSheet(
   BuildContext context,
   MetronomeController metronome,
-) => showModalBottomSheet<void>(
+) => showDragSheet(
+  context,
+  handleKey: TimeSignatureSheet.handleKey,
+  child: TimeSignatureSheet(metronome: metronome),
+);
+
+/// A bottom sheet with the Android drag behavior (ui-spec.md "Sheet
+/// behavior"): it follows the finger and closes past a third of its
+/// height or on a flick down; the dim area and Back close it too.
+Future<void> showDragSheet(
+  BuildContext context, {
+  required Widget child,
+  Key? handleKey,
+}) => showModalBottomSheet<void>(
   context: context,
   isScrollControlled: true,
   // Our own drag (closes past a third, or on a flick down; Flutter's
@@ -38,7 +55,7 @@ Future<void> showTimeSignatureSheet(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            key: TimeSignatureSheet.handleKey,
+            key: handleKey,
             margin: const EdgeInsets.symmetric(vertical: 22),
             width: 40,
             height: 4,
@@ -47,7 +64,7 @@ Future<void> showTimeSignatureSheet(
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          Flexible(child: TimeSignatureSheet(metronome: metronome)),
+          Flexible(child: child),
         ],
       ),
     ),
@@ -60,6 +77,15 @@ class TimeSignatureSheet extends StatelessWidget {
   final MetronomeController metronome;
 
   static const handleKey = Key('sheet-handle');
+  static const subdivisionKey = Key('subdivision');
+
+  /// Spoken names of the subdivisions, by clicks per beat.
+  static const subdivisionNames = {
+    1: 'Quarter notes',
+    2: 'Eighth notes',
+    3: 'Triplets',
+    4: 'Sixteenth notes',
+  };
 
   static const common = [
     (2, 4),
@@ -89,7 +115,7 @@ class TimeSignatureSheet extends StatelessWidget {
                 const Padding(
                   padding: EdgeInsets.only(top: 4, bottom: 18),
                   child: Text(
-                    'Time signature',
+                    'Rhythm',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -127,6 +153,19 @@ class TimeSignatureSheet extends StatelessWidget {
                   onChanged: (beats, unit) {
                     Haptics.tick();
                     metronome.setMeter(beats, unit);
+                  },
+                ),
+                const SizedBox(height: 24),
+                Text('Subdivision', style: label),
+                const SizedBox(height: 8),
+                Segmented<int>(
+                  key: subdivisionKey,
+                  options: subdivisionNames,
+                  selected: pattern.stepsPerBeat,
+                  icon: (steps) => SubdivisionIcon(steps, size: 24),
+                  onSelected: (steps) {
+                    Haptics.tick();
+                    metronome.setSubdivision(steps);
                   },
                 ),
                 const SizedBox(height: 24),

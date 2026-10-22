@@ -281,7 +281,11 @@ class LibraryController extends ChangeNotifier {
   /// Load [song] ([index] = its position in [visibleSongs], if known);
   /// while playing it restarts on beat 1 at the song's tempo.
   void playSong(Song song, MetronomeController metronome, {int? index}) {
-    metronome.loadSong(bpm: song.bpm, pattern: song.pattern);
+    metronome.loadSong(
+      bpm: song.bpm,
+      pattern: song.pattern,
+      countIn: song.countIn,
+    );
     _emptyTab = null;
     _update(
       _played(song.id).withSession(
@@ -296,7 +300,11 @@ class LibraryController extends ChangeNotifier {
   /// setlist (choosing the set again starts at its first song). While
   /// playing it restarts on beat 1 at the song's tempo.
   void playSingleSong(Song song, MetronomeController metronome) {
-    metronome.loadSong(bpm: song.bpm, pattern: song.pattern);
+    metronome.loadSong(
+      bpm: song.bpm,
+      pattern: song.pattern,
+      countIn: song.countIn,
+    );
     _emptyTab = null;
     _update(
       _played(song.id)
@@ -335,6 +343,7 @@ class LibraryController extends ChangeNotifier {
       name: name,
       bpm: metronome.bpm,
       pattern: metronome.pattern,
+      countIn: metronome.countIn,
     );
     final list = activeSetlist;
     if (list != null) addToSetlist(list.id, song.id);
@@ -354,7 +363,9 @@ class LibraryController extends ChangeNotifier {
   bool songChanged(MetronomeController metronome) {
     final song = currentSong;
     return song != null &&
-        (song.bpm != metronome.bpm || song.pattern != metronome.pattern);
+        (song.bpm != metronome.bpm ||
+            song.pattern != metronome.pattern ||
+            song.countIn != metronome.countIn);
   }
 
   /// Stores the main-screen changes in the loaded song (every set gets them).
@@ -366,7 +377,11 @@ class LibraryController extends ChangeNotifier {
   /// applies as on the main screen (no restart on beat 1).
   void revertSong(MetronomeController metronome) {
     if (currentSong case final song?) {
-      metronome.applyEdit(bpm: song.bpm, pattern: song.pattern);
+      metronome.applyEdit(
+        bpm: song.bpm,
+        pattern: song.pattern,
+        countIn: song.countIn,
+      );
     }
   }
 
@@ -387,6 +402,7 @@ class LibraryController extends ChangeNotifier {
       name: name,
       bpm: metronome.bpm,
       pattern: metronome.pattern,
+      countIn: metronome.countIn,
     );
     _freshSongId = fresh ? song.id : null;
     if (list == null || index < 0 || placement == SongPlacement.none) {
@@ -417,7 +433,13 @@ class LibraryController extends ChangeNotifier {
 
   /// Overwrites [song]'s tempo and pattern with the metronome's.
   void updateSongFromMetronome(Song song, MetronomeController metronome) =>
-      updateSong(song.copyWith(bpm: metronome.bpm, pattern: metronome.pattern));
+      updateSong(
+        song.copyWith(
+          bpm: metronome.bpm,
+          pattern: metronome.pattern,
+          countIn: metronome.countIn,
+        ),
+      );
 
   void addToSetlist(String setlistId, String songId) {
     final list = setlists.firstWhere((s) => s.id == setlistId);
@@ -740,12 +762,14 @@ class LibraryController extends ChangeNotifier {
     required String name,
     required int bpm,
     required MetronomePattern pattern,
+    int countIn = 0,
   }) {
     final song = Song(
       id: _newId(),
       name: name,
       bpm: bpm,
       pattern: pattern,
+      countIn: countIn,
       editedAt: DateTime.now(),
     );
     _update(_library.copyWith(songs: [...songs, song]));
@@ -916,19 +940,21 @@ class LibraryController extends ChangeNotifier {
 
   void deleteSetlist(String id) => deleteSetlists({id});
 
-  /// Restores the last session's tempo, pattern, flash offset, click
+  /// Restores the last session's tempo, pattern, count-in, flash offset, click
   /// sound and volumes into [metronome], then saves them whenever they
   /// change.
   void attach(MetronomeController metronome) {
     metronome
       ..setBpm(_library.lastBpm)
       ..setPattern(_library.lastPattern)
+      ..setCountIn(_library.lastCountIn)
       ..setVisualOffset(_library.visualOffset)
       ..setClickSound(_library.clickSound, preview: false)
       ..setVolumes(_library.volumes);
     metronome.addListener(() {
       if (metronome.bpm == _library.lastBpm &&
           metronome.pattern == _library.lastPattern &&
+          metronome.countIn == _library.lastCountIn &&
           metronome.visualOffset == _library.visualOffset &&
           metronome.clickSound == _library.clickSound &&
           metronome.volumes == _library.volumes) {
@@ -938,6 +964,7 @@ class LibraryController extends ChangeNotifier {
         _library.copyWith(
           lastBpm: metronome.bpm,
           lastPattern: metronome.pattern,
+          lastCountIn: metronome.countIn,
           visualOffset: metronome.visualOffset,
           clickSound: metronome.clickSound,
           volumes: metronome.volumes,

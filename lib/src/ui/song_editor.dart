@@ -35,7 +35,11 @@ Future<Song?> openSongEditor(
   );
   metronome.endPreview();
   if (saved != null && saved.id == library.currentSong?.id) {
-    metronome.applyEdit(bpm: saved.bpm, pattern: saved.pattern);
+    metronome.applyEdit(
+      bpm: saved.bpm,
+      pattern: saved.pattern,
+      countIn: saved.countIn,
+    );
   }
   return saved;
 }

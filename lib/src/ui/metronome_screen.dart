@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 
@@ -15,6 +16,7 @@ import 'fit_text.dart';
 import 'haptics.dart';
 import 'menu_panel.dart';
 import 'motion.dart';
+import 'on_start_sheet.dart';
 import 'poly_lane.dart';
 import 'setlist_group.dart';
 import 'save_as_new_dialog.dart';
@@ -53,7 +55,8 @@ class MetronomeScreen extends StatelessWidget {
   static const titleKey = Key('title');
   static const tempoNameKey = Key('tempo-name');
   static const meterKey = Key('meter');
-  static const subdivisionKey = Key('subdivision');
+  static const onStartKey = Key('on-start');
+  static const countInLineKey = Key('count-in-line');
   static const revertKey = Key('revert');
   static const firstChangeKey = Key('first-change-line');
   static const menuKey = Key('menu-button');
@@ -209,10 +212,13 @@ class MetronomeScreen extends StatelessWidget {
                         // Fixed height: the tempo name, or Revert / Save to song.
                         SizedBox(
                           height: 44,
-                          child: _TempoLine(
+                          child: _CountInLine(
                             controller: controller,
-                            library: library,
-                            bpm: bpm,
+                            child: _TempoLine(
+                              controller: controller,
+                              library: library,
+                              bpm: bpm,
+                            ),
                           ),
                         ),
                       ],
@@ -427,15 +433,19 @@ class MetronomeScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 4),
-        _squareButton(
-          key: subdivisionKey,
-          tooltip: 'Subdivision: ${_subdivisionNames[pattern.stepsPerBeat]}',
-          // Cycles 1 → 2 → 3 → 4 → 1; while playing, from the next beat.
-          onPressed: () {
-            Haptics.tick();
-            controller.setSubdivision(pattern.stepsPerBeat % 4 + 1);
-          },
-          child: SubdivisionIcon(pattern.stepsPerBeat),
+        // Red while anything in it is on, so Start never does something
+        // you can't see.
+        Builder(
+          builder: (context) => _squareButton(
+            key: onStartKey,
+            tooltip: controller.countIn == 0
+                ? 'When I press Start'
+                : 'When I press Start: count-in ${controller.countIn} '
+                      '${controller.countIn == 1 ? 'bar' : 'bars'}',
+            lit: controller.countIn > 0,
+            onPressed: () => showOnStartSheet(context, controller),
+            child: const StopwatchIcon(),
+          ),
         ),
         const SizedBox(width: 4),
         SizedBox(
@@ -451,17 +461,33 @@ class MetronomeScreen extends StatelessWidget {
               ),
               onPressed: () => showTimeSignatureSheet(context, controller),
               child: Semantics(
-                label: pattern.polyrhythm == 0
-                    ? 'Time signature ${pattern.timeSignature}'
-                    : 'Time signature ${pattern.timeSignature}, '
-                          'polyrhythm ${pattern.polyrhythm}',
+                label: [
+                  'Rhythm ${pattern.timeSignature}',
+                  if (pattern.stepsPerBeat > 1)
+                    TimeSignatureSheet.subdivisionNames[pattern.stepsPerBeat]!
+                        .toLowerCase(),
+                  if (pattern.polyrhythm > 0)
+                    'polyrhythm ${pattern.polyrhythm}',
+                ].join(', '),
                 excludeSemantics: true,
-                child: Text(
-                  pattern.meterLabel,
+                // "4/4 ♪♪ · 3": the note only off quarters.
+                child: DefaultTextStyle.merge(
                   style: const TextStyle(
                     fontFamily: MetraFonts.condensed,
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(pattern.timeSignature),
+                      if (pattern.stepsPerBeat > 1) ...[
+                        const SizedBox(width: 5),
+                        SubdivisionIcon(pattern.stepsPerBeat, size: 20),
+                      ],
+                      if (pattern.polyrhythm > 0)
+                        Text(' · ${pattern.polyrhythm}'),
+                    ],
                   ),
                 ),
               ),
@@ -491,6 +517,7 @@ class MetronomeScreen extends StatelessWidget {
     required VoidCallback onPressed,
     required Widget child,
     bool dot = false,
+    bool lit = false,
   }) => Tooltip(
     message: tooltip,
     // Read once, as the button's own label.
@@ -502,7 +529,7 @@ class MetronomeScreen extends StatelessWidget {
       child: Stack(
         children: [
           Positioned.fill(
-            child: _squareButtonBody(key, tooltip, onPressed, child),
+            child: _squareButtonBody(key, tooltip, onPressed, child, lit),
           ),
           // An 8px red dot in the drawn button's top-right corner.
           if (dot)
@@ -533,26 +560,25 @@ class MetronomeScreen extends StatelessWidget {
     String tooltip,
     VoidCallback onPressed,
     Widget child,
+    bool lit,
   ) => Center(
-    child: OutlinedButton(
-      key: key,
-      style: OutlinedButton.styleFrom(
-        padding: EdgeInsets.zero,
-        minimumSize: const Size.square(44),
-        fixedSize: const Size.square(44),
-        tapTargetSize: MaterialTapTargetSize.padded,
+    child: Builder(
+      builder: (context) => OutlinedButton(
+        key: key,
+        style: OutlinedButton.styleFrom(
+          // Lit: red outline and icon.
+          foregroundColor: lit ? context.colors.accent : null,
+          side: lit ? BorderSide(color: context.colors.accent, width: 2) : null,
+          padding: EdgeInsets.zero,
+          minimumSize: const Size.square(44),
+          fixedSize: const Size.square(44),
+          tapTargetSize: MaterialTapTargetSize.padded,
+        ),
+        onPressed: onPressed,
+        child: Semantics(label: tooltip, child: child),
       ),
-      onPressed: onPressed,
-      child: Semantics(label: tooltip, child: child),
     ),
   );
-
-  static const _subdivisionNames = {
-    1: 'quarter notes',
-    2: 'eighth notes',
-    3: 'triplets',
-    4: 'sixteenth notes',
-  };
 }
 
 /// What a screen reader hears unasked (ui-spec.md "Accessibility"): only
@@ -877,6 +903,98 @@ class _TempoLineState extends State<_TempoLine> {
                 : null,
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// While a count-in plays, the line under the BPM reads "Count-in · 3 of
+/// 4" ("Count-in · 2 · 3 of 4" in bar 2 of 2); otherwise it is [child].
+/// Read per frame from the engine clock, like the beat blocks.
+class _CountInLine extends StatefulWidget {
+  const _CountInLine({required this.controller, required this.child});
+
+  final MetronomeController controller;
+  final Widget child;
+
+  static String? labelFor(MetronomeController controller, Duration? now) {
+    final step = now == null ? null : controller.stepAt(now);
+    final countIn = step?.countIn;
+    if (step == null || countIn == null) {
+      // Before its first beat has sounded.
+      return step == null && controller.countingIn ? 'Count-in' : null;
+    }
+    final beat = '${step.barPosition + 1} of ${step.pattern.beatsPerBar}';
+    return countIn.bars > 1
+        ? 'Count-in · ${countIn.bar} · $beat'
+        : 'Count-in · $beat';
+  }
+
+  @override
+  State<_CountInLine> createState() => _CountInLineState();
+}
+
+class _CountInLineState extends State<_CountInLine>
+    with SingleTickerProviderStateMixin {
+  late final Ticker _ticker = createTicker(_onTick);
+  String? _label;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_sync);
+    _sync();
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_sync);
+    _ticker.dispose();
+    super.dispose();
+  }
+
+  // Ticks only while playing.
+  void _sync() {
+    if (widget.controller.isPlaying) {
+      if (!_ticker.isActive) _ticker.start();
+    } else {
+      _ticker.stop();
+      if (_label != null) setState(() => _label = null);
+    }
+  }
+
+  void _onTick(Duration _) {
+    final label = _CountInLine.labelFor(
+      widget.controller,
+      widget.controller.visualTimeAt(
+        SchedulerBinding.instance.currentFrameTimeStamp,
+      ),
+    );
+    if (label != _label) setState(() => _label = label);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = _label;
+    // The tempo line stays underneath, keeping its state (its tips).
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Visibility(
+          visible: label == null,
+          maintainState: true,
+          maintainAnimation: true,
+          maintainSize: true,
+          child: widget.child,
+        ),
+        if (label != null)
+          Center(
+            child: Text(
+              label,
+              key: MetronomeScreen.countInLineKey,
+              style: TextStyle(fontSize: 16, color: context.colors.text),
+            ),
+          ),
       ],
     );
   }

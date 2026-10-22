@@ -188,7 +188,8 @@ void main() {
       expect(find.byType(BottomSheet), findsOneWidget, reason: 'stays open');
       await tester.tapAt(const Offset(10, 10));
       await tester.pumpAndSettle();
-      expect(find.text('4/4 · 3'), findsOneWidget);
+      expect(find.text(' · 3'), findsOneWidget);
+      expect(find.bySemanticsLabel('Rhythm 4/4, polyrhythm 3'), findsOneWidget);
     });
 
     testWidgets('lane: cells by time, cell 1 under beat 1; taps cycle; '
@@ -253,7 +254,7 @@ void main() {
       await pumpScreen(tester);
       await tester.tap(find.byKey(MetronomeScreen.meterKey));
       await tester.pumpAndSettle();
-      expect(find.text('Time signature'), findsOneWidget);
+      expect(find.text('Rhythm'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('common-12-8')));
       await tester.pumpAndSettle();
       expect(controller.pattern.timeSignature, '12/8');
@@ -282,18 +283,35 @@ void main() {
       ], reason: 'beat states kept, the new beat regular');
     });
 
-    testWidgets('subdivision button cycles 1-4, one dot per beat', (
-      tester,
-    ) async {
+    testWidgets('the Rhythm sheet sets the subdivision live and stays '
+        'open; the 4/4 button shows its note', (tester) async {
       await pumpScreen(tester);
-      for (final expected in [2, 3]) {
-        await tester.tap(find.byKey(MetronomeScreen.subdivisionKey));
+      expect(find.bySemanticsLabel('Rhythm 4/4'), findsOneWidget);
+      await tester.tap(find.byKey(MetronomeScreen.meterKey));
+      await tester.pumpAndSettle();
+      expect(find.text('Rhythm'), findsOneWidget);
+      Finder segment(int steps) => find.descendant(
+        of: find.byKey(TimeSignatureSheet.subdivisionKey),
+        matching: find.byKey(ValueKey('segment-$steps')),
+      );
+      for (final expected in [2, 3, 4, 1]) {
+        await tester.tap(segment(expected));
         await tester.pump();
         expect(controller.pattern.stepsPerBeat, expected);
       }
+      await tester.tap(segment(2));
+      await tester.pump();
+      expect(find.byType(TimeSignatureSheet), findsOneWidget);
       expect(controller.pattern.timeSignature, '4/4');
       expect(find.byKey(const ValueKey('beat-3-off')), findsOneWidget);
-      expect(find.byKey(const ValueKey('beat-4-off')), findsNothing);
+      expect(find.byKey(const ValueKey('tick-3-1-off')), findsOneWidget);
+      expect(find.bySemanticsLabel('Rhythm 4/4, eighth notes'), findsOneWidget);
+      controller.setPolyrhythm(3);
+      await tester.pump();
+      expect(
+        find.bySemanticsLabel('Rhythm 4/4, eighth notes, polyrhythm 3'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('tapping a beat dot cycles its accent', (tester) async {
@@ -331,14 +349,99 @@ void main() {
     });
   });
 
-  testWidgets('subdivision wraps from 4 back to 1', (tester) async {
-    await pumpScreen(tester);
-    for (var i = 0; i < 4; i++) {
-      await tester.tap(find.byKey(MetronomeScreen.subdivisionKey));
+  group('when I press Start', () {
+    // Null: the theme's plain outline.
+    Color? outline(WidgetTester tester) => tester
+        .widget<OutlinedButton>(find.byKey(MetronomeScreen.onStartKey))
+        .style
+        ?.side
+        ?.resolve({})
+        ?.color;
+
+    testWidgets('the stopwatch opens the sheet; Count-in only; red while on', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      expect(outline(tester), isNull);
+      await tester.tap(find.byKey(MetronomeScreen.onStartKey));
+      await tester.pumpAndSettle();
+      expect(find.text('When I press Start'), findsOneWidget);
+      expect(find.text('Speed up'), findsNothing);
+      expect(find.text('Stop after'), findsNothing);
+      await tester.tap(find.text('1 bar'));
       await tester.pump();
-    }
-    expect(controller.pattern.stepsPerBeat, 1);
-    expect(find.byTooltip('Subdivision: quarter notes'), findsOneWidget);
+      expect(controller.countIn, 1);
+      expect(outline(tester), testTheme.extension<MetraColors>()!.accent);
+      expect(
+        find.byTooltip('When I press Start: count-in 1 bar'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Off'));
+      await tester.pump();
+      expect(controller.countIn, 0);
+      expect(outline(tester), isNull);
+      expect(find.byTooltip('When I press Start'), findsOneWidget);
+    });
+
+    testWidgets('counting in: numbers in the blocks, lit as they sound, '
+        'ticks dark, "Count-in · 3 of 4"; then the song, nothing moved', (
+      tester,
+    ) async {
+      controller
+        ..setPattern(MetronomePattern.simple(beatsPerBar: 4, stepsPerBeat: 2))
+        ..setCountIn(2);
+      await pumpScreen(tester);
+      final bpmAt = tester.getTopLeft(find.byKey(MetronomeScreen.bpmKey));
+      final rulerAt = tester.getTopLeft(find.byType(TempoRuler));
+      await tester.tap(find.byKey(MetronomeScreen.playKey));
+      await tester.pump();
+      Future<void> to(int ms) async {
+        while (output.time < Duration(milliseconds: ms)) {
+          output.time += const Duration(milliseconds: 20);
+          await tester.pump(const Duration(milliseconds: 20));
+        }
+      }
+
+      // 120 bpm: count-in beats every 500 ms from 120 ms, 2 bars.
+      await to(140);
+      expect(find.byKey(const ValueKey('count-in-1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('beat-0-on')), findsOneWidget);
+      expect(find.byKey(const ValueKey('tick-0-0-off')), findsOneWidget);
+      expect(find.text('Count-in · 1 · 1 of 4'), findsOneWidget);
+      await to(1140);
+      expect(find.text('Count-in · 1 · 3 of 4'), findsOneWidget);
+      expect(find.byKey(const ValueKey('beat-2-on')), findsOneWidget);
+      expect(find.byKey(const ValueKey('tick-2-0-off')), findsOneWidget);
+      expect(find.byKey(const ValueKey('tick-2-1-off')), findsOneWidget);
+      await to(3640);
+      expect(find.text('Count-in · 2 · 4 of 4'), findsOneWidget);
+      expect(tester.getTopLeft(find.byKey(MetronomeScreen.bpmKey)), bpmAt);
+      expect(tester.getTopLeft(find.byType(TempoRuler)), rulerAt);
+      // The song: beat 1 at 120 + 8 × 500 ms.
+      await to(4140);
+      expect(find.byKey(const ValueKey('count-in-1')), findsNothing);
+      expect(find.byKey(MetronomeScreen.countInLineKey), findsNothing);
+      expect(find.byKey(const ValueKey('beat-0-on')), findsOneWidget);
+      expect(find.byKey(const ValueKey('tick-0-0-on')), findsOneWidget);
+      expect(find.byKey(MetronomeScreen.tempoNameKey), findsOneWidget);
+      await tester.tap(find.byKey(MetronomeScreen.playKey));
+      await tester.pump();
+    });
+
+    testWidgets('Stop during a count-in stops; the numbers go', (tester) async {
+      controller.setCountIn(1);
+      await pumpScreen(tester);
+      await tester.tap(find.byKey(MetronomeScreen.playKey));
+      await tester.pump();
+      output.time = const Duration(milliseconds: 140);
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(find.byKey(const ValueKey('count-in-1')), findsOneWidget);
+      await tester.tap(find.byKey(MetronomeScreen.playKey));
+      await tester.pump();
+      expect(controller.isPlaying, isFalse);
+      expect(find.byKey(const ValueKey('count-in-1')), findsNothing);
+      expect(find.byKey(MetronomeScreen.countInLineKey), findsNothing);
+    });
   });
 
   testWidgets('tempo name follows the bpm', (tester) async {
@@ -916,10 +1019,9 @@ void main() {
       final haptics = recordHaptics(tester);
       await tester.tap(find.text('+1'));
       await tester.tap(find.byKey(MetronomeScreen.tapKey));
-      await tester.tap(find.byKey(MetronomeScreen.subdivisionKey));
       await tester.tap(find.byKey(const ValueKey('beat-1-off')));
       await tester.pump(const Duration(seconds: 1));
-      expect(haptics, List.filled(4, 'lightImpact'));
+      expect(haptics, List.filled(3, 'lightImpact'));
     });
 
     testWidgets('holding ±1 ticks on every step', (tester) async {

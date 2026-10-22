@@ -106,6 +106,7 @@ void main() {
       metronome.setClickSound(ClickSound.cowbell);
       const quiet = ClickVolumes(accent: 0.7, beat: 0.6, subdivision: 0.1);
       metronome.setVolumes(quiet);
+      metronome.setCountIn(2); // Free play's own
 
       final loaded = await reload();
       final next = MetronomeController(FakeClickOutput());
@@ -116,6 +117,7 @@ void main() {
       expect(next.visualOffset, const Duration(milliseconds: 30));
       expect(next.clickSound, ClickSound.cowbell);
       expect(next.volumes, quiet);
+      expect(next.countIn, 2);
     });
 
     test('a fresh install keeps the defaults', () {
@@ -247,6 +249,32 @@ void main() {
       expect(library.currentSong?.name, 'B');
       expect(metronome.bpm, 110);
     });
+
+    test(
+      'Next while playing counts in only when that song has a count-in',
+      () async {
+        final output = FakeClickOutput()..time = const Duration(seconds: 1);
+        final playing = MetronomeController(output);
+        addTearDown(playing.dispose);
+        final gig = library.addSetlist('Gig');
+        for (final (name, countIn) in [('A', 0), ('B', 1), ('C', 0)]) {
+          final song = library.addSong(name: name, bpm: 100, pattern: waltz);
+          library
+            ..updateSong(song.copyWith(countIn: countIn))
+            ..addToSetlist(gig.id, song.id);
+        }
+        library
+          ..setActiveSetlist(gig.id)
+          ..nextSong(playing);
+        await playing.play();
+        expect(playing.countingIn, isFalse, reason: 'A has none');
+        library.nextSong(playing);
+        expect(playing.countIn, 1);
+        expect(playing.countingIn, isTrue, reason: 'B counts in');
+        library.nextSong(playing);
+        expect(playing.countingIn, isFalse, reason: 'C starts at once');
+      },
+    );
 
     test('follows setlist order, including a song listed twice', () {
       final a = library.addSong(name: 'A', bpm: 100, pattern: waltz);
@@ -481,6 +509,24 @@ void main() {
       library.playSong(other, metronome);
       expect(library.songChanged(metronome), isFalse);
       expect(library.songById(song.id)!.bpm, 100);
+    });
+
+    test('count-in is part of the song: change shows, Save stores, Revert '
+        'restores, and it is saved to disk', () async {
+      expect(metronome.countIn, 0, reason: 'a new song has none');
+      metronome.setCountIn(2);
+      expect(library.songChanged(metronome), isTrue);
+      library.revertSong(metronome);
+      expect(metronome.countIn, 0);
+      expect(library.songChanged(metronome), isFalse);
+      metronome.setCountIn(1);
+      library.saveToSong(metronome);
+      expect(library.songChanged(metronome), isFalse);
+      expect(library.songById(song.id)!.countIn, 1);
+      final copy = library.saveAsNewSong('A 2', metronome);
+      expect(copy.countIn, 1);
+      final reopened = await reload();
+      expect(reopened.songById(song.id)!.countIn, 1);
     });
 
     test('they survive closing the app', () async {

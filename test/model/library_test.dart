@@ -32,7 +32,7 @@ void main() {
   test('library survives JSON', () {
     final library = Library(
       songs: [
-        Song(id: 'a', name: 'Waltz', bpm: 90, pattern: waltz),
+        Song(id: 'a', name: 'Waltz', bpm: 90, pattern: waltz, countIn: 2),
         const Song(
           id: 'b',
           name: 'Rock',
@@ -45,9 +45,12 @@ void main() {
       ],
       lastBpm: 97,
       lastPattern: waltz,
+      lastCountIn: 1,
       visualOffset: const Duration(milliseconds: 20),
     );
     final copy = roundTrip(library);
+    expect(copy.songs.map((s) => s.countIn), [2, 0]);
+    expect(copy.lastCountIn, 1);
     expect(copy.songs.map((s) => [s.id, s.name, s.bpm, s.pattern]), [
       ['a', 'Waltz', 90, waltz],
       ['b', 'Rock', 128, const MetronomePattern.standard()],
@@ -57,6 +60,14 @@ void main() {
     expect(copy.lastBpm, 97);
     expect(copy.lastPattern, waltz);
     expect(copy.visualOffset, const Duration(milliseconds: 20));
+  });
+
+  test('older songs and files load with count-in off', () {
+    final json = Song(id: 'a', name: 'A', bpm: 90, pattern: waltz).toJson()
+      ..remove('countIn');
+    expect(Song.fromJson(json).countIn, 0);
+    final file = Library.empty.toJson()..remove('lastCountIn');
+    expect(Library.fromJson(file).lastCountIn, 0);
   });
 
   test('empty library has app defaults', () {

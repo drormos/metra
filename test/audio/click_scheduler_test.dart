@@ -494,4 +494,109 @@ void main() {
       expect(output.clicks, isEmpty);
     });
   });
+
+  group('count-in', () {
+    final eighths = MetronomePattern.simple(beatsPerBar: 4, stepsPerBeat: 2);
+
+    test('beats only, beat 1 accented; then the song starts on beat 1 '
+        'exactly on time', () async {
+      await scheduler.start(
+        bpm: 120,
+        pattern: eighths.withPolyrhythm(3),
+        countInBars: 1,
+      );
+      expect(scheduler.countingIn, isTrue);
+      runFor(_ms * 2500); // now 3500
+      final clicks = output.live;
+      expect(
+        [for (final c in clicks.take(5)) (c.at.inMilliseconds, c.level)],
+        [
+          (1120, StepLevel.accent),
+          (1620, StepLevel.normal),
+          (2120, StepLevel.normal),
+          (2620, StepLevel.normal),
+          (3120, StepLevel.accent), // the song's beat 1, on the grid
+        ],
+      );
+      expect(clicks[5].at, _ms * 3370);
+      expect(clicks[5].level, StepLevel.soft);
+      expect(
+        output.livePulses.first.at,
+        _ms * 3120,
+        reason: 'no polyrhythm during the count-in',
+      );
+      expect(scheduler.countingIn, isFalse);
+      expect(scheduler.stepAt(_ms * 2620)!.countIn, (bar: 1, bars: 1));
+      expect(scheduler.stepAt(_ms * 2620)!.barPosition, 3);
+      expect(scheduler.stepAt(_ms * 3120)!.countIn, isNull);
+    });
+
+    test('2 bars, in the song\'s time signature', () async {
+      await scheduler.start(
+        bpm: 120,
+        pattern: MetronomePattern.simple(
+          beatsPerBar: 3,
+          stepsPerBeat: 1,
+          beatUnit: 8,
+        ),
+        countInBars: 2,
+      );
+      runFor(_ms * 3200); // now 4200
+      expect(output.live.map((c) => c.at.inMilliseconds).take(7), [
+        1120,
+        1620,
+        2120,
+        2620,
+        3120,
+        3620,
+        4120,
+      ]);
+      expect(scheduler.stepAt(_ms * 3620)!.countIn, (bar: 2, bars: 2));
+      expect(scheduler.stepAt(_ms * 4120)!.countIn, isNull);
+      expect(output.live[3].level, StepLevel.accent, reason: 'bar 2, beat 1');
+    });
+
+    test(
+      'a subdivision change during it lands with the song, not before',
+      () async {
+        await scheduler.start(bpm: 120, pattern: eighths, countInBars: 1);
+        runFor(_ms * 700); // now 1700
+        scheduler.switchAtNextBeat(
+          bpm: 120,
+          pattern: eighths.withSubdivision(4),
+          restartBar: false,
+        );
+        runFor(_ms * 1800); // now 3500
+        final times = output.liveTimes.map((t) => t.inMilliseconds).toList();
+        expect(times.take(6), [1120, 1620, 2120, 2620, 3120, 3245]);
+      },
+    );
+
+    test('restartNow (a song loaded while playing) counts in first', () async {
+      await start();
+      runFor(_ms * 400); // now 1400
+      scheduler.restartNow(bpm: 60, pattern: eighths, countInBars: 1);
+      runFor(_ms * 5000);
+      final after = [
+        for (final c in output.live)
+          if (c.at > _ms * 1400) (c.at.inMilliseconds, c.level),
+      ];
+      expect(after.take(6), [
+        (1460, StepLevel.accent),
+        (2460, StepLevel.normal),
+        (3460, StepLevel.normal),
+        (4460, StepLevel.normal),
+        (5460, StepLevel.accent),
+        (5960, StepLevel.soft),
+      ]);
+    });
+
+    test('stop during it cancels the rest', () async {
+      await scheduler.start(bpm: 120, pattern: eighths, countInBars: 1);
+      runFor(_ms * 600);
+      scheduler.stop();
+      expect(scheduler.countingIn, isFalse);
+      expect(output.liveTimes.last, lessThanOrEqualTo(output.time));
+    });
+  });
 }
