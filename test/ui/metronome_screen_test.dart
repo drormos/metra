@@ -406,6 +406,64 @@ void main() {
     });
   });
 
+  for (final scale in [1.0, 1.3, 2.0]) {
+    testWidgets('top row at ${(scale * 100).round()}% text: stopwatch, 4/4 '
+        'and gear share one visible 44px box on one line; 4/4 only wider; '
+        '48dp touch targets', (tester) async {
+      controller
+        ..setPattern(
+          MetronomePattern.simple(
+            beatsPerBar: 12,
+            stepsPerBeat: 3,
+            beatUnit: 8,
+          ),
+        )
+        ..setPolyrhythm(5);
+      await tester.pumpWidget(
+        MediaQuery(
+          data: MediaQueryData(
+            size: const Size(412, 915),
+            textScaler: TextScaler.linear(scale),
+          ),
+          child: MaterialApp(
+            theme: testTheme,
+            home: MetronomeScreen(controller: controller),
+          ),
+        ),
+      );
+      addTearDown(controller.dispose);
+      Rect box(Key key) => tester.getRect(
+        find.descendant(of: find.byKey(key), matching: find.byType(Material)),
+      );
+      final boxes = [
+        for (final key in [
+          MetronomeScreen.onStartKey,
+          MetronomeScreen.meterKey,
+          MetronomeScreen.settingsKey,
+        ])
+          box(key),
+      ];
+      for (final b in boxes) {
+        expect(b.height, 44);
+        expect(b.top, boxes.first.top);
+      }
+      expect(boxes[0].width, 44);
+      expect(boxes[2].width, 44);
+      expect(boxes[1].width, greaterThan(44));
+      for (final key in [
+        MetronomeScreen.onStartKey,
+        MetronomeScreen.meterKey,
+      ]) {
+        expect(tester.getSize(find.byKey(key)).height, 48, reason: 'touch');
+      }
+      final side = tester
+          .widget<OutlinedButton>(find.byKey(MetronomeScreen.meterKey))
+          .style;
+      expect(side?.side, isNull, reason: 'the theme border, as the others');
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   group('when I press Start', () {
     // Null: the theme's plain outline.
     Color? outline(WidgetTester tester) => tester

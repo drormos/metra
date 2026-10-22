@@ -454,46 +454,56 @@ class MetronomeScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 4),
+        // The same visible 44px box as the square buttons (only wider), its
+        // 48dp touch target invisible padding around it: centred, so the
+        // 48px row never stretches the outline.
         SizedBox(
           height: 48,
-          child: Builder(
-            builder: (context) => OutlinedButton(
-              key: meterKey,
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                minimumSize: const Size(44, 44),
-                fixedSize: const Size.fromHeight(44),
-                tapTargetSize: MaterialTapTargetSize.padded,
-              ),
-              onPressed: () => showTimeSignatureSheet(context, controller),
-              child: Semantics(
-                label: [
-                  'Rhythm ${pattern.timeSignature}',
-                  if (pattern.stepsPerBeat > 1)
-                    TimeSignatureSheet.subdivisionNames[pattern.stepsPerBeat]!
-                        .toLowerCase(),
-                  if (pattern.polyrhythm > 0)
-                    'polyrhythm ${pattern.polyrhythm}',
-                ].join(', '),
-                excludeSemantics: true,
-                // "4/4 ♪♪ · 3": the note only off quarters.
-                child: DefaultTextStyle.merge(
-                  style: const TextStyle(
-                    fontFamily: MetraFonts.condensed,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(pattern.timeSignature),
-                      if (pattern.stepsPerBeat > 1) ...[
-                        const SizedBox(width: 5),
-                        SubdivisionIcon(pattern.stepsPerBeat, size: 20),
-                      ],
-                      if (pattern.polyrhythm > 0)
-                        Text(' · ${pattern.polyrhythm}'),
-                    ],
+          child: Center(
+            child: Builder(
+              builder: (context) => OutlinedButton(
+                key: meterKey,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  minimumSize: const Size(44, 44),
+                  fixedSize: const Size.fromHeight(44),
+                  tapTargetSize: MaterialTapTargetSize.padded,
+                ),
+                onPressed: () => showTimeSignatureSheet(context, controller),
+                child: Semantics(
+                  label: [
+                    'Rhythm ${pattern.timeSignature}',
+                    if (pattern.stepsPerBeat > 1)
+                      TimeSignatureSheet.subdivisionNames[pattern.stepsPerBeat]!
+                          .toLowerCase(),
+                    if (pattern.polyrhythm > 0)
+                      'polyrhythm ${pattern.polyrhythm}',
+                  ].join(', '),
+                  excludeSemantics: true,
+                  // "4/4 ♪♪ · 3": the note only off quarters. One fixed line
+                  // that shrinks rather than growing the box.
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: DefaultTextStyle.merge(
+                      style: const TextStyle(
+                        fontFamily: MetraFonts.condensed,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        height: 1,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(pattern.timeSignature),
+                          if (pattern.stepsPerBeat > 1) ...[
+                            const SizedBox(width: 5),
+                            SubdivisionIcon(pattern.stepsPerBeat, size: 20),
+                          ],
+                          if (pattern.polyrhythm > 0)
+                            Text(' · ${pattern.polyrhythm}'),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
