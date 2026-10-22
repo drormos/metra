@@ -1055,41 +1055,55 @@ void main() {
       matching: find.byType(Text),
     );
 
-    for (final up in [true, false]) {
-      testWidgets('BPM ${up ? 'up' : 'down'}: only the changed digit '
-          'dissolves in place, the new leading; the others never dim', (
-        tester,
-      ) async {
-        controller.setBpm(up ? 120 : 121);
-        await pumpScreen(tester);
-        Rect at(Finder f) => tester.getRect(f);
-        final bpm = at(find.byKey(MetronomeScreen.bpmKey));
-        final ruler = at(find.byType(TempoRuler));
-        final units = at(find.text(up ? '0' : '1').last);
-        controller.setBpm(up ? 121 : 120);
-        await tester.pump();
-        await tester.pump(MetraMotion.dissolve * 0.25);
-        expect(digits(), findsNWidgets(4), reason: 'the units: old and new');
-        final layers = tester
-            .widgetList<Opacity>(
-              find.descendant(
-                of: find.byKey(MetronomeScreen.bpmKey),
-                matching: find.byType(Opacity),
-              ),
-            )
-            .toList();
-        expect(layers, hasLength(2), reason: 'only the units slot');
-        expect(layers[0].opacity, 1, reason: 'the old waits for the new');
-        expect(layers[1].opacity, inExclusiveRange(0, 1), reason: 'leads');
-        // Old and new in the very same place.
-        expect(at(find.text(up ? '0' : '1').last).center, units.center);
-        expect(at(find.text(up ? '1' : '0').last).center, units.center);
-        expect(at(find.byKey(MetronomeScreen.bpmKey)), bpm);
-        expect(at(find.byType(TempoRuler)), ruler);
-        await tester.pump(MetraMotion.dissolve);
-        expect(digits(), findsNWidgets(3));
-      });
-    }
+    Iterable<double> dims(WidgetTester tester) => tester
+        .widgetList<Opacity>(
+          find.descendant(
+            of: find.byKey(MetronomeScreen.bpmKey),
+            matching: find.byType(Opacity),
+          ),
+        )
+        .map((o) => o.opacity);
+
+    testWidgets('BPM: the changed digit snaps in at ~60% and brightens to '
+        'full; the old is gone at once; the others untouched; nothing '
+        'moves', (tester) async {
+      controller.setBpm(120);
+      await pumpScreen(tester);
+      Rect at(Finder f) => tester.getRect(f);
+      final bpm = at(find.byKey(MetronomeScreen.bpmKey));
+      final ruler = at(find.byType(TempoRuler));
+      final units = at(find.text('0'));
+      controller.setBpm(121);
+      await tester.pump();
+      expect(digits(), findsNWidgets(3), reason: 'never two shapes');
+      expect(find.text('0'), findsNothing, reason: 'the old is gone');
+      expect(dims(tester), [MetraMotion.brightenFrom], reason: 'units only');
+      expect(at(find.text('1').last).center, units.center);
+      await tester.pump(MetraMotion.brighten ~/ 2);
+      expect(dims(tester).single, inExclusiveRange(0.6, 1));
+      expect(at(find.byKey(MetronomeScreen.bpmKey)), bpm);
+      expect(at(find.byType(TempoRuler)), ruler);
+      await tester.pump(MetraMotion.brighten);
+      expect(dims(tester), isEmpty, reason: 'full');
+    });
+
+    testWidgets('a change within ~250 ms of the last shows at full at once '
+        '(fast tapping never pulses)', (tester) async {
+      controller.setBpm(120);
+      await pumpScreen(tester);
+      controller.setBpm(121);
+      await tester.pump();
+      expect(dims(tester), isNotEmpty);
+      await tester.pump(const Duration(milliseconds: 150));
+      controller.setBpm(122);
+      await tester.pump();
+      expect(dims(tester), isEmpty);
+      await tester.pump(const Duration(milliseconds: 400));
+      controller.setBpm(123);
+      await tester.pump();
+      expect(dims(tester), isNotEmpty, reason: 'a slow change brightens');
+      await tester.pump(MetraMotion.brighten * 2);
+    });
 
     testWidgets('while the tempo is being held or dragged, instant', (
       tester,
@@ -1100,7 +1114,7 @@ void main() {
       await tester.pump();
       controller.setBpm(121);
       await tester.pump();
-      expect(digits(), findsNWidgets(3), reason: 'no fade');
+      expect(dims(tester), isEmpty, reason: 'at full at once');
     });
 
     testWidgets('"Remove animations": instant', (tester) async {
@@ -1112,7 +1126,7 @@ void main() {
       await pumpScreen(tester);
       controller.setBpm(121);
       await tester.pump();
-      expect(digits(), findsNWidgets(3));
+      expect(dims(tester), isEmpty);
     });
   });
 }

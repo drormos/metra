@@ -14,16 +14,16 @@ class TabularText extends StatelessWidget {
     this.text, {
     super.key,
     this.style,
-    this.dissolve = Duration.zero,
+    this.brighten = Duration.zero,
   });
 
   final String text;
   final TextStyle? style;
 
-  /// A digit that changes dissolves in its own slot over this long
-  /// ([MetraMotion.dissolve]); the others stay still at full opacity.
-  /// Zero: instant.
-  final Duration dissolve;
+  /// A digit that changes snaps in and brightens to full over this long
+  /// ([MetraMotion.brighten]); the others are untouched. Zero: instant at
+  /// full opacity.
+  final Duration brighten;
 
   static final _slots = <TextStyle, double>{};
 
@@ -65,10 +65,10 @@ class TabularText extends StatelessWidget {
                     // By place from the right, so 99 → 100 keeps the units.
                     key: ValueKey(text.length - i),
                     width: slot,
-                    child: _DissolveDigit(
+                    child: _BrightenDigit(
                       c,
                       style: resolved,
-                      duration: dissolve,
+                      duration: brighten,
                     ),
                   )
                 : Text(c, style: resolved),
@@ -78,11 +78,12 @@ class TabularText extends StatelessWidget {
   }
 }
 
-/// One digit in its slot (ui-spec.md "Motion", steady dissolve): when it
-/// changes, old and new are drawn in the same place and the new leads
-/// ([MetraMotion.dissolveAt]), so strokes they share never dim.
-class _DissolveDigit extends StatefulWidget {
-  const _DissolveDigit(
+/// One digit in its slot (ui-spec.md "BPM: snap in, soft brighten"): when
+/// it changes, the old one is gone at once and the new one appears in the
+/// same frame at [MetraMotion.brightenFrom], rising to full. Never two
+/// shapes, never an empty slot, no movement.
+class _BrightenDigit extends StatefulWidget {
+  const _BrightenDigit(
     this.digit, {
     required this.style,
     required this.duration,
@@ -93,53 +94,51 @@ class _DissolveDigit extends StatefulWidget {
   final Duration duration;
 
   @override
-  State<_DissolveDigit> createState() => _DissolveDigitState();
+  State<_BrightenDigit> createState() => _BrightenDigitState();
 }
 
-class _DissolveDigitState extends State<_DissolveDigit>
+class _BrightenDigitState extends State<_BrightenDigit>
     with SingleTickerProviderStateMixin {
-  late final _dissolve = AnimationController(vsync: this, value: 1);
-  String? _old;
+  late final _brighten = AnimationController(vsync: this, value: 1);
 
   @override
-  void didUpdateWidget(_DissolveDigit old) {
+  void didUpdateWidget(_BrightenDigit old) {
     super.didUpdateWidget(old);
     if (old.digit == widget.digit) return;
     if (widget.duration == Duration.zero) {
-      _dissolve.value = 1;
-      _old = null;
+      _brighten.value = 1;
       return;
     }
-    _old = old.digit;
-    _dissolve
+    _brighten
       ..duration = widget.duration
       ..forward(from: 0);
   }
 
   @override
   void dispose() {
-    _dissolve.dispose();
+    _brighten.dispose();
     super.dispose();
   }
 
-  Text _text(String c) =>
-      Text(c, style: widget.style, textAlign: TextAlign.center);
-
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _dissolve,
-    builder: (context, _) {
-      final old = _old;
-      final t = _dissolve.value;
-      if (old == null || t >= 1) return _text(widget.digit);
-      final o = MetraMotion.dissolveAt(_dissolve.duration! * t);
-      return Stack(
-        alignment: Alignment.center,
-        children: [
-          Opacity(opacity: o.old, child: _text(old)),
-          Opacity(opacity: o.next, child: _text(widget.digit)),
-        ],
-      );
-    },
-  );
+  Widget build(BuildContext context) {
+    final text = Text(
+      widget.digit,
+      style: widget.style,
+      textAlign: TextAlign.center,
+    );
+    return AnimatedBuilder(
+      animation: _brighten,
+      child: text,
+      builder: (context, child) {
+        final t = _brighten.value;
+        if (t >= 1) return child!;
+        const from = MetraMotion.brightenFrom;
+        return Opacity(
+          opacity: from + (1 - from) * MetraMotion.brightenCurve.transform(t),
+          child: child,
+        );
+      },
+    );
+  }
 }

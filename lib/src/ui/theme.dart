@@ -198,7 +198,15 @@ abstract final class MetraMotion {
   static const swap = Duration(milliseconds: 120);
   static const swapCurve = Curves.easeInOut;
 
-  /// The BPM, title and set name: only what changes dissolves, and the
+  /// The BPM (ui-spec.md "BPM: snap in, soft brighten"): a changed digit
+  /// appears at once at [brightenFrom] and rises to full over [brighten];
+  /// a change within [brightenSkip] of the one before shows at full.
+  static const brighten = Duration(milliseconds: 90);
+  static const brightenFrom = 0.6;
+  static const brightenCurve = Curves.easeOut;
+  static const brightenSkip = Duration(milliseconds: 250);
+
+  /// The title and set name: only what changes dissolves, and the
   /// new leads (ui-spec.md "Shared strokes stay bright"): it fades in over
   /// [dissolveIn] (ease-out); once it's at [dissolveLead], the old fades
   /// out over [dissolveOut]. Strokes the two share never dim.
