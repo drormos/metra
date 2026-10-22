@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/library_controller.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
+import 'package:metra/src/model/on_start.dart';
 import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/quick_pick.dart';
@@ -133,6 +134,9 @@ void main() {
       await checkAll(tester, '$theme rhythm sheet');
       await tester.tapAt(const Offset(200, 40));
       await tester.pumpAndSettle();
+      metronome.setOnStart(
+        const OnStart(speedUp: true, stopAfter: StopAfter.time),
+      );
       await tester.tap(find.byKey(MetronomeScreen.onStartKey));
       await tester.pumpAndSettle();
       await checkAll(tester, '$theme when I press Start');

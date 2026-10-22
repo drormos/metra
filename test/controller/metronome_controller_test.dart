@@ -8,6 +8,7 @@ import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/click_sound.dart';
 import 'package:metra/src/model/click_volumes.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
+import 'package:metra/src/model/on_start.dart';
 
 import '../audio/fake_click_output.dart';
 
@@ -480,10 +481,14 @@ void main() {
         final waltz = MetronomePattern.simple(beatsPerBar: 3, stepsPerBeat: 2);
         await controller.play();
         output.time = _ms * 1500;
-        controller.loadSong(bpm: 60, pattern: waltz, countIn: 1);
+        controller.loadSong(
+          bpm: 60,
+          pattern: waltz,
+          onStart: const OnStart(countIn: 1),
+        );
         expect(controller.countingIn, isTrue);
         output.time = _ms * 2000;
-        controller.loadSong(bpm: 60, pattern: waltz, countIn: 0);
+        controller.loadSong(bpm: 60, pattern: waltz, onStart: OnStart.off);
         expect(controller.countingIn, isFalse);
         expect(controller.countIn, 0);
       },
@@ -498,6 +503,74 @@ void main() {
       expect(controller.countingIn, isFalse);
       controller.endPreview();
       expect(controller.countIn, 2);
+    });
+  });
+
+  group('runs', () {
+    // Tops the scheduler up at the fake engine time.
+    void runTo(int ms) {
+      while (output.time < _ms * ms) {
+        output.time += _ms * 25;
+        controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      }
+    }
+
+    const climb = OnStart(speedUp: true, changeBy: 10, every: 1);
+
+    test(
+      'speed up shows each new tempo; Stop returns to where it started',
+      () async {
+        controller.setOnStart(climb);
+        await controller.play(); // beat 1 at 1120, bar lines every 2 s
+        runTo(3200);
+        expect(controller.bpm, 130);
+        expect(controller.startBpm, 120, reason: 'what saves compare to');
+        expect(controller.inRun, isTrue);
+        controller.stop();
+        expect(controller.bpm, 120);
+        expect(controller.startBpm, 120);
+      },
+    );
+
+    test('reaching the limit stops and resets too', () async {
+      controller.setOnStart(
+        climb.copyWith(stopAfter: StopAfter.bars, stopBars: 2),
+      );
+      await controller.play();
+      runTo(6000);
+      expect(controller.isPlaying, isFalse);
+      expect(controller.bpm, 120);
+    });
+
+    test(
+      'stop after alone leaves a hand-set tempo; no run in a preview',
+      () async {
+        controller.setOnStart(
+          const OnStart(stopAfter: StopAfter.bars, stopBars: 99),
+        );
+        await controller.play();
+        controller.setBpm(100);
+        controller.stop();
+        expect(controller.bpm, 100);
+        controller.setOnStart(climb);
+        await controller.preview(
+          bpm: 90,
+          pattern: const MetronomePattern.standard(),
+        );
+        expect(controller.inRun, isFalse);
+        runTo(4000);
+        expect(controller.bpm, 90);
+        controller.endPreview();
+      },
+    );
+
+    test('changing speed up while it runs applies from the next bar', () async {
+      controller.setOnStart(climb);
+      await controller.play();
+      runTo(2000);
+      controller.setOnStart(climb.copyWith(changeBy: 1));
+      runTo(3200);
+      expect(controller.bpm, 121);
     });
   });
 }

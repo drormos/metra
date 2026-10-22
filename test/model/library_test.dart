@@ -6,6 +6,7 @@ import 'package:metra/src/model/click_sound.dart';
 import 'package:metra/src/model/click_volumes.dart';
 import 'package:metra/src/model/library.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
+import 'package:metra/src/model/on_start.dart';
 
 void main() {
   final waltz = MetronomePattern(
@@ -32,7 +33,18 @@ void main() {
   test('library survives JSON', () {
     final library = Library(
       songs: [
-        Song(id: 'a', name: 'Waltz', bpm: 90, pattern: waltz, countIn: 2),
+        Song(
+          id: 'a',
+          name: 'Waltz',
+          bpm: 90,
+          pattern: waltz,
+          onStart: OnStart(
+            countIn: 2,
+            speedUp: true,
+            until: 160,
+            stopAfter: StopAfter.time,
+          ),
+        ),
         const Song(
           id: 'b',
           name: 'Rock',
@@ -45,12 +57,20 @@ void main() {
       ],
       lastBpm: 97,
       lastPattern: waltz,
-      lastCountIn: 1,
+      lastOnStart: const OnStart(countIn: 1),
       visualOffset: const Duration(milliseconds: 20),
     );
     final copy = roundTrip(library);
-    expect(copy.songs.map((s) => s.countIn), [2, 0]);
-    expect(copy.lastCountIn, 1);
+    expect(copy.songs.map((s) => s.onStart), [
+      const OnStart(
+        countIn: 2,
+        speedUp: true,
+        until: 160,
+        stopAfter: StopAfter.time,
+      ),
+      OnStart.off,
+    ]);
+    expect(copy.lastOnStart, const OnStart(countIn: 1));
     expect(copy.songs.map((s) => [s.id, s.name, s.bpm, s.pattern]), [
       ['a', 'Waltz', 90, waltz],
       ['b', 'Rock', 128, const MetronomePattern.standard()],
@@ -62,12 +82,21 @@ void main() {
     expect(copy.visualOffset, const Duration(milliseconds: 20));
   });
 
-  test('older songs and files load with count-in off', () {
+  test('older songs and files load with everything off; build 37–38 '
+      'count-ins carry over', () {
     final json = Song(id: 'a', name: 'A', bpm: 90, pattern: waltz).toJson()
-      ..remove('countIn');
-    expect(Song.fromJson(json).countIn, 0);
-    final file = Library.empty.toJson()..remove('lastCountIn');
-    expect(Library.fromJson(file).lastCountIn, 0);
+      ..remove('onStart');
+    expect(Song.fromJson(json).onStart, OnStart.off);
+    expect(
+      Song.fromJson({...json, 'countIn': 2}).onStart,
+      const OnStart(countIn: 2),
+    );
+    final file = Library.empty.toJson()..remove('lastOnStart');
+    expect(Library.fromJson(file).lastOnStart, OnStart.off);
+    expect(
+      Library.fromJson({...file, 'lastCountIn': 1}).lastOnStart,
+      const OnStart(countIn: 1),
+    );
   });
 
   test('empty library has app defaults', () {

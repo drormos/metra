@@ -43,29 +43,33 @@ Future<void> showDragSheet(
       : null,
   backgroundColor: context.colors.sheet.withAlpha(0),
   elevation: 0,
-  builder: (context) => DragToClose(
-    axis: Axis.vertical,
-    onClose: () => Navigator.pop(context),
-    child: Material(
-      color: context.colors.sheet,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            key: handleKey,
-            margin: const EdgeInsets.symmetric(vertical: 22),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: context.colors.beatResting,
-              borderRadius: BorderRadius.circular(2),
+  // Lifted above the keyboard (the sheet's typed values).
+  builder: (context) => Padding(
+    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+    child: DragToClose(
+      axis: Axis.vertical,
+      onClose: () => Navigator.pop(context),
+      child: Material(
+        color: context.colors.sheet,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              key: handleKey,
+              margin: const EdgeInsets.symmetric(vertical: 22),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: context.colors.beatResting,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-          Flexible(child: child),
-        ],
+            Flexible(child: child),
+          ],
+        ),
       ),
     ),
   ),

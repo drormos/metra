@@ -18,6 +18,7 @@ class ScheduledStep {
     required this.pattern,
     required this.barPosition,
     this.countIn,
+    this.bar,
   });
 
   /// Absolute step index.
@@ -37,6 +38,23 @@ class ScheduledStep {
 
   /// For a count-in beat: its bar (1-based) of [bars]; null for the song.
   final ({int bar, int bars})? countIn;
+
+  /// The song bar this step is in, from 0 at the song's beat 1 (count-in
+  /// bars don't count); null in a count-in.
+  final int? bar;
+}
+
+/// What a run does over time (speed up, stop after), asked as the song's
+/// beats are scheduled: [tempoAt] at every beat (any beat may change the
+/// tempo, from that beat on), [endsAt] at every bar line after the first.
+abstract interface class RunPlan {
+  /// The tempo from beat [beat] of song bar [bar] (both from 0) on, given
+  /// the tempo so far, or null to keep it.
+  double? tempoAt(int bar, int beat, double bpm);
+
+  /// Whether the run ends at the line starting song bar [bar], [elapsed]
+  /// after the song's beat 1.
+  bool endsAt(int bar, Duration elapsed);
 }
 
 /// One polyrhythm pulse that has been handed to the engine.
@@ -117,6 +135,18 @@ class ClickScheduler {
   // [_countInBars] bars.
   int? _countInEnd;
   int _countInBars = 0;
+  // The run (null: none), its first step, the song bar the last scheduled
+  // step is in (−1 before beat 1), and when beat 1 plays.
+  RunPlan? _run;
+  int _runBegin = 0;
+  int _bar = -1;
+  Duration? _runStart;
+  // Where the run ends (the bar line not scheduled), once decided.
+  Duration? _endAt;
+  // The step whose tempo the run last changed, and the tempo before it,
+  // so scheduling that step again (after a cancel) doesn't add twice.
+  int? _planStep;
+  double _planFrom = 0;
   Timer? _timer;
   bool _prepared = false;
 
@@ -128,6 +158,21 @@ class ClickScheduler {
   /// Whether a count-in is playing, or about to (the song hasn't been
   /// handed to the engine yet).
   bool get countingIn => _countInEnd != null;
+
+  /// Called when the run changes the tempo (as the step is scheduled), and
+  /// once the engine clock reaches the bar line where the run ends.
+  void Function(double bpm)? onRunTempo;
+  void Function()? onRunEnd;
+
+  /// When the song's beat 1 plays in this run, or null before it's known.
+  Duration? get runStart => _runStart;
+
+  /// Changes to the run apply from the next beat not yet scheduled.
+  set run(RunPlan? run) {
+    _run = run;
+    _endAt = null;
+    refill();
+  }
 
   /// The bar a count-in plays: [song]'s beats and time signature, beats
   /// only (no subdivisions, no polyrhythm), beat 1 accented.
@@ -173,6 +218,7 @@ class ClickScheduler {
     required double bpm,
     required MetronomePattern pattern,
     int countInBars = 0,
+    RunPlan? run,
   }) async {
     stop();
     final session = ++_session;
@@ -188,6 +234,7 @@ class ClickScheduler {
       bpm: bpm,
       pattern: pattern,
       countInBars: countInBars,
+      run: run,
     );
   }
 
@@ -200,15 +247,20 @@ class ClickScheduler {
     required double bpm,
     required MetronomePattern pattern,
     required int countInBars,
+    RunPlan? run,
   }) {
     final first = countInBars > 0 ? countInPattern(pattern) : pattern;
+    _run = run;
+    _runBegin = step;
+    _runStart = null;
+    _planStep = null;
     _switchAt = null;
     _nextGrid = null;
     _nextPattern = null;
     _countInEnd = null;
     _pattern = first;
     _barStart = step;
-    _nextStep = step;
+    _rewindTo(step);
     _grid = BeatGrid(
       anchor: at,
       anchorStep: step,
@@ -233,6 +285,8 @@ class ClickScheduler {
     _timer = null;
     _grid = null;
     _countInEnd = null;
+    _run = null;
+    _endAt = null;
     if (_steps.isNotEmpty || _pulses.isNotEmpty) {
       final now = _output.now();
       for (final step in _steps) {
@@ -279,7 +333,7 @@ class ClickScheduler {
     // its time; otherwise the last committed step does.
     final pivot = max(lastCommitted, grid.anchorStep);
     var next = grid.retempo(pivotStep: pivot, bpm: bpm);
-    _nextStep = lastCommitted + 1;
+    _rewindTo(lastCommitted + 1);
     if (next.stepTime(_nextStep) < cutoff) {
       // Speeding up past steps that are already gone: start the new
       // segment as soon as safely possible.
@@ -357,6 +411,7 @@ class ClickScheduler {
     required double bpm,
     required MetronomePattern pattern,
     int countInBars = 0,
+    RunPlan? run,
   }) {
     final grid = _grid;
     if (grid == null) return;
@@ -369,6 +424,7 @@ class ClickScheduler {
       bpm: bpm,
       pattern: pattern,
       countInBars: countInBars,
+      run: run,
     );
   }
 
@@ -392,7 +448,7 @@ class ClickScheduler {
     final cutoff = _output.now() + guard;
     _cancelPulses((p) => p.time > cutoff);
     _pattern = pattern;
-    _nextStep = firstOpen;
+    _rewindTo(firstOpen);
     // Pulse states (and a polyrhythm turned off) apply from the next pulse.
     _reemitTail(firstOpen - 1, after: cutoff, pattern: pattern);
     refill();
@@ -483,7 +539,7 @@ class ClickScheduler {
   }) {
     _cancelFrom(at);
     _cancelPulses((p) => p.step >= at);
-    _nextStep = min(_nextStep, at);
+    _rewindTo(min(_nextStep, at));
     _switchAt = at;
     _nextPattern = pattern;
     _nextBarStart = barStart;
@@ -511,7 +567,11 @@ class ClickScheduler {
     if (_grid == null) return;
 
     final now = _output.now();
-    _steps.removeWhere((step) => step.time <= now - retention);
+    if (_endAt case final end? when now >= end) return onRunEnd?.call();
+    // The latest step stays: it carries the bar count on.
+    while (_steps.length > 1 && _steps.first.time <= now - retention) {
+      _steps.removeAt(0);
+    }
     _pulses.removeWhere((pulse) => pulse.end <= now - retention);
 
     // A stalled timer must not play steps late (they would be off-grid):
@@ -522,14 +582,30 @@ class ClickScheduler {
       _nextStep = max(_nextStep, switchAt);
       _applySwitch();
     }
+    // shortcut: bar lines skipped here aren't counted by a run; only a
+    // stalled timer skips, which would also break the click itself.
     _nextStep = max(_nextStep, _grid!.firstStepAtOrAfter(cutoff));
 
     final horizon = now + lookahead;
-    while (true) {
+    while (_endAt == null) {
       if (_nextStep == _switchAt) _applySwitch();
+      final barPosition = (_nextStep - _barStart) % _pattern.stepsPerBar;
+      final song = _countInEnd == null;
+      final bar = song && barPosition == 0 ? _bar + 1 : _bar;
+      final run = _run;
+      if (song && run != null && barPosition % _pattern.stepsPerBeat == 0) {
+        final at = _grid!.stepTime(_nextStep);
+        if (barPosition == 0 &&
+            bar > 0 &&
+            run.endsAt(bar, at - (_runStart ?? at))) {
+          _endAt = at; // this bar line is silence
+          break;
+        }
+        _plan(run, bar, barPosition ~/ _pattern.stepsPerBeat);
+      }
       final time = _grid!.stepTime(_nextStep);
       if (time > horizon) break;
-      final barPosition = (_nextStep - _barStart) % _pattern.stepsPerBar;
+      if (song && bar == 0 && barPosition == 0) _runStart = time;
       final level = _pattern.steps[barPosition];
       final handle = level == StepLevel.silent
           ? null
@@ -548,10 +624,40 @@ class ClickScheduler {
                   bar: (_nextStep - _barStart) ~/ _pattern.stepsPerBar + 1,
                   bars: _countInBars,
                 ),
+          bar: song ? bar : null,
         ),
       );
+      _bar = bar;
       _emitPulses(_nextStep, barPosition, _pattern, _grid!);
       _nextStep++;
+    }
+  }
+
+  /// [run]'s tempo from the next step (a beat of song bar [bar]): placed
+  /// with that step kept where it is, and only once per step.
+  void _plan(RunPlan run, int bar, int beat) {
+    final grid = _grid!;
+    final step = _nextStep;
+    final again = _planStep == step && grid.anchorStep == step;
+    final before = again ? _planFrom : grid.bpm;
+    final bpm = run.tempoAt(bar, beat, before) ?? before;
+    if (bpm == grid.bpm) return;
+    _planStep = step;
+    _planFrom = before;
+    _grid = grid.retempo(pivotStep: step, bpm: bpm);
+    onRunTempo?.call(bpm);
+  }
+
+  /// Steps from [step] on will be (re)scheduled: the bar count and the end
+  /// go back to just before it.
+  void _rewindTo(int step) {
+    _nextStep = step;
+    _endAt = null;
+    _bar = -1;
+    for (final s in _steps.reversed) {
+      if (s.index >= step) continue;
+      if (s.index >= _runBegin) _bar = s.bar ?? -1;
+      break;
     }
   }
 

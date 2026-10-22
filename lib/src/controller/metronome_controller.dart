@@ -8,6 +8,7 @@ import '../audio/click_scheduler.dart';
 import '../model/click_sound.dart';
 import '../model/click_volumes.dart';
 import '../model/metronome_pattern.dart';
+import '../model/on_start.dart';
 import '../timing/engine_clock_smoother.dart';
 import '../timing/tap_tempo.dart';
 
@@ -15,7 +16,10 @@ import '../timing/tap_tempo.dart';
 /// Widgets read and drive this; they hold no metronome state themselves.
 class MetronomeController extends ChangeNotifier {
   MetronomeController(this._output) : _scheduler = ClickScheduler(_output) {
-    _scheduler.lookahead = foregroundLookahead;
+    _scheduler
+      ..lookahead = foregroundLookahead
+      ..onRunTempo = _runTempo
+      ..onRunEnd = stop;
     _failures = _output.deviceFailures.listen((_) => _recover());
   }
 
@@ -45,7 +49,10 @@ class MetronomeController extends ChangeNotifier {
   int _bpm = 120;
   MetronomePattern _pattern = const MetronomePattern.standard();
   bool _playing = false;
-  int _countIn = 0;
+  OnStart _onStart = OnStart.off;
+  // The tempo when this run started (Stop returns there with speed up);
+  // null when not playing a run.
+  int? _runFrom;
   Object? _audioError;
   bool _disposed = false;
   Duration _visualOffset = defaultVisualOffset;
@@ -57,22 +64,42 @@ class MetronomeController extends ChangeNotifier {
   // What the main screen was doing before a song editor preview took over.
   ({int bpm, MetronomePattern pattern, bool playing})? _beforePreview;
 
-  /// Bars of count-in (0 = off, 1 or 2) before the song, whenever playback
-  /// starts from stopped and when a song is loaded while playing
-  /// (ui-spec.md "When I press Start").
-  static const countInChoices = [0, 1, 2];
   bool _offsetTestStarted = false;
 
   int get bpm => _bpm;
   MetronomePattern get pattern => _pattern;
   bool get isPlaying => _playing;
 
-  /// See [countInChoices]. Takes effect the next time playback starts.
-  int get countIn => _countIn;
+  /// Count-in, speed up, stop after (ui-spec.md "When I press Start"):
+  /// they apply whenever playback starts from stopped and when a song is
+  /// loaded while playing. A count-in waits for the next start; speed up
+  /// and stop after changes apply to a run in progress from its next beat.
+  OnStart get onStart => _onStart;
 
-  void setCountIn(int bars) {
-    if (bars == _countIn) return;
-    _countIn = bars;
+  int get countIn => _onStart.countIn;
+
+  void setOnStart(OnStart onStart) {
+    if (onStart == _onStart) return;
+    _onStart = onStart;
+    if (_runFrom != null) _scheduler.run = onStart.runs ? onStart : null;
+    notifyListeners();
+  }
+
+  void setCountIn(int bars) => setOnStart(_onStart.copyWith(countIn: bars));
+
+  /// The tempo outside a speed-up run: while one plays, where it started
+  /// (Stop returns there); otherwise [bpm]. What a song's changes and
+  /// saves compare against.
+  int get startBpm => _runFrom != null && _onStart.speedUp ? _runFrom! : _bpm;
+
+  /// Whether a run (speed up or stop after) is playing.
+  bool get inRun => _playing && _runFrom != null && _onStart.runs;
+
+  /// When the song's beat 1 played in this run (engine time), or null.
+  Duration? get runStart => _playing ? _scheduler.runStart : null;
+
+  void _runTempo(double bpm) {
+    _bpm = bpm.round();
     notifyListeners();
   }
 
@@ -245,9 +272,9 @@ class MetronomeController extends ChangeNotifier {
   void applyEdit({
     required int bpm,
     required MetronomePattern pattern,
-    int? countIn,
+    OnStart? onStart,
   }) {
-    if (countIn != null) setCountIn(countIn);
+    if (onStart != null) setOnStart(onStart);
     setBpm(bpm);
     if (pattern == _pattern) return;
     if (pattern.beatsPerBar != _pattern.beatsPerBar ||
@@ -289,8 +316,8 @@ class MetronomeController extends ChangeNotifier {
   /// previewing go through [applyEdit].
   Future<void> preview({required int bpm, required MetronomePattern pattern}) {
     _beforePreview ??= (bpm: _bpm, pattern: _pattern, playing: _playing);
-    _load(bpm, pattern, countIn: false);
-    return play(countIn: false);
+    _load(bpm, pattern, run: false);
+    return play(run: false);
   }
 
   /// Leaving the song editor: restores what the main screen was doing
@@ -300,8 +327,8 @@ class MetronomeController extends ChangeNotifier {
     if (before == null) return;
     _beforePreview = null;
     if (!before.playing) stop();
-    _load(before.bpm, before.pattern, countIn: false);
-    if (before.playing) play(countIn: false);
+    _load(before.bpm, before.pattern, run: false);
+    if (before.playing) play(run: false);
   }
 
   void _switchAtNextBeat(MetronomePattern pattern, {required bool restartBar}) {
@@ -315,25 +342,28 @@ class MetronomeController extends ChangeNotifier {
   }
 
   /// Load a song (next/previous, or picked from a list) with its
-  /// [countIn] (null keeps the current one). While playing it restarts
-  /// immediately on beat 1 at the new tempo, after the song's count-in;
-  /// while stopped it only loads.
+  /// [onStart] (null keeps the current one). While playing it restarts
+  /// immediately on beat 1 at the new tempo, after the song's count-in,
+  /// starting its own run; while stopped it only loads.
   void loadSong({
     required int bpm,
     required MetronomePattern pattern,
-    int? countIn,
+    OnStart? onStart,
   }) {
-    if (countIn != null) _countIn = countIn;
-    _load(bpm, pattern, countIn: true);
+    if (onStart != null) _onStart = onStart;
+    _load(bpm, pattern, run: true);
   }
 
-  void _load(int bpm, MetronomePattern pattern, {required bool countIn}) {
+  /// [run]: with the count-in, speed up and stop after.
+  void _load(int bpm, MetronomePattern pattern, {required bool run}) {
     _bpm = bpm.clamp(minBpm, maxBpm);
     _pattern = pattern;
+    if (_playing) _runFrom = run ? _bpm : null;
     _scheduler.restartNow(
       bpm: _bpm.toDouble(),
       pattern: pattern,
-      countInBars: countIn ? _countIn : 0,
+      countInBars: run ? _onStart.countIn : 0,
+      run: run && _onStart.runs ? _onStart : null,
     );
     notifyListeners();
   }
@@ -349,18 +379,25 @@ class MetronomeController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Starts on beat 1, after the count-in unless [countIn] is false.
-  Future<void> play({bool countIn = true}) async {
+  /// Starts on beat 1, with the count-in, speed up and stop after unless
+  /// [run] is false.
+  Future<void> play({bool run = true}) async {
     if (_playing) return;
     _playing = true;
+    _runFrom = run ? _bpm : null;
     notifyListeners();
-    await _start(countIn ? _countIn : 0);
+    await _start(run);
   }
 
+  /// Stop, by hand or at a run's limit: after speed up, the tempo returns
+  /// to where it started, so the next Start replays the same exercise.
   void stop() {
     if (!_playing) return;
     _scheduler.stop();
     _playing = false;
+    final from = _runFrom;
+    _runFrom = null;
+    if (from != null && _onStart.speedUp) _bpm = from;
     notifyListeners();
   }
 
@@ -378,13 +415,16 @@ class MetronomeController extends ChangeNotifier {
   @visibleForTesting
   Duration get lookaheadForTesting => _scheduler.lookahead;
 
-  Future<void> _start(int countInBars) async {
+  Future<void> _start(bool run) async {
+    final countInBars = run ? _onStart.countIn : 0;
+    final plan = run && _onStart.runs ? _onStart : null;
     try {
       final bpm = _bpm, pattern = _pattern;
       await _scheduler.start(
         bpm: bpm.toDouble(),
         pattern: pattern,
         countInBars: countInBars,
+        run: plan,
       );
       // Changed while the device was starting, when the scheduler wasn't
       // running to take it: restart with what the screen shows.
@@ -393,12 +433,14 @@ class MetronomeController extends ChangeNotifier {
           bpm: _bpm.toDouble(),
           pattern: _pattern,
           countInBars: countInBars,
+          run: plan,
         );
       }
       _setAudioError(null);
     } catch (e) {
       _scheduler.stop();
       _playing = false;
+      _runFrom = null;
       _setAudioError(e, force: true);
     }
   }

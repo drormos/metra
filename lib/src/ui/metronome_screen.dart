@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
+import '../model/on_start.dart';
 import '../model/tempo_name.dart';
 import '../model/whats_new.dart';
 import 'beat_indicator.dart';
@@ -212,7 +213,7 @@ class MetronomeScreen extends StatelessWidget {
                         // Fixed height: the tempo name, or Revert / Save to song.
                         SizedBox(
                           height: 44,
-                          child: _CountInLine(
+                          child: _RunLine(
                             controller: controller,
                             child: _TempoLine(
                               controller: controller,
@@ -438,11 +439,8 @@ class MetronomeScreen extends StatelessWidget {
         Builder(
           builder: (context) => _squareButton(
             key: onStartKey,
-            tooltip: controller.countIn == 0
-                ? 'When I press Start'
-                : 'When I press Start: count-in ${controller.countIn} '
-                      '${controller.countIn == 1 ? 'bar' : 'bars'}',
-            lit: controller.countIn > 0,
+            tooltip: _onStartTooltip(controller.onStart),
+            lit: controller.onStart.anyOn,
             onPressed: () => showOnStartSheet(context, controller),
             child: const StopwatchIcon(),
           ),
@@ -511,6 +509,18 @@ class MetronomeScreen extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  /// "When I press Start: count-in 1 bar, speed up, stop after".
+  static String _onStartTooltip(OnStart on) {
+    final parts = [
+      if (on.countIn > 0) 'count-in ${OnStart.barsLabel(on.countIn)}',
+      if (on.speedUp) 'speed up',
+      if (on.stopAfter != StopAfter.off) 'stop after',
+    ];
+    return parts.isEmpty
+        ? 'When I press Start'
+        : 'When I press Start: ${parts.join(', ')}';
   }
 
   Widget _squareButton({
@@ -911,10 +921,11 @@ class _TempoLineState extends State<_TempoLine> {
 }
 
 /// While a count-in plays, the line under the BPM reads "Count-in · 3 of
-/// 4" ("Count-in · 2 · 3 of 4" in bar 2 of 2); otherwise it is [child].
+/// 4" ("Count-in · 2 · 3 of 4" in bar 2 of 2); during a run, its progress
+/// ("↗ +5 every 8 bars · next in 3 · 4:12 left"); otherwise it is [child].
 /// Read per frame from the engine clock, like the beat blocks.
-class _CountInLine extends StatefulWidget {
-  const _CountInLine({required this.controller, required this.child});
+class _RunLine extends StatefulWidget {
+  const _RunLine({required this.controller, required this.child});
 
   final MetronomeController controller;
   final Widget child;
@@ -924,7 +935,17 @@ class _CountInLine extends StatefulWidget {
     final countIn = step?.countIn;
     if (step == null || countIn == null) {
       // Before its first beat has sounded.
-      return step == null && controller.countingIn ? 'Count-in' : null;
+      if (step == null && controller.countingIn) return 'Count-in';
+      if (!controller.inRun) return null;
+      final start = controller.runStart;
+      final elapsed = now == null || start == null || now < start
+          ? Duration.zero
+          : now - start;
+      return controller.onStart.progress(
+        bpm: controller.bpm,
+        bar: step?.bar ?? -1,
+        elapsed: elapsed,
+      );
     }
     final beat = '${step.barPosition + 1} of ${step.pattern.beatsPerBar}';
     return countIn.bars > 1
@@ -933,10 +954,10 @@ class _CountInLine extends StatefulWidget {
   }
 
   @override
-  State<_CountInLine> createState() => _CountInLineState();
+  State<_RunLine> createState() => _RunLineState();
 }
 
-class _CountInLineState extends State<_CountInLine>
+class _RunLineState extends State<_RunLine>
     with SingleTickerProviderStateMixin {
   late final Ticker _ticker = createTicker(_onTick);
   String? _label;
@@ -966,7 +987,7 @@ class _CountInLineState extends State<_CountInLine>
   }
 
   void _onTick(Duration _) {
-    final label = _CountInLine.labelFor(
+    final label = _RunLine.labelFor(
       widget.controller,
       widget.controller.visualTimeAt(
         SchedulerBinding.instance.currentFrameTimeStamp,
@@ -991,10 +1012,14 @@ class _CountInLineState extends State<_CountInLine>
         ),
         if (label != null)
           Center(
-            child: Text(
-              label,
-              key: MetronomeScreen.countInLineKey,
-              style: TextStyle(fontSize: 16, color: context.colors.text),
+            // Shrinks rather than overflowing on narrow phones.
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                key: MetronomeScreen.countInLineKey,
+                style: TextStyle(fontSize: 16, color: context.colors.text),
+              ),
             ),
           ),
       ],

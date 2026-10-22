@@ -5,6 +5,7 @@ import 'package:flutter/material.dart'
 
 import '../model/library.dart';
 import '../model/metronome_pattern.dart';
+import '../model/on_start.dart';
 import '../storage/library_store.dart';
 import 'metronome_controller.dart';
 
@@ -284,7 +285,7 @@ class LibraryController extends ChangeNotifier {
     metronome.loadSong(
       bpm: song.bpm,
       pattern: song.pattern,
-      countIn: song.countIn,
+      onStart: song.onStart,
     );
     _emptyTab = null;
     _update(
@@ -303,7 +304,7 @@ class LibraryController extends ChangeNotifier {
     metronome.loadSong(
       bpm: song.bpm,
       pattern: song.pattern,
-      countIn: song.countIn,
+      onStart: song.onStart,
     );
     _emptyTab = null;
     _update(
@@ -341,9 +342,9 @@ class LibraryController extends ChangeNotifier {
   Song saveCurrentAsSong(String name, MetronomeController metronome) {
     final song = addSong(
       name: name,
-      bpm: metronome.bpm,
+      bpm: metronome.startBpm,
       pattern: metronome.pattern,
-      countIn: metronome.countIn,
+      onStart: metronome.onStart,
     );
     final list = activeSetlist;
     if (list != null) addToSetlist(list.id, song.id);
@@ -363,9 +364,9 @@ class LibraryController extends ChangeNotifier {
   bool songChanged(MetronomeController metronome) {
     final song = currentSong;
     return song != null &&
-        (song.bpm != metronome.bpm ||
+        (song.bpm != metronome.startBpm ||
             song.pattern != metronome.pattern ||
-            song.countIn != metronome.countIn);
+            song.onStart != metronome.onStart);
   }
 
   /// Stores the main-screen changes in the loaded song (every set gets them).
@@ -380,7 +381,7 @@ class LibraryController extends ChangeNotifier {
       metronome.applyEdit(
         bpm: song.bpm,
         pattern: song.pattern,
-        countIn: song.countIn,
+        onStart: song.onStart,
       );
     }
   }
@@ -400,9 +401,9 @@ class LibraryController extends ChangeNotifier {
     final list = activeSetlist;
     final song = addSong(
       name: name,
-      bpm: metronome.bpm,
+      bpm: metronome.startBpm,
       pattern: metronome.pattern,
-      countIn: metronome.countIn,
+      onStart: metronome.onStart,
     );
     _freshSongId = fresh ? song.id : null;
     if (list == null || index < 0 || placement == SongPlacement.none) {
@@ -435,9 +436,9 @@ class LibraryController extends ChangeNotifier {
   void updateSongFromMetronome(Song song, MetronomeController metronome) =>
       updateSong(
         song.copyWith(
-          bpm: metronome.bpm,
+          bpm: metronome.startBpm,
           pattern: metronome.pattern,
-          countIn: metronome.countIn,
+          onStart: metronome.onStart,
         ),
       );
 
@@ -762,14 +763,14 @@ class LibraryController extends ChangeNotifier {
     required String name,
     required int bpm,
     required MetronomePattern pattern,
-    int countIn = 0,
+    OnStart onStart = OnStart.off,
   }) {
     final song = Song(
       id: _newId(),
       name: name,
       bpm: bpm,
       pattern: pattern,
-      countIn: countIn,
+      onStart: onStart,
       editedAt: DateTime.now(),
     );
     _update(_library.copyWith(songs: [...songs, song]));
@@ -947,14 +948,14 @@ class LibraryController extends ChangeNotifier {
     metronome
       ..setBpm(_library.lastBpm)
       ..setPattern(_library.lastPattern)
-      ..setCountIn(_library.lastCountIn)
+      ..setOnStart(_library.lastOnStart)
       ..setVisualOffset(_library.visualOffset)
       ..setClickSound(_library.clickSound, preview: false)
       ..setVolumes(_library.volumes);
     metronome.addListener(() {
-      if (metronome.bpm == _library.lastBpm &&
+      if (metronome.startBpm == _library.lastBpm &&
           metronome.pattern == _library.lastPattern &&
-          metronome.countIn == _library.lastCountIn &&
+          metronome.onStart == _library.lastOnStart &&
           metronome.visualOffset == _library.visualOffset &&
           metronome.clickSound == _library.clickSound &&
           metronome.volumes == _library.volumes) {
@@ -962,9 +963,9 @@ class LibraryController extends ChangeNotifier {
       }
       _update(
         _library.copyWith(
-          lastBpm: metronome.bpm,
+          lastBpm: metronome.startBpm,
           lastPattern: metronome.pattern,
-          lastCountIn: metronome.countIn,
+          lastOnStart: metronome.onStart,
           visualOffset: metronome.visualOffset,
           clickSound: metronome.clickSound,
           volumes: metronome.volumes,

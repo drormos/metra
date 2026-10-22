@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart' show ThemeMode;
+import 'package:flutter/material.dart' show AppLifecycleState, ThemeMode;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/library_controller.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
@@ -8,6 +8,7 @@ import 'package:metra/src/model/click_sound.dart';
 import 'package:metra/src/model/click_volumes.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/model/library.dart';
+import 'package:metra/src/model/on_start.dart';
 import 'package:metra/src/storage/library_store.dart';
 
 import '../audio/fake_click_output.dart';
@@ -260,7 +261,7 @@ void main() {
         for (final (name, countIn) in [('A', 0), ('B', 1), ('C', 0)]) {
           final song = library.addSong(name: name, bpm: 100, pattern: waltz);
           library
-            ..updateSong(song.copyWith(countIn: countIn))
+            ..updateSong(song.copyWith(onStart: OnStart(countIn: countIn)))
             ..addToSetlist(gig.id, song.id);
         }
         library
@@ -522,11 +523,36 @@ void main() {
       metronome.setCountIn(1);
       library.saveToSong(metronome);
       expect(library.songChanged(metronome), isFalse);
-      expect(library.songById(song.id)!.countIn, 1);
+      expect(library.songById(song.id)!.onStart.countIn, 1);
       final copy = library.saveAsNewSong('A 2', metronome);
-      expect(copy.countIn, 1);
+      expect(copy.onStart.countIn, 1);
       final reopened = await reload();
-      expect(reopened.songById(song.id)!.countIn, 1);
+      expect(reopened.songById(song.id)!.onStart.countIn, 1);
+    });
+
+    test('speed up and stop after are part of the song; a run\'s own '
+        'tempo changes are not', () async {
+      const run = OnStart(speedUp: true, every: 1, stopAfter: StopAfter.time);
+      metronome.setOnStart(run);
+      expect(library.songChanged(metronome), isTrue);
+      library.saveToSong(metronome);
+      expect(library.songById(song.id)!.onStart, run);
+      library.revertSong(metronome);
+      expect(metronome.onStart, run);
+      metronome.setOnStart(run.withUntil(150));
+      library.revertSong(metronome);
+      expect(metronome.onStart, run, reason: 'Revert restores it');
+      final output = FakeClickOutput()..time = const Duration(seconds: 1);
+      final playing = MetronomeController(output);
+      addTearDown(playing.dispose);
+      library.playSong(library.songById(song.id)!, playing);
+      await playing.play();
+      for (var t = 1000; t < 3500; t += 25) {
+        output.time = Duration(milliseconds: t);
+        playing.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      }
+      expect(playing.bpm, 105, reason: 'climbing');
+      expect(library.songChanged(playing), isFalse);
     });
 
     test('they survive closing the app', () async {

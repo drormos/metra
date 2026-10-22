@@ -3,6 +3,7 @@ import 'package:flutter/material.dart' show ThemeMode, immutable;
 import 'click_sound.dart';
 import 'click_volumes.dart';
 import 'metronome_pattern.dart';
+import 'on_start.dart';
 
 @immutable
 class Song {
@@ -11,7 +12,7 @@ class Song {
     required this.name,
     required this.bpm,
     required this.pattern,
-    this.countIn = 0,
+    this.onStart = OnStart.off,
     this.editedAt,
     this.playedAt,
   });
@@ -21,9 +22,9 @@ class Song {
   final int bpm;
   final MetronomePattern pattern;
 
-  /// Bars of count-in before the song (0 = off), like its tempo
+  /// Count-in, speed up, stop after: part of the song like its tempo
   /// (ui-spec.md "When I press Start").
-  final int countIn;
+  final OnStart onStart;
 
   /// When the song was last loaded into the click (any mode), for the
   /// Songs tab's "most recently played"; null if never or an older file.
@@ -37,7 +38,7 @@ class Song {
     String? name,
     int? bpm,
     MetronomePattern? pattern,
-    int? countIn,
+    OnStart? onStart,
     DateTime? editedAt,
     DateTime? playedAt,
   }) => Song(
@@ -45,7 +46,7 @@ class Song {
     name: name ?? this.name,
     bpm: bpm ?? this.bpm,
     pattern: pattern ?? this.pattern,
-    countIn: countIn ?? this.countIn,
+    onStart: onStart ?? this.onStart,
     editedAt: editedAt ?? this.editedAt,
     playedAt: playedAt ?? this.playedAt,
   );
@@ -55,7 +56,7 @@ class Song {
     'name': name,
     'bpm': bpm,
     'pattern': pattern.toJson(),
-    'countIn': countIn,
+    'onStart': onStart.toJson(),
     'editedAt': editedAt?.millisecondsSinceEpoch,
     'playedAt': playedAt?.millisecondsSinceEpoch,
   };
@@ -65,7 +66,7 @@ class Song {
     name: json['name'] as String,
     bpm: json['bpm'] as int,
     pattern: MetronomePattern.fromJson(json['pattern'] as Map<String, Object?>),
-    countIn: json['countIn'] as int? ?? 0, // older files: off
+    onStart: _onStartOf(json['onStart'], json['countIn']),
     editedAt: switch (json['editedAt']) {
       final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
       _ => null,
@@ -76,6 +77,13 @@ class Song {
     },
   );
 }
+
+/// Stored "When I press Start" settings; files from builds 37–38 had only
+/// a count-in, older ones nothing (all off).
+OnStart _onStartOf(Object? json, Object? countIn) => switch (json) {
+  final Map<String, Object?> map => OnStart.fromJson(map),
+  _ => OnStart.fromJson({'countIn': countIn}),
+};
 
 /// An ordered list of songs, by id.
 @immutable
@@ -130,7 +138,7 @@ class Library {
     required this.lastBpm,
     required this.lastPattern,
     required this.visualOffset,
-    this.lastCountIn = 0,
+    this.lastOnStart = OnStart.off,
     this.clickSound = ClickSound.woodblock,
     this.themeMode = ThemeMode.system,
     this.vibrate = true,
@@ -160,8 +168,9 @@ class Library {
   final int lastBpm;
   final MetronomePattern lastPattern;
 
-  /// The click's count-in (Free play's own after a fresh launch).
-  final int lastCountIn;
+  /// The click's count-in, speed up, stop after (Free play's own after a
+  /// fresh launch).
+  final OnStart lastOnStart;
   final Duration visualOffset;
   final ClickSound clickSound;
 
@@ -200,7 +209,7 @@ class Library {
     List<Setlist>? setlists,
     int? lastBpm,
     MetronomePattern? lastPattern,
-    int? lastCountIn,
+    OnStart? lastOnStart,
     Duration? visualOffset,
     ClickSound? clickSound,
     ThemeMode? themeMode,
@@ -215,7 +224,7 @@ class Library {
     setlists: setlists ?? this.setlists,
     lastBpm: lastBpm ?? this.lastBpm,
     lastPattern: lastPattern ?? this.lastPattern,
-    lastCountIn: lastCountIn ?? this.lastCountIn,
+    lastOnStart: lastOnStart ?? this.lastOnStart,
     visualOffset: visualOffset ?? this.visualOffset,
     clickSound: clickSound ?? this.clickSound,
     themeMode: themeMode ?? this.themeMode,
@@ -241,7 +250,7 @@ class Library {
     setlists: setlists,
     lastBpm: lastBpm,
     lastPattern: lastPattern,
-    lastCountIn: lastCountIn,
+    lastOnStart: lastOnStart,
     visualOffset: visualOffset,
     clickSound: clickSound,
     themeMode: themeMode,
@@ -260,7 +269,7 @@ class Library {
     'version': version,
     'lastBpm': lastBpm,
     'lastPattern': lastPattern.toJson(),
-    'lastCountIn': lastCountIn,
+    'lastOnStart': lastOnStart.toJson(),
     'visualOffsetMs': visualOffset.inMilliseconds,
     'clickSound': clickSound.name,
     'themeMode': themeMode.name,
@@ -294,7 +303,7 @@ class Library {
             ),
           ) ??
           empty.lastPattern,
-      lastCountIn: json['lastCountIn'] as int? ?? 0,
+      lastOnStart: _onStartOf(json['lastOnStart'], json['lastCountIn']),
       visualOffset: Duration(milliseconds: json['visualOffsetMs'] as int? ?? 0),
       // Optional (older files lack it); an unknown name falls back rather
       // than discarding the whole library.

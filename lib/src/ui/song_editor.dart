@@ -38,7 +38,7 @@ Future<Song?> openSongEditor(
     metronome.applyEdit(
       bpm: saved.bpm,
       pattern: saved.pattern,
-      countIn: saved.countIn,
+      onStart: saved.onStart,
     );
   }
   return saved;

@@ -2,6 +2,7 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/audio/click_scheduler.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
+import 'package:metra/src/model/on_start.dart';
 
 import 'fake_click_output.dart';
 
@@ -599,4 +600,135 @@ void main() {
       expect(output.liveTimes.last, lessThanOrEqualTo(output.time));
     });
   });
+
+  group('runs', () {
+    List<int> times() => [for (final t in output.liveTimes) t.inMilliseconds];
+
+    test('speed up changes tempo exactly on bar lines; beat 1 of each bar '
+        'stays on the grid', () async {
+      final tempos = <double>[];
+      scheduler.onRunTempo = tempos.add;
+      await scheduler.start(
+        bpm: 120,
+        pattern: const MetronomePattern.standard(),
+        run: const OnStart(speedUp: true, changeBy: 10, every: 2),
+      );
+      runFor(_ms * 9000);
+      // Bars 0–1 at 500 ms, from bar 2 (step 8, 5120) at 130 bpm.
+      expect(times().take(10), [
+        1120, 1620, 2120, 2620, 3120, 3620, 4120, 4620, //
+        5120, 5581,
+      ]);
+      expect(times()[16], 5120 + 3692, reason: 'bar 4 at 140 from here');
+      expect(tempos, [130, 140]);
+    });
+
+    test('Until: climbs to it and holds', () async {
+      await scheduler.start(
+        bpm: 120,
+        pattern: const MetronomePattern.standard(),
+        run: const OnStart(speedUp: true, changeBy: 20, every: 1, until: 150),
+      );
+      runFor(_ms * 6000);
+      final gaps = [
+        for (var i = 1; i < output.live.length; i++)
+          (output.live[i].at - output.live[i - 1].at).inMilliseconds,
+      ];
+      // Bar 0 at 120, bar 1 at 140, then 150 forever.
+      expect(gaps.sublist(0, 4), [500, 500, 500, 500]);
+      expect(gaps.sublist(4, 8), everyElement(closeTo(429, 1)));
+      expect(gaps.sublist(8), everyElement(closeTo(400, 1)));
+    });
+
+    test(
+      'a tempo change by hand mid-run: the next step adds to it, once',
+      () async {
+        await scheduler.start(
+          bpm: 100,
+          pattern: const MetronomePattern.standard(),
+          run: const OnStart(speedUp: true, changeBy: 10, every: 2),
+        );
+        runFor(_ms * 2000); // in bar 1
+        scheduler.setTempo(60);
+        runFor(_ms * 6000);
+        final gaps = [
+          for (var i = 1; i < output.live.length; i++)
+            (output.live[i].at - output.live[i - 1].at).inMilliseconds,
+        ];
+        // Bar 2 (step 8) and on at 70 = 60 + 10.
+        expect(gaps.last, closeTo(857, 1));
+        // Re-placing the bar line's step (a beat tap) doesn't add again.
+        scheduler.replaceLevels(const MetronomePattern.standard().cycleBeat(2));
+        runFor(_ms * 1000);
+        expect(
+          (output.live.last.at - output.live[output.live.length - 2].at)
+              .inMilliseconds,
+          closeTo(857, 1),
+        );
+      },
+    );
+
+    test('stop after bars: the last bar plays, the next bar line is '
+        'silent, then it ends; count-in bars don\'t count', () async {
+      var ended = 0;
+      scheduler.onRunEnd = () => ended++;
+      await scheduler.start(
+        bpm: 120,
+        pattern: const MetronomePattern.standard(),
+        countInBars: 1,
+        run: const OnStart(stopAfter: StopAfter.bars, stopBars: 2),
+      );
+      runFor(_ms * 5600); // song beat 1 at 3120; its bar 2 line at 7120
+      expect(times().last, 6620, reason: 'count-in 4 + 2 bars × 4 beats');
+      expect(output.live.length, 12);
+      expect(ended, 0);
+      runFor(_ms * 600); // past 7120
+      expect(ended, greaterThanOrEqualTo(1));
+      expect(times().last, 6620);
+    });
+
+    test('stop after time: at the first bar line past the limit', () async {
+      var ended = false;
+      scheduler.onRunEnd = () => ended = true;
+      await scheduler.start(
+        bpm: 120,
+        pattern: const MetronomePattern.standard(),
+        run: const OnStart(
+          stopAfter: StopAfter.time,
+          stopTime: Duration(seconds: 3),
+        ),
+      );
+      runFor(_ms * 6000);
+      // Bar lines every 2 s from 1120; 3 s after → the line at 5120.
+      expect(times().last, 4620);
+      expect(ended, isTrue);
+    });
+
+    test(
+      'a plan may change tempo on any beat (groundwork for ramps)',
+      () async {
+        await scheduler.start(
+          bpm: 120,
+          pattern: const MetronomePattern.standard(),
+          run: _OnBeat(bar: 0, beat: 2, bpm: 60),
+        );
+        runFor(_ms * 3000);
+        expect(times().take(4), [1120, 1620, 2120, 3120]);
+      },
+    );
+  });
+}
+
+class _OnBeat implements RunPlan {
+  _OnBeat({required this.bar, required this.beat, required this.bpm});
+
+  final int bar, beat;
+  final double bpm;
+
+  @override
+  double? tempoAt(int bar, int beat, double bpm) =>
+      bar == this.bar && beat == this.beat ? this.bpm : null;
+
+  @override
+  bool endsAt(int bar, Duration elapsed) => false;
 }

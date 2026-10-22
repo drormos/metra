@@ -5,7 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
+import 'package:metra/src/model/on_start.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
+import 'package:metra/src/ui/on_start_sheet.dart';
+import 'package:metra/src/ui/value_stepper.dart';
 import 'package:metra/src/ui/poly_lane.dart';
 import 'package:metra/src/ui/tabular_text.dart';
 import 'package:metra/src/ui/theme.dart';
@@ -16,6 +19,8 @@ import 'package:metra/src/ui/time_signature_sheet.dart';
 
 import '../audio/fake_click_output.dart';
 import 'test_theme.dart';
+
+const _frame = Duration(milliseconds: 16);
 
 void main() {
   late FakeClickOutput output;
@@ -358,16 +363,16 @@ void main() {
         ?.resolve({})
         ?.color;
 
-    testWidgets('the stopwatch opens the sheet; Count-in only; red while on', (
-      tester,
-    ) async {
+    testWidgets('the stopwatch opens the sheet: Count-in, Speed up, Stop '
+        'after; red while any is on', (tester) async {
       await pumpScreen(tester);
       expect(outline(tester), isNull);
       await tester.tap(find.byKey(MetronomeScreen.onStartKey));
       await tester.pumpAndSettle();
       expect(find.text('When I press Start'), findsOneWidget);
-      expect(find.text('Speed up'), findsNothing);
-      expect(find.text('Stop after'), findsNothing);
+      expect(find.text('Speed up'), findsOneWidget);
+      expect(find.text('Stop after'), findsOneWidget);
+      expect(find.text(OnStartSheet.everyLabel), findsNothing);
       await tester.tap(find.text('1 bar'));
       await tester.pump();
       expect(controller.countIn, 1);
@@ -376,11 +381,209 @@ void main() {
         find.byTooltip('When I press Start: count-in 1 bar'),
         findsOneWidget,
       );
-      await tester.tap(find.text('Off'));
+      await tester.tap(find.text('Off').first);
       await tester.pump();
       expect(controller.countIn, 0);
       expect(outline(tester), isNull);
-      expect(find.byTooltip('When I press Start'), findsOneWidget);
+      await tester.tap(find.byKey(OnStartSheet.speedUpKey));
+      await tester.pump();
+      expect(controller.onStart.speedUp, isTrue);
+      expect(outline(tester), isNotNull, reason: 'speed up alone');
+      for (final text in [
+        OnStartSheet.changeLabel,
+        OnStartSheet.everyLabel,
+        OnStartSheet.untilLabel,
+        OnStartSheet.speedUpHint,
+        '+5',
+        '8 bars',
+        'No limit',
+      ]) {
+        expect(
+          find.descendant(
+            of: find.byType(OnStartSheet),
+            matching: find.text(text),
+          ),
+          findsOneWidget,
+          reason: text,
+        );
+      }
+      await tester.tap(find.byKey(OnStartSheet.speedUpKey));
+      await tester.pump();
+      expect(outline(tester), isNull);
+      await tester.ensureVisible(find.text('Time'));
+      await tester.tap(find.text('Time'));
+      await tester.pump();
+      expect(controller.onStart.stopAfter, StopAfter.time);
+      expect(outline(tester), isNotNull, reason: 'stop after alone');
+      expect(find.text(OnStartSheet.lengthLabel), findsOneWidget);
+      expect(find.text('5:00'), findsOneWidget);
+      expect(find.text(OnStartSheet.stopAfterHint), findsOneWidget);
+    });
+
+    group('editing values', () {
+      Future<void> openSheet(WidgetTester tester, OnStart on) async {
+        tester.view
+          ..physicalSize = const Size(420, 1400)
+          ..devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        controller.setOnStart(on);
+        await pumpScreen(tester);
+        await tester.tap(find.byKey(MetronomeScreen.onStartKey));
+        await tester.pumpAndSettle();
+      }
+
+      Future<void> tapStep(WidgetTester tester, Key key) async {
+        await tester.tap(find.byKey(key));
+        await tester.pump();
+      }
+
+      Future<void> type(WidgetTester tester, String label, String text) async {
+        await tester.tap(find.byKey(ValueStepper.fieldKey(label)));
+        await tester.pump();
+        await tester.enterText(find.byKey(ValueStepper.fieldKey(label)), text);
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pump();
+      }
+
+      testWidgets('− / + steps fit the unit; Until starts at tempo + 20 and '
+          'goes back to No limit below 30', (tester) async {
+        await openSheet(
+          tester,
+          const OnStart(speedUp: true, changeBy: 1, every: 16),
+        );
+        await tapStep(tester, ValueStepper.minusKey(OnStartSheet.changeLabel));
+        expect(controller.onStart.changeBy, -1, reason: 'skips 0');
+        expect(
+          find.descendant(
+            of: find.byType(OnStartSheet),
+            matching: find.text('−1'),
+          ),
+          findsOneWidget,
+        );
+        await tapStep(tester, ValueStepper.plusKey(OnStartSheet.everyLabel));
+        expect(controller.onStart.every, 20);
+        await tapStep(tester, ValueStepper.plusKey(OnStartSheet.untilLabel));
+        expect(controller.onStart.until, 140);
+        await tapStep(tester, ValueStepper.plusKey(OnStartSheet.untilLabel));
+        expect(controller.onStart.until, 145);
+        controller.setOnStart(controller.onStart.withUntil(30));
+        await tester.pump();
+        await tapStep(tester, ValueStepper.minusKey(OnStartSheet.untilLabel));
+        expect(controller.onStart.until, isNull);
+        expect(find.text('No limit'), findsOneWidget);
+      });
+
+      testWidgets('tap to type: snaps into range; time fills from the right; '
+          'an empty Until is No limit', (tester) async {
+        await openSheet(
+          tester,
+          const OnStart(speedUp: true, until: 150, stopAfter: StopAfter.time),
+        );
+        await type(tester, OnStartSheet.everyLabel, '99');
+        expect(controller.onStart.every, 64);
+        expect(find.text('64 bars'), findsOneWidget);
+        await type(tester, OnStartSheet.changeLabel, '0');
+        expect(controller.onStart.changeBy, 1);
+        await type(tester, OnStartSheet.changeLabel, '-7');
+        expect(controller.onStart.changeBy, -7);
+        await type(tester, OnStartSheet.untilLabel, '');
+        expect(controller.onStart.until, isNull);
+        // Typing 1, 2, 3, 0 over the selected value.
+        final field = find.byKey(
+          ValueStepper.fieldKey(OnStartSheet.lengthLabel),
+        );
+        await tester.tap(field);
+        await tester.pump();
+        var text = '';
+        for (final digit in ['1', '2', '3', '0']) {
+          text = '${tester.widget<TextField>(field).controller!.text}$digit';
+          tester.testTextInput.updateEditingValue(TextEditingValue(text: text));
+          await tester.pump();
+        }
+        expect(tester.widget<TextField>(field).controller!.text, '12:30');
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pump();
+        expect(
+          controller.onStart.stopTime,
+          const Duration(minutes: 12, seconds: 30),
+        );
+        await type(tester, OnStartSheet.lengthLabel, '5');
+        expect(controller.onStart.stopTime, OnStart.minTime, reason: 'snaps');
+      });
+
+      testWidgets('holding + repeats, accelerating, with a bump at the limit', (
+        tester,
+      ) async {
+        await openSheet(
+          tester,
+          const OnStart(stopAfter: StopAfter.bars, stopBars: 1),
+        );
+        final haptics = <String>[];
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          (call) async {
+            if (call.method == 'HapticFeedback.vibrate') {
+              haptics.add(call.arguments as String);
+            }
+            return null;
+          },
+        );
+        final plus = find.byKey(ValueStepper.plusKey(OnStartSheet.lengthLabel));
+        final gesture = await tester.startGesture(tester.getCenter(plus));
+        await tester.pump(const Duration(milliseconds: 450));
+        expect(controller.onStart.stopBars, 2, reason: 'one step at 0.4 s');
+        Future<int> stepsIn(Duration span) async {
+          final from = controller.onStart.stopBars;
+          for (var t = Duration.zero; t < span; t += _frame) {
+            await tester.pump(_frame);
+          }
+          return controller.onStart.stopBars - from;
+        }
+
+        // Bars step by 1 up to 16: the first half second is ~6 per second.
+        final early = await stepsIn(const Duration(milliseconds: 500));
+        expect(early, inInclusiveRange(2, 5));
+        // Holding on: ~15 per second (from 16 the steps are 4 and 8 bars).
+        final fromValue = controller.onStart.stopBars;
+        await stepsIn(const Duration(seconds: 1));
+        expect(controller.onStart.stopBars - fromValue, greaterThan(early * 4));
+        // On to the end of the range: it stops with a medium bump.
+        await stepsIn(const Duration(seconds: 12));
+        expect(controller.onStart.stopBars, OnStart.maxBars);
+        expect(haptics, contains('HapticFeedbackType.mediumImpact'));
+        await gesture.up();
+        await tester.pump();
+      });
+    });
+
+    testWidgets('while a run plays, the line under the BPM shows progress', (
+      tester,
+    ) async {
+      controller.setOnStart(
+        const OnStart(
+          speedUp: true,
+          changeBy: 5,
+          every: 2,
+          stopAfter: StopAfter.bars,
+          stopBars: 8,
+        ),
+      );
+      await pumpScreen(tester);
+      await tester.tap(find.byKey(MetronomeScreen.playKey));
+      await tester.pump();
+      // 120 bpm 4/4 from 120 ms: bar 1 starts at 2120.
+      while (output.time < const Duration(milliseconds: 2200)) {
+        output.time += const Duration(milliseconds: 20);
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+      expect(
+        find.text('↗ +5 every 2 bars · next in 1 · 7 bars left'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(MetronomeScreen.playKey));
+      await tester.pump();
+      expect(find.byKey(MetronomeScreen.countInLineKey), findsNothing);
+      expect(find.byKey(MetronomeScreen.tempoNameKey), findsOneWidget);
     });
 
     testWidgets('counting in: numbers in the blocks, lit as they sound, '
