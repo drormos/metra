@@ -21,6 +21,9 @@ Future<void> showTimeSignatureSheet(
   // closes past half), so the sheet draws its own surface and handle.
   enableDrag: false,
   showDragHandle: false,
+  sheetAnimationStyle: RowGestures.reduceMotion(context)
+      ? AnimationStyle.noAnimation
+      : null,
   backgroundColor: context.colors.sheet.withAlpha(0),
   elevation: 0,
   builder: (context) => DragToClose(
@@ -209,8 +212,9 @@ class TimeSignatureSheet extends StatelessWidget {
                 metronome.setPolyrhythm(n);
               }
             : null,
-        child: SizedBox(
-          height: 48,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 48),
+          alignment: Alignment.center,
           child: Center(
             child: Text(
               n == 0 ? 'Off' : '$n',
@@ -222,7 +226,7 @@ class TimeSignatureSheet extends StatelessWidget {
                     ? colors.background
                     : enabled
                     ? colors.text
-                    : colors.beatResting,
+                    : colors.disabledText,
               ),
             ),
           ),
@@ -237,8 +241,8 @@ class TimeSignatureSheet extends StatelessWidget {
     int beats,
     int unit, {
     required bool selected,
-  }) => SizedBox(
-    height: 56,
+  }) => ConstrainedBox(
+    constraints: const BoxConstraints(minHeight: 56),
     child: OutlinedButton(
       key: ValueKey('common-$beats-$unit'),
       style: OutlinedButton.styleFrom(

@@ -725,7 +725,7 @@ void main() {
       final semantics = tester.ensureSemantics();
       await pumpScreen(tester);
       final node = tester.getSemantics(ruler());
-      expect(node.value, '120 bpm');
+      expect(node.value, '120 BPM, Allegro');
       node.owner!.performAction(node.id, SemanticsAction.increase);
       await tester.pump();
       expect(controller.bpm, 121);

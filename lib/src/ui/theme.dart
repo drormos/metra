@@ -30,6 +30,8 @@ class MetraColors extends ThemeExtension<MetraColors> {
     required this.pulseResting,
     required this.pulseAccentResting,
     required this.pulseMutedLine,
+    required this.disabledText,
+    required this.controlOutline,
     required this.accent,
     required this.primary,
     required this.onPrimary,
@@ -60,6 +62,8 @@ class MetraColors extends ThemeExtension<MetraColors> {
     pulseResting: Color(0xFF262626),
     pulseAccentResting: Color(0xFF5A1A16),
     pulseMutedLine: Color(0xFF3A3A3A),
+    disabledText: Color(0xFF5A5A5A),
+    controlOutline: Color(0xFF6E6E6E),
     accent: Color(0xFFFF3B30),
     primary: Color(0xFFFF3B30),
     onPrimary: Color(0xFF000000),
@@ -90,6 +94,8 @@ class MetraColors extends ThemeExtension<MetraColors> {
     pulseResting: Color(0xFFD8D3C9),
     pulseAccentResting: Color(0xFFF0CCC8),
     pulseMutedLine: Color(0xFFB9B4AA),
+    disabledText: Color(0xFFA39E94),
+    controlOutline: Color(0xFF8A857C),
     accent: Color(0xFFD7261E),
     primary: Color(0xFF111111),
     onPrimary: Color(0xFFF3F1EC),
@@ -142,6 +148,14 @@ class MetraColors extends ThemeExtension<MetraColors> {
   final Color pulseResting;
   final Color pulseAccentResting;
   final Color pulseMutedLine;
+
+  /// Text of things that can't be used ("In this set"); exempt from
+  /// contrast rules, so never for readable text.
+  final Color disabledText;
+
+  /// Outlines that must be seen to be used (unchecked checkboxes, search
+  /// fields): 3:1 or better.
+  final Color controlOutline;
 
   /// Tempo needle, current-song marker, checkmarks.
   final Color accent;

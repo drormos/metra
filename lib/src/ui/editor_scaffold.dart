@@ -328,7 +328,7 @@ class SearchField extends StatelessWidget {
     final colors = context.colors;
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(4),
-      borderSide: BorderSide(color: colors.border, width: 2),
+      borderSide: BorderSide(color: colors.controlOutline, width: 2),
     );
     return ValueListenableBuilder(
       valueListenable: controller,
@@ -382,12 +382,14 @@ class BackBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(4, 8, 16, 12),
+    // The row is 48dp (the touch minimum for ‹); the padding gives back
+    // the 4px, so the bar looks the same.
+    padding: const EdgeInsets.fromLTRB(4, 6, 16, 10),
     decoration: BoxDecoration(
       border: Border(bottom: BorderSide(color: context.colors.divider)),
     ),
     child: SizedBox(
-      height: 44,
+      height: 48,
       child: Row(
         children: [
           IconButton(

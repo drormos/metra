@@ -133,7 +133,7 @@ class _BeatIndicatorState extends State<BeatIndicator>
   }
 
   /// The whole beat column (block and strip) is the tap target, padded to
-  /// at least 44 px tall.
+  /// at least 48dp tall.
   Widget _tapTarget(
     int beat,
     StepLevel level, {
@@ -147,9 +147,8 @@ class _BeatIndicatorState extends State<BeatIndicator>
     };
     return Semantics(
       button: true,
-      label:
-          'Beat ${beat + 1}, $kind${sounding ? ', playing' : ''}. '
-          'Tap to change.',
+      label: 'Beat ${beat + 1}, $kind',
+      onTapHint: 'change',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
@@ -157,7 +156,7 @@ class _BeatIndicatorState extends State<BeatIndicator>
           _controller.cycleBeat(beat);
         },
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(vertical: 6),
           child: child,
         ),
       ),

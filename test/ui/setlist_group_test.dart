@@ -111,7 +111,6 @@ void main() {
         matchesSemantics(
           isSelected: true,
           hasSelectedState: true,
-          isButton: true,
           hasTapAction: true,
           isFocusable: true,
           hasFocusAction: true,
@@ -267,17 +266,23 @@ void main() {
       },
     );
 
-    testWidgets('long-press the set name opens the set page', (tester) async {
-      await withSet(tester);
+    testWidgets('the title block is one long-press target: the song\'s '
+        'editor, or with no song the set\'s page', (tester) async {
+      await withSet(tester); // a set, no song yet
+      await tester.longPress(find.byKey(MetronomeScreen.titleBlockKey));
+      await tester.pumpAndSettle();
+      expect(find.byKey(SetlistPicker.backToSetlistsKey), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(SetlistGroup.nextKey));
       await tester.pump();
       expect(
-        tester.widget<Text>(find.byKey(MetronomeScreen.subtitleKey)).data,
-        'Friday set',
+        tester.getSize(find.byKey(MetronomeScreen.titleBlockKey)).height,
+        greaterThanOrEqualTo(48),
       );
       await tester.longPress(find.byKey(MetronomeScreen.subtitleKey));
       await tester.pumpAndSettle();
-      expect(find.byKey(SetlistPicker.backToSetlistsKey), findsOneWidget);
+      expect(find.byType(SongEditor), findsOneWidget);
     });
 
     testWidgets('Single song: previous | next through the library A–Z', (
@@ -427,7 +432,10 @@ void main() {
       await tester.tap(find.byKey(SetlistGroup.previousKey));
       await tester.pump();
       expect(title(tester), 'Two');
-      expect(find.bySemanticsLabel('Previous song: One'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('Previous song: One, 100 BPM'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('same size and position in both modes', (tester) async {

@@ -234,7 +234,9 @@ class _LibraryPickState extends State<LibraryPick> {
     decoration: BoxDecoration(
       color: checked ? colors.accent : null,
       borderRadius: BorderRadius.circular(4),
-      border: checked ? null : Border.all(color: colors.beatResting, width: 2),
+      border: checked
+          ? null
+          : Border.all(color: colors.controlOutline, width: 2),
     ),
     child: checked
         ? Icon(Icons.check, size: 18, color: colors.onPrimary)

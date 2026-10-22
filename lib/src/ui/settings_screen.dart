@@ -104,7 +104,7 @@ class SettingsScreen extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(
-          height: action == null ? null : 44,
+          height: action == null ? null : 48,
           child: Row(
             children: [
               Expanded(
@@ -243,7 +243,7 @@ class SettingsScreen extends StatelessWidget {
         key: resetKey,
         style: TextButton.styleFrom(
           foregroundColor: context.colors.text,
-          minimumSize: const Size(0, 44),
+          minimumSize: const Size(0, 48),
           padding: const EdgeInsets.symmetric(horizontal: 4),
         ),
         // Only the four volumes.

@@ -10,7 +10,6 @@ import '../platform/android_bridge.dart';
 import 'editor_scaffold.dart';
 import 'haptics.dart';
 import 'icons.dart';
-import 'metronome_screen.dart';
 import 'play_marker.dart';
 import 'search_match.dart';
 import 'setlist_picker.dart';
@@ -44,21 +43,23 @@ Future<void> showQuickPick(
     context,
     PageRouteBuilder<void>(
       opaque: false,
-      transitionDuration: const Duration(milliseconds: 150),
-      reverseTransitionDuration: const Duration(milliseconds: 100),
+      transitionDuration: RowGestures.motion(
+        context,
+        const Duration(milliseconds: 150),
+      ),
+      reverseTransitionDuration: RowGestures.motion(
+        context,
+        const Duration(milliseconds: 100),
+      ),
       pageBuilder: (_, _, _) => _QuickPickLayer(
         anchor: anchor,
         inset: inset,
-        // Text grows with the system font only as far as on the main
-        // screen it opens over, so the rows and the header keep their shape.
-        child: MediaQuery.withClampedTextScaling(
-          maxScaleFactor: MetronomeScreen.maxTextScale,
-          child: QuickPick(
-            kind: kind,
-            library: library,
-            metronome: metronome,
-            pages: context,
-          ),
+        // Lists follow the system font size fully (rows grow).
+        child: QuickPick(
+          kind: kind,
+          library: library,
+          metronome: metronome,
+          pages: context,
         ),
       ),
       transitionsBuilder: (_, animation, _, child) =>
@@ -296,6 +297,10 @@ class _QuickPickState extends State<QuickPick>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       seen();
+      // "Remove animations": no hint (it still counts as shown).
+      if (RowGestures.reduceMotion(context)) {
+        return setState(() => _hintRow = null);
+      }
       _hint.forward().whenComplete(() {
         if (mounted) setState(() => _hintRow = null);
       });
@@ -447,6 +452,13 @@ class _QuickPickState extends State<QuickPick>
                                 _startRename(song.id, song.name, _Rename.song),
                             label: 'Delete song',
                             actionLabel: 'Delete song',
+                            moreActions: {
+                              'Rename': () => _startRename(
+                                song.id,
+                                song.name,
+                                _Rename.song,
+                              ),
+                            },
                             ask: () => confirmDelete(
                               context,
                               title: 'Delete ${song.name}?',
@@ -640,7 +652,7 @@ class _QuickPickState extends State<QuickPick>
   /// haptic). Already in the set: greyed, "In this set", not tappable.
   Widget _pickRow(MetraColors colors, Song song, {required bool inSet}) {
     final ticked = _picked.contains(song.id);
-    final faint = inSet ? colors.slot : null;
+    final faint = inSet ? colors.disabledText : null;
     return Material(
       color: ticked ? colors.surface : colors.sheet,
       child: InkWell(
@@ -655,7 +667,7 @@ class _QuickPickState extends State<QuickPick>
                 );
               },
         child: Container(
-          height: _rowHeight,
+          constraints: const BoxConstraints(minHeight: _rowHeight),
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             border: Border(bottom: BorderSide(color: colors.divider)),
@@ -677,7 +689,7 @@ class _QuickPickState extends State<QuickPick>
                         ? colors.text
                         : inSet
                         ? colors.lifted
-                        : colors.slot,
+                        : colors.controlOutline,
                     width: 2,
                   ),
                 ),
@@ -713,7 +725,7 @@ class _QuickPickState extends State<QuickPick>
                   textAlign: TextAlign.right,
                   style: TextStyle(
                     fontSize: 13,
-                    color: inSet ? colors.beatResting : colors.muted,
+                    color: inSet ? colors.disabledText : colors.muted,
                   ),
                 ),
               ),
@@ -725,7 +737,7 @@ class _QuickPickState extends State<QuickPick>
                   textAlign: TextAlign.right,
                   style: TextStyle(
                     fontSize: 13,
-                    color: inSet ? colors.beatResting : colors.slot,
+                    color: inSet ? colors.disabledText : colors.muted,
                   ),
                 ),
               ),
@@ -810,6 +822,10 @@ class _QuickPickState extends State<QuickPick>
                                 _startRename(set.id, set.name, _Rename.set),
                             label: 'Delete set',
                             actionLabel: 'Delete set',
+                            moreActions: {
+                              'Rename': () =>
+                                  _startRename(set.id, set.name, _Rename.set),
+                            },
                             ask: () => confirmDelete(
                               context,
                               title: 'Delete ${set.name}?',
@@ -964,8 +980,8 @@ class _QuickPickState extends State<QuickPick>
     Setlist setlist,
     int count,
     int current,
-  ) => SizedBox(
-    height: 56,
+  ) => ConstrainedBox(
+    constraints: const BoxConstraints(minHeight: 56),
     child: Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 8, 0),
       child: Row(
@@ -982,40 +998,48 @@ class _QuickPickState extends State<QuickPick>
                   setId: setlist.id,
                 ),
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    setlist.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+              // At least 48dp to touch, however short the text.
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 48),
+                alignment: Alignment.centerLeft,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      setlist.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  Text(
-                    current < 0
-                        ? (count == 1 ? '1 song' : '$count songs')
-                        : 'Song ${current + 1} of $count',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: colors.muted),
-                  ),
-                ],
+                    Text(
+                      current < 0
+                          ? (count == 1 ? '1 song' : '$count songs')
+                          : 'Song ${current + 1} of $count',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: colors.muted),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
           const SizedBox(width: 8),
           // Large system text: the button gives way before the name does.
           Flexible(
+            // 40px to see, 48dp to touch (padded tap target).
             child: SizedBox(
-              height: 40,
               child: OutlinedButton.icon(
                 key: QuickPick.changeSetKey,
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
+                  minimumSize: const Size(0, 40),
+                  tapTargetSize: MaterialTapTargetSize.padded,
                 ),
                 onPressed: () => setState(() => _kind = QuickPickKind.sets),
                 icon: const SetlistIcon(size: 16),
@@ -1056,7 +1080,7 @@ class _QuickPickState extends State<QuickPick>
       onTap: () =>
           _choose(() => _library.playSong(song, widget.metronome, index: i)),
       child: Container(
-        height: _entryHeight,
+        constraints: const BoxConstraints(minHeight: _entryHeight),
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: colors.divider)),
@@ -1070,7 +1094,7 @@ class _QuickPickState extends State<QuickPick>
                   : Text(
                       '${i + 1}',
                       textAlign: TextAlign.right,
-                      style: TextStyle(fontSize: 13, color: colors.slot),
+                      style: TextStyle(fontSize: 13, color: colors.muted),
                     ),
             ),
             const SizedBox(width: 12),
@@ -1085,6 +1109,8 @@ class _QuickPickState extends State<QuickPick>
                 ),
               ),
             ),
+            if (current)
+              Semantics(label: 'playing', child: const SizedBox.shrink()),
             if (_isJustAdded(i)) ...[
               const SizedBox(width: 8),
               Text(
@@ -1225,7 +1251,7 @@ class _QuickPickState extends State<QuickPick>
 
   /// The row being renamed: a field with the name selected, and "Done".
   Widget _renameRow(MetraColors colors, {required Widget leading}) => Container(
-    height: _rowHeight,
+    constraints: const BoxConstraints(minHeight: _rowHeight),
     color: colors.selectedRow,
     padding: const EdgeInsets.only(left: 14, right: 4),
     child: Row(
@@ -1275,7 +1301,7 @@ class _QuickPickState extends State<QuickPick>
         liveRegion: true,
         container: true,
         child: Container(
-          height: 48,
+          constraints: const BoxConstraints(minHeight: 48),
           padding: const EdgeInsets.only(left: 12, right: 4),
           decoration: BoxDecoration(
             color: colors.divider,
@@ -1342,6 +1368,7 @@ class _QuickPickState extends State<QuickPick>
           fontWeight: FontWeight.w600,
         ),
       ),
+      if (current) Semantics(label: 'playing', child: const SizedBox.shrink()),
       const SizedBox(width: 12),
       SizedBox(
         width: 28,
@@ -1401,12 +1428,14 @@ class _QuickPickState extends State<QuickPick>
       onLongPress: onLongPress,
       enableFeedback: false, // Our own haptic, gated by the setting.
       child: Ink(
-        height: _rowHeight,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: colors.divider)),
         ),
-        child: Row(children: children),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: _rowHeight),
+          child: Row(children: children),
+        ),
       ),
     ),
   );
@@ -1432,8 +1461,8 @@ class _QuickPickState extends State<QuickPick>
     return InkWell(
       key: key,
       onTap: onTap,
-      child: SizedBox(
-        height: 48,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Row(

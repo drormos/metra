@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 
 import '../controller/library_controller.dart';
@@ -54,6 +55,7 @@ class MetronomeScreen extends StatelessWidget {
   static const saveToSongKey = Key('save-to-song');
   static const saveAsNewKey = Key('save-as-new');
   static const subtitleKey = Key('subtitle');
+  static const titleBlockKey = Key('title-block');
 
   // The polyrhythm lane plus its gap, kept free above the BPM.
   static const _laneSpace = PolyLane.height + 2;
@@ -138,7 +140,11 @@ class MetronomeScreen extends StatelessWidget {
         child: Scaffold(
           // No text fields here; a sheet's keyboard mustn't squeeze it.
           resizeToAvoidBottomInset: false,
-          body: metronome,
+          body: _Announcer(
+            controller: controller,
+            library: library,
+            child: metronome,
+          ),
         ),
       ),
     );
@@ -180,15 +186,18 @@ class MetronomeScreen extends StatelessWidget {
                         SizedBox(height: twin),
                         // Sized for three digits from the area, never the value;
                         // the number is large already, so no text scaling.
+                        // Read as part of the tempo control (the ruler).
                         MediaQuery.withNoTextScaling(
-                          child: BpmReadout(
-                            bpm: bpm,
-                            fontSize: BpmReadout.fit(
-                              context,
-                              Size(box.maxWidth, box.maxHeight - twin - 44),
+                          child: ExcludeSemantics(
+                            child: BpmReadout(
+                              bpm: bpm,
+                              fontSize: BpmReadout.fit(
+                                context,
+                                Size(box.maxWidth, box.maxHeight - twin - 44),
+                              ),
+                              unitSize: 18,
+                              numberKey: bpmKey,
                             ),
-                            unitSize: 18,
-                            numberKey: bpmKey,
                           ),
                         ),
                         // Fixed height: the tempo name, or Revert / Save to song.
@@ -199,7 +208,7 @@ class MetronomeScreen extends StatelessWidget {
                 ),
               );
               // The lane hangs 2px under the subdivision strip (the beat
-              // row's tap padding is 4px), over the empty twin.
+              // row's tap padding is 6px), over the empty twin.
               return Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -208,7 +217,7 @@ class MetronomeScreen extends StatelessWidget {
                     Positioned(
                       left: 0,
                       right: 0,
-                      top: -2,
+                      top: -4,
                       child: PolyLane(controller: controller),
                     ),
                 ],
@@ -218,7 +227,19 @@ class MetronomeScreen extends StatelessWidget {
         ),
         TempoRuler(bpm: bpm, onChanged: controller.setBpm),
         const SizedBox(height: 18), // 6px + the normal 12px gap
-        TempoSteps(bpm: bpm, onStep: controller.nudge, height: 60),
+        TempoSteps(
+          bpm: bpm,
+          // Each step says the new tempo to a screen reader.
+          onStep: (delta) {
+            controller.nudge(delta);
+            SemanticsService.sendAnnouncement(
+              View.of(context),
+              '${controller.bpm} BPM',
+              TextDirection.ltr,
+            );
+          },
+          height: 60,
+        ),
         const SizedBox(height: 12),
         SizedBox(
           height: 72,
@@ -255,7 +276,11 @@ class MetronomeScreen extends StatelessWidget {
                   child: OutlinedButton(
                     key: tapKey,
                     onPressed: () {},
-                    child: const Text('Tap', style: TextStyle(fontSize: 22)),
+                    child: Semantics(
+                      label: 'Tap tempo',
+                      excludeSemantics: true,
+                      child: const Text('Tap', style: TextStyle(fontSize: 22)),
+                    ),
                   ),
                 ),
               ),
@@ -362,21 +387,37 @@ class MetronomeScreen extends StatelessWidget {
       open();
     }
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        GestureDetector(
-          onLongPress: library == null || song == null
-              ? null
-              : () => longPress(
-                  () =>
-                      openSongEditor(context, library, controller, song: song),
-                ),
+    // One long-press target for the whole 54px block (the 48dp minimum
+    // leaves no room for two): the song's editor, or with no song the
+    // set's page (also on the "4/12" button's long-press).
+    final VoidCallback? onLongPress = library == null
+        ? null
+        : song != null
+        ? () => longPress(
+            () => openSongEditor(context, library, controller, song: song),
+          )
+        : set != null
+        ? () => longPress(
+            () => openSetlists(
+              context,
+              library: library,
+              metronome: controller,
+              setId: set.id,
+            ),
+          )
+        : null;
+    return GestureDetector(
+      key: titleBlockKey,
+      behavior: HitTestBehavior.opaque,
+      onLongPress: onLongPress,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           // 34px, shrinking to 22px for long names; ellipsis only below.
           // A fixed 34px line box, the name at its bottom: a shrunk title
           // never moves the subtitle.
-          child: SizedBox(
+          SizedBox(
             height: 34,
             child: Align(
               alignment: Alignment.bottomLeft,
@@ -393,23 +434,11 @@ class MetronomeScreen extends StatelessWidget {
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 3),
-        // Always 17px; with the 34px title box it fills the 54px block,
-        // so the subtitle sits on the block's bottom in every mode.
-        SizedBox(
-          height: 17,
-          child: GestureDetector(
-            onLongPress: library == null || set == null
-                ? null
-                : () => longPress(
-                    () => openSetlists(
-                      context,
-                      library: library,
-                      metronome: controller,
-                      setId: set.id,
-                    ),
-                  ),
+          const SizedBox(height: 3),
+          // Always 17px; with the 34px title box it fills the 54px block,
+          // so the subtitle sits on the block's bottom in every mode.
+          SizedBox(
+            height: 17,
             child: Text(
               set?.name ?? '',
               key: subtitleKey,
@@ -422,8 +451,8 @@ class MetronomeScreen extends StatelessWidget {
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -439,7 +468,7 @@ class MetronomeScreen extends StatelessWidget {
             child: MediaQuery.withNoTextScaling(child: _titleBlock(context)),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 4),
         _squareButton(
           key: subdivisionKey,
           tooltip: 'Subdivision: ${_subdivisionNames[pattern.stepsPerBeat]}',
@@ -450,29 +479,38 @@ class MetronomeScreen extends StatelessWidget {
           },
           child: SubdivisionIcon(pattern.stepsPerBeat),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 4),
         SizedBox(
-          height: 44,
+          height: 48,
           child: Builder(
             builder: (context) => OutlinedButton(
               key: meterKey,
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 minimumSize: const Size(44, 44),
+                fixedSize: const Size.fromHeight(44),
+                tapTargetSize: MaterialTapTargetSize.padded,
               ),
               onPressed: () => showTimeSignatureSheet(context, controller),
-              child: Text(
-                pattern.meterLabel,
-                style: const TextStyle(
-                  fontFamily: MetraFonts.condensed,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
+              child: Semantics(
+                label: pattern.polyrhythm == 0
+                    ? 'Time signature ${pattern.timeSignature}'
+                    : 'Time signature ${pattern.timeSignature}, '
+                          'polyrhythm ${pattern.polyrhythm}',
+                excludeSemantics: true,
+                child: Text(
+                  pattern.meterLabel,
+                  style: const TextStyle(
+                    fontFamily: MetraFonts.condensed,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 4),
         Builder(
           builder: (context) => _squareButton(
             tooltip: 'Menu',
@@ -494,13 +532,17 @@ class MetronomeScreen extends StatelessWidget {
     message: tooltip,
     // Read once, as the button's own label.
     excludeFromSemantics: true,
+    // 44px to see, 48dp to touch: the button is drawn 44 inside a padded
+    // tap target (the row's gaps are 4px narrower to match).
     child: SizedBox.square(
-      dimension: 44,
+      dimension: 48,
       child: OutlinedButton(
         key: key,
         style: OutlinedButton.styleFrom(
           padding: EdgeInsets.zero,
           minimumSize: const Size.square(44),
+          fixedSize: const Size.square(44),
+          tapTargetSize: MaterialTapTargetSize.padded,
         ),
         onPressed: onPressed,
         child: Semantics(label: tooltip, child: child),
@@ -514,4 +556,63 @@ class MetronomeScreen extends StatelessWidget {
     3: 'triplets',
     4: 'sixteenth notes',
   };
+}
+
+/// What a screen reader hears unasked (ui-spec.md "Accessibility"): only
+/// Start / Stop and song changes, never anything per click.
+class _Announcer extends StatefulWidget {
+  const _Announcer({
+    required this.controller,
+    required this.library,
+    required this.child,
+  });
+
+  final MetronomeController controller;
+  final LibraryController? library;
+  final Widget child;
+
+  @override
+  State<_Announcer> createState() => _AnnouncerState();
+}
+
+class _AnnouncerState extends State<_Announcer> {
+  late bool _playing = widget.controller.isPlaying;
+  late String? _songId = widget.library?.currentSong?.id;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_check);
+    widget.library?.addListener(_check);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_check);
+    widget.library?.removeListener(_check);
+    super.dispose();
+  }
+
+  void _say(String message) => SemanticsService.sendAnnouncement(
+    View.of(context),
+    message,
+    TextDirection.ltr,
+  );
+
+  void _check() {
+    if (!mounted) return;
+    final playing = widget.controller.isPlaying;
+    if (playing != _playing) {
+      _playing = playing;
+      _say(playing ? 'Playing' : 'Stopped');
+    }
+    final song = widget.library?.currentSong;
+    if (song?.id != _songId) {
+      _songId = song?.id;
+      if (song != null) _say('${song.name}, ${song.bpm} BPM');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

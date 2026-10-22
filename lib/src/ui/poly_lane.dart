@@ -104,9 +104,8 @@ class _PolyLaneState extends State<PolyLane>
     final n = _controller.pattern.polyrhythm;
     return Semantics(
       button: true,
-      label:
-          'Pulse ${k + 1} of $n, $kind${sounding ? ', playing' : ''}. '
-          'Tap to change.',
+      label: 'Pulse ${k + 1} of $n, $kind',
+      onTapHint: 'change',
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {

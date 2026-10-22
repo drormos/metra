@@ -107,7 +107,7 @@ class _VersionLineState extends State<VersionLine> {
               .showSnackBar(const SnackBar(content: Text('Copied')));
         },
         child: Container(
-          height: 44,
+          height: 48,
           alignment: Alignment.center,
           child: Text(
             line,

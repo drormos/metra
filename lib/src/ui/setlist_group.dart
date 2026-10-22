@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
@@ -135,38 +136,44 @@ class SetlistGroup extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         child: SizedBox(
           height: tabsHeight,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _tab(
-                colors,
-                key: songsTabKey,
-                icon: const SubdivisionIcon(1, size: 20),
-                label: 'Songs',
-                active: current == ModeTab.songs,
-                onTap: () =>
-                    go(ModeTab.songs, () => library.openSongsTab(metronome)),
-              ),
-              _tab(
-                colors,
-                key: freePlayTabKey,
-                icon: const MetronomeIcon(size: 18),
-                label: 'Free play',
-                active: current == ModeTab.freePlay,
-                onTap: () => go(ModeTab.freePlay, library.detachSong),
-              ),
-              _tab(
-                colors,
-                key: setlistsTabKey,
-                icon: const SetlistIcon(),
-                label: 'Setlists',
-                active: current == ModeTab.setlists,
-                onTap: () => go(
-                  ModeTab.setlists,
-                  () => library.openSetlistsTab(metronome),
+          // Read as tabs, the current one "selected".
+          child: Semantics(
+            role: SemanticsRole.tabBar,
+            container: true,
+            explicitChildNodes: true,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _tab(
+                  colors,
+                  key: songsTabKey,
+                  icon: const SubdivisionIcon(1, size: 20),
+                  label: 'Songs',
+                  active: current == ModeTab.songs,
+                  onTap: () =>
+                      go(ModeTab.songs, () => library.openSongsTab(metronome)),
                 ),
-              ),
-            ],
+                _tab(
+                  colors,
+                  key: freePlayTabKey,
+                  icon: const MetronomeIcon(size: 18),
+                  label: 'Free play',
+                  active: current == ModeTab.freePlay,
+                  onTap: () => go(ModeTab.freePlay, library.detachSong),
+                ),
+                _tab(
+                  colors,
+                  key: setlistsTabKey,
+                  icon: const SetlistIcon(),
+                  label: 'Setlists',
+                  active: current == ModeTab.setlists,
+                  onTap: () => go(
+                    ModeTab.setlists,
+                    () => library.openSetlistsTab(metronome),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -243,7 +250,7 @@ class SetlistGroup extends StatelessWidget {
       // The bar's 1px line is drawn over the tabs' top edge, so the active
       // tab's red line covers it.
       child: Semantics(
-        button: true,
+        role: SemanticsRole.tab,
         selected: active,
         child: InkWell(
           key: key,
@@ -348,7 +355,7 @@ class SetlistGroup extends StatelessWidget {
               openSongLibrary(context, library, metronome);
             },
             child: Semantics(
-              label: 'All songs',
+              label: 'Songs, opens song list',
               excludeSemantics: true,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -436,7 +443,10 @@ class SetlistGroup extends StatelessWidget {
             },
             // The label goes inside, so the button keeps its actions.
             child: Semantics(
-              label: '${setlist.name}, song $position',
+              label: index < 0
+                  ? '${setlist.name}, opens song list'
+                  : '${setlist.name}, song ${index + 1} of '
+                        '${library.visibleSongs.length}, opens song list',
               excludeSemantics: true,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -518,7 +528,8 @@ class SetlistGroup extends StatelessWidget {
       child: Semantics(
         label: song == null
             ? (forward ? 'No next song' : 'No previous song')
-            : '${forward ? 'Next' : 'Previous'} song: ${song.name}',
+            : '${forward ? 'Next' : 'Previous'} song: ${song.name}, '
+                  '${song.bpm} BPM',
         excludeSemantics: true,
         child: song == null
             ? const SizedBox.expand()

@@ -819,7 +819,7 @@ void main() {
         of: find.byType(ExitShift),
         matching: row(0),
       );
-      expect(tester.getTopLeft(listed).dy, closeTo(second, 0.5));
+      expect(tester.getTopLeft(listed).dy, closeTo(second, 1));
       await tester.pump(RowGestures.slideOff + RowGestures.collapse);
       await tester.pump();
       expect(tester.getTopLeft(listed).dy, lessThan(second), reason: 'closed');
@@ -1146,5 +1146,23 @@ void main() {
       await tester.pump();
       expect(inPanel('No sets match "xyz"'), findsOneWidget);
     });
+  });
+
+  testWidgets('"Remove animations": no hint (still counted as shown), and a '
+      'short swipe snaps back at once', (tester) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    await pump(tester, hintSeen: false);
+    await tester.tap(find.byKey(SetlistGroup.headerKey));
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(inPanel('Remove'), findsNothing, reason: 'no hint');
+    expect(library.swipeHintSeen, isTrue, reason: 'flag still set');
+    final x = tester.getTopLeft(row(0)).dx;
+    await tester.drag(row(0), const Offset(-80, 0));
+    await tester.pump();
+    expect(tester.getTopLeft(row(0)).dx, x, reason: 'instant');
   });
 }

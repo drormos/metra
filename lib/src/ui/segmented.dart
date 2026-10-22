@@ -10,7 +10,7 @@ class Segmented<T> extends StatelessWidget {
     required this.options,
     required this.selected,
     required this.onSelected,
-    this.height = 44,
+    this.height = 48,
     this.style,
   });
 

@@ -70,6 +70,15 @@ abstract final class RowGestures {
 
   /// The lists' own scroll slop.
   static const listSettings = DeviceGestureSettings(touchSlop: scrollSlop);
+
+  /// Android's "Remove animations": list, sheet and panel animations are
+  /// instant (ui-spec.md "Reduced motion").
+  static bool reduceMotion(BuildContext context) =>
+      MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+
+  /// [duration], or none with "Remove animations" on.
+  static Duration motion(BuildContext context, Duration duration) =>
+      reduceMotion(context) ? Duration.zero : duration;
 }
 
 /// Running row animations that a new touch hurries along: each registers a
@@ -141,6 +150,10 @@ class _SettleInState extends State<SettleIn>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final box = context.findRenderObject() as RenderBox?;
       if (!mounted || box == null || !box.attached) return;
+      if (RowGestures.reduceMotion(context)) {
+        _settle.value = 1;
+        return;
+      }
       setState(() => _from = fromTop - box.localToGlobal(Offset.zero).dy);
       final catchUp = _catchUp = CatchUpScope.of(context);
       catchUp?.add(
@@ -306,7 +319,9 @@ class RowExitHostState extends State<RowExitHost>
     required double from,
   }) {
     final host = context.findRenderObject() as RenderBox?;
-    if (host == null || !box.attached) return;
+    if (host == null || !box.attached || RowGestures.reduceMotion(context)) {
+      return;
+    }
     final topLeft = box.localToGlobal(Offset.zero, ancestor: host);
     setState(
       () => _leaving = (
@@ -498,6 +513,10 @@ class _SwipeRowState extends State<SwipeRow>
   /// Springs back; a new touch anywhere in the list finishes it quickly.
   void _back() {
     if (_armed) setState(() => _armed = false);
+    if (RowGestures.reduceMotion(context)) {
+      _offset.value = 0;
+      return;
+    }
     final catchUp = _catchUp = CatchUpScope.of(context);
     catchUp?.add(
       this,
@@ -522,7 +541,7 @@ class _SwipeRowState extends State<SwipeRow>
       if (!_armed) setState(() => _armed = true);
       _offset.animateTo(
         offset.sign * _threshold,
-        duration: RowGestures.springBack,
+        duration: RowGestures.motion(context, RowGestures.springBack),
         curve: Curves.easeOut,
       );
       final ok = await ask();
@@ -560,12 +579,12 @@ class _SwipeRowState extends State<SwipeRow>
   Widget _behind(BuildContext context, double offset) {
     final colors = context.colors;
     return AnimatedContainer(
-      duration: RowGestures.armTransition,
+      duration: RowGestures.motion(context, RowGestures.armTransition),
       color: _armed ? colors.accent : colors.accentResting,
       alignment: offset > 0 ? Alignment.centerLeft : Alignment.centerRight,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: AnimatedScale(
-        duration: RowGestures.armTransition,
+        duration: RowGestures.motion(context, RowGestures.armTransition),
         scale: _armed ? RowGestures.armedScale : 1,
         alignment: offset > 0 ? Alignment.centerLeft : Alignment.centerRight,
         child: Row(
@@ -721,7 +740,7 @@ class _DragToCloseState extends State<DragToClose>
     } else {
       _offset.animateTo(
         0,
-        duration: RowGestures.springBack,
+        duration: RowGestures.motion(context, RowGestures.springBack),
         curve: Curves.easeOut,
       );
     }

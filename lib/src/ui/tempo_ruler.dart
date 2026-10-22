@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 
 import '../controller/metronome_controller.dart';
+import '../model/tempo_name.dart';
 import 'haptics.dart';
 import 'tabular_text.dart';
 import 'theme.dart';
@@ -287,15 +288,19 @@ class _TempoRulerState extends State<TempoRuler>
     setState(() => _value = null);
   }
 
+  static String _spoken(int bpm) => '$bpm BPM, ${tempoName(bpm)}';
+
   @override
   Widget build(BuildContext context) {
     final bpm = widget.bpm;
     return Semantics(
       slider: true,
       label: 'Tempo',
-      value: '$bpm bpm',
-      increasedValue: '${min(bpm + 1, MetronomeController.maxBpm)} bpm',
-      decreasedValue: '${max(bpm - 1, MetronomeController.minBpm)} bpm',
+      // One adjustable control for the BPM and the ruler: "Tempo, 120 BPM,
+      // Allegro"; swipe up/down for ±1.
+      value: _spoken(bpm),
+      increasedValue: _spoken(min(bpm + 1, MetronomeController.maxBpm)),
+      decreasedValue: _spoken(max(bpm - 1, MetronomeController.minBpm)),
       onIncrease: () => _set(min(bpm + 1, MetronomeController.maxBpm)),
       onDecrease: () => _set(max(bpm - 1, MetronomeController.minBpm)),
       // Touch-down stops a glide. A raw listener, not a tap recognizer: a
