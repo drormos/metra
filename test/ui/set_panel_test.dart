@@ -113,6 +113,49 @@ void main() {
   }
 
   group('songs view', () {
+    testWidgets('opens out of the center button; swiped down past the '
+        'threshold it flies off the bottom without pausing', (tester) async {
+      await pump(tester);
+      final button = tester.getCenter(find.byKey(SetlistGroup.headerKey));
+      await tester.tap(find.byKey(SetlistGroup.headerKey));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 16));
+      final panel = find
+          .ancestor(of: find.byType(QuickPick), matching: find.byType(Opacity))
+          .first;
+      final scale = find
+          .ancestor(
+            of: find.byType(QuickPick),
+            matching: find.byType(Transform),
+          )
+          .first;
+      final t = tester.widget<Transform>(scale);
+      expect(t.transform.storage[0], inInclusiveRange(0.96, 0.999));
+      final rect = tester.getRect(panel);
+      final align = t.alignment! as Alignment;
+      expect(rect.left + (align.x + 1) / 2 * rect.width, closeTo(button.dx, 2));
+      expect(rect.top + (align.y + 1) / 2 * rect.height, closeTo(button.dy, 2));
+      await tester.pumpAndSettle();
+
+      Finder pick() => find.byType(QuickPick);
+      await tester.timedDrag(
+        find.byKey(QuickPick.handleKey),
+        const Offset(0, QuickPick.closeDrag + 40),
+        const Duration(milliseconds: 800),
+      );
+      var top = tester.getRect(pick()).top;
+      var frames = 0;
+      while (pick().evaluate().isNotEmpty) {
+        await tester.pump(const Duration(milliseconds: 16));
+        frames++;
+        if (pick().evaluate().isEmpty) break;
+        final now = tester.getRect(pick()).top;
+        expect(now, greaterThan(top), reason: 'no pause (frame $frames)');
+        top = now;
+      }
+      expect(frames, lessThanOrEqualTo(14));
+    });
+
     testWidgets('a touch that starts on the dim closes the panel on touch-up, '
         'tap or swipe, and never reaches the screen below', (tester) async {
       await pump(tester);

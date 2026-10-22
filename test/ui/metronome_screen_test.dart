@@ -1,4 +1,3 @@
-import 'dart:ui' show SemanticsAction;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -385,6 +384,162 @@ void main() {
         expect(find.byKey(TopPanel.surfaceKey), findsNothing, reason: 'tap');
         expect(controller.isPlaying, isFalse, reason: 'no button tap');
       }
+    });
+
+    group('panel motion', () {
+      Finder surface() => find.byKey(TopPanel.surfaceKey);
+      double opacity(WidgetTester tester) => tester
+          .widget<Opacity>(
+            find.ancestor(of: surface(), matching: find.byType(Opacity)).first,
+          )
+          .opacity;
+      Transform scaleOf(WidgetTester tester) => tester.widget<Transform>(
+        find.ancestor(of: surface(), matching: find.byType(Transform)).first,
+      );
+      // The x scale (z stays 1).
+      double scale(WidgetTester tester) => scaleOf(tester).transform.storage[0];
+
+      testWidgets('opens out of its button: 0.96 → 1 about the button with '
+          'a fade in ~200ms; closing by tap or the button is the reverse', (
+        tester,
+      ) async {
+        await pumpScreen(tester);
+        final button = tester.getCenter(find.byKey(MetronomeScreen.onStartKey));
+        await tester.tap(find.byKey(MetronomeScreen.onStartKey));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(scale(tester), inInclusiveRange(0.96, 0.999));
+        expect(opacity(tester), lessThan(1));
+        // The scale's fixed point is the button.
+        // The panel's layout box (outside its transforms).
+        final rect = tester.getRect(
+          find.ancestor(of: surface(), matching: find.byType(Opacity)).first,
+        );
+        final align = scaleOf(tester).alignment! as Alignment;
+        final fixed = Offset(
+          rect.left + (align.x + 1) / 2 * rect.width,
+          rect.top + (align.y + 1) / 2 * rect.height,
+        );
+        expect(fixed.dx, closeTo(button.dx, 2));
+        expect(fixed.dy, closeTo(button.dy, 2));
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(scale(tester), 1);
+        expect(opacity(tester), 1);
+        // The same button: shrinks back toward it while fading.
+        await tester.tap(find.byKey(MetronomeScreen.onStartKey));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 90));
+        expect(scale(tester), inExclusiveRange(0.96, 1));
+        expect(opacity(tester), inExclusiveRange(0, 1));
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(surface(), findsNothing, reason: 'gone in ~180ms');
+      });
+
+      testWidgets('swipe up: follows 1:1, then flies off from where it is '
+          'without pausing, fading with the distance; short: springs back', (
+        tester,
+      ) async {
+        await pumpScreen(tester);
+        await tester.tap(find.byKey(MetronomeScreen.meterKey));
+        await tester.pumpAndSettle();
+        final start = tester.getRect(surface());
+        final gesture = await tester.startGesture(
+          tester.getCenter(find.byKey(TopPanel.handleKey)),
+        );
+        for (var i = 0; i < 10; i++) {
+          await gesture.moveBy(const Offset(0, -10));
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        expect(tester.getRect(surface()).top, closeTo(start.top - 100, 1));
+        // Short of a third: springs back in ~180ms.
+        await gesture.up();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(tester.getRect(surface()).top, start.top);
+
+        // Past a third, slowly: keeps going up every frame until gone.
+        await tester.timedDrag(
+          find.byKey(TopPanel.handleKey),
+          Offset(0, -start.height * 0.5),
+          const Duration(milliseconds: 800),
+        );
+        var top = tester.getRect(surface()).top;
+        var fade = opacity(tester);
+        var frames = 0;
+        while (surface().evaluate().isNotEmpty) {
+          await tester.pump(const Duration(milliseconds: 16));
+          frames++;
+          if (surface().evaluate().isEmpty) break;
+          final now = tester.getRect(surface()).top;
+          expect(now, lessThan(top), reason: 'no pause (frame $frames)');
+          expect(opacity(tester), lessThanOrEqualTo(fade));
+          top = now;
+          fade = opacity(tester);
+        }
+        expect(frames, lessThanOrEqualTo(14), reason: '~180ms, no extra fade');
+        expect(find.byType(TimeSignatureSheet), findsNothing);
+      });
+
+      testWidgets('predictive back: follows the gesture (1 → 0.9 toward the '
+          'button, dimmer); cancel springs back; commit closes', (
+        tester,
+      ) async {
+        await pumpScreen(tester);
+        await tester.tap(find.byKey(MetronomeScreen.meterKey));
+        await tester.pumpAndSettle();
+        Future<void> back(String method, [double progress = 0]) async {
+          await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
+            SystemChannels.backGesture.name,
+            SystemChannels.backGesture.codec.encodeMethodCall(
+              MethodCall(method, {
+                'x': 0.0,
+                'y': 300.0,
+                'progress': progress,
+                'swipeEdge': 0,
+              }),
+            ),
+            (_) {},
+          );
+          await tester.pump();
+        }
+
+        await back('startBackGesture');
+        await back('updateBackGestureProgress', 0.5);
+        expect(scale(tester), closeTo(0.95, 0.001));
+        expect(opacity(tester), lessThan(1));
+        await back('updateBackGestureProgress', 1);
+        expect(scale(tester), closeTo(0.9, 0.001));
+        await back('cancelBackGesture');
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(scale(tester), 1);
+        expect(opacity(tester), 1);
+        await back('startBackGesture');
+        await back('updateBackGestureProgress', 0.6);
+        await back('commitBackGesture');
+        await tester.pump(const Duration(milliseconds: 200));
+        expect(surface(), findsNothing);
+      });
+
+      testWidgets('"Remove animations": all instant', (tester) async {
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            const FakeAccessibilityFeatures(disableAnimations: true);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+        await pumpScreen(tester);
+        await tester.tap(find.byKey(MetronomeScreen.meterKey));
+        await tester.pump();
+        expect(scale(tester), 1);
+        expect(opacity(tester), 1);
+        final height = tester.getSize(surface()).height;
+        await tester.timedDrag(
+          find.byKey(TopPanel.handleKey),
+          Offset(0, -height * 0.5),
+          const Duration(milliseconds: 500),
+        );
+        await tester.pump();
+        expect(surface(), findsNothing);
+      });
     });
 
     testWidgets('time signature picker sets the meter', (tester) async {

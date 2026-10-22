@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'panel_motion.dart';
 import 'swipe_row.dart';
 import 'theme.dart';
 
@@ -8,9 +9,9 @@ import 'theme.dart';
 /// sits just under the top row, 12px from the screen edges, fits its
 /// content, down to 16px above the screen's bottom (over the dimmed
 /// context row; taller content scrolls inside); the screen below the top
-/// row is dimmed, the top row stays sharp
-/// and usable. Tap outside, the same button again, Back, or a swipe up
-/// closes it. The click keeps playing.
+/// row is dimmed, the top row stays sharp and usable. It grows out of its
+/// button ([PanelMotion]); tap outside, the same button again, Back, or a
+/// swipe up closes it. The click keeps playing.
 abstract final class TopPanel {
   /// The main screen's top row, which the panel hangs under.
   static final topRowKey = GlobalKey(debugLabel: 'top-row');
@@ -20,8 +21,9 @@ abstract final class TopPanel {
 
   static _TopPanelRoute? _open;
 
-  /// Opens the panel [id] with [child]; if a panel is open it closes, and
-  /// when it was this one, that's all (the button toggles it).
+  /// Opens the panel [id] with [child] out of the button [context]
+  /// belongs to; if a panel is open it closes, and when it was this one,
+  /// that's all (the button toggles it).
   static Future<void> toggle(
     BuildContext context, {
     required Object id,
@@ -31,9 +33,11 @@ abstract final class TopPanel {
     final same = open != null && open.isActive && open.id == id;
     close();
     if (same) return;
+    final box = context.findRenderObject()! as RenderBox;
     final route = _TopPanelRoute(
       id: id,
       child: child,
+      origin: box.localToGlobal(box.size.center(Offset.zero)),
       reduced: RowGestures.reduceMotion(context),
       dim: context.colors.dim,
     );
@@ -57,12 +61,14 @@ class _TopPanelRoute extends PopupRoute<void> {
   _TopPanelRoute({
     required this.id,
     required this.child,
+    required this.origin,
     required this.reduced,
     required this.dim,
   });
 
   final Object id;
   final Widget child;
+  final Offset origin;
   final bool reduced;
   final Color dim;
 
@@ -89,39 +95,37 @@ class _TopPanelRoute extends PopupRoute<void> {
 
   @override
   Duration get reverseTransitionDuration =>
-      reduced ? Duration.zero : MetraMotion.leave;
+      reduced ? Duration.zero : PanelMotion.settle;
 
   @override
   Widget buildPage(
     BuildContext context,
     Animation<double> animation,
     Animation<double> secondaryAnimation,
-  ) => _TopPanelPage(
-    animation: animation,
-    dim: dim,
-    onClose: () => isCurrent ? navigator?.pop() : null,
-    child: child,
+  ) => PanelMotion(
+    route: this,
+    origin: origin,
+    edge: PanelEdge.top,
+    builder: (context, motion) =>
+        _TopPanelPage(motion: motion, dim: dim, child: child),
   );
 }
 
 class _TopPanelPage extends StatelessWidget {
   const _TopPanelPage({
-    required this.animation,
+    required this.motion,
     required this.dim,
-    required this.onClose,
     required this.child,
   });
 
-  final Animation<double> animation;
+  final PanelMotionState motion;
   final Color dim;
-  final VoidCallback onClose;
   final Widget child;
 
-  static double? _edge(GlobalKey key, {required bool bottom}) {
+  static double? _bottomOf(GlobalKey key) {
     final box = key.currentContext?.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize) return null;
-    final at = box.localToGlobal(Offset.zero);
-    return bottom ? at.dy + box.size.height : at.dy;
+    return box.localToGlobal(Offset.zero).dy + box.size.height;
   }
 
   @override
@@ -129,7 +133,7 @@ class _TopPanelPage extends StatelessWidget {
     final colors = context.colors;
     final screen = MediaQuery.sizeOf(context);
     final padding = MediaQuery.paddingOf(context);
-    final top = _edge(TopPanel.topRowKey, bottom: true) ?? padding.top + 62;
+    final top = _bottomOf(TopPanel.topRowKey) ?? padding.top + 62;
     // Down to 16px above the screen's bottom (above the gesture bar),
     // over the dimmed context row and tabs; above the keyboard while a
     // value is typed.
@@ -140,96 +144,96 @@ class _TopPanelPage extends StatelessWidget {
           MediaQuery.viewInsetsOf(context).bottom,
         ].reduce((a, b) => a > b ? a : b) -
         16;
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (context, panel) {
-        final t = animation.status == AnimationStatus.reverse
-            ? 1 - MetraMotion.leaveFade.transform(1 - animation.value)
-            : MetraMotion.arriveCurve.transform(animation.value);
-        return Stack(
-          children: [
-            // Below the top row: dimmed, a tap closes.
-            Positioned(
-              left: 0,
-              right: 0,
-              top: top,
-              bottom: 0,
-              child: CloseOnTouch(
-                child: ColoredBox(color: dim.withValues(alpha: dim.a * t)),
-              ),
+    final t = motion.dim;
+    return Stack(
+      children: [
+        // Below the top row: dimmed; a touch starting here closes.
+        Positioned(
+          left: 0,
+          right: 0,
+          top: top,
+          bottom: 0,
+          child: CloseOnTouch(
+            child: ColoredBox(color: dim.withValues(alpha: dim.a * t)),
+          ),
+        ),
+        Positioned(
+          left: 12,
+          right: 12,
+          top: top,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: (bottom - top).clamp(120.0, screen.height),
             ),
-            Positioned(
-              left: 12,
-              right: 12,
-              top: top,
-              child: Opacity(
-                opacity: t,
-                child: Transform.translate(
-                  offset: Offset(0, -MetraMotion.arriveRise * (1 - t)),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: (bottom - top).clamp(120.0, screen.height),
-                    ),
-                    child: panel,
-                  ),
+            // Swiped up it follows 1:1; past a third, or on a flick, it
+            // flies off the top; otherwise it springs back.
+            child: GestureDetector(
+              onVerticalDragUpdate: (d) => motion.dragBy(d.delta.dy),
+              onVerticalDragEnd: (d) {
+                // Up is negative.
+                final v = d.velocity.pixelsPerSecond.dy;
+                motion.release(
+                  velocity: v,
+                  close:
+                      -v > RowGestures.closeFlick ||
+                      (motion.dragged >
+                              RowGestures.closeFraction * motion.panelHeight &&
+                          v <= RowGestures.closeFlick),
+                );
+              },
+              child: motion.panel(_surface(context, colors)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _surface(BuildContext context, MetraColors colors) => Container(
+    key: TopPanel.surfaceKey,
+    decoration: BoxDecoration(
+      color: colors.sheet,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: colors.border),
+      boxShadow: [
+        BoxShadow(
+          color: colors.dim,
+          blurRadius: 24,
+          offset: const Offset(0, 8),
+        ),
+      ],
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Material(
+      type: MaterialType.transparency,
+      // The panel is inside the screen: no system insets of its own.
+      child: MediaQuery.removePadding(
+        context: context,
+        removeTop: true,
+        removeBottom: true,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 18),
+            Flexible(child: child),
+            Center(
+              child: Container(
+                key: TopPanel.handleKey,
+                margin: const EdgeInsets.symmetric(vertical: 10),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: colors.beatResting,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
           ],
-        );
-      },
-      child: DragToClose(
-        axis: Axis.vertical,
-        reverse: true,
-        onClose: onClose,
-        child: Container(
-          key: TopPanel.surfaceKey,
-          decoration: BoxDecoration(
-            color: colors.sheet,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: colors.border),
-            boxShadow: [
-              BoxShadow(
-                color: colors.dim,
-                blurRadius: 24,
-                offset: Offset(0, 8),
-              ),
-            ],
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Material(
-            type: MaterialType.transparency,
-            // The panel is inside the screen: no system insets of its own.
-            child: MediaQuery.removePadding(
-              context: context,
-              removeTop: true,
-              removeBottom: true,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 18),
-                  Flexible(child: child),
-                  Center(
-                    child: Container(
-                      key: TopPanel.handleKey,
-                      margin: const EdgeInsets.symmetric(vertical: 10),
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: colors.beatResting,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }
 
 /// A panel's dimmed area (ui-spec.md "Top panels"): any touch that starts

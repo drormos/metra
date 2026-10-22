@@ -15,6 +15,7 @@ import 'motion.dart';
 import 'play_marker.dart';
 import 'search_match.dart';
 import 'swipe_row.dart';
+import 'panel_motion.dart';
 import 'theme.dart';
 import 'top_panel.dart';
 
@@ -49,7 +50,10 @@ Future<void> showQuickPick(
     PageRouteBuilder<void>(
       opaque: false,
       transitionDuration: RowGestures.motion(context, MetraMotion.arrive),
-      reverseTransitionDuration: RowGestures.motion(context, MetraMotion.leave),
+      reverseTransitionDuration: RowGestures.motion(
+        context,
+        PanelMotion.settle,
+      ),
       pageBuilder: (_, _, _) => _QuickPickLayer(
         anchor: anchor,
         inset: inset,
@@ -61,8 +65,8 @@ Future<void> showQuickPick(
           start: start,
         ),
       ),
-      transitionsBuilder: (_, animation, _, child) =>
-          FadeTransition(opacity: animation, child: child),
+      // [PanelMotion] in the layer moves it (out of the center button).
+      transitionsBuilder: (_, _, _, child) => child,
     ),
   );
 }
@@ -95,7 +99,9 @@ class _QuickPickLayerState extends State<_QuickPickLayer>
     ..addListener(() => setState(() {}));
   double? _normal; // measured when a drag starts
   bool _sized = false; // [_height] is in use
-  double _down = 0; // dragged down from normal (closing)
+
+  // The panel's motion (its own swipe down to close).
+  PanelMotionState get _motion => PanelMotion.of(_panel.currentContext!);
 
   @override
   void dispose() {
@@ -132,13 +138,13 @@ class _QuickPickLayerState extends State<_QuickPickLayer>
     setState(() {
       if (next >= normal) {
         _sized = true;
-        _down = 0;
+
         _height.value = min(next, _tallHeight);
       } else {
         // Below normal: the panel follows the finger down, to close.
         _height.value = normal;
         _sized = false;
-        _down = max(0, _down + d.delta.dy);
+        _motion.dragBy(d.delta.dy);
       }
     });
   }
@@ -146,11 +152,16 @@ class _QuickPickLayerState extends State<_QuickPickLayer>
   void _end(DragEndDetails d) {
     final v = d.primaryVelocity ?? 0;
     final normal = _normal ?? 0;
-    if (_down > 0) {
-      if (_down > QuickPick.closeDrag || v > QuickPick.flick) {
-        return Navigator.pop(context);
-      }
-      return setState(() => _down = 0);
+    final motion = _motion;
+    if (motion.dragged > 0) {
+      // Past the threshold or flicked down: it flies off the bottom, from
+      // where it is; otherwise it springs back.
+      return motion.release(
+        velocity: v,
+        close:
+            v > QuickPick.flick ||
+            (motion.dragged > QuickPick.closeDrag && v >= -QuickPick.flick),
+      );
     }
     final tall =
         v < -QuickPick.flick ||
@@ -195,59 +206,72 @@ class _QuickPickLayerState extends State<_QuickPickLayer>
     final normalMax = min(470.0, _tallHeight);
     final tall = _sized && _height.value > (_normal ?? 0) + 0.5;
     final height = _sized ? _height.value : null;
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: CloseOnTouch(
-            key: QuickPick.outsideKey,
-            child: CustomPaint(painter: _Dim(colors.dim, anchor)),
-          ),
-        ),
-        Positioned(
-          left: anchor.left + widget.inset,
-          right: size.width - anchor.right + widget.inset,
-          bottom: bottom - _down,
-          child: ConstrainedBox(
-            key: _panel,
-            constraints: height == null
-                ? BoxConstraints(maxHeight: max(0, normalMax))
-                : BoxConstraints.tightFor(height: max(0, height)),
-            child: Semantics(
-              customSemanticsActions: _keyboard
-                  ? null
-                  : {
-                      CustomSemanticsAction(
-                        label: tall
-                            ? 'Make the list shorter'
-                            : 'Make the list taller',
-                      ): _toggle,
-                    },
-              child: Material(
-                color: colors.sheet,
-                clipBehavior: Clip.antiAlias,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  side: BorderSide(color: colors.border),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _handle(colors),
-                    Flexible(
-                      fit: height == null ? FlexFit.loose : FlexFit.tight,
-                      child: _FillsPanel(
-                        fills: height != null,
-                        child: widget.child,
-                      ),
-                    ),
-                  ],
+    return PanelMotion(
+      route: ModalRoute.of(context)!,
+      // The context row's center button, which opens every list.
+      origin: Offset(anchor.center.dx, anchor.top + 32),
+      edge: PanelEdge.bottom,
+      builder: (context, motion) => Stack(
+        children: [
+          Positioned.fill(
+            child: CloseOnTouch(
+              key: QuickPick.outsideKey,
+              child: CustomPaint(
+                painter: _Dim(
+                  colors.dim.withValues(alpha: colors.dim.a * motion.dim),
+                  anchor,
                 ),
               ),
             ),
           ),
-        ),
-      ],
+          Positioned(
+            left: anchor.left + widget.inset,
+            right: size.width - anchor.right + widget.inset,
+            bottom: bottom,
+            child: motion.panel(
+              ConstrainedBox(
+                key: _panel,
+                constraints: height == null
+                    ? BoxConstraints(maxHeight: max(0, normalMax))
+                    : BoxConstraints.tightFor(height: max(0, height)),
+                child: Semantics(
+                  customSemanticsActions: _keyboard
+                      ? null
+                      : {
+                          CustomSemanticsAction(
+                            label: tall
+                                ? 'Make the list shorter'
+                                : 'Make the list taller',
+                          ): _toggle,
+                        },
+                  child: Material(
+                    color: colors.sheet,
+                    clipBehavior: Clip.antiAlias,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(color: colors.border),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _handle(colors),
+                        Flexible(
+                          fit: height == null ? FlexFit.loose : FlexFit.tight,
+                          child: _FillsPanel(
+                            fills: height != null,
+                            child: widget.child,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
