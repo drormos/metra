@@ -14,12 +14,12 @@ import '../model/whats_new.dart';
 import 'beat_indicator.dart';
 import 'fit_text.dart';
 import 'haptics.dart';
-import 'menu_panel.dart';
 import 'motion.dart';
 import 'on_start_sheet.dart';
 import 'poly_lane.dart';
 import 'setlist_group.dart';
 import 'save_as_new_dialog.dart';
+import 'settings_screen.dart';
 import 'icons.dart';
 import 'song_editor.dart';
 import 'subdivision_icon.dart';
@@ -59,8 +59,8 @@ class MetronomeScreen extends StatelessWidget {
   static const countInLineKey = Key('count-in-line');
   static const revertKey = Key('revert');
   static const firstChangeKey = Key('first-change-line');
-  static const menuKey = Key('menu-button');
-  static const menuDotKey = Key('menu-dot');
+  static const settingsKey = Key('settings-button');
+  static const updateDotKey = Key('update-dot');
   static const saveToSongKey = Key('save-to-song');
   static const saveAsNewKey = Key('save-as-new');
   static const subtitleKey = Key('subtitle');
@@ -497,14 +497,16 @@ class MetronomeScreen extends StatelessWidget {
         const SizedBox(width: 4),
         Builder(
           builder: (context) => _squareButton(
-            key: menuKey,
-            tooltip: WhatsNew.showDot(library) ? 'Menu, new update' : 'Menu',
+            key: settingsKey,
+            tooltip: WhatsNew.showDot(library)
+                ? 'Settings, new update'
+                : 'Settings',
             onPressed: () =>
-                showMenuPanel(context, metronome: controller, library: library),
-            // After an update, until the Menu is opened (ui-spec.md
+                openSettings(context, metronome: controller, library: library),
+            // After an update, until Settings is opened (ui-spec.md
             // "What's new").
             dot: WhatsNew.showDot(library),
-            child: const MenuIcon(),
+            child: const Icon(Icons.settings_outlined, size: 22),
           ),
         ),
       ],
@@ -534,7 +536,7 @@ class MetronomeScreen extends StatelessWidget {
           // An 8px red dot in the drawn button's top-right corner.
           if (dot)
             Positioned(
-              key: menuDotKey,
+              key: updateDotKey,
               top: 5,
               right: 5,
               child: IgnorePointer(

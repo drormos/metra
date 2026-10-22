@@ -103,10 +103,10 @@ void main() {
     handle.dispose();
   });
 
-  testWidgets('Menu', (tester) async {
+  testWidgets('Settings', (tester) async {
     final handle = tester.ensureSemantics();
     await pump(tester);
-    await tester.tap(find.byTooltip('Menu'));
+    await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
     await expectLabeled(tester);
     handle.dispose();

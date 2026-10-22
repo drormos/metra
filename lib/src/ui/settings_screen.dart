@@ -7,19 +7,22 @@ import '../controller/metronome_controller.dart';
 import '../model/click_sound.dart';
 import '../model/click_volumes.dart';
 import '../model/metronome_pattern.dart';
+import '../model/whats_new.dart';
+import 'about.dart';
 import 'editor_scaffold.dart';
 import 'meter_control.dart';
 import 'segmented.dart';
 import 'theme.dart';
 
 /// Opens Settings (ui-spec.md "Settings", `settings.reference.html`),
-/// from Menu → Settings. Changes apply at once. Leaving stops a visual
-/// offset test that started the click.
+/// from the gear button. Changes apply at once. Opening clears the gear's
+/// update dot; leaving stops a visual offset test that started the click.
 Future<void> openSettings(
   BuildContext context, {
   required MetronomeController metronome,
   LibraryController? library,
 }) async {
+  WhatsNew.settingsOpened(library);
   await Navigator.push(
     context,
     MaterialPageRoute<void>(
@@ -41,6 +44,13 @@ class SettingsScreen extends StatelessWidget {
   static const resetKey = Key('settings-volume-reset');
   static const offsetKey = Key('settings-offset');
   static const testKey = Key('settings-offset-test');
+  static const whatsNewKey = Key('settings-whats-new');
+  static const allUpdatesKey = Key('settings-all-updates');
+  static const gotItKey = Key('settings-got-it');
+  static const feedbackKey = Key('settings-feedback');
+  static const allUpdatesRowKey = Key('settings-all-updates-row');
+  static const aboutKey = Key('settings-about');
+  static const versionKey = Key('settings-version');
 
   static const _themes = {
     ThemeMode.system: 'System',
@@ -63,6 +73,9 @@ class SettingsScreen extends StatelessWidget {
                 builder: (context, _) => ListView(
                   padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
                   children: [
+                    if (WhatsNew.showBlock(library))
+                      if (WhatsNew.latest case final latest?)
+                        _whatsNew(context, latest, library!),
                     if (library != null) ...[
                       _section(
                         context,
@@ -83,6 +96,7 @@ class SettingsScreen extends StatelessWidget {
                       _section(context, 'Vibration', _vibration(context)),
                     _volumeSection(context),
                     _section(context, 'Visual offset', _offset(context)),
+                    _about(context),
                   ],
                 ),
               ),
@@ -90,6 +104,132 @@ class SettingsScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  /// After an update, at the top: "New in 1.4.0", up to 3 lines, and two
+  /// quiet buttons, "All updates ›" and "Got it" (hides it until the next
+  /// update).
+  Widget _whatsNew(
+    BuildContext context,
+    Release latest,
+    LibraryController library,
+  ) {
+    final colors = context.colors;
+    ButtonStyle quiet(Color color) => TextButton.styleFrom(
+      foregroundColor: color,
+      minimumSize: const Size(0, 48),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+    );
+    return Container(
+      key: whatsNewKey,
+      margin: const EdgeInsets.only(bottom: 28),
+      padding: const EdgeInsets.fromLTRB(16, 14, 8, 2),
+      decoration: BoxDecoration(
+        color: colors.sheet,
+        border: Border.all(color: colors.border),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'New in ${latest.version}',
+            style: TextStyle(fontSize: 14, color: colors.muted),
+          ),
+          for (final line in latest.lines.take(3))
+            Padding(
+              padding: const EdgeInsets.only(top: 6, right: 8),
+              child: Text(line, style: const TextStyle(fontSize: 15)),
+            ),
+          // Wraps rather than overflowing with large text.
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            children: [
+              TextButton(
+                key: allUpdatesKey,
+                style: quiet(colors.muted),
+                onPressed: () => openAllUpdates(context),
+                child: const Text('All updates ›'),
+              ),
+              TextButton(
+                key: gotItKey,
+                style: quiet(colors.text),
+                onPressed: () => WhatsNew.markSeen(library),
+                child: const Text('Got it'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The last section: Send feedback, All updates, About Metra, then the
+  /// version line (long-press copies it).
+  Widget _about(BuildContext context) {
+    final colors = context.colors;
+    Widget row(Key key, String title, VoidCallback onTap, {String? detail}) =>
+        InkWell(
+          key: key,
+          onTap: onTap,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 56),
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: colors.divider)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: const TextStyle(fontSize: 16)),
+                      if (detail != null)
+                        Text(
+                          detail,
+                          style: TextStyle(fontSize: 12, color: colors.muted),
+                        ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, size: 22, color: colors.muted),
+              ],
+            ),
+          ),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Text(
+            'About',
+            style: TextStyle(fontSize: 14, color: colors.muted),
+          ),
+        ),
+        row(
+          feedbackKey,
+          'Send feedback',
+          () => sendFeedback(context),
+          detail: "Tell Dror what works and what doesn't",
+        ),
+        row(allUpdatesRowKey, 'All updates', () => openAllUpdates(context)),
+        row(
+          aboutKey,
+          'About Metra',
+          () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(builder: (_) => const AboutScreen()),
+          ),
+          detail: 'Why this app exists',
+        ),
+        const SizedBox(height: 6),
+        const VersionLine(key: versionKey),
+      ],
     );
   }
 

@@ -59,7 +59,7 @@ abstract final class RowGestures {
   /// How far the one-time hint slides a row.
   static const hintSlide = 56.0;
 
-  /// The time signature sheet and the ☰ panel close when dragged past this
+  /// The bottom sheets close when dragged past this
   /// share of their size, or flicked faster than [closeFlick] (dp/s)
   /// toward closing; otherwise they spring back ([springBack]).
   static const closeFraction = 1 / 3;

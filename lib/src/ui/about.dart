@@ -11,15 +11,15 @@ import 'haptics.dart';
 import 'theme.dart';
 import '../model/whats_new.dart';
 
-/// Menu > About (ui-spec.md "Menu"): Send feedback, About Metra, and the
-/// version line.
+/// Settings → About (ui-spec.md "Settings"): Send feedback, All updates,
+/// About Metra, and the version line.
 
 const feedbackEmail = 'metra.application@gmail.com';
 
 /// The app's version and build.
 Future<PackageInfo> appVersion() => PackageInfo.fromPlatform();
 
-/// "Metra 1.0.0 (2)": shown in the Menu, copied on long-press.
+/// "Metra 1.0.0 (2)": shown in Settings, copied on long-press.
 String versionLine(PackageInfo app) =>
     'Metra ${app.version} (${app.buildNumber})';
 
@@ -90,7 +90,7 @@ class VersionLine extends StatefulWidget {
 }
 
 class _VersionLineState extends State<VersionLine> {
-  // Held here: the Menu rebuilds often (the offset test's flash).
+  // Held here: Settings rebuilds often (the offset test's flash).
   late final _app = appVersion();
 
   @override
@@ -129,8 +129,6 @@ class AboutScreen extends StatelessWidget {
       'full of ads, or missing the one thing I needed on stage.\n\n'
       'So I built my own, with everything I wanted, and made it free.';
 
-  static const allUpdatesKey = Key('about-all-updates');
-
   static const promise =
       'No ads, no account, no tracking. Your songs stay on your phone.';
 
@@ -162,16 +160,6 @@ class AboutScreen extends StatelessWidget {
                       color: colors.muted,
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  // Always findable, after "Got it" too.
-                  if (WhatsNew.releases.isNotEmpty)
-                    ListTile(
-                      key: AboutScreen.allUpdatesKey,
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('All updates'),
-                      trailing: Icon(Icons.chevron_right, color: colors.muted),
-                      onTap: () => openAllUpdates(context),
-                    ),
                 ],
               ),
             ),

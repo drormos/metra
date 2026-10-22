@@ -40,12 +40,12 @@ void main() {
     expect(releases.first.lines, ['One', 'Two']);
   });
 
-  test('after an update: dot and block; opening the Menu clears the dot; '
+  test('after an update: dot and block; opening Settings clears the dot; '
       '"Got it" the block; the next version shows again', () {
     WhatsNew.releases = WhatsNew.parse(notes);
     expect(WhatsNew.showDot(library), isTrue);
     expect(WhatsNew.showBlock(library), isTrue);
-    WhatsNew.menuOpened(library);
+    WhatsNew.settingsOpened(library);
     expect(WhatsNew.showDot(library), isFalse);
     expect(WhatsNew.showBlock(library), isTrue, reason: 'until Got it');
     WhatsNew.markSeen(library);

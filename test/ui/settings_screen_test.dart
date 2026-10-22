@@ -12,7 +12,6 @@ import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/model/whats_new.dart';
 import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/about.dart';
-import 'package:metra/src/ui/menu_panel.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/settings_screen.dart';
 
@@ -43,8 +42,9 @@ void main() {
     }
   });
 
-  /// The main screen with two setlists and three songs, then the Menu.
-  Future<void> openMenu(
+  /// The main screen with two setlists and three songs, then Settings
+  /// from the gear.
+  Future<void> openSettingsScreen(
     WidgetTester tester, {
     Size size = const Size(400, 900),
     bool open = true,
@@ -79,23 +79,12 @@ void main() {
       ),
     );
     if (!open) return;
-    await tester.tap(find.byKey(MetronomeScreen.menuKey));
+    await tester.tap(find.byKey(MetronomeScreen.settingsKey));
     await tester.pumpAndSettle();
   }
 
-  /// Then Menu → Settings.
-  Future<void> openSettingsScreen(
-    WidgetTester tester, {
-    Size size = const Size(400, 900),
-  }) async {
-    await openMenu(tester, size: size);
-    await tester.tap(find.byKey(MenuPanel.settingsKey));
-    await tester.pumpAndSettle();
-  }
-
-  /// Back on the main screen: no panel, no page over it.
+  /// Back on the main screen: no page over it.
   void expectMain() {
-    expect(find.byType(MenuPanel), findsNothing);
     expect(find.byType(SettingsScreen), findsNothing);
     expect(find.byType(MetronomeScreen), findsOneWidget);
   }
@@ -127,63 +116,47 @@ void main() {
     await reveal(tester, find.byKey(SettingsScreen.testKey));
   });
 
-  testWidgets('Settings: only sound, volume, theme and the offset', (
+  testWidgets('the gear opens Settings directly; About is its last section; '
+      'Back returns to the main screen; the click keeps playing', (
     tester,
   ) async {
     await openSettingsScreen(tester);
-    expect(find.text('Settings'), findsOneWidget);
-    for (final gone in ['Your music', 'About', 'Send feedback']) {
-      expect(find.text(gone), findsNothing);
-    }
-    await tester.tap(find.byTooltip('Back'));
-    await tester.pumpAndSettle();
-    expectMain();
-  });
-
-  testWidgets('the Menu panel: rows, counts; closes on outside tap, swipe, '
-      'back; the click keeps playing', (tester) async {
-    await openMenu(tester);
     await metronome.play();
-    // Not pumpAndSettle: while playing, the beat blocks animate every frame.
-    Future<void> settle() async {
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-    }
-
-    final panel = tester.getRect(find.byKey(MenuPanel.surfaceKey));
-    expect(panel.width, MenuPanel.width);
-    expect(panel.right, 400, reason: 'from the right');
-    for (final text in [
-      'Menu',
-      'Settings',
-      'Sound, volume, theme',
-      'Send feedback',
-      'About Metra',
-    ]) {
-      expect(
-        find.descendant(of: find.byType(MenuPanel), matching: find.text(text)),
-        findsOneWidget,
-        reason: text,
-      );
-    }
+    expect(find.text('Settings'), findsOneWidget);
     expect(find.text('Your music'), findsNothing);
-    expect(find.text('Song library'), findsNothing);
-    await tester.tapAt(const Offset(20, 450));
-    await settle();
-    expectMain();
-    await tester.tap(find.byTooltip('Menu'));
-    await settle();
-    await tester.fling(
-      find.byKey(MenuPanel.surfaceKey),
-      const Offset(200, 0),
-      1000,
+    await reveal(tester, find.byKey(SettingsScreen.versionKey));
+    for (final text in [
+      'About',
+      'Send feedback',
+      "Tell Dror what works and what doesn't",
+      'All updates',
+      'About Metra',
+      'Why this app exists',
+    ]) {
+      expect(find.text(text), findsOneWidget, reason: text);
+    }
+    double top(Key key) => tester.getTopLeft(find.byKey(key)).dy;
+    expect(
+      top(SettingsScreen.feedbackKey),
+      lessThan(top(SettingsScreen.allUpdatesRowKey)),
     );
-    await settle();
-    expectMain();
-    await tester.tap(find.byTooltip('Menu'));
-    await settle();
+    expect(
+      top(SettingsScreen.allUpdatesRowKey),
+      lessThan(top(SettingsScreen.aboutKey)),
+    );
+    expect(
+      top(SettingsScreen.aboutKey),
+      lessThan(top(SettingsScreen.versionKey)),
+    );
+    expect(
+      tester.getSize(find.byKey(SettingsScreen.aboutKey)).height,
+      greaterThanOrEqualTo(56),
+    );
     await tester.binding.handlePopRoute();
-    await settle();
+    // Not pumpAndSettle: while playing, the beat blocks animate every frame.
+    for (var i = 0; i < 30; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
     expectMain();
     expect(metronome.isPlaying, isTrue);
     metronome.stop();
@@ -204,9 +177,10 @@ void main() {
         null,
       ),
     );
-    await openMenu(tester);
+    await openSettingsScreen(tester);
+    await reveal(tester, find.byKey(SettingsScreen.versionKey));
     expect(find.text('Metra 1.2.3 (7)'), findsOneWidget);
-    await tester.longPress(find.byKey(MenuPanel.versionKey));
+    await tester.longPress(find.byKey(SettingsScreen.versionKey));
     await tester.pump();
     expect(copied, [
       {'text': 'Metra 1.2.3 (7)'},
@@ -214,47 +188,21 @@ void main() {
     expect(find.text('Copied'), findsOneWidget);
   });
 
-  testWidgets('the ☰ panel follows a swipe right: short springs back; a '
-      'screen reader reads it as "Menu"', (tester) async {
-    await openMenu(tester);
-    final left = tester.getTopLeft(find.byKey(MenuPanel.surfaceKey)).dx;
-    await tester.timedDrag(
-      find.byKey(MenuPanel.surfaceKey),
-      const Offset(60, 0),
-      const Duration(seconds: 1),
-    );
-    await tester.pumpAndSettle();
-    expect(tester.getTopLeft(find.byKey(MenuPanel.surfaceKey)).dx, left);
-    expect(
-      find.byWidgetPredicate(
-        (w) =>
-            w is Semantics &&
-            w.properties.label == 'Menu' &&
-            (w.properties.scopesRoute ?? false),
-      ),
-      findsOneWidget,
-    );
-    await tester.timedDrag(
-      find.byKey(MenuPanel.surfaceKey),
-      const Offset(140, 0),
-      const Duration(seconds: 1),
-    );
-    await tester.pumpAndSettle();
-    expect(find.byType(MenuPanel), findsNothing, reason: 'past a third');
-  });
-
-  testWidgets('About Metra opens the note; back returns to main', (
+  testWidgets('About Metra opens the note; Back to Settings, then main', (
     tester,
   ) async {
-    await openMenu(tester);
-    await tester.tap(find.byKey(MenuPanel.aboutKey));
+    await openSettingsScreen(tester);
+    await tapVisible(tester, find.byKey(SettingsScreen.aboutKey));
     await tester.pumpAndSettle();
     expect(find.byType(AboutScreen), findsOneWidget);
-    expect(find.byType(MenuPanel), findsNothing, reason: 'the panel closed');
     expect(find.text(AboutScreen.promise), findsOneWidget);
+    expect(find.text('All updates'), findsNothing, reason: 'in Settings');
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
     expect(find.byType(AboutScreen), findsNothing);
+    expect(find.byType(SettingsScreen), findsOneWidget);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
     expectMain();
   });
 
@@ -372,37 +320,53 @@ void main() {
     );
     tearDown(() => WhatsNew.releases = const []);
 
-    testWidgets('after an update: a dot on ☰; the Menu shows the block '
-        '(3 lines); opening clears the dot; "Got it" hides the block', (
+    testWidgets('after an update: a dot on the gear; Settings shows the '
+        'block on top (3 lines); opening clears the dot; "Got it" hides it', (
       tester,
     ) async {
-      await openMenu(tester, open: false);
-      expect(find.byKey(MetronomeScreen.menuDotKey), findsOneWidget);
-      await tester.tap(find.byKey(MetronomeScreen.menuKey));
+      await openSettingsScreen(tester, open: false);
+      expect(find.byKey(MetronomeScreen.updateDotKey), findsOneWidget);
+      expect(find.byTooltip('Settings, new update'), findsOneWidget);
+      await tester.tap(find.byKey(MetronomeScreen.settingsKey));
       await tester.pumpAndSettle();
-      expect(find.byKey(MetronomeScreen.menuDotKey), findsNothing);
       expect(find.text('New in 1.4.0'), findsOneWidget);
       expect(find.text('Three'), findsOneWidget);
       expect(find.text('Four'), findsNothing, reason: 'up to 3 lines');
       expect(
-        tester.getTopLeft(find.byKey(MenuPanel.whatsNewKey)).dy,
-        lessThan(tester.getTopLeft(find.byKey(MenuPanel.settingsKey)).dy),
-        reason: 'above Settings',
+        tester.getTopLeft(find.byKey(SettingsScreen.whatsNewKey)).dy,
+        lessThan(tester.getTopLeft(find.text('Theme')).dy),
+        reason: 'at the top',
       );
-      await tester.tap(find.byKey(MenuPanel.gotItKey));
+      await tester.tap(find.byKey(SettingsScreen.gotItKey));
       await tester.pumpAndSettle();
-      expect(find.byKey(MenuPanel.whatsNewKey), findsNothing);
+      expect(find.byKey(SettingsScreen.whatsNewKey), findsNothing);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(MetronomeScreen.menuKey));
+      expect(find.byKey(MetronomeScreen.updateDotKey), findsNothing);
+      await tester.tap(find.byKey(MetronomeScreen.settingsKey));
       await tester.pumpAndSettle();
-      expect(find.byKey(MenuPanel.whatsNewKey), findsNothing, reason: 'gone');
+      expect(
+        find.byKey(SettingsScreen.whatsNewKey),
+        findsNothing,
+        reason: 'gone',
+      );
     });
 
-    testWidgets('"All updates ›": every version, newest first; also from '
-        'About', (tester) async {
-      await openMenu(tester);
-      await tester.tap(find.byKey(MenuPanel.allUpdatesKey));
+    testWidgets('opening Settings clears the dot, the block stays until '
+        '"Got it"', (tester) async {
+      await openSettingsScreen(tester);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(MetronomeScreen.updateDotKey), findsNothing);
+      await tester.tap(find.byKey(MetronomeScreen.settingsKey));
+      await tester.pumpAndSettle();
+      expect(find.byKey(SettingsScreen.whatsNewKey), findsOneWidget);
+    });
+
+    testWidgets('"All updates ›": every version, newest first; also the '
+        'About row', (tester) async {
+      await openSettingsScreen(tester);
+      await tester.tap(find.byKey(SettingsScreen.allUpdatesKey));
       await tester.pumpAndSettle();
       expect(find.byType(AllUpdatesScreen), findsOneWidget);
       expect(
@@ -412,23 +376,20 @@ void main() {
       expect(find.text('·  Four'), findsOneWidget, reason: 'all lines');
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(MetronomeScreen.menuKey));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(MenuPanel.aboutKey));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(AboutScreen.allUpdatesKey));
+      expect(find.byType(SettingsScreen), findsOneWidget, reason: 'back');
+      await tapVisible(tester, find.byKey(SettingsScreen.allUpdatesRowKey));
       await tester.pumpAndSettle();
       expect(find.byType(AllUpdatesScreen), findsOneWidget);
     });
 
     testWidgets('a fresh install: no dot, no block', (tester) async {
-      await openMenu(tester, open: false);
+      await openSettingsScreen(tester, open: false);
       WhatsNew.markSeen(library);
       await tester.pump();
-      expect(find.byKey(MetronomeScreen.menuDotKey), findsNothing);
-      await tester.tap(find.byKey(MetronomeScreen.menuKey));
+      expect(find.byKey(MetronomeScreen.updateDotKey), findsNothing);
+      await tester.tap(find.byKey(MetronomeScreen.settingsKey));
       await tester.pumpAndSettle();
-      expect(find.byKey(MenuPanel.whatsNewKey), findsNothing);
+      expect(find.byKey(SettingsScreen.whatsNewKey), findsNothing);
     });
   });
 }

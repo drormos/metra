@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 /// the ambient [IconTheme] color unless [color] is given.
 
 /// Setlist: "note queue", three lines (the last short) with a note at the
-/// lower right. Distinct from the Menu icon.
+/// lower right.
 class SetlistIcon extends StatelessWidget {
   const SetlistIcon({super.key, this.size = 18, this.color});
 
@@ -49,39 +49,6 @@ class _SetlistPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_SetlistPainter old) => old.color != color;
-}
-
-/// Menu: ☰, three equal lines.
-class MenuIcon extends StatelessWidget {
-  const MenuIcon({super.key, this.size = 20});
-
-  final double size;
-
-  @override
-  Widget build(BuildContext context) => CustomPaint(
-    size: Size.square(size),
-    painter: _MenuPainter(IconTheme.of(context).color!),
-  );
-}
-
-class _MenuPainter extends CustomPainter {
-  _MenuPainter(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.scale(size.width / 20);
-    final stroke = Paint()
-      ..color = color
-      ..strokeWidth = 2;
-    for (final y in [5.0, 10.0, 15.0]) {
-      canvas.drawLine(Offset(3, y), Offset(17, y), stroke);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_MenuPainter old) => old.color != color;
 }
 
 /// Free play: a metronome body with its pendulum.

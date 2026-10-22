@@ -7,7 +7,6 @@ import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
-import 'package:metra/src/ui/menu_panel.dart';
 import 'package:metra/src/ui/quick_pick.dart';
 import 'package:metra/src/ui/setlist_group.dart';
 import 'package:metra/src/ui/theme.dart';
@@ -16,7 +15,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../audio/fake_click_output.dart';
 
 /// Flutter's accessibility guidelines (Android tap targets, labeled tap
-/// targets, text contrast) on the main screen, the panels, the Menu and
+/// targets, text contrast) on the main screen, the panels, the sheets and
 /// Settings, in both themes (ui-spec.md "Accessibility").
 void main() {
   late Directory dir;
@@ -112,7 +111,9 @@ void main() {
     ('dark', MetraColors.stageBlack),
     ('daylight', MetraColors.daylight),
   ]) {
-    testWidgets('$theme: main screen, panels, Menu, Settings', (tester) async {
+    testWidgets('$theme: main screen, panels, sheets, Settings', (
+      tester,
+    ) async {
       final handle = tester.ensureSemantics();
       failures.clear();
       await pump(tester, colors: colors);
@@ -127,10 +128,18 @@ void main() {
       await tester.tapAt(const Offset(200, 40));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('Menu'));
+      await tester.tap(find.byKey(MetronomeScreen.meterKey));
       await tester.pumpAndSettle();
-      await checkAll(tester, '$theme menu');
-      await tester.tap(find.byKey(MenuPanel.settingsKey));
+      await checkAll(tester, '$theme rhythm sheet');
+      await tester.tapAt(const Offset(200, 40));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(MetronomeScreen.onStartKey));
+      await tester.pumpAndSettle();
+      await checkAll(tester, '$theme when I press Start');
+      await tester.tapAt(const Offset(200, 40));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Settings'));
       await tester.pumpAndSettle();
       await checkAll(tester, '$theme settings');
       handle.dispose();
@@ -169,19 +178,13 @@ void main() {
       expect(tester.takeException(), isNull, reason: 'time signature sheet');
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Menu'));
+      await tester.tap(find.byKey(MetronomeScreen.onStartKey));
       await tester.pumpAndSettle();
-      expect(find.byType(MenuPanel), findsOneWidget);
-      expect(tester.takeException(), isNull, reason: 'menu');
-      await tester.scrollUntilVisible(
-        find.byKey(MenuPanel.settingsKey),
-        100,
-        scrollable: find.descendant(
-          of: find.byType(MenuPanel),
-          matching: find.byType(Scrollable),
-        ),
-      );
-      await tester.tap(find.byKey(MenuPanel.settingsKey));
+      expect(find.byType(BottomSheet), findsOneWidget);
+      expect(tester.takeException(), isNull, reason: 'when I press Start');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(MetronomeScreen.settingsKey));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull, reason: 'settings');
     });

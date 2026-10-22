@@ -6,8 +6,8 @@ import '../controller/library_controller.dart';
 typedef Release = ({String version, String heading, List<String> lines});
 
 /// What's new (ui-spec.md "First launch and updates"): every version from
-/// `assets/whats_new.md`, newest first. After an update the ☰ button
-/// shows a dot (cleared by opening the Menu) and the Menu a block for the
+/// `assets/whats_new.md`, newest first. After an update the gear button
+/// shows a dot (cleared by opening Settings) and Settings a block for the
 /// newest version (until "Got it"); a fresh install counts as seen.
 abstract final class WhatsNew {
   static const asset = 'assets/whats_new.md';
@@ -47,7 +47,7 @@ abstract final class WhatsNew {
   static String _dot(String version) => 'whats-new-dot:$version';
   static String _block(String version) => 'whats-new:$version';
 
-  /// The ☰ dot: an update not yet looked at.
+  /// The gear's dot: an update not yet looked at.
   static bool showDot(LibraryController? library) {
     final latest = WhatsNew.latest;
     return library != null &&
@@ -55,7 +55,7 @@ abstract final class WhatsNew {
         !library.tipSeen(_dot(latest.version));
   }
 
-  /// The Menu's block: an update not yet dismissed with "Got it".
+  /// Settings' block: an update not yet dismissed with "Got it".
   static bool showBlock(LibraryController? library) {
     final latest = WhatsNew.latest;
     return library != null &&
@@ -63,8 +63,8 @@ abstract final class WhatsNew {
         !library.tipSeen(_block(latest.version));
   }
 
-  /// Opening the Menu clears the dot.
-  static void menuOpened(LibraryController? library) {
+  /// Opening Settings clears the dot.
+  static void settingsOpened(LibraryController? library) {
     final latest = WhatsNew.latest;
     if (library != null && latest != null) {
       library.markTipSeen(_dot(latest.version));
