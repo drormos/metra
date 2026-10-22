@@ -113,6 +113,27 @@ void main() {
   }
 
   group('songs view', () {
+    testWidgets('a touch that starts on the dim closes the panel on touch-up, '
+        'tap or swipe, and never reaches the screen below', (tester) async {
+      await pump(tester);
+      final block = tester.getCenter(find.byKey(const ValueKey('beat-1-off')));
+      final levels = metronome.pattern.beatLevels;
+      await openPanel(tester);
+      await tester.dragFrom(block, const Offset(200, 0));
+      await tester.pumpAndSettle();
+      expect(find.byType(QuickPick), findsNothing, reason: 'sideways swipe');
+      await openPanel(tester);
+      await tester.dragFrom(block, const Offset(0, 300));
+      await tester.pumpAndSettle();
+      expect(find.byType(QuickPick), findsNothing, reason: 'downward swipe');
+      await openPanel(tester);
+      await tester.tapAt(block);
+      await tester.pumpAndSettle();
+      expect(find.byType(QuickPick), findsNothing, reason: 'tap');
+      expect(metronome.pattern.beatLevels, levels, reason: 'no block tapped');
+      expect(library.currentSong?.name, 'Two');
+    });
+
     testWidgets('header: name, "Song 2 of 3", "Change set"; "+ Add songs ›"', (
       tester,
     ) async {

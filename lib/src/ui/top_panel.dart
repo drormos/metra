@@ -99,7 +99,7 @@ class _TopPanelRoute extends PopupRoute<void> {
   ) => _TopPanelPage(
     animation: animation,
     dim: dim,
-    onClose: () => Navigator.of(context).maybePop(),
+    onClose: () => isCurrent ? navigator?.pop() : null,
     child: child,
   );
 }
@@ -154,14 +154,8 @@ class _TopPanelPage extends StatelessWidget {
               right: 0,
               top: top,
               bottom: 0,
-              child: Semantics(
-                button: true,
-                label: 'Close',
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: onClose,
-                  child: ColoredBox(color: dim.withValues(alpha: dim.a * t)),
-                ),
+              child: CloseOnTouch(
+                child: ColoredBox(color: dim.withValues(alpha: dim.a * t)),
               ),
             ),
             Positioned(
@@ -235,5 +229,40 @@ class _TopPanelPage extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// A panel's dimmed area (ui-spec.md "Top panels"): any touch that starts
+/// on it, a tap or a swipe in any direction, closes the panel on touch-up,
+/// like Back. It absorbs those touches: nothing reaches the screen below
+/// (no ruler drags, no button taps). Read as "Close" by screen readers.
+class CloseOnTouch extends StatelessWidget {
+  const CloseOnTouch({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: 'Close',
+    onTap: () => _close(context),
+    child: Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerUp: (_) => _close(context),
+      // Claims the gesture, so no recognizer elsewhere takes it.
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        excludeFromSemantics: true,
+        onTap: () {},
+        onPanStart: (_) {},
+        child: child,
+      ),
+    ),
+  );
+
+  /// Once: a second finger lifting while the panel leaves pops nothing.
+  static void _close(BuildContext context) {
+    final route = ModalRoute.of(context);
+    if (route != null && route.isCurrent) Navigator.of(context).pop();
   }
 }

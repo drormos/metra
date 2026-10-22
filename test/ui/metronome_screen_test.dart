@@ -342,6 +342,49 @@ void main() {
       });
     }
 
+    testWidgets('a touch that starts on the dim closes the panel on '
+        'touch-up, tap or swipe, and never reaches the screen below', (
+      tester,
+    ) async {
+      tester.view
+        ..physicalSize = const Size(800, 1500)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await pumpScreen(tester);
+      final ruler = tester.getCenter(find.byType(TempoRuler));
+      final start = tester.getCenter(find.byKey(MetronomeScreen.playKey));
+      for (final button in [
+        MetronomeScreen.meterKey,
+        MetronomeScreen.onStartKey,
+      ]) {
+        Future<void> open() async {
+          await tester.tap(find.byKey(button));
+          await tester.pumpAndSettle();
+          expect(find.byKey(TopPanel.surfaceKey), findsOneWidget);
+          expect(
+            tester.getRect(find.byKey(TopPanel.surfaceKey)).bottom,
+            lessThan(ruler.dy - 30),
+            reason: 'the ruler is under the dim',
+          );
+        }
+
+        await open();
+        await tester.dragFrom(ruler, const Offset(-300, 0));
+        await tester.pumpAndSettle();
+        expect(find.byKey(TopPanel.surfaceKey), findsNothing, reason: 'swipe');
+        expect(controller.bpm, 120, reason: 'no ruler drag');
+        await open();
+        await tester.dragFrom(ruler, const Offset(0, -200));
+        await tester.pumpAndSettle();
+        expect(find.byKey(TopPanel.surfaceKey), findsNothing, reason: 'up');
+        await open();
+        await tester.tapAt(start);
+        await tester.pumpAndSettle();
+        expect(find.byKey(TopPanel.surfaceKey), findsNothing, reason: 'tap');
+        expect(controller.isPlaying, isFalse, reason: 'no button tap');
+      }
+    });
+
     testWidgets('time signature picker sets the meter', (tester) async {
       await pumpScreen(tester);
       await pick(tester, MetronomeScreen.meterKey, '7/8');

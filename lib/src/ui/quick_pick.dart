@@ -16,6 +16,7 @@ import 'play_marker.dart';
 import 'search_match.dart';
 import 'swipe_row.dart';
 import 'theme.dart';
+import 'top_panel.dart';
 
 /// Which dropdown: the Songs or Setlists mode tab, or the set's "4/12 ⌄"
 /// (setlist mode).
@@ -197,15 +198,9 @@ class _QuickPickLayerState extends State<_QuickPickLayer>
     return Stack(
       children: [
         Positioned.fill(
-          child: Semantics(
-            label: 'Close',
-            button: true,
-            child: GestureDetector(
-              key: QuickPick.outsideKey,
-              behavior: HitTestBehavior.opaque,
-              onTap: () => Navigator.pop(context),
-              child: CustomPaint(painter: _Dim(colors.dim, anchor)),
-            ),
+          child: CloseOnTouch(
+            key: QuickPick.outsideKey,
+            child: CustomPaint(painter: _Dim(colors.dim, anchor)),
           ),
         ),
         Positioned(
