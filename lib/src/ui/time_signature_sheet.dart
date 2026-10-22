@@ -6,8 +6,8 @@ import 'haptics.dart';
 import 'meter_control.dart';
 import 'segmented.dart';
 import 'subdivision_icon.dart';
-import 'swipe_row.dart';
 import 'theme.dart';
+import 'top_panel.dart';
 
 /// The Rhythm sheet (ui-spec.md, `on-start.reference.html`): "Common"
 /// meters apply with one tap and close it; "Custom", Subdivision and
@@ -15,64 +15,14 @@ import 'theme.dart';
 /// [MetronomeController.setMeter], so beat states are kept and, while
 /// playing, the next beat starts a bar; a subdivision lands on the next
 /// beat.
+/// Opens (or, open already, closes) the Rhythm panel under the top row.
 Future<void> showTimeSignatureSheet(
   BuildContext context,
   MetronomeController metronome,
-) => showDragSheet(
+) => TopPanel.toggle(
   context,
-  handleKey: TimeSignatureSheet.handleKey,
+  id: TimeSignatureSheet,
   child: TimeSignatureSheet(metronome: metronome),
-);
-
-/// A bottom sheet with the Android drag behavior (ui-spec.md "Sheet
-/// behavior"): it follows the finger and closes past a third of its
-/// height or on a flick down; the dim area and Back close it too.
-Future<void> showDragSheet(
-  BuildContext context, {
-  required Widget child,
-  Key? handleKey,
-}) => showModalBottomSheet<void>(
-  context: context,
-  isScrollControlled: true,
-  // Our own drag (closes past a third, or on a flick down; Flutter's
-  // closes past half), so the sheet draws its own surface and handle.
-  enableDrag: false,
-  showDragHandle: false,
-  sheetAnimationStyle: RowGestures.reduceMotion(context)
-      ? AnimationStyle.noAnimation
-      : null,
-  backgroundColor: context.colors.sheet.withAlpha(0),
-  elevation: 0,
-  // Lifted above the keyboard (the sheet's typed values).
-  builder: (context) => Padding(
-    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-    child: DragToClose(
-      axis: Axis.vertical,
-      onClose: () => Navigator.pop(context),
-      child: Material(
-        color: context.colors.sheet,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              key: handleKey,
-              margin: const EdgeInsets.symmetric(vertical: 22),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: context.colors.beatResting,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Flexible(child: child),
-          ],
-        ),
-      ),
-    ),
-  ),
 );
 
 class TimeSignatureSheet extends StatelessWidget {
@@ -80,7 +30,6 @@ class TimeSignatureSheet extends StatelessWidget {
 
   final MetronomeController metronome;
 
-  static const handleKey = Key('sheet-handle');
   static const subdivisionKey = Key('subdivision');
 
   /// Spoken names of the subdivisions, by clicks per beat.

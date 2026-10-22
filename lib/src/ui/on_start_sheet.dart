@@ -5,17 +5,21 @@ import '../model/on_start.dart';
 import 'haptics.dart';
 import 'motion.dart';
 import 'theme.dart';
-import 'time_signature_sheet.dart';
+import 'top_panel.dart';
 import 'value_stepper.dart';
 
-/// The "When I press Start" sheet (ui-spec.md, `on-start-sheet.reference
-/// .html`), opened from the stopwatch button: Count-in, Speed up, Stop
-/// after. Changes apply at once and belong to the loaded song like its
-/// tempo.
+/// The "When I press Start" panel (ui-spec.md, `on-start-sheet.reference
+/// .html`), dropping from the stopwatch button (which also closes it):
+/// Count-in, Speed up, Stop after. Changes apply at once and belong to the
+/// loaded song like its tempo.
 Future<void> showOnStartSheet(
   BuildContext context,
   MetronomeController metronome,
-) => showDragSheet(context, child: OnStartSheet(metronome: metronome));
+) => TopPanel.toggle(
+  context,
+  id: OnStartSheet,
+  child: OnStartSheet(metronome: metronome),
+);
 
 class OnStartSheet extends StatelessWidget {
   const OnStartSheet({super.key, required this.metronome});

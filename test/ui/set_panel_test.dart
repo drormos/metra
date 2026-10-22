@@ -11,6 +11,7 @@ import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/editor_scaffold.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
+import 'package:metra/src/ui/top_panel.dart';
 import 'package:metra/src/ui/quick_pick.dart';
 import 'package:metra/src/ui/setlist_group.dart';
 import 'package:metra/src/ui/theme.dart';
@@ -1112,7 +1113,7 @@ void main() {
       await tester.tap(find.byKey(MetronomeScreen.meterKey));
       await tester.pumpAndSettle();
       expect(await back(), isTrue);
-      expect(find.byType(BottomSheet), findsNothing, reason: '5: sheet');
+      expect(find.byKey(TopPanel.surfaceKey), findsNothing, reason: '5: sheet');
 
       expect(await back(), isFalse, reason: 'the bare main screen: leave');
     });

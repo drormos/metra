@@ -16,6 +16,7 @@ import 'package:metra/src/ui/repeat_button.dart';
 import 'package:metra/src/ui/haptics.dart';
 import 'package:metra/src/ui/tempo_ruler.dart';
 import 'package:metra/src/ui/time_signature_sheet.dart';
+import 'package:metra/src/ui/top_panel.dart';
 
 import '../audio/fake_click_output.dart';
 import 'test_theme.dart';
@@ -190,7 +191,11 @@ void main() {
         find.text('3 against 4: three even clicks per bar, in their own sound'),
         findsOneWidget,
       );
-      expect(find.byType(BottomSheet), findsOneWidget, reason: 'stays open');
+      expect(
+        find.byKey(TopPanel.surfaceKey),
+        findsOneWidget,
+        reason: 'stays open',
+      );
       await tester.tapAt(const Offset(10, 10));
       await tester.pumpAndSettle();
       expect(find.text(' · 3'), findsOneWidget);
@@ -223,28 +228,75 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('pulse-1-off')));
       expect(controller.pattern.polyStates[1], StepLevel.accent);
     });
-    testWidgets('the sheet follows a drag down: short springs back, past a '
-        'third closes', (tester) async {
+    testWidgets('the panels drop from the top row: under it, 12px from the '
+        'edges, the top row sharp above; tap outside, the same button, Back '
+        'or a swipe up closes; the other button swaps; the click plays on', (
+      tester,
+    ) async {
       await pumpScreen(tester);
+      await tester.tap(find.byKey(MetronomeScreen.playKey));
+      await tester.pump();
+      Future<void> settle() async {
+        for (var i = 0; i < 20; i++) {
+          await tester.pump(const Duration(milliseconds: 20));
+        }
+      }
+
+      final rowBottom = tester.getBottomLeft(find.byKey(TopPanel.topRowKey)).dy;
       await tester.tap(find.byKey(MetronomeScreen.meterKey));
-      await tester.pumpAndSettle();
-      final top = tester.getTopLeft(find.byKey(TimeSignatureSheet.handleKey));
-      final sheet = tester.getSize(find.byType(TimeSignatureSheet));
-      await tester.timedDrag(
-        find.byKey(TimeSignatureSheet.handleKey),
-        Offset(0, sheet.height * 0.2),
-        const Duration(seconds: 1),
+      await settle();
+      final panel = tester.getRect(find.byKey(TopPanel.surfaceKey));
+      expect(panel.top, rowBottom);
+      expect(panel.left, 12);
+      expect(panel.right, 800 - 12);
+      expect(
+        tester.getBottomLeft(find.byKey(TopPanel.handleKey)).dy,
+        lessThan(panel.bottom),
+        reason: 'the handle at its bottom edge',
       );
-      await tester.pumpAndSettle();
-      expect(find.byType(TimeSignatureSheet), findsOneWidget);
-      expect(tester.getTopLeft(find.byKey(TimeSignatureSheet.handleKey)), top);
-      await tester.timedDrag(
-        find.byKey(TimeSignatureSheet.handleKey),
-        Offset(0, sheet.height * 0.45),
-        const Duration(seconds: 1),
-      );
-      await tester.pumpAndSettle();
+      // The same button again closes it.
+      await tester.tap(find.byKey(MetronomeScreen.meterKey));
+      await settle();
       expect(find.byType(TimeSignatureSheet), findsNothing);
+      // Outside (the dimmed screen) closes it.
+      await tester.tap(find.byKey(MetronomeScreen.meterKey));
+      await settle();
+      await tester.tapAt(const Offset(4, 300)); // beside the panel
+      await settle();
+      expect(find.byType(TimeSignatureSheet), findsNothing);
+      // The other top-row button swaps to its panel.
+      await tester.tap(find.byKey(MetronomeScreen.meterKey));
+      await settle();
+      await tester.tap(find.byKey(MetronomeScreen.onStartKey));
+      await settle();
+      expect(find.byType(TimeSignatureSheet), findsNothing);
+      expect(find.byType(OnStartSheet), findsOneWidget);
+      // Back closes it.
+      await tester.binding.handlePopRoute();
+      await settle();
+      expect(find.byType(OnStartSheet), findsNothing);
+      // A short swipe up springs back; past a third closes.
+      await tester.tap(find.byKey(MetronomeScreen.meterKey));
+      await settle();
+      final height = tester.getSize(find.byKey(TopPanel.surfaceKey)).height;
+      final top = tester.getTopLeft(find.byKey(TopPanel.surfaceKey));
+      await tester.timedDrag(
+        find.byKey(TopPanel.handleKey),
+        Offset(0, -height * 0.2),
+        const Duration(seconds: 1),
+      );
+      await settle();
+      expect(tester.getTopLeft(find.byKey(TopPanel.surfaceKey)), top);
+      await tester.timedDrag(
+        find.byKey(TopPanel.handleKey),
+        Offset(0, -height * 0.45),
+        const Duration(seconds: 1),
+      );
+      await settle();
+      expect(find.byType(TimeSignatureSheet), findsNothing);
+      expect(controller.isPlaying, isTrue, reason: 'the click plays on');
+      await tester.tap(find.byKey(MetronomeScreen.playKey));
+      await tester.pump();
     });
 
     testWidgets('time signature picker sets the meter', (tester) async {

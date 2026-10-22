@@ -27,6 +27,7 @@ import 'subdivision_icon.dart';
 import 'tempo_controls.dart';
 import 'tempo_ruler.dart';
 import 'time_signature_sheet.dart';
+import 'top_panel.dart';
 import 'theme.dart';
 
 /// Main screen (ui-spec.md), the same phone layout on every platform.
@@ -111,7 +112,13 @@ class MetronomeScreen extends StatelessWidget {
                   // itself to the content width.
                   if (library != null) ...[
                     const SizedBox(height: 12),
-                    SetlistGroup(library: library, metronome: controller),
+                    KeyedSubtree(
+                      key: TopPanel.bottomKey,
+                      child: SetlistGroup(
+                        library: library,
+                        metronome: controller,
+                      ),
+                    ),
                     SizedBox(height: gestureGap),
                   ],
                 ],
@@ -167,7 +174,7 @@ class MetronomeScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _topRow(context),
+        KeyedSubtree(key: TopPanel.topRowKey, child: _topRow(context)),
         const SizedBox(height: 16),
         BeatIndicator(controller: controller),
         // Two groups (ui-spec.md "Vertical layout"): the BPM number alone
@@ -345,9 +352,10 @@ class MetronomeScreen extends StatelessWidget {
     // editor, the only way in (ui-spec.md "Song editor"). No song: nothing.
     final VoidCallback? onLongPress = library == null || song == null
         ? null
-        : () => longPress(
-            () => openSongEditor(context, library, controller, song: song),
-          );
+        : () => longPress(() {
+            TopPanel.close();
+            openSongEditor(context, library, controller, song: song);
+          });
     return GestureDetector(
       key: titleBlockKey,
       behavior: HitTestBehavior.opaque,
@@ -499,8 +507,10 @@ class MetronomeScreen extends StatelessWidget {
             tooltip: WhatsNew.showDot(library)
                 ? 'Settings, new update'
                 : 'Settings',
-            onPressed: () =>
-                openSettings(context, metronome: controller, library: library),
+            onPressed: () {
+              TopPanel.close();
+              openSettings(context, metronome: controller, library: library);
+            },
             // After an update, until Settings is opened (ui-spec.md
             // "What's new").
             dot: WhatsNew.showDot(library),

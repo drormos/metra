@@ -703,9 +703,13 @@ class DragToClose extends StatefulWidget {
     required this.axis,
     required this.onClose,
     required this.child,
+    this.reverse = false,
   });
 
   final Axis axis;
+
+  /// Closes toward the top (or left) instead: a panel from the top row.
+  final bool reverse;
   final VoidCallback onClose;
   final Widget child;
 
@@ -730,12 +734,15 @@ class _DragToCloseState extends State<DragToClose>
     return widget.axis == Axis.vertical ? box.size.height : box.size.width;
   }
 
+  double get _sign => widget.reverse ? -1 : 1;
+
   void _update(double delta) {
-    if (!_closing) _offset.value = max(0, _offset.value + delta);
+    if (!_closing) _offset.value = max(0, _offset.value + delta * _sign);
   }
 
   void _end(double velocity) {
     if (_closing) return;
+    velocity *= _sign;
     final past = _offset.value > RowGestures.closeFraction * _size;
     if (velocity > RowGestures.closeFlick ||
         (past && velocity >= -RowGestures.closeFlick)) {
@@ -766,8 +773,8 @@ class _DragToCloseState extends State<DragToClose>
         animation: _offset,
         builder: (context, child) => Transform.translate(
           offset: vertical
-              ? Offset(0, _offset.value)
-              : Offset(_offset.value, 0),
+              ? Offset(0, _offset.value * _sign)
+              : Offset(_offset.value * _sign, 0),
           child: child,
         ),
         child: widget.child,
