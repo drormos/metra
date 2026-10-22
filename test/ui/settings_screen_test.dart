@@ -13,9 +13,7 @@ import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/about.dart';
 import 'package:metra/src/ui/menu_panel.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
-import 'package:metra/src/ui/setlist_picker.dart';
 import 'package:metra/src/ui/settings_screen.dart';
-import 'package:metra/src/ui/song_library.dart';
 
 import '../audio/fake_click_output.dart';
 import 'test_theme.dart';
@@ -96,8 +94,6 @@ void main() {
   void expectMain() {
     expect(find.byType(MenuPanel), findsNothing);
     expect(find.byType(SettingsScreen), findsNothing);
-    expect(find.byType(SetlistPicker), findsNothing);
-    expect(find.byType(SongLibrary), findsNothing);
     expect(find.byType(MetronomeScreen), findsOneWidget);
   }
 
@@ -156,9 +152,6 @@ void main() {
     expect(panel.right, 400, reason: 'from the right');
     for (final text in [
       'Menu',
-      'Your music',
-      'Song library',
-      'Setlists',
       'Settings',
       'Sound, volume, theme',
       'Send feedback',
@@ -170,20 +163,8 @@ void main() {
         reason: text,
       );
     }
-    expect(
-      find.descendant(
-        of: find.byKey(MenuPanel.songLibraryKey),
-        matching: find.text('3'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(MenuPanel.setlistsKey),
-        matching: find.text('2'),
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('Your music'), findsNothing);
+    expect(find.text('Song library'), findsNothing);
     await tester.tapAt(const Offset(20, 450));
     await settle();
     expectMain();
@@ -287,52 +268,6 @@ void main() {
       expect(params['body'], endsWith('\n\n'));
     },
   );
-
-  testWidgets('Your music: Setlists and Song library; back to main', (
-    tester,
-  ) async {
-    await openMenu(tester);
-    await tester.tap(find.byKey(MenuPanel.setlistsKey));
-    await tester.pumpAndSettle();
-    expect(find.text('What to play'), findsOneWidget);
-    expect(find.byType(SetlistPicker), findsOneWidget);
-    await tester.tap(find.byTooltip('Back'));
-    await tester.pumpAndSettle();
-    expectMain();
-    await tester.tap(find.byTooltip('Menu'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(MenuPanel.songLibraryKey));
-    await tester.pumpAndSettle();
-    expect(find.byType(SongLibrary), findsOneWidget);
-    await tester.tap(find.byTooltip('Back'));
-    await tester.pumpAndSettle();
-    expectMain();
-  });
-
-  testWidgets('loading from Menu > Setlists lands on the main screen', (
-    tester,
-  ) async {
-    await openMenu(tester);
-    await tester.tap(find.byKey(MenuPanel.setlistsKey));
-    await tester.pumpAndSettle();
-    final friday = library.setlists.firstWhere((l) => l.name == 'Friday set');
-    await tester.tap(find.byKey(ValueKey('picker-set-${friday.id}')));
-    await tester.pumpAndSettle();
-    expect(find.byType(SetlistPicker), findsNothing);
-    expectMain();
-    expect(library.activeSetlist?.id, friday.id);
-  });
-
-  testWidgets('Free play from Menu > Setlists lands on the main screen', (
-    tester,
-  ) async {
-    await openMenu(tester);
-    await tester.tap(find.byKey(MenuPanel.setlistsKey));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(SetlistPicker.freePlayKey));
-    await tester.pumpAndSettle();
-    expectMain();
-  });
 
   testWidgets('theme and click sound apply at once', (tester) async {
     await openSettingsScreen(tester);

@@ -12,15 +12,16 @@ import 'haptics.dart';
 import 'icons.dart';
 import 'play_marker.dart';
 import 'search_match.dart';
-import 'setlist_picker.dart';
-import 'song_editor.dart';
-import 'song_library.dart';
 import 'swipe_row.dart';
 import 'theme.dart';
 
 /// Which dropdown: the Songs or Setlists mode tab, or the set's "4/12 ⌄"
 /// (setlist mode).
 enum QuickPickKind { songs, sets, set }
+
+/// What the panel does as it opens: the context row's empty-state "+"
+/// buttons (ui-spec.md "Empty lists") go straight to creating.
+enum QuickPickStart { none, newSong, newSetlist, addSongs }
 
 /// Opens a quick-pick dropdown (ui-spec.md "Quick-pick dropdowns",
 /// `drop-songs` / `drop-sets` / `drop-set` references) just above the
@@ -36,6 +37,7 @@ Future<void> showQuickPick(
   required LibraryController library,
   required MetronomeController metronome,
   double inset = 0,
+  QuickPickStart start = QuickPickStart.none,
 }) {
   final box = context.findRenderObject()! as RenderBox;
   final anchor = box.localToGlobal(Offset.zero) & box.size;
@@ -59,7 +61,7 @@ Future<void> showQuickPick(
           kind: kind,
           library: library,
           metronome: metronome,
-          pages: context,
+          start: start,
         ),
       ),
       transitionsBuilder: (_, animation, _, child) =>
@@ -155,15 +157,14 @@ class QuickPick extends StatefulWidget {
     required this.kind,
     required this.library,
     required this.metronome,
-    required this.pages,
+    this.start = QuickPickStart.none,
   });
 
   final QuickPickKind kind;
   final LibraryController library;
   final MetronomeController metronome;
 
-  /// The main screen's context, for the pages the panel opens.
-  final BuildContext pages;
+  final QuickPickStart start;
 
   static const searchAbove = 8;
   static const outsideKey = Key('quick-pick-outside');
@@ -173,6 +174,9 @@ class QuickPick extends StatefulWidget {
   static const pickBackKey = Key('quick-pick-picker-back');
   static const pickAddKey = Key('quick-pick-picker-add');
   static const pickSearchKey = Key('quick-pick-picker-search');
+
+  /// How long a list's one-time hint line stays.
+  static const hintLineFor = Duration(seconds: 3);
 
   /// How long rows just added from the picker show "Added".
   static const addedFor = Duration(seconds: 2);
@@ -244,8 +248,12 @@ class _QuickPickState extends State<QuickPick>
   ({int index, double fromTop})? _settle;
   final _catchUp = CatchUp();
 
-  // The one-time swipe hint: [_hintRow] slides out and back.
+  // The one-time hint: in list [_hintKind], [_hintRow] slides out and
+  // back, then [_hintLine] shows under the list for a moment.
+  QuickPickKind? _hintKind;
   int? _hintRow;
+  String? _hintLine;
+  Timer? _hintLineTimer;
   late final _hint = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 800),
@@ -267,32 +275,59 @@ class _QuickPickState extends State<QuickPick>
         );
       });
     }
-    _maybeHint();
+    if (widget.start == QuickPickStart.none) _maybeHint(widget.kind);
+    // After the first frame: creating changes the library mid-build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      switch (widget.start) {
+        case QuickPickStart.none:
+          break;
+        case QuickPickStart.newSong:
+          _newSong();
+        case QuickPickStart.newSetlist:
+          _newSetlist();
+        case QuickPickStart.addSongs:
+          if (_library.activeSetlist case final set?) _openPicker(set.id);
+      }
+    });
     AndroidBridge.recommendedTimeout(QuickPick.undoFor).then((d) {
       _undoFor = d;
     });
   }
 
-  /// The first time ever the set panel (or, with its own flag, the Songs
-  /// list) opens on 2+ songs, a row that isn't playing slides out to show
-  /// what a swipe does, then springs back. No haptic.
-  void _maybeHint() {
-    final List<Song> songs;
+  /// Principle 7's one-time hints (ui-spec.md "One-time hints"): the
+  /// first time each list shows 2+ rows, a row that isn't current slides
+  /// out to show the swipe, then a muted line names both gestures for
+  /// [QuickPick.hintLineFor]. Once per list (stored flag); with "Remove
+  /// animations" it's skipped but still counts as shown.
+  void _maybeHint(QuickPickKind kind) {
+    final int count;
     final int current;
     final VoidCallback seen;
-    switch (widget.kind) {
+    final String line;
+    switch (kind) {
       case QuickPickKind.set when !_library.swipeHintSeen:
-        songs = _library.visibleSongs;
+        count = _library.visibleSongs.length;
         current = _library.currentIndex;
         seen = _library.markSwipeHintSeen;
+        line = 'Hold a song to move it · Swipe to remove';
+      case QuickPickKind.sets when !_library.setsHintSeen:
+        final sets = _library.setlistsRecentlyPlayed;
+        count = sets.length;
+        current = sets.indexWhere((s) => s.id == _library.activeSetlist?.id);
+        seen = _library.markSetsHintSeen;
+        line = 'Hold a set to rename it · Swipe to delete';
       case QuickPickKind.songs when !_library.songsHintSeen:
-        songs = _library.songsAZ;
+        final songs = _library.songsAZ;
+        count = songs.length;
         current = songs.indexWhere((s) => s.id == _library.currentSong?.id);
         seen = _library.markSongsHintSeen;
+        line = 'Hold a song to rename it · Swipe to delete';
       default:
         return;
     }
-    if (songs.length < 2) return;
+    if (count < 2) return;
+    _hintKind = kind;
     _hintRow = current == 0 ? 1 : 0;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -301,16 +336,44 @@ class _QuickPickState extends State<QuickPick>
       if (RowGestures.reduceMotion(context)) {
         return setState(() => _hintRow = null);
       }
-      _hint.forward().whenComplete(() {
-        if (mounted) setState(() => _hintRow = null);
+      _hint.forward(from: 0).whenComplete(() {
+        if (!mounted) return;
+        setState(() {
+          _hintRow = null;
+          _hintLine = line;
+        });
+        _hintLineTimer?.cancel();
+        _hintLineTimer = Timer(QuickPick.hintLineFor, () {
+          if (mounted) setState(() => _hintLine = null);
+        });
       });
     });
+  }
+
+  /// The hint for list [kind]'s row [i], while it runs.
+  Animation<double>? _hintFor(QuickPickKind kind, int i) =>
+      _hintKind == kind && i == _hintRow ? _hint : null;
+
+  /// The muted line under the list, after the nudge.
+  Widget? _hintNote(MetraColors colors) {
+    final line = _hintLine;
+    if (line == null || _hintKind != _kind) return null;
+    return Padding(
+      key: const ValueKey('hint-line'),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Text(
+        line,
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 13, color: colors.muted),
+      ),
+    );
   }
 
   @override
   void dispose() {
     _undoTimer?.cancel();
     _addedTimer?.cancel();
+    _hintLineTimer?.cancel();
     _pickSearch.dispose();
     _pickScroll.dispose();
     _hint.dispose();
@@ -346,18 +409,6 @@ class _QuickPickState extends State<QuickPick>
     Haptics.medium();
     load();
     Navigator.pop(context);
-  }
-
-  /// Closes, then opens a page from the main screen.
-  void _open(void Function(BuildContext pages) open) {
-    Navigator.pop(context);
-    open(widget.pages);
-  }
-
-  /// Long-press = edit: closes, then opens the editor or the set's page.
-  void _edit(void Function(BuildContext pages) open) {
-    Haptics.medium();
-    _open(open);
   }
 
   // Back from the sets view returns to the set's songs; Back while
@@ -466,11 +517,13 @@ class _QuickPickState extends State<QuickPick>
                                 final sets when sets.isEmpty => null,
                                 final sets =>
                                   'It will also be removed from '
-                                      '${SongLibrary.whereUsed(sets)}.',
+                                      '${whereUsed(sets)}.',
                               },
                             ),
                             onSwiped: () => _deleteSong(song),
-                            hint: i == _hintRow && query.isEmpty ? _hint : null,
+                            hint: query.isEmpty
+                                ? _hintFor(QuickPickKind.songs, i)
+                                : null,
                             child: _songRow(
                               colors,
                               song,
@@ -487,23 +540,15 @@ class _QuickPickState extends State<QuickPick>
                         ),
               ],
             ),
+      note: _hintNote(colors),
       bar: _undoBar(colors),
       actions: [
-        all.isEmpty
-            ? _action(
-                key: QuickPick.newSongKey,
-                label: 'New song',
-                opens: true,
-                onTap: () => _open(
-                  (pages) => openSongEditor(pages, _library, widget.metronome),
-                ),
-              )
-            : _action(
-                key: QuickPick.newSongKey,
-                label: '+ New song',
-                opens: true,
-                onTap: _newSong,
-              ),
+        _action(
+          key: QuickPick.newSongKey,
+          label: '+ New song',
+          opens: true,
+          onTap: _newSong,
+        ),
       ],
     );
   }
@@ -818,6 +863,7 @@ class _QuickPickState extends State<QuickPick>
                             key: ValueKey('set-${set.id}-$_generation'),
                             index: i,
                             enabled: _renaming == null,
+                            hint: _hintFor(QuickPickKind.sets, i),
                             onHold: () =>
                                 _startRename(set.id, set.name, _Rename.set),
                             label: 'Delete set',
@@ -845,6 +891,7 @@ class _QuickPickState extends State<QuickPick>
                         ),
               ],
             ),
+      note: _hintNote(colors),
       bar: _undoBar(colors),
       actions: [
         _action(
@@ -920,7 +967,7 @@ class _QuickPickState extends State<QuickPick>
                       'Move down': () => _move(setlist, i, i + 1),
                   },
                   onSwiped: () => _removeSong(setlist, i, songs[i]),
-                  hint: i == _hintRow ? _hint : null,
+                  hint: _hintFor(QuickPickKind.set, i),
                   child: _entryRow(
                     colors,
                     setlist,
@@ -934,6 +981,7 @@ class _QuickPickState extends State<QuickPick>
           );
         },
       ),
+      note: _hintNote(colors),
       bar: _undoBar(colors),
       actions: [
         _action(
@@ -973,8 +1021,8 @@ class _QuickPickState extends State<QuickPick>
     });
   }
 
-  /// 56px: the set name with "Song 4 of 12" under it (long-press = the
-  /// set's page), and "Change set" on the right.
+  /// 56px: the set name with "Song 4 of 12" under it, and "Change set"
+  /// on the right.
   Widget _setHeader(
     MetraColors colors,
     Setlist setlist,
@@ -987,18 +1035,8 @@ class _QuickPickState extends State<QuickPick>
       child: Row(
         children: [
           Expanded(
-            child: InkWell(
+            child: KeyedSubtree(
               key: QuickPick.setHeaderKey,
-              enableFeedback: false, // Our own haptic, gated by the setting.
-              onLongPress: () => _edit(
-                (pages) => openSetlists(
-                  pages,
-                  library: _library,
-                  metronome: widget.metronome,
-                  setId: setlist.id,
-                ),
-              ),
-              // At least 48dp to touch, however short the text.
               child: Container(
                 constraints: const BoxConstraints(minHeight: 48),
                 alignment: Alignment.centerLeft,
@@ -1041,7 +1079,10 @@ class _QuickPickState extends State<QuickPick>
                   minimumSize: const Size(0, 40),
                   tapTargetSize: MaterialTapTargetSize.padded,
                 ),
-                onPressed: () => setState(() => _kind = QuickPickKind.sets),
+                onPressed: () {
+                  setState(() => _kind = QuickPickKind.sets);
+                  _maybeHint(QuickPickKind.sets);
+                },
                 icon: const SetlistIcon(size: 16),
                 label: const Text(
                   'Change set',
@@ -1490,7 +1531,13 @@ class _QuickPickState extends State<QuickPick>
 /// Pinned [top], the scrolling [list], then the pinned [actions] under a
 /// 2px line, with 1px lines between them, so they never read as rows.
 class _Panel extends StatelessWidget {
-  const _Panel({this.top, required this.list, required this.actions, this.bar});
+  const _Panel({
+    this.top,
+    required this.list,
+    required this.actions,
+    this.bar,
+    this.note,
+  });
 
   final Widget? top;
   final Widget list;
@@ -1498,6 +1545,9 @@ class _Panel extends StatelessWidget {
 
   /// Just above the pinned actions (the Undo bar).
   final Widget? bar;
+
+  /// Under the list (the one-time hint line).
+  final Widget? note;
 
   @override
   Widget build(BuildContext context) {
@@ -1522,6 +1572,7 @@ class _Panel extends StatelessWidget {
             ),
           ),
         ),
+        ?note,
         ?bar,
         Container(
           decoration: BoxDecoration(

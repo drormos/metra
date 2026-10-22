@@ -10,9 +10,7 @@ import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/quick_pick.dart';
 import 'package:metra/src/ui/setlist_group.dart';
-import 'package:metra/src/ui/setlist_picker.dart';
 import 'package:metra/src/ui/song_editor.dart';
-import 'package:metra/src/ui/song_library.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../audio/fake_click_output.dart';
@@ -114,23 +112,10 @@ void main() {
     handle.dispose();
   });
 
-  testWidgets('set page, song library, song editor', (tester) async {
+  testWidgets('song editor', (tester) async {
     final handle = tester.ensureSemantics();
     await pump(tester);
     final context = tester.element(find.byType(SetlistGroup));
-    openSetlists(
-      context,
-      library: library,
-      metronome: metronome,
-      setId: library.activeSetlist!.id,
-    );
-    await tester.pumpAndSettle();
-    await expectLabeled(tester);
-    Navigator.pop(tester.element(find.byType(SetlistPicker)));
-    await tester.pumpAndSettle();
-    openSongLibrary(context, library, metronome);
-    await tester.pumpAndSettle();
-    await expectLabeled(tester);
     openSongEditor(context, library, metronome, song: library.songs.first);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(SongEditor.patternKey));

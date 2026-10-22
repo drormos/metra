@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'theme.dart';
 
-/// The play triangle at the start of a song row (picker, song library):
+/// The play triangle at the start of a song row (the lists):
 /// outlined and muted, filled in the accent for the current song. Shows
 /// that tapping the row plays it.
 class PlayMarker extends StatelessWidget {

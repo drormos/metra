@@ -371,22 +371,6 @@ class LibraryController extends ChangeNotifier {
     updateSetlist(list.copyWith(songIds: [...list.songIds, songId]));
   }
 
-  /// Removes the entries at [indices] (only those occurrences; the songs
-  /// stay in the library). Returns the set as it was, for Undo through
-  /// [updateSetlist].
-  Setlist removeEntries(String setlistId, Set<int> indices) {
-    final list = setlists.firstWhere((s) => s.id == setlistId);
-    updateSetlist(
-      list.copyWith(
-        songIds: [
-          for (final (i, id) in list.songIds.indexed)
-            if (!indices.contains(i)) id,
-        ],
-      ),
-    );
-    return list;
-  }
-
   /// The set panel's swipe-to-remove: the entry at [index] leaves the set
   /// (never the library). In the active set, removing an entry before the
   /// current one moves the position back ("4/12" → "3/11"). Removing the
@@ -569,6 +553,13 @@ class LibraryController extends ChangeNotifier {
     if (!songsHintSeen) _update(_library.copyWith(songsHintSeen: true));
   }
 
+  /// The sets view's own one-time hint.
+  bool get setsHintSeen => _library.setsHintSeen;
+
+  void markSetsHintSeen() {
+    if (!setsHintSeen) _update(_library.copyWith(setsHintSeen: true));
+  }
+
   /// Renames a song; an empty name keeps the old one. Duplicates allowed.
   void renameSong(String id, String name) {
     final trimmed = name.trim();
@@ -730,11 +721,6 @@ class LibraryController extends ChangeNotifier {
     (song) => song.id != exceptId && _nameKey(song.name) == _nameKey(name),
   );
 
-  /// Whether another setlist (not [exceptId]) already has [name].
-  bool setlistNameTaken(String name, {String? exceptId}) => setlists.any(
-    (list) => list.id != exceptId && _nameKey(list.name) == _nameKey(name),
-  );
-
   void updateSong(Song song) {
     final edited = song.copyWith(editedAt: DateTime.now());
     _update(
@@ -742,14 +728,6 @@ class LibraryController extends ChangeNotifier {
         songs: [for (final s in songs) s.id == song.id ? edited : s],
       ),
     );
-  }
-
-  /// Most recently created or saved first; songs without a time last.
-  List<Song> get songsRecentlyEdited {
-    // Songs saved before edit times were recorded sort as oldest.
-    final epoch = DateTime.fromMillisecondsSinceEpoch(0);
-    return [...songs]
-      ..sort((a, b) => (b.editedAt ?? epoch).compareTo(a.editedAt ?? epoch));
   }
 
   /// Deletes songs from the library and every set. Deleting the loaded

@@ -13,7 +13,6 @@ import 'haptics.dart';
 import 'menu_panel.dart';
 import 'poly_lane.dart';
 import 'setlist_group.dart';
-import 'setlist_picker.dart';
 import 'save_as_new_dialog.dart';
 import 'icons.dart';
 import 'song_editor.dart';
@@ -387,25 +386,13 @@ class MetronomeScreen extends StatelessWidget {
       open();
     }
 
-    // One long-press target for the whole 54px block (the 48dp minimum
-    // leaves no room for two): the song's editor, or with no song the
-    // set's page (also on the "4/12" button's long-press).
-    final VoidCallback? onLongPress = library == null
+    // One 54px long-press target (at least the 48dp minimum): the song
+    // editor, the only way in (ui-spec.md "Song editor"). No song: nothing.
+    final VoidCallback? onLongPress = library == null || song == null
         ? null
-        : song != null
-        ? () => longPress(
+        : () => longPress(
             () => openSongEditor(context, library, controller, song: song),
-          )
-        : set != null
-        ? () => longPress(
-            () => openSetlists(
-              context,
-              library: library,
-              metronome: controller,
-              setId: set.id,
-            ),
-          )
-        : null;
+          );
     return GestureDetector(
       key: titleBlockKey,
       behavior: HitTestBehavior.opaque,

@@ -109,7 +109,7 @@ class MetraColors extends ThemeExtension<MetraColors> {
   /// Over the main screen while a dropdown panel is open.
   final Color dim;
 
-  /// A set's page while reordering: the lifted row, the dashed drop slot,
+  /// A set's songs while reordering: the lifted row, the dashed drop slot,
   /// and the lifted row's shadow.
   final Color lifted;
   final Color slot;

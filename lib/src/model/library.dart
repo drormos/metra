@@ -130,6 +130,7 @@ class Library {
     this.currentPosition = -1,
     this.swipeHintSeen = false,
     this.songsHintSeen = false,
+    this.setsHintSeen = false,
   });
 
   static const empty = Library(
@@ -173,6 +174,9 @@ class Library {
   /// The same, for the Songs list (its own flag).
   final bool songsHintSeen;
 
+  /// The same, for the sets view.
+  final bool setsHintSeen;
+
   Library copyWith({
     List<Song>? songs,
     List<Setlist>? setlists,
@@ -185,6 +189,7 @@ class Library {
     ClickVolumes? volumes,
     bool? swipeHintSeen,
     bool? songsHintSeen,
+    bool? setsHintSeen,
   }) => Library(
     songs: songs ?? this.songs,
     setlists: setlists ?? this.setlists,
@@ -200,6 +205,7 @@ class Library {
     currentPosition: currentPosition,
     swipeHintSeen: swipeHintSeen ?? this.swipeHintSeen,
     songsHintSeen: songsHintSeen ?? this.songsHintSeen,
+    setsHintSeen: setsHintSeen ?? this.setsHintSeen,
   );
 
   /// The mode and current song; nulls here are meaningful (Free play, no
@@ -223,6 +229,7 @@ class Library {
     currentPosition: position,
     swipeHintSeen: swipeHintSeen,
     songsHintSeen: songsHintSeen,
+    setsHintSeen: setsHintSeen,
   );
 
   Map<String, Object?> toJson() => {
@@ -239,6 +246,7 @@ class Library {
     'currentPosition': currentPosition,
     'swipeHintSeen': swipeHintSeen,
     'songsHintSeen': songsHintSeen,
+    'setsHintSeen': setsHintSeen,
     'songs': [for (final song in songs) song.toJson()],
     'setlists': [for (final setlist in setlists) setlist.toJson()],
   };
@@ -279,6 +287,7 @@ class Library {
       currentPosition: json['currentPosition'] as int? ?? -1,
       swipeHintSeen: json['swipeHintSeen'] as bool? ?? false,
       songsHintSeen: json['songsHintSeen'] as bool? ?? false,
+      setsHintSeen: json['setsHintSeen'] as bool? ?? false,
       songs: [
         for (final song in songs)
           ?_orNull(() => Song.fromJson(song as Map<String, Object?>)),

@@ -13,9 +13,7 @@ import 'package:metra/src/ui/play_marker.dart';
 import 'package:metra/src/ui/quick_pick.dart';
 import 'package:metra/src/ui/save_as_new_dialog.dart';
 import 'package:metra/src/ui/setlist_group.dart';
-import 'package:metra/src/ui/setlist_picker.dart';
 import 'package:metra/src/ui/song_editor.dart';
-import 'package:metra/src/ui/song_library.dart';
 import 'package:metra/src/ui/tabular_text.dart';
 
 import '../audio/fake_click_output.dart';
@@ -266,14 +264,12 @@ void main() {
       },
     );
 
-    testWidgets('the title block is one long-press target: the song\'s '
-        'editor, or with no song the set\'s page', (tester) async {
+    testWidgets('the title block is one long-press target: the song '
+        'editor; with no song, nothing', (tester) async {
       await withSet(tester); // a set, no song yet
       await tester.longPress(find.byKey(MetronomeScreen.titleBlockKey));
       await tester.pumpAndSettle();
-      expect(find.byKey(SetlistPicker.backToSetlistsKey), findsOneWidget);
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
+      expect(find.byType(SongEditor), findsNothing);
       await tester.tap(find.byKey(SetlistGroup.nextKey));
       await tester.pump();
       expect(
@@ -391,10 +387,11 @@ void main() {
       );
       await tester.tapAt(const Offset(200, 60));
       await tester.pumpAndSettle();
+      // No long-press of its own: a hold is just a tap (the list opens).
       await tester.longPress(find.byKey(SetlistGroup.songsKey));
       await tester.pumpAndSettle();
-      expect(find.byType(SongLibrary), findsOneWidget);
-      expect(haptics, ['HapticFeedbackType.mediumImpact']);
+      expect(find.byType(QuickPick), findsOneWidget);
+      expect(haptics, isEmpty);
     });
 
     testWidgets('the tabs stay above the system gesture area', (tester) async {
@@ -658,11 +655,12 @@ void main() {
       expect(library.tab, ModeTab.setlists);
       await tester.tap(find.byKey(SetlistGroup.firstSetlistKey));
       await tester.pumpAndSettle();
-      expect(find.byKey(SetlistPicker.titleFieldKey), findsOneWidget);
-      await tester.binding.handlePopRoute();
+      // The sets view with the new set being named; Done opens the picker.
+      expect(find.byKey(QuickPick.renameFieldKey), findsOneWidget);
+      expect(library.setlists, hasLength(1));
+      await tester.tap(find.byKey(QuickPick.renameDoneKey));
       await tester.pumpAndSettle();
-      expect(find.text('What to play'), findsOneWidget);
-      expect(library.setlists, isEmpty, reason: 'left empty');
+      expect(find.textContaining('Add to'), findsOneWidget, reason: 'picker');
     });
 
     testWidgets('no songs: the tab shows "No songs yet"; "+ New song"', (
@@ -676,7 +674,12 @@ void main() {
       expect(library.tab, ModeTab.songs);
       await tester.tap(find.byKey(SetlistGroup.firstSongKey));
       await tester.pumpAndSettle();
-      expect(find.byType(SongEditor), findsOneWidget);
+      // The Songs list with a new row being named; Done saves and loads it.
+      expect(find.byKey(QuickPick.renameFieldKey), findsOneWidget);
+      await tester.tap(find.byKey(QuickPick.renameDoneKey));
+      await tester.pumpAndSettle();
+      expect(library.songs, hasLength(1));
+      expect(library.currentSong?.name, library.songs.single.name);
     });
 
     testWidgets('set ⌄: header, current song marked; a tap jumps to it', (
@@ -726,59 +729,18 @@ void main() {
       expect(metronome.bpm, 110, reason: 'the click keeps its tempo');
     });
 
-    for (final inPanel in [false, true]) {
-      testWidgets(
-        'long-press the set (${inPanel ? 'panel header' : 'main '
-                  'control'}) opens its page; one haptic; the click continues',
-        (tester) async {
-          final haptics = <Object?>[];
-          tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-            SystemChannels.platform,
-            (call) async {
-              if (call.method == 'HapticFeedback.vibrate') {
-                haptics.add(call.arguments);
-              }
-              return null;
-            },
-          );
-          addTearDown(
-            () => tester.binding.defaultBinaryMessenger
-                .setMockMethodCallHandler(SystemChannels.platform, null),
-          );
-          await withLibrary(tester, loaded: true);
-          await metronome.play();
-          if (inPanel) {
-            await tester.tap(find.byKey(SetlistGroup.headerKey));
-            await tester.pump();
-            await tester.pump(const Duration(milliseconds: 200));
-            await tester.longPress(find.byKey(QuickPick.setHeaderKey));
-          } else {
-            await tester.longPress(find.byKey(SetlistGroup.headerKey));
-          }
-          for (var i = 0; i < 6; i++) {
-            await tester.pump(const Duration(milliseconds: 100));
-          }
-          expect(find.byType(QuickPick), findsNothing);
-          expect(find.byKey(SetlistPicker.backToSetlistsKey), findsOneWidget);
-          expect(find.text('3 songs'), findsOneWidget);
-          expect(haptics, ['HapticFeedbackType.mediumImpact']);
-          expect(metronome.isPlaying, isTrue);
-          expect(library.currentSong?.name, 'Two', reason: 'nothing reloads');
-          await tester.binding.handlePopRoute();
-          // Not pumpAndSettle: the click is playing.
-          for (var i = 0; i < 6; i++) {
-            await tester.pump(const Duration(milliseconds: 100));
-          }
-          expect(
-            find.byType(SetlistPicker),
-            findsNothing,
-            reason: 'main screen',
-          );
-          metronome.stop();
-          await tester.pump();
-        },
-      );
-    }
+    testWidgets('long-pressing the set (main control or panel header) '
+        'opens no page', (tester) async {
+      await withLibrary(tester, loaded: true);
+      // A hold on "4/12" is just a tap: the set's list.
+      await tester.longPress(find.byKey(SetlistGroup.headerKey));
+      await tester.pumpAndSettle();
+      expect(find.byType(QuickPick), findsOneWidget);
+      await tester.longPress(find.byKey(QuickPick.setHeaderKey));
+      await tester.pumpAndSettle();
+      expect(find.byType(QuickPick), findsOneWidget, reason: 'still here');
+      expect(find.byKey(QuickPick.changeSetKey), findsOneWidget);
+    });
 
     testWidgets('no "Free play" rows in the dropdowns', (tester) async {
       await withLibrary(tester);

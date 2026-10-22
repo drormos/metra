@@ -608,23 +608,19 @@ void main() {
     });
   });
 
-  test(
-    'songs record when they were edited; recently edited sorts by it',
-    () async {
-      final a = library.addSong(name: 'A', bpm: 100, pattern: waltz);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
-      final b = library.addSong(name: 'B', bpm: 100, pattern: waltz);
-      expect(a.editedAt, isNotNull);
-      expect(library.songsRecentlyEdited.map((s) => s.name), ['B', 'A']);
-      await Future<void>.delayed(const Duration(milliseconds: 5));
-      library.updateSong(library.songById(a.id)!.copyWith(bpm: 101));
-      expect(library.songsRecentlyEdited.map((s) => s.name), ['A', 'B']);
-      expect(
-        (await reload()).songById(b.id)!.editedAt,
-        b.editedAt!.copyWith(microsecond: 0),
-      );
-    },
-  );
+  test('songs record when they were edited', () async {
+    final a = library.addSong(name: 'A', bpm: 100, pattern: waltz);
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+    final b = library.addSong(name: 'B', bpm: 100, pattern: waltz);
+    expect(a.editedAt, isNotNull);
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+    library.updateSong(library.songById(a.id)!.copyWith(bpm: 101));
+    expect(library.songById(a.id)!.editedAt!.isAfter(b.editedAt!), isTrue);
+    expect(
+      (await reload()).songById(b.id)!.editedAt,
+      b.editedAt!.copyWith(microsecond: 0),
+    );
+  });
 
   test('a failed save is reported until a save works again', () async {
     await library.flush();

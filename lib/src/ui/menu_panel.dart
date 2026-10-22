@@ -3,17 +3,14 @@ import 'package:flutter/material.dart';
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import 'about.dart';
-import 'icons.dart';
 import 'settings_screen.dart';
-import 'setlist_picker.dart';
-import 'song_library.dart';
-import 'subdivision_icon.dart';
 import 'swipe_row.dart';
 import 'theme.dart';
 
 /// Opens the Menu (ui-spec.md "Menu", `menu.reference.html`): a 304px
-/// panel from the right over the dimmed main screen, a list of places to
-/// go. The click keeps playing. Tap outside, swipe right, or back closes
+/// panel from the right over the dimmed main screen, a short list of
+/// places to go (Settings, Send feedback, About); songs and sets are
+/// managed in the main screen's lists. The click keeps playing. Tap outside, swipe right, or back closes
 /// it. A row closes it and opens its page from the main screen, so back
 /// from that page returns there.
 Future<void> showMenuPanel(
@@ -57,7 +54,7 @@ class MenuPanel extends StatefulWidget {
 
   final MetronomeController metronome;
 
-  /// Null when storage is unavailable: no Your music.
+  /// Null when storage is unavailable.
   final LibraryController? library;
 
   /// The main screen's context, for the pages the rows open.
@@ -67,8 +64,6 @@ class MenuPanel extends StatefulWidget {
 
   /// The panel itself (the route around it fills the screen).
   static const surfaceKey = Key('menu-surface');
-  static const songLibraryKey = Key('menu-song-library');
-  static const setlistsKey = Key('menu-setlists');
   static const settingsKey = Key('menu-settings');
   static const feedbackKey = Key('menu-feedback');
   static const aboutKey = Key('menu-about');
@@ -138,45 +133,6 @@ class _MenuPanelState extends State<MenuPanel> {
                       child: ListView(
                         padding: EdgeInsets.zero,
                         children: [
-                          if (library != null) ...[
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                top: 16,
-                                bottom: 2,
-                              ),
-                              child: Text(
-                                'Your music',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: colors.muted,
-                                ),
-                              ),
-                            ),
-                            _row(
-                              key: MenuPanel.songLibraryKey,
-                              icon: const SubdivisionIcon(1, size: 20),
-                              title: 'Song library',
-                              count: library.songs.length,
-                              onTap: () => _go(
-                                (pages) =>
-                                    openSongLibrary(pages, library, metronome),
-                              ),
-                            ),
-                            _row(
-                              key: MenuPanel.setlistsKey,
-                              icon: const SetlistIcon(),
-                              title: 'Setlists',
-                              count: library.setlists.length,
-                              onTap: () => _go(
-                                (pages) => openSetlists(
-                                  pages,
-                                  library: library,
-                                  metronome: metronome,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                          ],
                           _row(
                             key: MenuPanel.settingsKey,
                             icon: const Icon(Icons.settings_outlined, size: 20),

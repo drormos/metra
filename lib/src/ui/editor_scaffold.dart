@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../model/library.dart';
 import 'theme.dart';
 
 /// Shared frame for full-screen editors (setlist, song, library pick):
@@ -307,8 +308,7 @@ class LabeledField extends StatelessWidget {
   }
 }
 
-/// The outlined search field (song library, What to play, the dropdown
-/// lists): a white border while focused, × clears what's typed.
+/// The outlined search field (the main screen's lists): a white border while focused, × clears what's typed.
 class SearchField extends StatelessWidget {
   const SearchField({
     super.key,
@@ -364,8 +364,7 @@ class SearchField extends StatelessWidget {
   }
 }
 
-/// Top bar of full screens that apply changes at once (song library,
-/// settings): a back chevron and a title, [centered] or after the chevron.
+/// Top bar of full screens that apply changes at once (Settings): a back chevron and a title, [centered] or after the chevron.
 class BackBar extends StatelessWidget {
   const BackBar({
     super.key,
@@ -569,3 +568,13 @@ class EmptyListState extends StatelessWidget {
     ),
   );
 }
+
+/// "Friday set and Rehearsal", or "5 setlists": where a song is used.
+String whereUsed(List<Setlist> sets) => sets.length <= 2
+    ? sets.map((l) => l.name).join(' and ')
+    : '${sets.length} setlists';
+
+/// The song editor's delete question, naming the sets it affects.
+String deleteSongMessage(Song song, List<Setlist> sets) => sets.isEmpty
+    ? 'Delete ${song.name}?'
+    : 'Delete ${song.name}? It will also be removed from ${whereUsed(sets)}.';

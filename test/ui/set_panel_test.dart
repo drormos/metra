@@ -10,7 +10,6 @@ import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/editor_scaffold.dart';
-import 'package:metra/src/ui/library_pick.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/quick_pick.dart';
 import 'package:metra/src/ui/setlist_group.dart';
@@ -123,7 +122,6 @@ void main() {
       expect(find.byKey(QuickPick.changeSetKey), findsOneWidget);
       await tester.tap(find.byKey(QuickPick.addSongsKey));
       await tester.pumpAndSettle();
-      expect(find.byType(LibraryPick), findsNothing, reason: 'in the panel');
       expect(inPanel('Add to Friday set'), findsOneWidget);
       await tester.binding.handlePopRoute(); // Back: nothing added
       await tester.pumpAndSettle();
@@ -210,7 +208,7 @@ void main() {
       expect(find.text('No songs in this set'), findsOneWidget);
       await tester.tap(find.byKey(SetlistGroup.emptySetKey));
       await tester.pumpAndSettle();
-      expect(find.byType(LibraryPick), findsOneWidget);
+      expect(inPanel('Add to Friday set'), findsOneWidget);
     });
 
     testWidgets('the one-time hint: a row slides to show "Remove", once', (
@@ -231,6 +229,24 @@ void main() {
       expect(inPanel('Remove'), findsNothing);
       expect(library.swipeHintSeen, isTrue);
       expect(haptics, isEmpty, reason: 'no haptic');
+      // Then the line naming both gestures, for ~3 s.
+      expect(
+        inPanel('Hold a song to move it · Swipe to remove'),
+        findsOneWidget,
+      );
+      await tester.pump(QuickPick.hintLineFor);
+      expect(inPanel('Hold a song to move it · Swipe to remove'), findsNothing);
+      // The sets view teaches its own, once.
+      await tester.tap(find.byKey(QuickPick.changeSetKey));
+      await tester.pumpAndSettle();
+      expect(
+        inPanel('Hold a set to rename it · Swipe to delete'),
+        findsOneWidget,
+      );
+      expect(library.setsHintSeen, isTrue);
+      await tester.pump(QuickPick.hintLineFor);
+      await tester.tap(find.byKey(QuickPick.backKey));
+      await tester.pumpAndSettle();
       await tester.tapAt(const Offset(200, 60));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(SetlistGroup.headerKey));

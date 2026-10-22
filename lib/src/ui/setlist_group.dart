@@ -7,12 +7,8 @@ import '../model/library.dart';
 import 'fit_text.dart';
 import 'haptics.dart';
 import 'icons.dart';
-import 'library_pick.dart';
 import 'quick_pick.dart';
 import 'save_as_new_dialog.dart';
-import 'setlist_picker.dart';
-import 'song_editor.dart';
-import 'song_library.dart';
 import 'subdivision_icon.dart';
 import 'tabular_text.dart';
 import 'theme.dart';
@@ -63,9 +59,13 @@ class SetlistGroup extends StatelessWidget {
     final tab = library.tab;
     // Each list opens just above the context row; the row and the tabs
     // stay clear of the dim.
-    void pick(QuickPickKind kind) => showQuickPick(
+    void pick(
+      QuickPickKind kind, [
+      QuickPickStart start = QuickPickStart.none,
+    ]) => showQuickPick(
       context,
       kind: kind,
+      start: start,
       library: library,
       metronome: metronome,
       inset: sidePadding,
@@ -87,7 +87,7 @@ class SetlistGroup extends StatelessWidget {
                   message: 'No songs in this set',
                   action: 'Add songs',
                   onPressed: () =>
-                      addSongsToSet(context, library, metronome, setlist.id),
+                      pick(QuickPickKind.set, QuickPickStart.addSongs),
                 ),
               ModeTab.setlists when setlist != null => _setRow(
                 context,
@@ -99,7 +99,8 @@ class SetlistGroup extends StatelessWidget {
                 key: firstSetlistKey,
                 message: 'No setlists yet',
                 action: 'New setlist',
-                onPressed: () => _newSetlist(context),
+                onPressed: () =>
+                    pick(QuickPickKind.sets, QuickPickStart.newSetlist),
               ),
               ModeTab.songs when library.singleSong => _songRow(context, pick),
               ModeTab.songs => _emptyRow(
@@ -107,7 +108,8 @@ class SetlistGroup extends StatelessWidget {
                 key: firstSongKey,
                 message: 'No songs yet',
                 action: 'New song',
-                onPressed: () => _newSong(context),
+                onPressed: () =>
+                    pick(QuickPickKind.songs, QuickPickStart.newSong),
               ),
               ModeTab.freePlay => _freePlayRow(context),
             },
@@ -214,26 +216,6 @@ class SetlistGroup extends StatelessWidget {
       ),
     ],
   );
-
-  /// The new song is then the loaded song (Single song).
-  Future<void> _newSong(BuildContext context) async {
-    final song = await openSongEditor(context, library, metronome);
-    if (song != null) library.playSingleSong(song, metronome);
-  }
-
-  /// Back from the new set's page (unless a set was loaded there), the
-  /// Setlists tab loads a set as if just tapped.
-  Future<void> _newSetlist(BuildContext context) async {
-    await openSetlists(
-      context,
-      library: library,
-      metronome: metronome,
-      newSet: true,
-    );
-    if (library.activeSetlist == null && library.setlists.isNotEmpty) {
-      library.openSetlistsTab(metronome);
-    }
-  }
 
   /// An icon over a 12px label; the current mode white with a 2px red
   /// line on its top edge (over the bar's 1px line), the others muted.
@@ -348,12 +330,6 @@ class SetlistGroup extends StatelessWidget {
               enableFeedback: false,
             ),
             onPressed: () => pick(QuickPickKind.songs),
-            // Long-press = the song library page, like "4/12" opens the
-            // set's page; back returns here.
-            onLongPress: () {
-              Haptics.medium();
-              openSongLibrary(context, library, metronome);
-            },
             child: Semantics(
               label: 'Songs, opens song list',
               excludeSemantics: true,
@@ -431,16 +407,6 @@ class SetlistGroup extends StatelessWidget {
               enableFeedback: false,
             ),
             onPressed: () => pick(QuickPickKind.set),
-            // Long-press = the set's page; back returns here.
-            onLongPress: () {
-              Haptics.medium();
-              openSetlists(
-                context,
-                library: library,
-                metronome: metronome,
-                setId: setlist.id,
-              );
-            },
             // The label goes inside, so the button keeps its actions.
             child: Semantics(
               label: index < 0

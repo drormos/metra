@@ -592,12 +592,16 @@ class _SwipeRowState extends State<SwipeRow>
           children: [
             Icon(Icons.delete_outline, size: 18, color: colors.text),
             const SizedBox(width: 6),
-            Text(
-              widget.label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: colors.text,
+            Flexible(
+              child: Text(
+                widget.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: colors.text,
+                ),
               ),
             ),
           ],

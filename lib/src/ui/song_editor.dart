@@ -9,7 +9,6 @@ import 'beat_indicator.dart';
 import 'editor_scaffold.dart';
 import 'haptics.dart';
 import 'meter_control.dart';
-import 'song_library.dart';
 import 'subdivision_icon.dart';
 import 'tempo_controls.dart';
 import 'tempo_ruler.dart';
@@ -156,7 +155,7 @@ class _SongEditorState extends State<SongEditor> {
     final song = widget.song!;
     final ok = await confirm(
       context,
-      SongLibrary.deleteMessage([song], _library.setlistsUsing(song.id)),
+      deleteSongMessage(song, _library.setlistsUsing(song.id)),
       'Delete',
     );
     if (!ok || !mounted) return;
