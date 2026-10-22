@@ -484,7 +484,7 @@ void main() {
         controller.loadSong(
           bpm: 60,
           pattern: waltz,
-          onStart: const OnStart(countIn: 1),
+          onStart: const OnStart(countInOn: true, countInBars: 1),
         );
         expect(controller.countingIn, isTrue);
         output.time = _ms * 2000;
@@ -534,7 +534,7 @@ void main() {
 
     test('reaching the limit stops and resets too', () async {
       controller.setOnStart(
-        climb.copyWith(stopAfter: StopAfter.bars, stopBars: 2),
+        climb.copyWith(stopOn: true, stopBy: StopBy.bars, stopBars: 2),
       );
       await controller.play();
       runTo(6000);
@@ -546,7 +546,7 @@ void main() {
       'stop after alone leaves a hand-set tempo; no run in a preview',
       () async {
         controller.setOnStart(
-          const OnStart(stopAfter: StopAfter.bars, stopBars: 99),
+          const OnStart(stopOn: true, stopBy: StopBy.bars, stopBars: 99),
         );
         await controller.play();
         controller.setBpm(100);

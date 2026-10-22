@@ -2,32 +2,39 @@ import 'package:flutter/foundation.dart';
 
 import '../audio/click_scheduler.dart';
 
-/// "Stop after": off, after a number of bars, or after a length of time.
+/// "Stop after" as it acts: off, after a number of bars, or after a time.
 enum StopAfter { off, bars, time }
 
+/// What "Stop after" counts when on.
+enum StopBy { bars, time }
+
 /// What happens over time after Start (ui-spec.md "When I press Start"):
-/// a count-in, speed up, stop after. Belongs to a song like its tempo
-/// (Free play has its own). Speed up and stop after make a "run": each
-/// tempo change and the stop land on bar lines, counted from the song's
-/// beat 1 (count-in bars don't count).
+/// a count-in, speed up, stop after, each switched on or off (values kept
+/// while off). Belongs to a song like its tempo (Free play has its own).
+/// Speed up and stop after make a "run": each tempo change and the stop
+/// land on bar lines, counted from the song's beat 1 (count-in bars don't
+/// count).
 @immutable
 class OnStart implements RunPlan {
   const OnStart({
-    this.countIn = 0,
+    this.countInOn = false,
+    this.countInBars = 1,
     this.speedUp = false,
     this.changeBy = 5,
     this.every = 8,
-    this.until,
-    this.stopAfter = StopAfter.off,
+    this.upTo,
+    this.stopOn = false,
+    this.stopBy = StopBy.time,
     this.stopBars = 32,
     this.stopTime = const Duration(minutes: 5),
   });
 
   static const off = OnStart();
 
-  /// Bars of count-in: 0 (off), 1 or 2.
-  final int countIn;
-  static const countInChoices = [0, 1, 2];
+  final bool countInOn;
+
+  /// 1 or 2 bars.
+  final int countInBars;
 
   final bool speedUp;
 
@@ -37,10 +44,12 @@ class OnStart implements RunPlan {
   /// Bars between steps, 1–64.
   final int every;
 
-  /// The tempo speed up stops at and holds; null is "No limit".
-  final int? until;
+  /// "Up to" ("Down to" when [changeBy] is negative): the tempo speed up
+  /// stops at and holds; null is "No limit".
+  final int? upTo;
 
-  final StopAfter stopAfter;
+  final bool stopOn;
+  final StopBy stopBy;
 
   /// Stop after this many bars (1–999) or this long (0:15–99:00).
   final int stopBars;
@@ -52,53 +61,92 @@ class OnStart implements RunPlan {
   static const minTime = Duration(seconds: 15);
   static const maxTime = Duration(minutes: 99);
 
+  /// Bars of count-in that play: 0 when off.
+  int get countIn => countInOn ? countInBars : 0;
+
+  StopAfter get stopAfter => !stopOn
+      ? StopAfter.off
+      : stopBy == StopBy.bars
+      ? StopAfter.bars
+      : StopAfter.time;
+
   /// Anything on: the stopwatch button is red.
-  bool get anyOn => countIn > 0 || runs;
+  bool get anyOn => countInOn || runs;
 
   /// Speed up or stop after: a run, with progress under the BPM.
-  bool get runs => speedUp || stopAfter != StopAfter.off;
+  bool get runs => speedUp || stopOn;
+
+  /// "Up to" or "Down to".
+  String get limitLabel => changeBy < 0 ? 'Down to' : 'Up to';
 
   OnStart copyWith({
-    int? countIn,
+    bool? countInOn,
+    int? countInBars,
     bool? speedUp,
     int? changeBy,
     int? every,
-    StopAfter? stopAfter,
+    bool? stopOn,
+    StopBy? stopBy,
     int? stopBars,
     Duration? stopTime,
   }) => OnStart(
-    countIn: countIn ?? this.countIn,
+    countInOn: countInOn ?? this.countInOn,
+    countInBars: countInBars ?? this.countInBars,
     speedUp: speedUp ?? this.speedUp,
     changeBy: changeBy ?? this.changeBy,
     every: every ?? this.every,
-    until: until,
-    stopAfter: stopAfter ?? this.stopAfter,
+    upTo: upTo,
+    stopOn: stopOn ?? this.stopOn,
+    stopBy: stopBy ?? this.stopBy,
     stopBars: stopBars ?? this.stopBars,
     stopTime: stopTime ?? this.stopTime,
   );
 
-  /// [until] may be null ("No limit"), so it has its own copy.
-  OnStart withUntil(int? until) => OnStart(
-    countIn: countIn,
+  /// [upTo] may be null ("No limit"), so it has its own copy.
+  OnStart withUpTo(int? upTo) => OnStart(
+    countInOn: countInOn,
+    countInBars: countInBars,
     speedUp: speedUp,
     changeBy: changeBy,
     every: every,
-    until: until,
-    stopAfter: stopAfter,
+    upTo: upTo,
+    stopOn: stopOn,
+    stopBy: stopBy,
     stopBars: stopBars,
     stopTime: stopTime,
   );
 
+  /// A new Change by; turning from up to down (or back) drops the limit,
+  /// which was on the other side.
+  OnStart withChangeBy(int changeBy) {
+    final next = copyWith(changeBy: changeBy);
+    return (changeBy > 0) == (this.changeBy > 0) ? next : next.withUpTo(null);
+  }
+
+  /// Whether [bpm] is at or past the limit (no more steps).
+  bool reached(num bpm) {
+    final limit = upTo;
+    return limit != null && (changeBy > 0 ? bpm >= limit : bpm <= limit);
+  }
+
+  /// The values Up to / Down to may take with the tempo at [bpm]: beyond
+  /// it (at least 1 bpm), within 30–300; null when there's no room.
+  (int, int)? limitRange(int bpm) {
+    final (lo, hi) = changeBy > 0 ? (bpm + 1, 300) : (30, bpm - 1);
+    return lo > hi ? null : (lo, hi);
+  }
+
   /// The tempo from beat [beat] of song bar [bar] (both from 0) on, given
   /// the tempo so far, or null to keep it. Speed up steps only on bar
-  /// lines, every [every] bars, toward [until], where it holds.
+  /// lines, every [every] bars, toward [upTo], where it holds (also when
+  /// the run starts at or past it: no steps then).
   @override
   double? tempoAt(int bar, int beat, double bpm) {
     if (!speedUp || beat != 0 || bar == 0 || bar % every != 0) return null;
     var next = bpm + changeBy;
-    final limit = until;
+    final limit = upTo;
     if (limit != null) {
-      if (changeBy > 0 ? bpm >= limit : bpm <= limit) return null; // holds
+      if (reached(bpm)) return null; // holds
       next = changeBy > 0
           ? (next > limit ? limit.toDouble() : next)
           : (next < limit ? limit.toDouble() : next);
@@ -118,20 +166,22 @@ class OnStart implements RunPlan {
   };
 
   /// The line under the BPM during a run (ui-spec.md "While playing"):
-  /// "↗ +5 every 8 bars · next in 3 · 4:12 left", at tempo [bpm], in song
-  /// bar [bar] (from 0; −1 before beat 1), [elapsed] after beat 1.
+  /// "↗ +5 every 8 bars · next in 3 · 4:12 left", at tempo [bpm] in a run
+  /// that started at [from], in song bar [bar] (from 0; −1 before beat 1),
+  /// [elapsed] after beat 1. At the limit: "Up to 160 · reached", or
+  /// "· already there" when the run started there.
   String progress({
     required int bpm,
+    required int from,
     required int bar,
     required Duration elapsed,
   }) {
     final at = bar < 0 ? 0 : bar;
     final arrow = changeBy > 0 ? '↗' : '↘';
-    final limit = until;
     return [
       if (speedUp)
-        if (limit != null && (changeBy > 0 ? bpm >= limit : bpm <= limit))
-          '$arrow holding at $limit'
+        if (reached(bpm))
+          '$limitLabel $upTo · ${reached(from) ? 'already there' : 'reached'}'
         else
           '$arrow ${changeLabel(changeBy)} every '
               '${every == 1 ? 'bar' : '$every bars'} · '
@@ -149,7 +199,7 @@ class OnStart implements RunPlan {
   // Value grids for − / + (ui-spec.md "Editing the values").
   static const everyGrid = [(16, 1), (maxEvery, 4)];
   static const barsGrid = [(16, 1), (64, 4), (maxBars, 8)];
-  static const untilGrid = [(300, 5)];
+  static const upToGrid = [(300, 5)];
   // In seconds.
   static const timeGrid = [(120, 15), (600, 30), (5940, 60)];
 
@@ -205,37 +255,44 @@ class OnStart implements RunPlan {
       d < minTime ? minTime : (d > maxTime ? maxTime : d);
 
   Map<String, Object?> toJson() => {
-    'countIn': countIn,
+    'countInOn': countInOn,
+    'countInBars': countInBars,
     'speedUp': speedUp,
     'changeBy': changeBy,
     'every': every,
-    'until': until,
-    'stopAfter': stopAfter.name,
+    'upTo': upTo,
+    'stopOn': stopOn,
+    'stopBy': stopBy.name,
     'stopBars': stopBars,
     'stopTimeS': stopTime.inSeconds,
   };
 
-  /// Missing or bad fields fall back to their defaults.
+  /// Missing or bad fields fall back to their defaults. Reads build 37–39
+  /// files too ("countIn" 0–2, "until", "stopAfter" off/bars/time).
   factory OnStart.fromJson(Map<String, Object?> json) {
     T read<T>(String key, T fallback) =>
         json[key] is T ? json[key] as T : fallback;
     const d = OnStart.off;
     final change = read('changeBy', d.changeBy);
+    final oldCountIn = read('countIn', 0);
+    final oldStop = StopAfter.values.asNameMap()[json['stopAfter']];
+    final bars = read('countInBars', oldCountIn == 2 ? 2 : 1);
     return OnStart(
-      countIn: countInChoices.contains(json['countIn'])
-          ? read('countIn', 0)
-          : 0,
+      countInOn: read('countInOn', oldCountIn == 1 || oldCountIn == 2),
+      countInBars: bars == 2 ? 2 : 1,
       speedUp: read('speedUp', false),
       changeBy: change == 0
           ? d.changeBy
           : clampInt(change, minChange, maxChange),
       every: clampInt(read('every', d.every), minEvery, maxEvery),
-      until: switch (json['until']) {
+      upTo: switch (json['upTo'] ?? json['until']) {
         final int v => clampInt(v, 30, 300),
         _ => null,
       },
-      stopAfter:
-          StopAfter.values.asNameMap()[json['stopAfter']] ?? StopAfter.off,
+      stopOn: read('stopOn', oldStop != null && oldStop != StopAfter.off),
+      stopBy:
+          StopBy.values.asNameMap()[json['stopBy']] ??
+          (oldStop == StopAfter.bars ? StopBy.bars : StopBy.time),
       stopBars: clampInt(read('stopBars', d.stopBars), minBars, maxBars),
       stopTime: clampTime(
         Duration(seconds: read('stopTimeS', d.stopTime.inSeconds)),
@@ -246,23 +303,27 @@ class OnStart implements RunPlan {
   @override
   bool operator ==(Object other) =>
       other is OnStart &&
-      other.countIn == countIn &&
+      other.countInOn == countInOn &&
+      other.countInBars == countInBars &&
       other.speedUp == speedUp &&
       other.changeBy == changeBy &&
       other.every == every &&
-      other.until == until &&
-      other.stopAfter == stopAfter &&
+      other.upTo == upTo &&
+      other.stopOn == stopOn &&
+      other.stopBy == stopBy &&
       other.stopBars == stopBars &&
       other.stopTime == stopTime;
 
   @override
   int get hashCode => Object.hash(
-    countIn,
+    countInOn,
+    countInBars,
     speedUp,
     changeBy,
     every,
-    until,
-    stopAfter,
+    upTo,
+    stopOn,
+    stopBy,
     stopBars,
     stopTime,
   );

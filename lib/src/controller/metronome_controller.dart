@@ -85,7 +85,12 @@ class MetronomeController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setCountIn(int bars) => setOnStart(_onStart.copyWith(countIn: bars));
+  /// 0 switches the count-in off (keeping its bars).
+  void setCountIn(int bars) => setOnStart(
+    bars == 0
+        ? _onStart.copyWith(countInOn: false)
+        : _onStart.copyWith(countInOn: true, countInBars: bars),
+  );
 
   /// The tempo outside a speed-up run: while one plays, where it started
   /// (Stop returns there); otherwise [bpm]. What a song's changes and

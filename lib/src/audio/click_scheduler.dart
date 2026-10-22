@@ -147,6 +147,9 @@ class ClickScheduler {
   // so scheduling that step again (after a cancel) doesn't add twice.
   int? _planStep;
   double _planFrom = 0;
+  // The run's tempo changes not yet reached by the engine clock, by step:
+  // (when it plays, the new tempo).
+  final Map<int, (Duration, double)> _tempoChanges = {};
   Timer? _timer;
   bool _prepared = false;
 
@@ -159,8 +162,9 @@ class ClickScheduler {
   /// handed to the engine yet).
   bool get countingIn => _countInEnd != null;
 
-  /// Called when the run changes the tempo (as the step is scheduled), and
-  /// once the engine clock reaches the bar line where the run ends.
+  /// Called when the engine clock reaches a step where the run changed the
+  /// tempo (so the shown tempo changes on the bar line, not when the bar
+  /// was scheduled), and when it reaches the bar line where the run ends.
   void Function(double bpm)? onRunTempo;
   void Function()? onRunEnd;
 
@@ -254,6 +258,7 @@ class ClickScheduler {
     _runBegin = step;
     _runStart = null;
     _planStep = null;
+    _tempoChanges.clear();
     _switchAt = null;
     _nextGrid = null;
     _nextPattern = null;
@@ -287,6 +292,7 @@ class ClickScheduler {
     _countInEnd = null;
     _run = null;
     _endAt = null;
+    _tempoChanges.clear();
     if (_steps.isNotEmpty || _pulses.isNotEmpty) {
       final now = _output.now();
       for (final step in _steps) {
@@ -567,6 +573,7 @@ class ClickScheduler {
     if (_grid == null) return;
 
     final now = _output.now();
+    _reportTempo(now);
     if (_endAt case final end? when now >= end) return onRunEnd?.call();
     // The latest step stays: it carries the bar count on.
     while (_steps.length > 1 && _steps.first.time <= now - retention) {
@@ -641,11 +648,21 @@ class ClickScheduler {
     final again = _planStep == step && grid.anchorStep == step;
     final before = again ? _planFrom : grid.bpm;
     final bpm = run.tempoAt(bar, beat, before) ?? before;
+    if (bpm != before) _tempoChanges[step] = (grid.stepTime(step), bpm);
     if (bpm == grid.bpm) return;
     _planStep = step;
     _planFrom = before;
     _grid = grid.retempo(pivotStep: step, bpm: bpm);
-    onRunTempo?.call(bpm);
+  }
+
+  void _reportTempo(Duration now) {
+    final due = [
+      for (final MapEntry(key: step, value: (at, _)) in _tempoChanges.entries)
+        if (at <= now) step,
+    ]..sort();
+    for (final step in due) {
+      onRunTempo?.call(_tempoChanges.remove(step)!.$2);
+    }
   }
 
   /// Steps from [step] on will be (re)scheduled: the bar count and the end
@@ -653,6 +670,7 @@ class ClickScheduler {
   void _rewindTo(int step) {
     _nextStep = step;
     _endAt = null;
+    _tempoChanges.removeWhere((at, _) => at >= step);
     _bar = -1;
     for (final s in _steps.reversed) {
       if (s.index >= step) continue;

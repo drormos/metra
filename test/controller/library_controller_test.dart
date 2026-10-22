@@ -261,7 +261,9 @@ void main() {
         for (final (name, countIn) in [('A', 0), ('B', 1), ('C', 0)]) {
           final song = library.addSong(name: name, bpm: 100, pattern: waltz);
           library
-            ..updateSong(song.copyWith(onStart: OnStart(countIn: countIn)))
+            ..updateSong(
+              song.copyWith(onStart: OnStart(countInOn: countIn > 0)),
+            )
             ..addToSetlist(gig.id, song.id);
         }
         library
@@ -532,14 +534,14 @@ void main() {
 
     test('speed up and stop after are part of the song; a run\'s own '
         'tempo changes are not', () async {
-      const run = OnStart(speedUp: true, every: 1, stopAfter: StopAfter.time);
+      const run = OnStart(speedUp: true, every: 1, stopOn: true);
       metronome.setOnStart(run);
       expect(library.songChanged(metronome), isTrue);
       library.saveToSong(metronome);
       expect(library.songById(song.id)!.onStart, run);
       library.revertSong(metronome);
       expect(metronome.onStart, run);
-      metronome.setOnStart(run.withUntil(150));
+      metronome.setOnStart(run.withUpTo(150));
       library.revertSong(metronome);
       expect(metronome.onStart, run, reason: 'Revert restores it');
       final output = FakeClickOutput()..time = const Duration(seconds: 1);

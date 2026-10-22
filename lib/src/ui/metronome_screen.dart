@@ -943,6 +943,7 @@ class _RunLine extends StatefulWidget {
           : now - start;
       return controller.onStart.progress(
         bpm: controller.bpm,
+        from: controller.startBpm,
         bar: step?.bar ?? -1,
         elapsed: elapsed,
       );

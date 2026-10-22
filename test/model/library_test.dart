@@ -39,10 +39,11 @@ void main() {
           bpm: 90,
           pattern: waltz,
           onStart: OnStart(
-            countIn: 2,
+            countInOn: true,
+            countInBars: 2,
             speedUp: true,
-            until: 160,
-            stopAfter: StopAfter.time,
+            upTo: 160,
+            stopOn: true,
           ),
         ),
         const Song(
@@ -57,20 +58,21 @@ void main() {
       ],
       lastBpm: 97,
       lastPattern: waltz,
-      lastOnStart: const OnStart(countIn: 1),
+      lastOnStart: const OnStart(countInOn: true, countInBars: 1),
       visualOffset: const Duration(milliseconds: 20),
     );
     final copy = roundTrip(library);
     expect(copy.songs.map((s) => s.onStart), [
       const OnStart(
-        countIn: 2,
+        countInOn: true,
+        countInBars: 2,
         speedUp: true,
-        until: 160,
-        stopAfter: StopAfter.time,
+        upTo: 160,
+        stopOn: true,
       ),
       OnStart.off,
     ]);
-    expect(copy.lastOnStart, const OnStart(countIn: 1));
+    expect(copy.lastOnStart, const OnStart(countInOn: true, countInBars: 1));
     expect(copy.songs.map((s) => [s.id, s.name, s.bpm, s.pattern]), [
       ['a', 'Waltz', 90, waltz],
       ['b', 'Rock', 128, const MetronomePattern.standard()],
@@ -89,13 +91,13 @@ void main() {
     expect(Song.fromJson(json).onStart, OnStart.off);
     expect(
       Song.fromJson({...json, 'countIn': 2}).onStart,
-      const OnStart(countIn: 2),
+      const OnStart(countInOn: true, countInBars: 2),
     );
     final file = Library.empty.toJson()..remove('lastOnStart');
     expect(Library.fromJson(file).lastOnStart, OnStart.off);
     expect(
       Library.fromJson({...file, 'lastCountIn': 1}).lastOnStart,
-      const OnStart(countIn: 1),
+      const OnStart(countInOn: true, countInBars: 1),
     );
   });
 

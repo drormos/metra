@@ -623,11 +623,48 @@ void main() {
       expect(tempos, [130, 140]);
     });
 
+    test('the last beat keeps the old tempo up to the bar line; the new '
+        'tempo starts at beat 1 (subdivisions too)', () async {
+      await scheduler.start(
+        bpm: 120,
+        pattern: MetronomePattern.simple(beatsPerBar: 4, stepsPerBeat: 2),
+        run: const OnStart(speedUp: true, changeBy: 60, every: 1),
+      );
+      runFor(_ms * 3000);
+      final t = output.liveTimes;
+      // Bar 1 starts at step 8: 1120 + 8 × 250.
+      expect(t[8], _ms * 3120);
+      expect(t[8] - t[7], _ms * 250, reason: 'last eighth → beat 1: old');
+      expect(t[7] - t[6], _ms * 250);
+      expect(
+        (t[9] - t[8]).inMicroseconds,
+        closeTo(166667, 1),
+        reason: 'beat 1 → its next click: the first new interval',
+      );
+    });
+
+    test('the new tempo is reported when the bar line plays, not when it '
+        'is scheduled', () async {
+      final reported = <(int, double)>[];
+      scheduler.onRunTempo = (bpm) =>
+          reported.add((output.time.inMilliseconds, bpm));
+      await scheduler.start(
+        bpm: 120,
+        pattern: const MetronomePattern.standard(),
+        run: const OnStart(speedUp: true, changeBy: 10, every: 1),
+      );
+      runFor(_ms * 2100); // bar 1's line (3120) is scheduled by now
+      expect(output.liveTimes, contains(_ms * 3120));
+      expect(reported, isEmpty);
+      runFor(_ms * 50);
+      expect(reported, [(3125, 130.0)]);
+    });
+
     test('Until: climbs to it and holds', () async {
       await scheduler.start(
         bpm: 120,
         pattern: const MetronomePattern.standard(),
-        run: const OnStart(speedUp: true, changeBy: 20, every: 1, until: 150),
+        run: const OnStart(speedUp: true, changeBy: 20, every: 1, upTo: 150),
       );
       runFor(_ms * 6000);
       final gaps = [
@@ -676,7 +713,7 @@ void main() {
         bpm: 120,
         pattern: const MetronomePattern.standard(),
         countInBars: 1,
-        run: const OnStart(stopAfter: StopAfter.bars, stopBars: 2),
+        run: const OnStart(stopOn: true, stopBy: StopBy.bars, stopBars: 2),
       );
       runFor(_ms * 5600); // song beat 1 at 3120; its bar 2 line at 7120
       expect(times().last, 6620, reason: 'count-in 4 + 2 bars × 4 beats');
@@ -693,10 +730,7 @@ void main() {
       await scheduler.start(
         bpm: 120,
         pattern: const MetronomePattern.standard(),
-        run: const OnStart(
-          stopAfter: StopAfter.time,
-          stopTime: Duration(seconds: 3),
-        ),
+        run: const OnStart(stopOn: true, stopTime: Duration(seconds: 3)),
       );
       runFor(_ms * 6000);
       // Bar lines every 2 s from 1120; 3 s after → the line at 5120.

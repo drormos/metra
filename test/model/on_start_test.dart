@@ -15,11 +15,11 @@ void main() {
     });
 
     test('stops at Until and holds; slowing down too', () {
-      final to = up.withUntil(112);
+      final to = up.withUpTo(112);
       expect(to.tempoAt(4, 0, 110), 112);
       expect(to.tempoAt(8, 0, 112), isNull);
       expect(to.tempoAt(8, 0, 130), isNull, reason: 'past it by hand');
-      final down = up.copyWith(changeBy: -10).withUntil(95);
+      final down = up.copyWith(changeBy: -10).withUpTo(95);
       expect(down.tempoAt(4, 0, 100), 95);
       expect(down.tempoAt(8, 0, 95), isNull);
       expect(up.copyWith(changeBy: 20).tempoAt(4, 0, 290), 300);
@@ -27,13 +27,10 @@ void main() {
   });
 
   test('stop after: the first bar line at or past the limit', () {
-    const bars = OnStart(stopAfter: StopAfter.bars, stopBars: 8);
+    const bars = OnStart(stopOn: true, stopBy: StopBy.bars, stopBars: 8);
     expect(bars.endsAt(7, Duration.zero), isFalse);
     expect(bars.endsAt(8, Duration.zero), isTrue);
-    const time = OnStart(
-      stopAfter: StopAfter.time,
-      stopTime: Duration(seconds: 30),
-    );
+    const time = OnStart(stopOn: true, stopTime: Duration(seconds: 30));
     expect(time.endsAt(9, const Duration(seconds: 29)), isFalse);
     expect(time.endsAt(10, const Duration(seconds: 31)), isTrue);
     expect(const OnStart().endsAt(999, const Duration(hours: 1)), isFalse);
@@ -62,8 +59,8 @@ void main() {
     expect(down(125, OnStart.timeGrid, 15), 120);
     expect(down(15, OnStart.timeGrid, 15), 15);
     // Until: the ruler's grid of 5.
-    expect(up(123, OnStart.untilGrid, 300), 125);
-    expect(down(123, OnStart.untilGrid, 30), 120);
+    expect(up(123, OnStart.upToGrid, 300), 125);
+    expect(down(123, OnStart.upToGrid, 30), 120);
     // Change by skips 0.
     expect(OnStart.changeUp(-1), 1);
     expect(OnStart.changeDown(1), -1);
@@ -94,27 +91,41 @@ void main() {
       speedUp: true,
       changeBy: 5,
       every: 8,
-      until: 160,
-      stopAfter: StopAfter.time,
+      upTo: 160,
+      stopOn: true,
       stopTime: Duration(minutes: 10),
     );
     expect(
       both.progress(
         bpm: 120,
+        from: 100,
         bar: 5,
         elapsed: const Duration(minutes: 5, seconds: 47, milliseconds: 200),
       ),
       '↗ +5 every 8 bars · next in 3 · 4:13 left',
     );
     expect(
-      both.progress(bpm: 160, bar: 40, elapsed: Duration.zero),
-      '↗ holding at 160 · 10:00 left',
+      both.progress(bpm: 160, from: 100, bar: 40, elapsed: Duration.zero),
+      'Up to 160 · reached · 10:00 left',
+    );
+    expect(
+      both.progress(bpm: 170, from: 170, bar: 2, elapsed: Duration.zero),
+      'Up to 160 · already there · 10:00 left',
     );
     expect(
       const OnStart(
-        stopAfter: StopAfter.bars,
+        speedUp: true,
+        changeBy: -5,
+        upTo: 90,
+      ).progress(bpm: 90, from: 120, bar: 9, elapsed: Duration.zero),
+      'Down to 90 · reached',
+    );
+    expect(
+      const OnStart(
+        stopOn: true,
+        stopBy: StopBy.bars,
         stopBars: 16,
-      ).progress(bpm: 100, bar: -1, elapsed: Duration.zero),
+      ).progress(bpm: 100, from: 100, bar: -1, elapsed: Duration.zero),
       '16 bars left',
     );
     expect(
@@ -122,26 +133,66 @@ void main() {
         speedUp: true,
         changeBy: -2,
         every: 1,
-      ).progress(bpm: 100, bar: 3, elapsed: Duration.zero),
+      ).progress(bpm: 100, from: 100, bar: 3, elapsed: Duration.zero),
       '↘ −2 every bar · next in 1',
+    );
+  });
+
+  test('Up to / Down to: label, range beyond the tempo, dropped when the '
+      'direction flips; already there means no steps', () {
+    const up = OnStart(speedUp: true, changeBy: 5, every: 1, upTo: 160);
+    expect(up.limitLabel, 'Up to');
+    expect(up.limitRange(120), (121, 300));
+    expect(up.limitRange(300), isNull);
+    expect(up.withChangeBy(10).upTo, 160);
+    final down = up.withChangeBy(-5);
+    expect(down.limitLabel, 'Down to');
+    expect(down.upTo, isNull);
+    expect(down.limitRange(120), (30, 119));
+    expect(up.tempoAt(1, 0, 170), isNull, reason: 'started past it');
+  });
+
+  test('switched off, values are kept', () {
+    const on = OnStart(countInOn: true, countInBars: 2, stopOn: true);
+    final off = on.copyWith(countInOn: false, stopOn: false);
+    expect(off.countIn, 0);
+    expect(off.stopAfter, StopAfter.off);
+    expect(off.anyOn, isFalse);
+    final back = off.copyWith(countInOn: true, stopOn: true);
+    expect(back.countIn, 2);
+    expect(back.stopAfter, StopAfter.time, reason: 'Time by default');
+  });
+
+  test('build 37–39 files carry over', () {
+    expect(
+      OnStart.fromJson({'countIn': 2, 'until': 150, 'stopAfter': 'bars'}),
+      const OnStart(
+        countInOn: true,
+        countInBars: 2,
+        upTo: 150,
+        stopOn: true,
+        stopBy: StopBy.bars,
+      ),
     );
   });
 
   test('JSON round trip; bad values fall back', () {
     const all = OnStart(
-      countIn: 2,
+      countInOn: true,
+      countInBars: 2,
       speedUp: true,
       changeBy: -3,
       every: 12,
-      until: 90,
-      stopAfter: StopAfter.bars,
+      upTo: 90,
+      stopOn: true,
+      stopBy: StopBy.bars,
       stopBars: 100,
       stopTime: Duration(minutes: 7, seconds: 30),
     );
     expect(OnStart.fromJson(all.toJson()), all);
     expect(
       OnStart.fromJson({'countIn': 5, 'changeBy': 0, 'every': 500, 'until': 9}),
-      const OnStart(every: 64, until: 30),
+      const OnStart(every: 64, upTo: 30),
     );
   });
 }

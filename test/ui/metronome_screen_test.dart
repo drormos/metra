@@ -363,61 +363,100 @@ void main() {
         ?.resolve({})
         ?.color;
 
-    testWidgets('the stopwatch opens the sheet: Count-in, Speed up, Stop '
-        'after; red while any is on', (tester) async {
+    testWidgets('the sheet: three equal switch rows when off; on unfolds the '
+        'controls with a summary; off folds them, values kept; the stopwatch '
+        'is red while any is on', (tester) async {
+      tester.view
+        ..physicalSize = const Size(420, 1400)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       await pumpScreen(tester);
       expect(outline(tester), isNull);
       await tester.tap(find.byKey(MetronomeScreen.onStartKey));
       await tester.pumpAndSettle();
       expect(find.text('When I press Start'), findsOneWidget);
-      expect(find.text('Speed up'), findsOneWidget);
-      expect(find.text('Stop after'), findsOneWidget);
+      double rowHeight(String name) => tester
+          .getSize(
+            find
+                .ancestor(of: find.text(name), matching: find.byType(Container))
+                .first,
+          )
+          .height;
+      for (final name in ['Count-in', 'Speed up', 'Stop after']) {
+        expect(rowHeight(name), 56, reason: name);
+      }
+      expect(find.byType(Switch), findsNWidgets(3));
+      expect(find.text(OnStartSheet.countInHint), findsNothing);
       expect(find.text(OnStartSheet.everyLabel), findsNothing);
-      await tester.tap(find.text('1 bar'));
-      await tester.pump();
+      expect(find.text(OnStartSheet.lengthLabel), findsNothing);
+
+      Finder inSheet(String text) => find.descendant(
+        of: find.byType(OnStartSheet),
+        matching: find.text(text),
+      );
+      // Count-in: 1 bar by default.
+      await tester.tap(find.byKey(OnStartSheet.countInKey));
+      await tester.pumpAndSettle();
       expect(controller.countIn, 1);
       expect(outline(tester), testTheme.extension<MetraColors>()!.accent);
+      expect(inSheet('2 bars'), findsOneWidget);
+      expect(inSheet('1 bar'), findsNWidgets(2), reason: 'summary + choice');
+      await tester.tap(inSheet('2 bars'));
+      await tester.pump();
+      expect(controller.countIn, 2);
       expect(
-        find.byTooltip('When I press Start: count-in 1 bar'),
+        find.byTooltip('When I press Start: count-in 2 bars'),
         findsOneWidget,
       );
-      await tester.tap(find.text('Off').first);
-      await tester.pump();
+      await tester.tap(find.byKey(OnStartSheet.countInKey));
+      await tester.pumpAndSettle();
       expect(controller.countIn, 0);
+      expect(
+        find.text(OnStartSheet.countInHint),
+        findsNothing,
+        reason: 'folded',
+      );
       expect(outline(tester), isNull);
+      await tester.tap(find.byKey(OnStartSheet.countInKey));
+      await tester.pumpAndSettle();
+      expect(controller.countIn, 2, reason: 'kept while off');
+      await tester.tap(find.byKey(OnStartSheet.countInKey));
+      await tester.pumpAndSettle();
+
+      // Speed up: three steppers, the summary.
       await tester.tap(find.byKey(OnStartSheet.speedUpKey));
-      await tester.pump();
+      await tester.pumpAndSettle();
       expect(controller.onStart.speedUp, isTrue);
       expect(outline(tester), isNotNull, reason: 'speed up alone');
       for (final text in [
         OnStartSheet.changeLabel,
         OnStartSheet.everyLabel,
-        OnStartSheet.untilLabel,
+        'Up to',
         OnStartSheet.speedUpHint,
-        '+5',
-        '8 bars',
+        '+5 every 8 bars',
         'No limit',
       ]) {
-        expect(
-          find.descendant(
-            of: find.byType(OnStartSheet),
-            matching: find.text(text),
-          ),
-          findsOneWidget,
-          reason: text,
-        );
+        expect(inSheet(text), findsOneWidget, reason: text);
       }
+      controller.setOnStart(controller.onStart.withUpTo(160));
+      await tester.pump();
+      expect(inSheet('+5 every 8 bars, up to 160'), findsOneWidget);
       await tester.tap(find.byKey(OnStartSheet.speedUpKey));
-      await tester.pump();
+      await tester.pumpAndSettle();
       expect(outline(tester), isNull);
-      await tester.ensureVisible(find.text('Time'));
-      await tester.tap(find.text('Time'));
-      await tester.pump();
+
+      // Stop after: Time by default, Length.
+      await tester.tap(find.byKey(OnStartSheet.stopAfterKey));
+      await tester.pumpAndSettle();
       expect(controller.onStart.stopAfter, StopAfter.time);
       expect(outline(tester), isNotNull, reason: 'stop after alone');
-      expect(find.text(OnStartSheet.lengthLabel), findsOneWidget);
-      expect(find.text('5:00'), findsOneWidget);
-      expect(find.text(OnStartSheet.stopAfterHint), findsOneWidget);
+      expect(inSheet(OnStartSheet.lengthLabel), findsOneWidget);
+      expect(inSheet('5:00'), findsNWidgets(2), reason: 'summary + field');
+      expect(inSheet(OnStartSheet.stopAfterHint), findsOneWidget);
+      await tester.tap(inSheet('Bars'));
+      await tester.pump();
+      expect(controller.onStart.stopAfter, StopAfter.bars);
+      expect(inSheet('32 bars'), findsOneWidget);
     });
 
     group('editing values', () {
@@ -445,49 +484,77 @@ void main() {
         await tester.pump();
       }
 
-      testWidgets('− / + steps fit the unit; Until starts at tempo + 20 and '
-          'goes back to No limit below 30', (tester) async {
+      testWidgets('− / + steps fit the unit; Up to starts at tempo + 20, '
+          'stays above the tempo, and − from its lowest goes to No limit', (
+        tester,
+      ) async {
         await openSheet(
           tester,
           const OnStart(speedUp: true, changeBy: 1, every: 16),
         );
-        await tapStep(tester, ValueStepper.minusKey(OnStartSheet.changeLabel));
-        expect(controller.onStart.changeBy, -1, reason: 'skips 0');
-        expect(
-          find.descendant(
-            of: find.byType(OnStartSheet),
-            matching: find.text('−1'),
-          ),
-          findsOneWidget,
-        );
         await tapStep(tester, ValueStepper.plusKey(OnStartSheet.everyLabel));
         expect(controller.onStart.every, 20);
-        await tapStep(tester, ValueStepper.plusKey(OnStartSheet.untilLabel));
-        expect(controller.onStart.until, 140);
-        await tapStep(tester, ValueStepper.plusKey(OnStartSheet.untilLabel));
-        expect(controller.onStart.until, 145);
-        controller.setOnStart(controller.onStart.withUntil(30));
+        await tapStep(tester, ValueStepper.plusKey('Up to'));
+        expect(controller.onStart.upTo, 140, reason: '120 + 20');
+        await tapStep(tester, ValueStepper.plusKey('Up to'));
+        expect(controller.onStart.upTo, 145);
+        controller.setOnStart(controller.onStart.withUpTo(125));
         await tester.pump();
-        await tapStep(tester, ValueStepper.minusKey(OnStartSheet.untilLabel));
-        expect(controller.onStart.until, isNull);
+        await tapStep(tester, ValueStepper.minusKey('Up to'));
+        expect(controller.onStart.upTo, 121, reason: 'tempo + 1 at least');
+        await tapStep(tester, ValueStepper.minusKey('Up to'));
+        expect(controller.onStart.upTo, isNull);
         expect(find.text('No limit'), findsOneWidget);
+        // Slowing down: "Down to", below the tempo; the old limit drops.
+        controller.setOnStart(controller.onStart.withUpTo(150));
+        await tester.pump();
+        await tapStep(tester, ValueStepper.minusKey(OnStartSheet.changeLabel));
+        expect(controller.onStart.changeBy, -1, reason: 'skips 0');
+        expect(controller.onStart.upTo, isNull);
+        expect(find.text('Down to'), findsOneWidget);
+        expect(find.text('Up to'), findsNothing);
+        await tapStep(tester, ValueStepper.minusKey('Down to'));
+        expect(controller.onStart.upTo, 100, reason: '120 − 20');
+        await tapStep(tester, ValueStepper.plusKey('Down to'));
+        expect(controller.onStart.upTo, 105);
+        controller.setOnStart(controller.onStart.withUpTo(115));
+        await tester.pump();
+        await tapStep(tester, ValueStepper.plusKey('Down to'));
+        expect(controller.onStart.upTo, 119, reason: 'tempo − 1 at most');
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.descendant(
+                  of: find.byKey(ValueStepper.plusKey('Down to')),
+                  matching: find.byType(FilledButton),
+                ),
+              )
+              .enabled,
+          isFalse,
+        );
       });
 
-      testWidgets('tap to type: snaps into range; time fills from the right; '
-          'an empty Until is No limit', (tester) async {
+      testWidgets('tap to type: snaps into range (Up to above the tempo); '
+          'time fills from the right; an empty Up to is No limit', (
+        tester,
+      ) async {
         await openSheet(
           tester,
-          const OnStart(speedUp: true, until: 150, stopAfter: StopAfter.time),
+          const OnStart(speedUp: true, upTo: 150, stopOn: true),
         );
         await type(tester, OnStartSheet.everyLabel, '99');
         expect(controller.onStart.every, 64);
         expect(find.text('64 bars'), findsOneWidget);
+        await type(tester, 'Up to', '100');
+        expect(controller.onStart.upTo, 121, reason: 'above the tempo');
+        await type(tester, 'Up to', '999');
+        expect(controller.onStart.upTo, 300);
+        await type(tester, 'Up to', '');
+        expect(controller.onStart.upTo, isNull);
         await type(tester, OnStartSheet.changeLabel, '0');
         expect(controller.onStart.changeBy, 1);
         await type(tester, OnStartSheet.changeLabel, '-7');
         expect(controller.onStart.changeBy, -7);
-        await type(tester, OnStartSheet.untilLabel, '');
-        expect(controller.onStart.until, isNull);
         // Typing 1, 2, 3, 0 over the selected value.
         final field = find.byKey(
           ValueStepper.fieldKey(OnStartSheet.lengthLabel),
@@ -516,7 +583,7 @@ void main() {
       ) async {
         await openSheet(
           tester,
-          const OnStart(stopAfter: StopAfter.bars, stopBars: 1),
+          const OnStart(stopOn: true, stopBy: StopBy.bars, stopBars: 1),
         );
         final haptics = <String>[];
         tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
@@ -564,7 +631,8 @@ void main() {
           speedUp: true,
           changeBy: 5,
           every: 2,
-          stopAfter: StopAfter.bars,
+          stopOn: true,
+          stopBy: StopBy.bars,
           stopBars: 8,
         ),
       );

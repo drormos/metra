@@ -134,9 +134,7 @@ void main() {
       await checkAll(tester, '$theme rhythm sheet');
       await tester.tapAt(const Offset(200, 40));
       await tester.pumpAndSettle();
-      metronome.setOnStart(
-        const OnStart(speedUp: true, stopAfter: StopAfter.time),
-      );
+      metronome.setOnStart(const OnStart(speedUp: true, stopOn: true));
       await tester.tap(find.byKey(MetronomeScreen.onStartKey));
       await tester.pumpAndSettle();
       await checkAll(tester, '$theme when I press Start');
