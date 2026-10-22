@@ -1268,6 +1268,7 @@ class _QuickPickState extends State<QuickPick>
           () => _library.saveAsNewSong(
             name.isEmpty ? _library.newSongName() : name,
             widget.metronome,
+            fresh: true,
           ),
         );
     }

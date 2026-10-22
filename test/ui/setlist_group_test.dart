@@ -15,6 +15,7 @@ import 'package:metra/src/ui/save_as_new_dialog.dart';
 import 'package:metra/src/ui/setlist_group.dart';
 import 'package:metra/src/ui/song_editor.dart';
 import 'package:metra/src/ui/tabular_text.dart';
+import 'package:metra/src/ui/tempo_ruler.dart';
 
 import '../audio/fake_click_output.dart';
 import 'test_theme.dart';
@@ -208,7 +209,107 @@ void main() {
       expect(library.currentSong?.name, 'One 2');
       expect(library.visibleSongs.first.name, 'One 2');
       expect(find.byKey(MetronomeScreen.revertKey), findsNothing);
+      expect(find.text('Saved as a new song'), findsOneWidget, reason: 'C');
+      await tester.pump(const Duration(milliseconds: 1500));
       expect(find.byKey(MetronomeScreen.tempoNameKey), findsOneWidget);
+    });
+
+    group('teaching "edit right here"', () {
+      const firstLoad = 'Change anything here, then Save';
+      const firstChange = 'Playing your changes. Save keeps them in this song.';
+
+      testWidgets('A: the first load ever, once; a change switches to the '
+          'actions at once', (tester) async {
+        await withSet(tester);
+        expect(find.text(firstLoad), findsNothing, reason: 'no song yet');
+        await tester.tap(find.byKey(SetlistGroup.nextKey)); // One
+        await tester.pump();
+        expect(find.text(firstLoad), findsOneWidget);
+        await tester.pump(const Duration(seconds: 4));
+        expect(find.text(firstLoad), findsNothing);
+        expect(find.byKey(MetronomeScreen.tempoNameKey), findsOneWidget);
+        await tester.tap(find.byKey(SetlistGroup.nextKey)); // Two
+        await tester.pump();
+        expect(find.text(firstLoad), findsNothing, reason: 'once');
+        library.revertSong(metronome);
+        await tester.pump();
+      });
+
+      testWidgets('A during a change: the actions show', (tester) async {
+        await withSet(tester);
+        await tester.tap(find.byKey(SetlistGroup.nextKey));
+        await tester.pump();
+        await tester.tap(find.text('+1'));
+        await tester.pump();
+        expect(find.text(firstLoad), findsNothing);
+        expect(find.byKey(MetronomeScreen.revertKey), findsOneWidget);
+      });
+
+      testWidgets('A again at the first load of a "+ New song" song, once', (
+        tester,
+      ) async {
+        await withSet(tester);
+        library.markTipSeen('edit-first-load');
+        library.saveAsNewSong('Fresh', metronome, fresh: true);
+        await tester.pump();
+        expect(find.text(firstLoad), findsOneWidget);
+        await tester.pump(const Duration(seconds: 4));
+        library.saveAsNewSong('Fresher', metronome, fresh: true);
+        await tester.pump();
+        expect(find.text(firstLoad), findsNothing, reason: 'once');
+        library.saveAsNewSong('Copy', metronome);
+        await tester.pump();
+        expect(find.text(firstLoad), findsNothing, reason: 'not a new song');
+      });
+
+      testWidgets('B: the first change, once, without moving anything; '
+          'C after Save', (tester) async {
+        await withSet(tester);
+        await tester.tap(find.byKey(SetlistGroup.nextKey));
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 4));
+        Rect at(Finder f) => tester.getRect(f);
+        final ruler = at(find.byType(TempoRuler));
+        final bpm = at(find.byKey(MetronomeScreen.bpmKey));
+        await tester.tap(find.text('+1'));
+        await tester.pump();
+        expect(find.text(firstChange), findsOneWidget);
+        final save = tester.widget<Text>(
+          find.descendant(
+            of: find.byKey(MetronomeScreen.saveToSongKey),
+            matching: find.text('Save'),
+          ),
+        );
+        expect(save.style?.fontWeight, FontWeight.w600, reason: 'Save lit');
+        expect(at(find.byType(TempoRuler)), ruler, reason: 'nothing moves');
+        expect(at(find.byKey(MetronomeScreen.bpmKey)).top, bpm.top);
+        await tester.tap(find.byKey(MetronomeScreen.saveToSongKey));
+        await tester.pump();
+        expect(find.text(firstChange), findsNothing);
+        expect(find.text('Saved to the song'), findsOneWidget, reason: 'C');
+        await tester.pump(const Duration(milliseconds: 1500));
+        expect(find.byKey(MetronomeScreen.tempoNameKey), findsOneWidget);
+        await tester.tap(find.text('+1'));
+        await tester.pump();
+        expect(find.byKey(MetronomeScreen.revertKey), findsOneWidget);
+        expect(find.text(firstChange), findsNothing, reason: 'once');
+        // Revert: no message.
+        await tester.tap(find.byKey(MetronomeScreen.revertKey));
+        await tester.pump();
+        expect(find.byKey(MetronomeScreen.tempoNameKey), findsOneWidget);
+      });
+
+      testWidgets('B goes after ~8 s', (tester) async {
+        await withSet(tester);
+        await tester.tap(find.byKey(SetlistGroup.nextKey));
+        await tester.pump();
+        await tester.tap(find.text('+1'));
+        await tester.pump();
+        expect(find.text(firstChange), findsOneWidget);
+        await tester.pump(const Duration(seconds: 8));
+        expect(find.text(firstChange), findsNothing);
+        expect(find.byKey(MetronomeScreen.revertKey), findsOneWidget);
+      });
     });
 
     testWidgets('title block and source bar keep their size in every mode', (

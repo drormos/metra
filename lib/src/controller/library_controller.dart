@@ -328,6 +328,7 @@ class LibraryController extends ChangeNotifier {
     String name,
     MetronomeController metronome, {
     SongPlacement placement = SongPlacement.replace,
+    bool fresh = false,
   }) {
     final index = currentIndex;
     final list = activeSetlist;
@@ -336,6 +337,7 @@ class LibraryController extends ChangeNotifier {
       bpm: metronome.bpm,
       pattern: metronome.pattern,
     );
+    _freshSongId = fresh ? song.id : null;
     if (list == null || index < 0 || placement == SongPlacement.none) {
       _update(
         _library.withSession(setlistId: null, songId: song.id, position: -1),
@@ -559,6 +561,18 @@ class LibraryController extends ChangeNotifier {
   void markSetsHintSeen() {
     if (!setsHintSeen) _update(_library.copyWith(setsHintSeen: true));
   }
+
+  /// Whether the one-time tip [name] was shown.
+  bool tipSeen(String name) => _library.tipsSeen.contains(name);
+
+  void markTipSeen(String name) {
+    if (tipSeen(name)) return;
+    _update(_library.copyWith(tipsSeen: {..._library.tipsSeen, name}));
+  }
+
+  /// The song "+ New song" just made (not saved), until another loads.
+  String? get freshSongId => _freshSongId;
+  String? _freshSongId;
 
   /// Renames a song; an empty name keeps the old one. Duplicates allowed.
   void renameSong(String id, String name) {

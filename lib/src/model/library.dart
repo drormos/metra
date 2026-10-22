@@ -131,6 +131,7 @@ class Library {
     this.swipeHintSeen = false,
     this.songsHintSeen = false,
     this.setsHintSeen = false,
+    this.tipsSeen = const {},
   });
 
   static const empty = Library(
@@ -177,6 +178,10 @@ class Library {
   /// The same, for the sets view.
   final bool setsHintSeen;
 
+  /// One-time tips already shown, by name (e.g. the main screen's
+  /// "edit right here" lines).
+  final Set<String> tipsSeen;
+
   Library copyWith({
     List<Song>? songs,
     List<Setlist>? setlists,
@@ -190,6 +195,7 @@ class Library {
     bool? swipeHintSeen,
     bool? songsHintSeen,
     bool? setsHintSeen,
+    Set<String>? tipsSeen,
   }) => Library(
     songs: songs ?? this.songs,
     setlists: setlists ?? this.setlists,
@@ -206,6 +212,7 @@ class Library {
     swipeHintSeen: swipeHintSeen ?? this.swipeHintSeen,
     songsHintSeen: songsHintSeen ?? this.songsHintSeen,
     setsHintSeen: setsHintSeen ?? this.setsHintSeen,
+    tipsSeen: tipsSeen ?? this.tipsSeen,
   );
 
   /// The mode and current song; nulls here are meaningful (Free play, no
@@ -230,6 +237,7 @@ class Library {
     swipeHintSeen: swipeHintSeen,
     songsHintSeen: songsHintSeen,
     setsHintSeen: setsHintSeen,
+    tipsSeen: tipsSeen,
   );
 
   Map<String, Object?> toJson() => {
@@ -247,6 +255,7 @@ class Library {
     'swipeHintSeen': swipeHintSeen,
     'songsHintSeen': songsHintSeen,
     'setsHintSeen': setsHintSeen,
+    'tipsSeen': tipsSeen.toList(),
     'songs': [for (final song in songs) song.toJson()],
     'setlists': [for (final setlist in setlists) setlist.toJson()],
   };
@@ -288,6 +297,7 @@ class Library {
       swipeHintSeen: json['swipeHintSeen'] as bool? ?? false,
       songsHintSeen: json['songsHintSeen'] as bool? ?? false,
       setsHintSeen: json['setsHintSeen'] as bool? ?? false,
+      tipsSeen: {...?(json['tipsSeen'] as List?)?.cast<String>()},
       songs: [
         for (final song in songs)
           ?_orNull(() => Song.fromJson(song as Map<String, Object?>)),

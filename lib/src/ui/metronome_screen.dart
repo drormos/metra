@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -51,6 +53,7 @@ class MetronomeScreen extends StatelessWidget {
   static const meterKey = Key('meter');
   static const subdivisionKey = Key('subdivision');
   static const revertKey = Key('revert');
+  static const firstChangeKey = Key('first-change-line');
   static const saveToSongKey = Key('save-to-song');
   static const saveAsNewKey = Key('save-as-new');
   static const subtitleKey = Key('subtitle');
@@ -200,7 +203,14 @@ class MetronomeScreen extends StatelessWidget {
                           ),
                         ),
                         // Fixed height: the tempo name, or Revert / Save to song.
-                        SizedBox(height: 44, child: _tempoLine(colors, bpm)),
+                        SizedBox(
+                          height: 44,
+                          child: _TempoLine(
+                            controller: controller,
+                            library: library,
+                            bpm: bpm,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -299,72 +309,6 @@ class MetronomeScreen extends StatelessWidget {
           ),
         ],
       ],
-    );
-  }
-
-  /// The tempo name; while the loaded song has unsaved main-screen
-  /// changes, Revert and Save to song instead (ui-spec.md "Changes to a
-  /// loaded song").
-  Widget _tempoLine(MetraColors colors, int bpm) {
-    final library = this.library;
-    if (library == null || !library.songChanged(controller)) {
-      return Center(
-        child: Text(
-          tempoName(bpm),
-          key: tempoNameKey,
-          style: TextStyle(fontSize: 16, color: colors.muted),
-        ),
-      );
-    }
-    // Plain grey text buttons, "Revert · Save · Save as new": quiet, one
-    // tap each (ui-spec.md "Changes to a loaded song").
-    Widget action(Key key, String text, VoidCallback onPressed) => TextButton(
-      key: key,
-      style: TextButton.styleFrom(
-        foregroundColor: colors.muted,
-        minimumSize: const Size(0, 44),
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-      ),
-      onPressed: onPressed,
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontFamily: MetraFonts.body,
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-    // The dim dot is the resting-beat grey (#3A3A3A).
-    final dot = Text(
-      '·',
-      style: TextStyle(fontSize: 15, color: colors.beatResting),
-    );
-    // Shrinks rather than overflowing on narrow phones.
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          action(revertKey, 'Revert', () {
-            Haptics.tick();
-            library.revertSong(controller);
-          }),
-          dot,
-          action(saveToSongKey, 'Save', () {
-            Haptics.tick();
-            library.saveToSong(controller);
-          }),
-          dot,
-          Builder(
-            builder: (context) => action(
-              saveAsNewKey,
-              'Save as new',
-              () => showSaveAsNewSong(context, library, controller),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -602,4 +546,250 @@ class _AnnouncerState extends State<_Announcer> {
 
   @override
   Widget build(BuildContext context) => widget.child;
+}
+
+/// The line under the BPM: the tempo name; while the loaded song has
+/// unsaved main-screen changes, Revert · Save · Save as new instead
+/// (ui-spec.md "Changes to a loaded song"). It also teaches "edit the
+/// song right here" (ui-spec.md "Teaching "edit right here"",
+/// `edit-on-main.reference.html`), never moving anything:
+/// A, once: "Change anything here, then Save" at the first load ever and
+/// the first load of a song "+ New song" made; B, once: at the first
+/// change, Save stands out and a muted line floats below; C, every save:
+/// a short "✓ Saved ..." confirmation.
+class _TempoLine extends StatefulWidget {
+  const _TempoLine({
+    required this.controller,
+    required this.library,
+    required this.bpm,
+  });
+
+  final MetronomeController controller;
+  final LibraryController? library;
+  final int bpm;
+
+  /// How long each line stays.
+  static const firstLoadFor = Duration(seconds: 4);
+  static const firstChangeFor = Duration(seconds: 8);
+  static const savedFor = Duration(milliseconds: 1500);
+
+  static const firstLoadTip = 'edit-first-load';
+  static const newSongTip = 'edit-new-song';
+  static const firstChangeTip = 'edit-first-change';
+
+  static const firstLoadText = 'Change anything here, then Save';
+  static const firstChangeText =
+      'Playing your changes. Save keeps them in this song.';
+  static const savedText = 'Saved to the song';
+  static const savedAsNewText = 'Saved as a new song';
+
+  @override
+  State<_TempoLine> createState() => _TempoLineState();
+}
+
+class _TempoLineState extends State<_TempoLine> {
+  late String? _songId = widget.library?.currentSong?.id;
+
+  /// A ("Change anything here...") while true.
+  bool _firstLoad = false;
+
+  /// B: Save stands out and the line below shows, while true.
+  bool _firstChange = false;
+
+  /// C: the "✓ Saved ..." text, while set.
+  String? _saved;
+
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.library?.addListener(_check);
+    widget.controller.addListener(_check);
+  }
+
+  @override
+  void dispose() {
+    widget.library?.removeListener(_check);
+    widget.controller.removeListener(_check);
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _say(String message) => SemanticsService.sendAnnouncement(
+    View.of(context),
+    message,
+    TextDirection.ltr,
+  );
+
+  /// Shows one line for [duration]; any other one ends.
+  void _show({
+    bool firstLoad = false,
+    bool firstChange = false,
+    String? saved,
+  }) {
+    _timer?.cancel();
+    setState(() {
+      _firstLoad = firstLoad;
+      _firstChange = firstChange;
+      _saved = saved;
+    });
+    final duration = firstLoad
+        ? _TempoLine.firstLoadFor
+        : firstChange
+        ? _TempoLine.firstChangeFor
+        : _TempoLine.savedFor;
+    if (firstLoad || firstChange || saved != null) {
+      _timer = Timer(duration, () {
+        if (mounted) _show();
+      });
+    }
+  }
+
+  void _check() {
+    final library = widget.library;
+    if (!mounted || library == null) return;
+    final song = library.currentSong;
+    if (song?.id != _songId) {
+      _songId = song?.id;
+      if (_firstLoad || _saved != null) _show();
+      // A song is loaded (never Free play): the first ever, or the first
+      // one "+ New song" made.
+      final fresh = song != null && song.id == library.freshSongId;
+      final first = !library.tipSeen(_TempoLine.firstLoadTip);
+      final firstNew = fresh && !library.tipSeen(_TempoLine.newSongTip);
+      if (song != null && (first || firstNew)) {
+        library.markTipSeen(_TempoLine.firstLoadTip);
+        if (fresh) library.markTipSeen(_TempoLine.newSongTip);
+        _show(firstLoad: true);
+        _say(_TempoLine.firstLoadText);
+        return;
+      }
+    }
+    if (library.songChanged(widget.controller) &&
+        !library.tipSeen(_TempoLine.firstChangeTip)) {
+      library.markTipSeen(_TempoLine.firstChangeTip);
+      _show(firstChange: true);
+      _say(_TempoLine.firstChangeText);
+    }
+  }
+
+  void _confirm(String text) {
+    _show(saved: text);
+    _say(text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final library = widget.library;
+    final controller = widget.controller;
+    if (library == null || !library.songChanged(controller)) {
+      final saved = _saved;
+      return Center(
+        child: saved != null
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check, size: 14, color: colors.muted),
+                  const SizedBox(width: 8),
+                  Text(
+                    saved,
+                    style: TextStyle(fontSize: 15, color: colors.muted),
+                  ),
+                ],
+              )
+            : _firstLoad
+            ? Text(
+                _TempoLine.firstLoadText,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 15, color: colors.text),
+              )
+            : Text(
+                tempoName(widget.bpm),
+                key: MetronomeScreen.tempoNameKey,
+                style: TextStyle(fontSize: 16, color: colors.muted),
+              ),
+      );
+    }
+    // Plain grey text buttons, "Revert · Save · Save as new": quiet, one
+    // tap each (ui-spec.md "Changes to a loaded song").
+    Widget action(
+      Key key,
+      String text,
+      VoidCallback onPressed, {
+      bool lit = false,
+    }) => TextButton(
+      key: key,
+      style: TextButton.styleFrom(
+        foregroundColor: lit ? colors.text : colors.muted,
+        minimumSize: const Size(0, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+      ),
+      onPressed: onPressed,
+      child: Text(
+        text,
+        style: TextStyle(
+          fontFamily: MetraFonts.body,
+          fontSize: 15,
+          fontWeight: lit ? FontWeight.w600 : FontWeight.w500,
+        ),
+      ),
+    );
+    // The dim dot is the resting-beat grey (#3A3A3A).
+    final dot = Text(
+      '·',
+      style: TextStyle(fontSize: 15, color: colors.beatResting),
+    );
+    // Shrinks rather than overflowing on narrow phones.
+    final actions = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          action(MetronomeScreen.revertKey, 'Revert', () {
+            Haptics.tick();
+            _show();
+            library.revertSong(controller);
+          }),
+          dot,
+          action(MetronomeScreen.saveToSongKey, 'Save', lit: _firstChange, () {
+            Haptics.tick();
+            library.saveToSong(controller);
+            _confirm(_TempoLine.savedText);
+          }),
+          dot,
+          Builder(
+            builder: (context) =>
+                action(MetronomeScreen.saveAsNewKey, 'Save as new', () async {
+                  _show();
+                  if (await showSaveAsNewSong(context, library, controller) &&
+                      mounted) {
+                    _confirm(_TempoLine.savedAsNewText);
+                  }
+                }),
+          ),
+        ],
+      ),
+    );
+    if (!_firstChange) return Center(child: actions);
+    // B's line floats below, over the space above the ruler: nothing moves.
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Center(child: actions),
+        Positioned(
+          left: -24,
+          right: -24,
+          top: 40,
+          child: Text(
+            _TempoLine.firstChangeText,
+            key: MetronomeScreen.firstChangeKey,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: colors.muted),
+          ),
+        ),
+      ],
+    );
+  }
 }

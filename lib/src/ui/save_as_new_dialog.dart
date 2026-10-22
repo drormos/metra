@@ -10,14 +10,17 @@ import 'theme.dart';
 /// song" there).
 /// Saves what the click plays now as a new library song and loads it; the
 /// click carries on unchanged.
-Future<void> showSaveAsNewSong(
+/// True once saved.
+Future<bool> showSaveAsNewSong(
   BuildContext context,
   LibraryController library,
   MetronomeController metronome,
-) => showDialog<void>(
-  context: context,
-  builder: (_) => _SaveAsNewDialog(library: library, metronome: metronome),
-);
+) async =>
+    await showDialog<bool>(
+      context: context,
+      builder: (_) => _SaveAsNewDialog(library: library, metronome: metronome),
+    ) ??
+    false;
 
 class _SaveAsNewDialog extends StatefulWidget {
   const _SaveAsNewDialog({required this.library, required this.metronome});
@@ -64,8 +67,10 @@ class _SaveAsNewDialogState extends State<_SaveAsNewDialog> {
       _name.text.trim(),
       widget.metronome,
       placement: _set == null ? SongPlacement.none : _placement,
+      // Free play's "+ New song from this" is a new song, not a copy.
+      fresh: _song == null,
     );
-    Navigator.pop(context);
+    Navigator.pop(context, true);
   }
 
   @override

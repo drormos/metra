@@ -912,6 +912,14 @@ void main() {
       library.markSwipeHintSeen();
       expect((await reload()).swipeHintSeen, isTrue);
     });
+
+    test('one-time tips are saved', () async {
+      expect(library.tipSeen('edit-first-load'), isFalse);
+      library.markTipSeen('edit-first-load');
+      final loaded = await reload();
+      expect(loaded.tipSeen('edit-first-load'), isTrue);
+      expect(loaded.tipSeen('edit-first-change'), isFalse);
+    });
   });
 }
 
