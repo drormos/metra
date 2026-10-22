@@ -351,23 +351,17 @@ class MetronomeScreen extends StatelessWidget {
           // never moves the subtitle.
           SizedBox(
             height: 34,
-            // A new name fades through (old out, then new in), sized to
-            // fit before it shows; every size sits on one baseline at the
-            // left edge, where the full-size name's baseline is.
-            child: FadeThrough(
-              value: song?.name,
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: Baseline(
-                  baseline: _baselineOf(context, _titleStyle),
-                  baselineType: TextBaseline.alphabetic,
-                  child: FitText(
-                    song?.name ?? '',
-                    textKey: titleKey,
-                    minFontSize: 22,
-                    style: _titleStyle,
-                  ),
-                ),
+            // A new name dissolves in place (only what changed), sized to
+            // fit first; every size sits on one baseline at the left edge,
+            // where the full-size name's baseline is.
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: DissolveText(
+                song?.name ?? '',
+                textKey: titleKey,
+                minFontSize: 22,
+                style: _titleStyle,
+                baseline: _baselineOf(context, _titleStyle),
               ),
             ),
           ),
@@ -376,20 +370,15 @@ class MetronomeScreen extends StatelessWidget {
           // so the subtitle sits on the block's bottom in every mode.
           SizedBox(
             height: 17,
-            child: FadeThrough(
-              value: set?.name,
-              child: SizedBox(
-                width: double.infinity,
-                child: Text(
-                  set?.name ?? '',
-                  key: subtitleKey,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 17 / 14,
-                    color: colors.muted,
-                  ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: DissolveText(
+                set?.name ?? '',
+                textKey: subtitleKey,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 17 / 14,
+                  color: colors.muted,
                 ),
               ),
             ),

@@ -68,15 +68,6 @@ class BpmReadout extends StatefulWidget {
 }
 
 class _BpmReadoutState extends State<BpmReadout> {
-  // Which way the last change went: digits roll up when the tempo rose.
-  bool _up = true;
-
-  @override
-  void didUpdateWidget(BpmReadout old) {
-    super.didUpdateWidget(old);
-    if (widget.bpm != old.bpm) _up = widget.bpm > old.bpm;
-  }
-
   @override
   Widget build(BuildContext context) {
     final unitSize = widget.unitSize;
@@ -98,7 +89,7 @@ class _BpmReadoutState extends State<BpmReadout> {
         ),
         SizedBox(width: gap),
         // Fixed digit slots: the readout never changes width or shakes.
-        // Changed digits roll (single steps, Tap tempo, a song load),
+        // Changed digits dissolve (single steps, Tap tempo, a song load),
         // except while the tempo is being dragged or held: then instant,
         // never behind the finger.
         ValueListenableBuilder(
@@ -107,10 +98,9 @@ class _BpmReadoutState extends State<BpmReadout> {
             '${widget.bpm}',
             key: widget.numberKey,
             style: BpmReadout.numberStyle(widget.fontSize),
-            roll: moving > 0
+            dissolve: moving > 0
                 ? Duration.zero
-                : MetraMotion.of(context, MetraMotion.roll),
-            rollUp: _up,
+                : MetraMotion.of(context, MetraMotion.dissolve),
           ),
         ),
         SizedBox(width: gap),

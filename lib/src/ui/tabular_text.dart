@@ -14,18 +14,16 @@ class TabularText extends StatelessWidget {
     this.text, {
     super.key,
     this.style,
-    this.roll = Duration.zero,
-    this.rollUp = true,
+    this.dissolve = Duration.zero,
   });
 
   final String text;
   final TextStyle? style;
 
-  /// A digit that changes rolls in its own slot over this long
-  /// ([MetraMotion.roll]), upward when [rollUp] (the number rose); the
-  /// others don't move. Zero: instant.
-  final Duration roll;
-  final bool rollUp;
+  /// A digit that changes dissolves in its own slot over this long
+  /// ([MetraMotion.dissolve]); the others stay still at full opacity.
+  /// Zero: instant.
+  final Duration dissolve;
 
   static final _slots = <TextStyle, double>{};
 
@@ -67,11 +65,10 @@ class TabularText extends StatelessWidget {
                     // By place from the right, so 99 → 100 keeps the units.
                     key: ValueKey(text.length - i),
                     width: slot,
-                    child: _RollingDigit(
+                    child: _DissolveDigit(
                       c,
                       style: resolved,
-                      duration: roll,
-                      up: rollUp,
+                      duration: dissolve,
                     ),
                   )
                 : Text(c, style: resolved),
@@ -81,54 +78,48 @@ class TabularText extends StatelessWidget {
   }
 }
 
-/// One digit in its slot (ui-spec.md "Motion", rolling digits): when it
-/// changes, the old one slides ~12% of its height in the direction of
-/// change while fading out and the new one slides in from the other side
-/// while fading in, clipped to the slot's width so nothing spills sideways.
-class _RollingDigit extends StatefulWidget {
-  const _RollingDigit(
+/// One digit in its slot (ui-spec.md "Motion", steady dissolve): when it
+/// changes, old and new are drawn in the same place, the old going 1 → 0
+/// while the new goes 0 → 1 on the same linear curve, so together they
+/// are always fully bright.
+class _DissolveDigit extends StatefulWidget {
+  const _DissolveDigit(
     this.digit, {
     required this.style,
     required this.duration,
-    required this.up,
   });
 
   final String digit;
   final TextStyle style;
   final Duration duration;
-  final bool up;
-
-  static const travel = 0.12;
 
   @override
-  State<_RollingDigit> createState() => _RollingDigitState();
+  State<_DissolveDigit> createState() => _DissolveDigitState();
 }
 
-class _RollingDigitState extends State<_RollingDigit>
+class _DissolveDigitState extends State<_DissolveDigit>
     with SingleTickerProviderStateMixin {
-  late final _roll = AnimationController(vsync: this, value: 1);
+  late final _dissolve = AnimationController(vsync: this, value: 1);
   String? _old;
-  bool _up = true;
 
   @override
-  void didUpdateWidget(_RollingDigit old) {
+  void didUpdateWidget(_DissolveDigit old) {
     super.didUpdateWidget(old);
     if (old.digit == widget.digit) return;
     if (widget.duration == Duration.zero) {
-      _roll.value = 1;
+      _dissolve.value = 1;
       _old = null;
       return;
     }
     _old = old.digit;
-    _up = widget.up;
-    _roll
+    _dissolve
       ..duration = widget.duration
       ..forward(from: 0);
   }
 
   @override
   void dispose() {
-    _roll.dispose();
+    _dissolve.dispose();
     super.dispose();
   }
 
@@ -137,43 +128,18 @@ class _RollingDigitState extends State<_RollingDigit>
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _roll,
+    animation: _dissolve,
     builder: (context, _) {
       final old = _old;
-      if (old == null || _roll.value >= 1) return _text(widget.digit);
-      final p = MetraMotion.rollCurve.transform(_roll.value);
-      // Up: the old leaves upward and the new comes from below.
-      final away = _up ? -1.0 : 1.0;
-      const t = _RollingDigit.travel;
-      return ClipRect(
-        clipper: const _SlotClip(),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            FractionalTranslation(
-              translation: Offset(0, away * t * p),
-              child: Opacity(opacity: 1 - p, child: _text(old)),
-            ),
-            FractionalTranslation(
-              translation: Offset(0, -away * t * (1 - p)),
-              child: Opacity(opacity: p, child: _text(widget.digit)),
-            ),
-          ],
-        ),
+      final t = _dissolve.value;
+      if (old == null || t >= 1) return _text(widget.digit);
+      return Stack(
+        alignment: Alignment.center,
+        children: [
+          Opacity(opacity: 1 - t, child: _text(old)),
+          Opacity(opacity: t, child: _text(widget.digit)),
+        ],
       );
     },
   );
-}
-
-/// The slot's width, with room above and below for the glyphs (the line
-/// is shorter than they are) and the short roll.
-class _SlotClip extends CustomClipper<Rect> {
-  const _SlotClip();
-
-  @override
-  Rect getClip(Size size) =>
-      Rect.fromLTRB(0, -size.height * 0.4, size.width, size.height * 1.4);
-
-  @override
-  bool shouldReclip(_SlotClip old) => false;
 }

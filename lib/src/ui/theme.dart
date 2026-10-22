@@ -198,13 +198,10 @@ abstract final class MetraMotion {
   static const swap = Duration(milliseconds: 120);
   static const swapCurve = Curves.easeInOut;
 
-  /// A BPM digit that changes rolls in its slot.
-  static const roll = Duration(milliseconds: 140);
-  static const rollCurve = Curves.easeOut;
-
-  /// The title and set name: the old fades out fully, then the new in.
-  static const fadeOut = Duration(milliseconds: 80);
-  static const fadeIn = Duration(milliseconds: 120);
+  /// The BPM, title and set name: only what changes dissolves, old and
+  /// new on the same linear curve (their opacities always add up to full,
+  /// so nothing dims or blinks).
+  static const dissolve = Duration(milliseconds: 160);
 
   /// Things going away: fade out (ease-in) while the height closes
   /// (ease-in-out).

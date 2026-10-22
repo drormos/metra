@@ -1056,28 +1056,37 @@ void main() {
     );
 
     for (final up in [true, false]) {
-      testWidgets('rolling digits ${up ? 'up' : 'down'}: only the changed '
-          'digit rolls, old and new apart; nothing else moves', (tester) async {
+      testWidgets('BPM ${up ? 'up' : 'down'}: only the changed digit '
+          'dissolves in place; the others never dim; nothing moves', (
+        tester,
+      ) async {
         controller.setBpm(up ? 120 : 121);
         await pumpScreen(tester);
         Rect at(Finder f) => tester.getRect(f);
         final bpm = at(find.byKey(MetronomeScreen.bpmKey));
         final ruler = at(find.byType(TempoRuler));
-        final tens = at(find.text('2'));
-        expect(digits(), findsNWidgets(3));
+        final units = at(find.text(up ? '0' : '1').last);
         controller.setBpm(up ? 121 : 120);
         await tester.pump();
-        await tester.pump(MetraMotion.roll ~/ 3);
+        await tester.pump(MetraMotion.dissolve * 0.25);
         expect(digits(), findsNWidgets(4), reason: 'the units: old and new');
-        final old = at(find.text(up ? '0' : '1').last);
-        final now = at(find.text(up ? '1' : '0').last);
-        // Rising: the old goes up and the new comes from below.
-        expect(old.top < now.top, up);
-        expect(old.top, isNot(now.top), reason: 'never in the same place');
-        expect(at(find.text('2')), tens, reason: 'unchanged digits stay');
+        final layers = tester
+            .widgetList<Opacity>(
+              find.descendant(
+                of: find.byKey(MetronomeScreen.bpmKey),
+                matching: find.byType(Opacity),
+              ),
+            )
+            .toList();
+        expect(layers, hasLength(2), reason: 'only the units slot');
+        expect(layers[0].opacity + layers[1].opacity, closeTo(1, 1e-9));
+        expect(layers[1].opacity, closeTo(0.25, 0.02), reason: 'linear');
+        // Old and new in the very same place.
+        expect(at(find.text(up ? '0' : '1').last).center, units.center);
+        expect(at(find.text(up ? '1' : '0').last).center, units.center);
         expect(at(find.byKey(MetronomeScreen.bpmKey)), bpm);
         expect(at(find.byType(TempoRuler)), ruler);
-        await tester.pump(MetraMotion.roll);
+        await tester.pump(MetraMotion.dissolve);
         expect(digits(), findsNWidgets(3));
       });
     }
