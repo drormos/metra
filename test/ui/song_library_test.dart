@@ -125,7 +125,8 @@ void main() {
     );
   });
 
-  testWidgets('search filters by name, ignoring case', (tester) async {
+  testWidgets('search matches anywhere, ignoring case and accents; the '
+      'match is highlighted', (tester) async {
     await pumpLibrary(tester);
     await tester.enterText(find.byType(TextField), 'A');
     await tester.pump();
@@ -133,9 +134,41 @@ void main() {
     await tester.enterText(find.byType(TextField), 'ra');
     await tester.pump();
     expect(listed(tester), ['Bravo']);
+    // The matching part is white and semibold.
+    final spans = <TextSpan>[];
+    for (final rich in tester.widgetList<RichText>(
+      find.descendant(
+        of: find.byKey(
+          ValueKey(
+            'library-${library.songs.firstWhere((s) => s.name == 'Bravo').id}',
+          ),
+        ),
+        matching: find.byType(RichText),
+      ),
+    )) {
+      rich.text.visitChildren((span) {
+        if (span is TextSpan) spans.add(span);
+        return true;
+      });
+    }
+    final match = spans.firstWhere((span) => span.text == 'ra');
+    expect(match.style!.fontWeight, FontWeight.w600);
+    await tester.enterText(find.byType(TextField), 'brávo');
+    await tester.pump();
+    expect(listed(tester), ['Bravo'], reason: 'accents ignored');
     await tester.enterText(find.byType(TextField), 'zzz');
     await tester.pump();
-    expect(find.text('No songs match.'), findsOneWidget);
+    expect(find.text('No songs match "zzz"'), findsOneWidget);
+    // The search key closes the keyboard and keeps the results.
+    await tester.enterText(find.byType(TextField), 'ra');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pump();
+    expect(listed(tester), ['Bravo']);
+    expect(
+      FocusManager.instance.primaryFocus?.context?.widget is EditableText,
+      isFalse,
+      reason: 'keyboard closed',
+    );
   });
 
   testWidgets('sorts by recently edited', (tester) async {

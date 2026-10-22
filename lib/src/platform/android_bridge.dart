@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -78,6 +80,16 @@ abstract final class AndroidBridge {
         if (call.method != 'callActive') throw MissingPluginException();
         await calls.callChanged(active: call.arguments as bool);
       });
+
+  /// How long an Undo bar should stay: [base], or longer if Android's
+  /// accessibility "Time to take action" asks for it.
+  static Future<Duration> recommendedTimeout(Duration base) async {
+    if (!Platform.isAndroid) return base;
+    final ms = await _call(android, 'recommendedTimeout', base.inMilliseconds);
+    return ms is int && ms > base.inMilliseconds
+        ? Duration(milliseconds: ms)
+        : base;
+  }
 
   static Future<Object?> _call(
     MethodChannel channel,

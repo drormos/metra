@@ -6,6 +6,7 @@ import '../model/library.dart';
 import 'editor_scaffold.dart';
 import 'haptics.dart';
 import 'play_marker.dart';
+import 'search_match.dart';
 import 'song_editor.dart';
 import 'theme.dart';
 
@@ -148,12 +149,11 @@ class _SongLibraryState extends State<SongLibrary> {
         child: ListenableBuilder(
           listenable: _library,
           builder: (context, _) {
-            final query = _search.text.trim().toLowerCase();
+            final query = _search.text;
             final songs = [
               for (final song
                   in _recent ? _library.songsRecentlyEdited : _library.songsAZ)
-                if (query.isEmpty || song.name.toLowerCase().contains(query))
-                  song,
+                if (matchesSearch(song.name, query)) song,
             ];
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -195,12 +195,7 @@ class _SongLibraryState extends State<SongLibrary> {
                           onAction: _edit,
                         )
                       : songs.isEmpty
-                      ? Center(
-                          child: Text(
-                            'No songs match.',
-                            style: TextStyle(color: colors.muted),
-                          ),
-                        )
+                      ? NoMatches('songs', query, color: colors.muted)
                       : ListView(
                           children: [
                             for (final song in songs) _row(colors, song),
@@ -325,10 +320,10 @@ class _SongLibraryState extends State<SongLibrary> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    SearchName(
                       song.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      query: _search.text,
+                      matchColor: colors.text,
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w500,

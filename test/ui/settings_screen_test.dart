@@ -230,6 +230,35 @@ void main() {
     expect(find.text('Copied'), findsOneWidget);
   });
 
+  testWidgets('the ☰ panel follows a swipe right: short springs back; a '
+      'screen reader reads it as "Menu"', (tester) async {
+    await openMenu(tester);
+    final left = tester.getTopLeft(find.byKey(MenuPanel.surfaceKey)).dx;
+    await tester.timedDrag(
+      find.byKey(MenuPanel.surfaceKey),
+      const Offset(60, 0),
+      const Duration(seconds: 1),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(find.byKey(MenuPanel.surfaceKey)).dx, left);
+    expect(
+      find.byWidgetPredicate(
+        (w) =>
+            w is Semantics &&
+            w.properties.label == 'Menu' &&
+            (w.properties.scopesRoute ?? false),
+      ),
+      findsOneWidget,
+    );
+    await tester.timedDrag(
+      find.byKey(MenuPanel.surfaceKey),
+      const Offset(140, 0),
+      const Duration(seconds: 1),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(MenuPanel), findsNothing, reason: 'past a third');
+  });
+
   testWidgets('About Metra opens the note; back returns to main', (
     tester,
   ) async {

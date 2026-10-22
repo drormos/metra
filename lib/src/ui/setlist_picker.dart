@@ -12,6 +12,7 @@ import 'haptics.dart';
 import 'icons.dart';
 import 'library_pick.dart';
 import 'play_marker.dart';
+import 'search_match.dart';
 import 'song_editor.dart';
 import 'theme.dart';
 
@@ -687,10 +688,10 @@ class _SetlistPickerState extends State<SetlistPicker> {
   /// where ‹ returns there.
   Widget _whatToPlayView(BuildContext context) {
     final colors = context.colors;
-    final query = _search.text.trim().toLowerCase();
+    final query = _search.text;
     final sets = [
       for (final set in _library.setlistsRecentlyPlayed)
-        if (query.isEmpty || set.name.toLowerCase().contains(query)) set,
+        if (matchesSearch(set.name, query)) set,
     ];
     // ‹ always returns to the main screen; nothing was loaded.
     return Column(
@@ -791,6 +792,7 @@ class _SetlistPickerState extends State<SetlistPicker> {
                 ),
                 Divider(height: 1, color: colors.divider),
                 for (final setlist in sets) _setRow(colors, setlist),
+                if (sets.isEmpty) NoMatches('sets', query, color: colors.muted),
               ],
             ],
           ),
@@ -888,10 +890,10 @@ class _SetlistPickerState extends State<SetlistPicker> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    SearchName(
                       setlist.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      query: _search.text,
+                      matchColor: colors.text,
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w500,

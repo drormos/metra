@@ -6,11 +6,13 @@ import 'package:flutter/material.dart';
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/library.dart';
+import '../platform/android_bridge.dart';
 import 'editor_scaffold.dart';
 import 'haptics.dart';
 import 'icons.dart';
 import 'metronome_screen.dart';
 import 'play_marker.dart';
+import 'search_match.dart';
 import 'setlist_picker.dart';
 import 'song_editor.dart';
 import 'song_library.dart';
@@ -206,6 +208,9 @@ class _QuickPickState extends State<QuickPick>
   ({String message, VoidCallback undo})? _undo;
   Timer? _undoTimer;
 
+  // ~6 s, or longer if Android's "Time to take action" asks for it.
+  Duration _undoFor = QuickPick.undoFor;
+
   // Bumped by every removal and undo, so a swiped row's key never comes
   // back while the list rebuilds.
   int _generation = 0;
@@ -262,6 +267,9 @@ class _QuickPickState extends State<QuickPick>
       });
     }
     _maybeHint();
+    AndroidBridge.recommendedTimeout(QuickPick.undoFor).then((d) {
+      _undoFor = d;
+    });
   }
 
   /// The first time ever the set panel (or, with its own flag, the Songs
@@ -312,7 +320,7 @@ class _QuickPickState extends State<QuickPick>
   void _showUndo(String message, VoidCallback undo) {
     _undoTimer?.cancel();
     setState(() => _undo = (message: message, undo: undo));
-    _undoTimer = Timer(QuickPick.undoFor, () {
+    _undoTimer = Timer(_undoFor, () {
       if (mounted) setState(() => _undo = null);
     });
   }
@@ -393,12 +401,12 @@ class _QuickPickState extends State<QuickPick>
   Widget _songsPanel() {
     final colors = context.colors;
     final all = _library.songsAZ;
-    final query = _search.text.trim().toLowerCase();
+    final query = _search.text;
     final songs = [
       for (final song in all)
         if (query.isEmpty ||
             song.id == _renaming ||
-            song.name.toLowerCase().contains(query))
+            matchesSearch(song.name, query))
           song,
     ];
     final current = _library.currentSong?.id;
@@ -414,6 +422,8 @@ class _QuickPickState extends State<QuickPick>
           : null,
       list: all.isEmpty && _renaming == null
           ? _empty('No songs yet')
+          : songs.isEmpty && _renaming == null
+          ? NoMatches('songs', query, color: colors.muted)
           : ListView(
               shrinkWrap: true,
               controller: _scroll,
@@ -540,7 +550,7 @@ class _QuickPickState extends State<QuickPick>
       return const SizedBox.shrink();
     }
     final all = _library.songsAZ;
-    final query = _pickSearch.text.trim().toLowerCase();
+    final query = _pickSearch.text;
     final inSet = set.songIds.toSet();
     final count = _picked.length;
     return _Panel(
@@ -593,8 +603,10 @@ class _QuickPickState extends State<QuickPick>
         padding: EdgeInsets.zero,
         children: [
           for (final song in all)
-            if (query.isEmpty || song.name.toLowerCase().contains(query))
+            if (matchesSearch(song.name, query))
               _pickRow(colors, song, inSet: inSet.contains(song.id)),
+          if (!all.any((s) => matchesSearch(s.name, query)))
+            NoMatches('songs', query, color: colors.muted),
         ],
       ),
       actions: [
@@ -679,10 +691,10 @@ class _QuickPickState extends State<QuickPick>
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    SearchName(
                       song.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      query: _pickSearch.text,
+                      matchColor: faint ?? colors.text,
                       style: TextStyle(fontSize: 16, color: faint),
                     ),
                     if (inSet)
@@ -732,12 +744,12 @@ class _QuickPickState extends State<QuickPick>
   Widget _setsPanel() {
     final colors = context.colors;
     final all = _library.setlistsRecentlyPlayed;
-    final query = _setSearch.text.trim().toLowerCase();
+    final query = _setSearch.text;
     final sets = [
       for (final set in all)
         if (query.isEmpty ||
             set.id == _renaming ||
-            set.name.toLowerCase().contains(query))
+            matchesSearch(set.name, query))
           set,
     ];
     final loaded = _library.activeSetlist?.id;
@@ -776,6 +788,8 @@ class _QuickPickState extends State<QuickPick>
             ),
       list: all.isEmpty
           ? _empty('No setlists yet')
+          : sets.isEmpty
+          ? NoMatches('sets', query, color: colors.muted)
           : ListView(
               shrinkWrap: true,
               padding: EdgeInsets.zero,
@@ -884,6 +898,11 @@ class _QuickPickState extends State<QuickPick>
                   enabled: !_reordering,
                   label: 'Remove',
                   actionLabel: 'Remove from set',
+                  moreActions: {
+                    if (i > 0) 'Move up': () => _move(setlist, i, i - 1),
+                    if (i < songs.length - 1)
+                      'Move down': () => _move(setlist, i, i + 1),
+                  },
                   onSwiped: () => _removeSong(setlist, i, songs[i]),
                   hint: i == _hintRow ? _hint : null,
                   child: _entryRow(
@@ -909,6 +928,12 @@ class _QuickPickState extends State<QuickPick>
         ),
       ],
     );
+  }
+
+  /// TalkBack's "Move up" / "Move down": one place, saved at once.
+  void _move(Setlist setlist, int from, int to) {
+    _library.reorderSetlist(setlist.id, from, to);
+    setState(() => _generation++);
   }
 
   /// The finger lifted a dragged row at list position [insert]: the new
@@ -1238,33 +1263,46 @@ class _QuickPickState extends State<QuickPick>
   Widget? _undoBar(MetraColors colors) {
     final undo = _undo;
     if (undo == null) return null;
-    return Container(
-      height: 48,
-      padding: const EdgeInsets.only(left: 12, right: 4),
-      decoration: BoxDecoration(
-        color: colors.divider,
-        border: Border(top: BorderSide(color: colors.border)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              undo.message,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 14, color: colors.tickSounding),
-            ),
+    // Swiped sideways it goes (the action stays done); screen readers
+    // announce it as it appears.
+    return Dismissible(
+      key: ObjectKey(undo),
+      onDismissed: (_) {
+        _undoTimer?.cancel();
+        setState(() => _undo = null);
+      },
+      child: Semantics(
+        liveRegion: true,
+        container: true,
+        child: Container(
+          height: 48,
+          padding: const EdgeInsets.only(left: 12, right: 4),
+          decoration: BoxDecoration(
+            color: colors.divider,
+            border: Border(top: BorderSide(color: colors.border)),
           ),
-          TextButton(
-            key: QuickPick.undoKey,
-            style: TextButton.styleFrom(foregroundColor: colors.text),
-            onPressed: _runUndo,
-            child: const Text(
-              'Undo',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-            ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  undo.message,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 14, color: colors.tickSounding),
+                ),
+              ),
+              TextButton(
+                key: QuickPick.undoKey,
+                style: TextButton.styleFrom(foregroundColor: colors.text),
+                onPressed: _runUndo,
+                child: const Text(
+                  'Undo',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1285,10 +1323,10 @@ class _QuickPickState extends State<QuickPick>
       SizedBox(width: 16, child: PlayMarker(current: current)),
       const SizedBox(width: 12),
       Expanded(
-        child: Text(
+        child: SearchName(
           song.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+          query: _search.text,
+          matchColor: colors.text,
           style: TextStyle(
             fontSize: 16,
             fontWeight: current ? FontWeight.w600 : FontWeight.w500,
@@ -1331,10 +1369,10 @@ class _QuickPickState extends State<QuickPick>
               : SetlistIcon(size: 16, color: colors.muted),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
+            child: SearchName(
               setlist.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              query: _setSearch.text,
+              matchColor: colors.text,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             ),
           ),

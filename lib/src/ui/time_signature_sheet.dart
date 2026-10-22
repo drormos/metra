@@ -4,6 +4,7 @@ import '../controller/metronome_controller.dart';
 import '../model/metronome_pattern.dart';
 import 'haptics.dart';
 import 'meter_control.dart';
+import 'swipe_row.dart';
 import 'theme.dart';
 
 /// The time signature sheet (ui-spec.md, `time-signature.reference.html`):
@@ -15,15 +16,47 @@ Future<void> showTimeSignatureSheet(
   MetronomeController metronome,
 ) => showModalBottomSheet<void>(
   context: context,
-  showDragHandle: true,
   isScrollControlled: true,
-  builder: (_) => TimeSignatureSheet(metronome: metronome),
+  // Our own drag (closes past a third, or on a flick down; Flutter's
+  // closes past half), so the sheet draws its own surface and handle.
+  enableDrag: false,
+  showDragHandle: false,
+  backgroundColor: context.colors.sheet.withAlpha(0),
+  elevation: 0,
+  builder: (context) => DragToClose(
+    axis: Axis.vertical,
+    onClose: () => Navigator.pop(context),
+    child: Material(
+      color: context.colors.sheet,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            key: TimeSignatureSheet.handleKey,
+            margin: const EdgeInsets.symmetric(vertical: 22),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: context.colors.beatResting,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Flexible(child: TimeSignatureSheet(metronome: metronome)),
+        ],
+      ),
+    ),
+  ),
 );
 
 class TimeSignatureSheet extends StatelessWidget {
   const TimeSignatureSheet({super.key, required this.metronome});
 
   final MetronomeController metronome;
+
+  static const handleKey = Key('sheet-handle');
 
   static const common = [
     (2, 4),

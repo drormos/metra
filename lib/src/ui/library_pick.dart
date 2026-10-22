@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'search_match.dart';
 import 'song_editor.dart';
 
 import '../controller/metronome_controller.dart';
@@ -100,10 +101,10 @@ class _LibraryPickState extends State<LibraryPick> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final query = _search.text.trim().toLowerCase();
+    final query = _search.text;
     final songs = [
       for (final song in widget.library.songsAZ)
-        if (query.isEmpty || song.name.toLowerCase().contains(query)) song,
+        if (matchesSearch(song.name, query)) song,
     ];
     final count = _checked.length;
     return EditorScaffold(
@@ -131,12 +132,7 @@ class _LibraryPickState extends State<LibraryPick> {
                     onAction: _newSongIntoSet,
                   )
                 : songs.isEmpty
-                ? Center(
-                    child: Text(
-                      'No songs match.',
-                      style: TextStyle(color: colors.muted),
-                    ),
-                  )
+                ? NoMatches('songs', query, color: colors.muted)
                 : ListView(
                     children: [
                       _selectAll(colors, songs),
@@ -269,10 +265,10 @@ class _LibraryPickState extends State<LibraryPick> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    SearchName(
                       song.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      query: _search.text,
+                      matchColor: colors.text,
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w500,

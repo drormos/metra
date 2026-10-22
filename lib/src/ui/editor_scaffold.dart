@@ -335,6 +335,9 @@ class SearchField extends StatelessWidget {
       builder: (context, value, _) => TextField(
         controller: controller,
         onChanged: onChanged,
+        // The search key closes the keyboard; the results stay.
+        textInputAction: TextInputAction.search,
+        onSubmitted: (_) => FocusScope.of(context).unfocus(),
         decoration: InputDecoration(
           hintText: hint,
           prefixIcon: Icon(Icons.search, color: colors.muted),

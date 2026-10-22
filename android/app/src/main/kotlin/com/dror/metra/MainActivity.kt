@@ -3,6 +3,7 @@ package com.dror.metra
 import android.content.Intent
 import android.content.res.Resources
 import android.media.AudioManager
+import android.view.accessibility.AccessibilityManager
 import android.os.Build
 import android.os.Bundle
 import com.ryanheise.audioservice.AudioServiceActivity
@@ -32,6 +33,23 @@ class MainActivity : AudioServiceActivity() {
                 "setLaunchTheme" -> {
                     setLaunchTheme(call.arguments as String)
                     result.success(null)
+                }
+                // Android's "Time to take action": how long the Undo bar
+                // stays (never shorter than asked).
+                "recommendedTimeout" -> {
+                    val base = (call.arguments as Number).toInt()
+                    result.success(
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            getSystemService(AccessibilityManager::class.java)
+                                .getRecommendedTimeoutMillis(
+                                    base,
+                                    AccessibilityManager.FLAG_CONTENT_TEXT or
+                                        AccessibilityManager.FLAG_CONTENT_CONTROLS,
+                                )
+                        } else {
+                            base
+                        },
+                    )
                 }
                 else -> result.notImplemented()
             }

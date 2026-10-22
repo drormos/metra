@@ -8,6 +8,7 @@ import 'settings_screen.dart';
 import 'setlist_picker.dart';
 import 'song_library.dart';
 import 'subdivision_icon.dart';
+import 'swipe_row.dart';
 import 'theme.dart';
 
 /// Opens the Menu (ui-spec.md "Menu", `menu.reference.html`): a 304px
@@ -72,9 +73,6 @@ class MenuPanel extends StatefulWidget {
 }
 
 class _MenuPanelState extends State<MenuPanel> {
-  // A swipe to the right closes the panel.
-  double _drag = 0;
-
   /// Closes the panel, then opens [page] from the main screen.
   void _go(void Function(BuildContext pages) page) {
     Navigator.pop(context);
@@ -89,118 +87,129 @@ class _MenuPanelState extends State<MenuPanel> {
     final padding = MediaQuery.paddingOf(context);
     return Align(
       alignment: Alignment.centerRight,
-      child: GestureDetector(
-        onHorizontalDragStart: (_) => _drag = 0,
-        onHorizontalDragUpdate: (d) => _drag += d.delta.dx,
-        onHorizontalDragEnd: (d) {
-          if (_drag > 60 || (d.primaryVelocity ?? 0) > 300) {
-            Navigator.pop(context);
-          }
-        },
-        child: Material(
-          color: colors.sheet,
-          child: Container(
-            key: MenuPanel.surfaceKey,
-            width: MenuPanel.width,
-            decoration: BoxDecoration(
-              border: Border(left: BorderSide(color: colors.border)),
-            ),
-            padding: EdgeInsets.fromLTRB(
-              20,
-              padding.top + 8,
-              20,
-              padding.bottom + 24,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(
-                  height: 44,
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Menu',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
+      // Swiped toward the right edge it follows the finger and closes past a
+      // third (or on a flick). A screen reader stays inside, reading "Menu".
+      child: DragToClose(
+        axis: Axis.horizontal,
+        onClose: () => Navigator.pop(context),
+        child: BlockSemantics(
+          child: Semantics(
+            scopesRoute: true,
+            namesRoute: true,
+            explicitChildNodes: true,
+            label: 'Menu',
+            child: Material(
+              color: colors.sheet,
+              child: Container(
+                key: MenuPanel.surfaceKey,
+                width: MenuPanel.width,
+                decoration: BoxDecoration(
+                  border: Border(left: BorderSide(color: colors.border)),
+                ),
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  padding.top + 8,
+                  20,
+                  padding.bottom + 24,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(
+                      height: 44,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Menu',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-                Expanded(
-                  child: ListView(
-                    padding: EdgeInsets.zero,
-                    children: [
-                      if (library != null) ...[
-                        Padding(
-                          padding: const EdgeInsets.only(top: 16, bottom: 2),
-                          child: Text(
-                            'Your music',
-                            style: TextStyle(fontSize: 13, color: colors.muted),
-                          ),
-                        ),
-                        _row(
-                          key: MenuPanel.songLibraryKey,
-                          icon: const SubdivisionIcon(1, size: 20),
-                          title: 'Song library',
-                          count: library.songs.length,
-                          onTap: () => _go(
-                            (pages) =>
-                                openSongLibrary(pages, library, metronome),
-                          ),
-                        ),
-                        _row(
-                          key: MenuPanel.setlistsKey,
-                          icon: const SetlistIcon(),
-                          title: 'Setlists',
-                          count: library.setlists.length,
-                          onTap: () => _go(
-                            (pages) => openSetlists(
-                              pages,
-                              library: library,
-                              metronome: metronome,
+                    Expanded(
+                      child: ListView(
+                        padding: EdgeInsets.zero,
+                        children: [
+                          if (library != null) ...[
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                top: 16,
+                                bottom: 2,
+                              ),
+                              child: Text(
+                                'Your music',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: colors.muted,
+                                ),
+                              ),
+                            ),
+                            _row(
+                              key: MenuPanel.songLibraryKey,
+                              icon: const SubdivisionIcon(1, size: 20),
+                              title: 'Song library',
+                              count: library.songs.length,
+                              onTap: () => _go(
+                                (pages) =>
+                                    openSongLibrary(pages, library, metronome),
+                              ),
+                            ),
+                            _row(
+                              key: MenuPanel.setlistsKey,
+                              icon: const SetlistIcon(),
+                              title: 'Setlists',
+                              count: library.setlists.length,
+                              onTap: () => _go(
+                                (pages) => openSetlists(
+                                  pages,
+                                  library: library,
+                                  metronome: metronome,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                          _row(
+                            key: MenuPanel.settingsKey,
+                            icon: const Icon(Icons.settings_outlined, size: 20),
+                            title: 'Settings',
+                            detail: 'Sound, volume, theme',
+                            onTap: () => _go(
+                              (pages) => openSettings(
+                                pages,
+                                metronome: metronome,
+                                library: library,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 24),
-                      ],
-                      _row(
-                        key: MenuPanel.settingsKey,
-                        icon: const Icon(Icons.settings_outlined, size: 20),
-                        title: 'Settings',
-                        detail: 'Sound, volume, theme',
-                        onTap: () => _go(
-                          (pages) => openSettings(
-                            pages,
-                            metronome: metronome,
-                            library: library,
+                          _row(
+                            key: MenuPanel.feedbackKey,
+                            title: 'Send feedback',
+                            detail: "Tell Dror what works and what doesn't",
+                            onTap: () => _go(sendFeedback),
                           ),
-                        ),
-                      ),
-                      _row(
-                        key: MenuPanel.feedbackKey,
-                        title: 'Send feedback',
-                        detail: "Tell Dror what works and what doesn't",
-                        onTap: () => _go(sendFeedback),
-                      ),
-                      _row(
-                        key: MenuPanel.aboutKey,
-                        title: 'About Metra',
-                        detail: 'Why this app exists',
-                        onTap: () => _go(
-                          (pages) => Navigator.push(
-                            pages,
-                            MaterialPageRoute<void>(
-                              builder: (_) => const AboutScreen(),
+                          _row(
+                            key: MenuPanel.aboutKey,
+                            title: 'About Metra',
+                            detail: 'Why this app exists',
+                            onTap: () => _go(
+                              (pages) => Navigator.push(
+                                pages,
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const AboutScreen(),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    const VersionLine(key: MenuPanel.versionKey),
+                  ],
                 ),
-                const VersionLine(key: MenuPanel.versionKey),
-              ],
+              ),
             ),
           ),
         ),

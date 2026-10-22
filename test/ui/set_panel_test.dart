@@ -878,9 +878,18 @@ void main() {
                 <int>[])
           CustomSemanticsAction.getAction(id)!.label!,
       ];
-      expect(actions(find.byType(SwipeRow).first), ['Remove from set']);
+      expect(
+        actions(find.byType(SwipeRow).first),
+        unorderedEquals(['Remove from set', 'Move down']),
+      );
+      expect(
+        actions(find.byType(SwipeRow).at(1)),
+        unorderedEquals(['Remove from set', 'Move up', 'Move down']),
+      );
       final node = tester.getSemantics(find.byType(SwipeRow).first);
-      final id = node.getSemanticsData().customSemanticsActionIds!.single;
+      final id = node.getSemanticsData().customSemanticsActionIds!.firstWhere(
+        (id) => CustomSemanticsAction.getAction(id)!.label == 'Remove from set',
+      );
       // A screen reader's custom action, as TalkBack sends it.
       // ignore: deprecated_member_use
       tester.binding.pipelineOwner.semanticsOwner!.performAction(
@@ -1068,6 +1077,74 @@ void main() {
       expect(metronome.isPlaying, isTrue);
       metronome.stop();
       await tester.pump();
+    });
+  });
+
+  group('polish', () {
+    testWidgets('the Undo bar: swipe it away and the removal stays; screen '
+        'readers hear it', (tester) async {
+      await pump(tester);
+      await openPanel(tester);
+      await tester.drag(row(0), const Offset(-260, 0));
+      await tester.pumpAndSettle();
+      final bar = find.byKey(QuickPick.undoKey);
+      expect(bar, findsOneWidget);
+      expect(
+        find.ancestor(
+          of: bar,
+          matching: find.byWidgetPredicate(
+            (w) => w is Semantics && (w.properties.liveRegion ?? false),
+          ),
+        ),
+        findsOneWidget,
+        reason: 'announced',
+      );
+      await tester.drag(
+        inPanel('Removed from Friday set'),
+        const Offset(300, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(QuickPick.undoKey), findsNothing);
+      expect(friday(), ['Two', 'Three'], reason: 'the removal stays done');
+    });
+
+    testWidgets('TalkBack "Move up" moves the row and saves', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pump(tester);
+      await openPanel(tester);
+      final node = tester.getSemantics(find.byType(SwipeRow).at(1));
+      final id = node.getSemanticsData().customSemanticsActionIds!.firstWhere(
+        (id) => CustomSemanticsAction.getAction(id)!.label == 'Move up',
+      );
+      // ignore: deprecated_member_use
+      tester.binding.pipelineOwner.semanticsOwner!.performAction(
+        node.id,
+        SemanticsAction.customAction,
+        id,
+      );
+      await tester.pumpAndSettle();
+      expect(friday(), ['Two', 'One', 'Three']);
+      expect(library.currentSong?.name, 'Two', reason: 'still playing Two');
+      handle.dispose();
+    });
+
+    testWidgets('search in the sets view: anywhere, accents ignored; no '
+        'match says so', (tester) async {
+      await pump(tester);
+      for (var i = 0; i < 8; i++) {
+        library.addSetlist('Extra $i');
+      }
+      library.addSetlist('Café gig');
+      await openPanel(tester);
+      await tester.tap(find.byKey(QuickPick.changeSetKey));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'cafe');
+      await tester.pump();
+      expect(inPanel('Friday set'), findsNothing);
+      expect(find.byKey(const ValueKey('no-matches')), findsNothing);
+      await tester.enterText(find.byType(TextField), 'xyz');
+      await tester.pump();
+      expect(inPanel('No sets match "xyz"'), findsOneWidget);
     });
   });
 }

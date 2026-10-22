@@ -58,6 +58,12 @@ abstract final class RowGestures {
   /// How far the one-time hint slides a row.
   static const hintSlide = 56.0;
 
+  /// The time signature sheet and the ☰ panel close when dragged past this
+  /// share of their size, or flicked faster than [closeFlick] (dp/s)
+  /// toward closing; otherwise they spring back ([springBack]).
+  static const closeFraction = 1 / 3;
+  static const closeFlick = 700.0;
+
   /// The long-press tolerance for the reorder lift too (see
   /// [HoldToReorder]).
   static const settings = DeviceGestureSettings(touchSlop: swipeStart);
@@ -433,6 +439,7 @@ class SwipeRow extends StatefulWidget {
     this.onHold,
     this.hint,
     this.enabled = true,
+    this.moreActions = const {},
   });
 
   final int index;
@@ -443,6 +450,9 @@ class SwipeRow extends StatefulWidget {
   final VoidCallback? onHold;
   final Animation<double>? hint;
   final bool enabled;
+
+  /// More TalkBack custom actions for the row ("Move up" / "Move down").
+  final Map<String, VoidCallback> moreActions;
   final Widget child;
 
   @override
@@ -593,6 +603,9 @@ class _SwipeRowState extends State<SwipeRow>
     return Semantics(
       customSemanticsActions: {
         CustomSemanticsAction(label: widget.actionLabel): _act,
+        for (final MapEntry(key: label, value: action)
+            in widget.moreActions.entries)
+          CustomSemanticsAction(label: label): action,
       },
       child: LayoutBuilder(
         builder: (context, box) {
@@ -652,6 +665,89 @@ class _SwipeRowState extends State<SwipeRow>
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Drag to close (ui-spec.md "Sheet behavior", "Panel behavior"): [child]
+/// follows the finger along [axis] toward closing (down, or right), and
+/// closes ([onClose]) past [RowGestures.closeFraction] of its size or on a
+/// flick faster than [RowGestures.closeFlick]; otherwise it springs back.
+class DragToClose extends StatefulWidget {
+  const DragToClose({
+    super.key,
+    required this.axis,
+    required this.onClose,
+    required this.child,
+  });
+
+  final Axis axis;
+  final VoidCallback onClose;
+  final Widget child;
+
+  @override
+  State<DragToClose> createState() => _DragToCloseState();
+}
+
+class _DragToCloseState extends State<DragToClose>
+    with SingleTickerProviderStateMixin {
+  late final _offset = AnimationController.unbounded(vsync: this);
+  bool _closing = false;
+
+  @override
+  void dispose() {
+    _offset.dispose();
+    super.dispose();
+  }
+
+  double get _size {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return 1;
+    return widget.axis == Axis.vertical ? box.size.height : box.size.width;
+  }
+
+  void _update(double delta) {
+    if (!_closing) _offset.value = max(0, _offset.value + delta);
+  }
+
+  void _end(double velocity) {
+    if (_closing) return;
+    final past = _offset.value > RowGestures.closeFraction * _size;
+    if (velocity > RowGestures.closeFlick ||
+        (past && velocity >= -RowGestures.closeFlick)) {
+      _closing = true;
+      widget.onClose();
+    } else {
+      _offset.animateTo(
+        0,
+        duration: RowGestures.springBack,
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final vertical = widget.axis == Axis.vertical;
+    return GestureDetector(
+      onVerticalDragUpdate: vertical ? (d) => _update(d.delta.dy) : null,
+      onVerticalDragEnd: vertical
+          ? (d) => _end(d.velocity.pixelsPerSecond.dy)
+          : null,
+      onHorizontalDragUpdate: vertical ? null : (d) => _update(d.delta.dx),
+      onHorizontalDragEnd: vertical
+          ? null
+          : (d) => _end(d.velocity.pixelsPerSecond.dx),
+      child: AnimatedBuilder(
+        animation: _offset,
+        builder: (context, child) => Transform.translate(
+          offset: vertical
+              ? Offset(0, _offset.value)
+              : Offset(_offset.value, 0),
+          child: child,
+        ),
+        child: widget.child,
       ),
     );
   }

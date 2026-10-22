@@ -217,6 +217,30 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('pulse-1-off')));
       expect(controller.pattern.polyStates[1], StepLevel.accent);
     });
+    testWidgets('the sheet follows a drag down: short springs back, past a '
+        'third closes', (tester) async {
+      await pumpScreen(tester);
+      await tester.tap(find.byKey(MetronomeScreen.meterKey));
+      await tester.pumpAndSettle();
+      final top = tester.getTopLeft(find.byKey(TimeSignatureSheet.handleKey));
+      final sheet = tester.getSize(find.byType(TimeSignatureSheet));
+      await tester.timedDrag(
+        find.byKey(TimeSignatureSheet.handleKey),
+        Offset(0, sheet.height * 0.2),
+        const Duration(seconds: 1),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(TimeSignatureSheet), findsOneWidget);
+      expect(tester.getTopLeft(find.byKey(TimeSignatureSheet.handleKey)), top);
+      await tester.timedDrag(
+        find.byKey(TimeSignatureSheet.handleKey),
+        Offset(0, sheet.height * 0.45),
+        const Duration(seconds: 1),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(TimeSignatureSheet), findsNothing);
+    });
+
     testWidgets('time signature picker sets the meter', (tester) async {
       await pumpScreen(tester);
       await pick(tester, MetronomeScreen.meterKey, '7/8');
