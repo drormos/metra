@@ -67,6 +67,22 @@ Theme setting: System (default) / Dark / Light, persisted. System follows the OS
 
 Long-press means "edit it", as a shortcut. In a set's songs (an ordered list), editing means moving: long-press lifts the row and dragging reorders. In the Songs list and the sets view, long-press renames in place. Long-pressing the song title on the main screen opens the song editor. Never on stage-critical buttons (Start/Stop, tempo, previous/next, the context row's center button).
 
+## Motion
+
+Things never pop in or vanish; they arrive and leave quickly and softly, and nothing waits for an animation (see "Never wait for an animation"). One set of values, defined once in the theme next to the colors:
+
+| Token | Duration | Curve | Used for |
+|---|---|---|---|
+| swap | 120ms | ease-in-out | text that changes in place: the BPM number, the title and set name, the tempo-name line ↔ Revert · Save · Save as new ↔ hints ↔ "✓ Saved" |
+| leave | 220ms | ease-in (fade) + ease-in-out (height) | things that go away: hints, the Undo bar, removed rows |
+| arrive | 200ms | ease-out | things that appear: hints, the Undo bar, the panel's content swapping in place |
+
+- **Text swaps (swap):** a cross-fade in place, the old text fading out while the new fades in, with no slide and no size change, so nothing moves (Principle 4). BPM: only the digits that change cross-fade; while a ±button is held or the ruler is moving, the number updates instantly (no fade), so fast changes never lag behind the finger.
+- **Hints and the Undo bar leaving (leave):** they fade out while their height smoothly closes, so the list "flows down" into the space instead of jumping. A hint over empty space (the line under the BPM) just fades.
+- **Arriving (arrive):** fade in plus a 6px rise.
+- **Beat lights:** a sounding block, subdivision tick or polyrhythm cell turns on **instantly** (the light marks the exact moment of the click, so no fade-in, ever) and fades back to its resting color over ~90ms (ease-out), or a third of the time to the next click if that's shorter, so it never blurs into the next one at fast tempos. It reads like a struck light, not a switch, and stays exact.
+- **Reduced motion** (Android "Remove animations"): swaps and arrive/leave become instant; beat lights switch on and off with no fade.
+
 ## Icons
 
 - **Setlist:** "note queue": three lines (the last one short) with a music note at the lower right. Used on the Setlists button, the setlist header, set rows, and the Setlists dropdown. Distinct from the Menu icon.
@@ -197,6 +213,7 @@ Choosing what to play never leaves the main screen. The context row's center but
   - **From the set (set-first), easier to see:** the pinned "+ Add songs" at the bottom of the set panel becomes an outlined button (48px, 2px border, setlist icon + "Add songs") instead of a plain row, so it reads as the panel's main action. After "+ New setlist" → name → picking songs → Add: if the click is stopped, the new set **loads** at song 1 (you just built it to play it) and the panel shows its songs; if it's playing, nothing switches (the click is never interrupted by creating something) and you're back in the sets view with the new set on top.
 - **One-time hints (Principle 7).** Long-press and swipe have no visible button, so each list teaches them once. After the swipe nudge (see Set ⌄), a small muted line appears under the list for ~3 s: "Hold a song to move it · Swipe to remove" (set panel), "Hold a set to rename it · Swipe to delete" (sets view), "Hold a song to rename it · Swipe to delete" (Songs list). Once per list (stored flag), skipped with Remove animations. Screen readers get the same actions as custom actions (see Accessibility).
 - **Delete asks, remove undoes.** One rule for every list: swiping something that deletes your own work (a song from the library, a whole set) asks first in a small dialog, because a song can hold real work (and later trainer settings) and is shared by sets; after confirming, the same Undo bar still appears as a second chance for a mistaken tap. Swiping that only takes something out of a list (a song out of a set) deletes nothing, so it's immediate with the Undo bar. See `delete-confirm.reference.html`.
+- **Taller panel (drag to expand):** every list panel (set panel, sets view, Songs list, song picker) has a small grab handle at its top edge (36×4px, #3A3A3A, centered, inside a 24px tall drag area). Dragging it up expands the panel to the full space above the context row (top: just under the status bar), for longer editing; it follows the finger and snaps to whichever height is nearer on release, or by flick direction. Two heights only: normal (as today) and tall. Dragging down from normal closes the panel, like tapping outside. Each panel opens at normal height every time (it never remembers tall), so on stage it always looks the same. Back from tall closes the panel (one level, not "back to normal"). With the keyboard up, the panel is already as tall as it can be; the handle does nothing. The context row and tabs stay visible below in both heights. See the "Taller panel" board.
 - **No "Free play" rows in the dropdowns:** Free play is the middle mode tab, always visible.
 - **Panel structure:** the search field (when shown) is pinned at the top and the action rows ("+ New song ›", "+ New setlist ›", "+ Add songs ›") are pinned at the bottom; only the list between them scrolls. The pinned action group is separated from the list by a 2px #2E2E2E line, and its rows by 1px #1F1F1F lines, so actions never read as list items.
 - **Long-press a row:** in the Songs list and the sets view it renames in place; in a set's songs it reorders (see Set ⌄).
@@ -314,6 +331,16 @@ Generate all platform sizes from these (e.g. with `flutter_launcher_icons`, afte
   - Only in setlist mode, a choice "In Friday set": **Replace Dead Weight** (default; the new song takes its place in the set, same position), **Add after Dead Weight** (both stay), **Don't add** (the app leaves the set and plays it in Single song mode).
   - Save creates the song in the library from the current tempo, time signature, subdivision, and beat states, and makes it the loaded song. The click carries on unchanged, no restart. The original song is untouched (in the library and in other sets). Nothing is unsaved anymore, so the tempo-name line returns.
   - From Free play or Single song there's no set question; the app is then in Single song mode with the new song.
+
+## First launch and updates
+
+- **Example content (first launch only):** a fresh install with an empty library gets 4 example songs and 1 example set, so every list, gesture and hint has something to show on. The app still opens in Free play.
+  - Songs: "Example · Rock" (120, 4/4, beat 1 accented), "Example · Waltz" (90, 3/4), "Example · Shuffle" (100, 4/4, triplet subdivision), "Example · Odd" (140, 7/8, accents on 1, 3, 5).
+  - Set: "Try me" with all four, in that order.
+  - They're ordinary songs and sets: play, rename, reorder, delete. Never re-created once deleted (stored flag), and never added to a library that already has songs (an update or a restore from backup doesn't add them).
+- **What's new (after each update):** the first time the app opens after an update, the ☰ button shows a small red dot (8px, top-right corner of the button). Opening the menu shows, above Settings, a muted block: "New in 1.0.3", up to 3 short lines ("Add a new song straight to a set", …), and two quiet text buttons: "All updates ›" and "Got it" (hides the block and the dot until the next update). Opening the menu also clears the dot. A fresh install shows no block. Never a popup.
+  - **All updates:** a simple page, newest version first: each version as a small heading ("1.0.3 · Oct 2026") with its lines under it. Reached from "All updates ›" in the block and from a row "All updates" on the About Metra page, so it's always findable after "Got it".
+  - **One source:** `assets/whats_new.md` holds every version, newest first (a "## 1.0.3 · Oct 2026" heading, then "- " lines). The block shows the top version; the page shows all of it; the top version's lines are also the Play Store release notes.
 
 ## Haptics
 

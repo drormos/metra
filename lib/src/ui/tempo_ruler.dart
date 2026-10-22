@@ -141,6 +141,8 @@ class _TempoRulerState extends State<TempoRuler>
   // Restarted by every real move; fires once the finger has rested.
   Timer? _lockTimer;
   bool _locked = false;
+  // Dragged or gliding (see [MetraMotion.tempoMoving]).
+  bool _moving = false;
   // Bpm direction of the last move: +1 up, −1 down.
   int _direction = 0;
   // Where this drag began, to cap how far one swipe goes.
@@ -154,6 +156,7 @@ class _TempoRulerState extends State<TempoRuler>
 
   @override
   void dispose() {
+    if (_moving) MetraMotion.moving(-1);
     _lockTimer?.cancel();
     _glide.dispose();
     super.dispose();
@@ -165,10 +168,15 @@ class _TempoRulerState extends State<TempoRuler>
     if (Haptics.reachesFive(previous, clamped)) Haptics.tick();
     setState(() => _value = clamped);
     _set(clamped.round());
-    if (_glide.isAnimating && clamped != value) _glide.stop(); // hit an end
+    if (_glide.isAnimating && clamped != value) {
+      _glide.stop(); // hit an end
+      _settle();
+    }
   }
 
   void _start(DragStartDetails details) {
+    if (!_moving) MetraMotion.moving(1);
+    _moving = true;
     _glide.stop(); // touching the ruler stops a glide
     _value ??= widget.bpm.toDouble();
     _swipeStart = _value!;
@@ -284,6 +292,8 @@ class _TempoRulerState extends State<TempoRuler>
 
   /// Back to rest: the ruler shows the whole tempo again.
   void _settle() {
+    if (_moving) MetraMotion.moving(-1);
+    _moving = false;
     if (!mounted) return;
     setState(() => _value = null);
   }

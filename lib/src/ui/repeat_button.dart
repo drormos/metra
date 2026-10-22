@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import 'haptics.dart';
+import 'theme.dart';
 
 /// A filled button that fires once on tap and repeats while held
 /// (ui-spec.md "Hold to repeat": tempo buttons, and the song editor's and
@@ -42,10 +43,13 @@ class RepeatButton extends StatefulWidget {
 
 class _RepeatButtonState extends State<RepeatButton> {
   Timer? _repeat;
+  bool _holding = false;
   // How long the button has been held, summed from the scheduled steps.
   Duration _held = Duration.zero;
 
   void _start() {
+    if (!_holding) MetraMotion.moving(1);
+    _holding = true;
     widget.onPressed?.call();
     _held = RepeatButton.holdDelay;
     _scheduleNext();
@@ -76,6 +80,8 @@ class _RepeatButtonState extends State<RepeatButton> {
   }
 
   void _stop() {
+    if (_holding) MetraMotion.moving(-1);
+    _holding = false;
     _repeat?.cancel();
     _repeat = null;
   }

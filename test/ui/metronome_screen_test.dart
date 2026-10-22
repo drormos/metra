@@ -306,7 +306,9 @@ void main() {
       expect(controller.pattern.beatLevels[2], StepLevel.silent);
     });
 
-    testWidgets('with subdivisions the beat dot stays lit', (tester) async {
+    testWidgets('with subdivisions the beat dot lights at the beat only', (
+      tester,
+    ) async {
       controller.setPattern(
         MetronomePattern.simple(beatsPerBar: 4, stepsPerBeat: 2),
       );
@@ -314,11 +316,13 @@ void main() {
       await pumpScreen(tester);
       await tester.tap(find.byKey(MetronomeScreen.playKey));
       await tester.pump();
-      // 120 BPM, 2 per beat: steps at 120, 370, 620 ms. 400 ms is the
-      // second half of beat 1.
-      output.time = const Duration(milliseconds: 400);
+      // 120 BPM, 2 per beat: steps at 120, 370, 620 ms.
+      output.time = const Duration(milliseconds: 140);
       await tester.pump(const Duration(milliseconds: 16));
       expect(find.byKey(const ValueKey('beat-0-on')), findsOneWidget);
+      output.time = const Duration(milliseconds: 400); // the eighth
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(find.byKey(const ValueKey('beat-0-off')), findsOneWidget);
       await tester.tap(find.byKey(MetronomeScreen.playKey));
       await tester.pump();
     });
@@ -337,7 +341,10 @@ void main() {
   testWidgets('tempo name follows the bpm', (tester) async {
     await pumpScreen(tester);
     String name() =>
-        tester.widget<Text>(find.byKey(MetronomeScreen.tempoNameKey)).data!;
+        // The newest, while the old one cross-fades out.
+        tester
+            .widget<Text>(find.byKey(MetronomeScreen.tempoNameKey).last)
+            .data!;
     expect(name(), 'Allegro');
     controller.setBpm(60);
     await tester.pump();
@@ -385,24 +392,74 @@ void main() {
       expect(key('tick-3-2-off'), findsOneWidget);
     });
 
-    testWidgets('a tick lights only for its own click; the block for the '
-        'whole beat', (tester) async {
+    testWidgets('lights come on at their click and fade back at once: the '
+        'block at its beat, a tick at its own click', (tester) async {
       await startTwoPerBeat(tester);
-      await playAt(tester, 150);
+      await playAt(tester, 140); // 20 ms after beat 1
       expect(key('beat-0-on'), findsOneWidget);
       expect(key('tick-0-0-on'), findsOneWidget);
       expect(key('tick-0-1-off'), findsOneWidget);
-
-      await playAt(tester, 400);
-      expect(key('beat-0-on'), findsOneWidget, reason: 'still beat 1');
+      final lit = tester.widget<Container>(key('beat-0-on')).color!;
+      await playAt(tester, 180);
+      expect(key('beat-0-on'), findsOneWidget, reason: 'still fading');
+      expect(
+        tester.widget<Container>(key('beat-0-on')).color,
+        isNot(lit),
+        reason: 'dimmer than at the click',
+      );
+      await playAt(tester, 220); // 100 ms on: past the 90 ms fade
+      expect(key('beat-0-off'), findsOneWidget);
       expect(key('tick-0-0-off'), findsOneWidget);
+
+      await playAt(tester, 380); // the eighth
+      expect(key('beat-0-off'), findsOneWidget, reason: 'not relit');
       expect(key('tick-0-1-on'), findsOneWidget);
 
-      await playAt(tester, 650);
-      expect(key('beat-0-off'), findsOneWidget, reason: 'nothing stays lit');
+      await playAt(tester, 640);
       expect(key('beat-1-on'), findsOneWidget);
       await stop(tester);
       expect(key('beat-1-off'), findsOneWidget);
+    });
+
+    testWidgets('300 bpm in 16ths: each tick lights at its click and is '
+        'back at rest before the next (no blur, no lag)', (tester) async {
+      controller
+        ..setBpm(300)
+        ..setPattern(MetronomePattern.simple(beatsPerBar: 4, stepsPerBeat: 4))
+        ..setVisualOffset(Duration.zero);
+      await pumpScreen(tester);
+      await tester.tap(find.byKey(MetronomeScreen.playKey));
+      await tester.pump();
+      // 16ths at 300 bpm are 50 ms apart, from 120 ms.
+      for (var n = 0; n < 8; n++) {
+        final at = 120 + n * 50;
+        final (beat, tick) = (n ~/ 4, n % 4);
+        await playAt(tester, at + 4);
+        expect(key('tick-$beat-$tick-on'), findsOneWidget, reason: 'step $n');
+        await playAt(tester, at + 20); // past a third of 50 ms
+        expect(key('tick-$beat-$tick-off'), findsOneWidget, reason: 'step $n');
+      }
+      await stop(tester);
+    });
+
+    testWidgets('"Remove animations": a block stays on for its beat, then '
+        'off (no fade)', (tester) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await startTwoPerBeat(tester);
+      await playAt(tester, 140);
+      final lit = tester.widget<Container>(key('beat-0-on')).color;
+      await playAt(tester, 400);
+      expect(key('beat-0-on'), findsOneWidget);
+      expect(tester.widget<Container>(key('beat-0-on')).color, lit);
+      await playAt(tester, 600);
+      expect(key('beat-0-on'), findsOneWidget);
+      await playAt(tester, 640);
+      expect(key('beat-0-off'), findsOneWidget);
+      await stop(tester);
     });
 
     testWidgets('a muted beat never lights; its subdivisions still do', (
@@ -990,5 +1047,54 @@ void main() {
     );
     addTearDown(controller.dispose);
     expect(find.text('Update the app'), findsOneWidget);
+  });
+
+  group('motion: text swaps in place', () {
+    Finder digits() => find.descendant(
+      of: find.byKey(MetronomeScreen.bpmKey),
+      matching: find.byType(Text),
+    );
+
+    testWidgets('only the digit that changes cross-fades; nothing moves', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      Rect at(Finder f) => tester.getRect(f);
+      final bpm = at(find.byKey(MetronomeScreen.bpmKey));
+      final ruler = at(find.byType(TempoRuler));
+      expect(digits(), findsNWidgets(3));
+      controller.setBpm(121);
+      await tester.pump();
+      await tester.pump(MetraMotion.swap ~/ 2);
+      expect(digits(), findsNWidgets(4), reason: 'the units: 0 out, 1 in');
+      expect(at(find.byKey(MetronomeScreen.bpmKey)), bpm);
+      expect(at(find.byType(TempoRuler)), ruler);
+      await tester.pump(MetraMotion.swap);
+      expect(digits(), findsNWidgets(3));
+    });
+
+    testWidgets('while the tempo is being held or dragged, instant', (
+      tester,
+    ) async {
+      await pumpScreen(tester);
+      MetraMotion.tempoMoving.value++;
+      addTearDown(() => MetraMotion.tempoMoving.value--);
+      await tester.pump();
+      controller.setBpm(121);
+      await tester.pump();
+      expect(digits(), findsNWidgets(3), reason: 'no fade');
+    });
+
+    testWidgets('"Remove animations": instant', (tester) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await pumpScreen(tester);
+      controller.setBpm(121);
+      await tester.pump();
+      expect(digits(), findsNWidgets(3));
+    });
   });
 }

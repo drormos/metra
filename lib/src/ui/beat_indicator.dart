@@ -7,11 +7,27 @@ import '../model/metronome_pattern.dart';
 import 'haptics.dart';
 import 'theme.dart';
 
+/// How lit a beat light is [since] its click (ui-spec.md "Motion"): fully
+/// on at the click, never a fade-in, then back to rest over
+/// [MetraMotion.lightFade] (ease-out), or a third of [period] (the time to
+/// its next click) if shorter. [reduced] ("Remove animations"): on until
+/// the next click, then off.
+double beatLight(Duration since, Duration? period, {required bool reduced}) {
+  if (since.isNegative) return 0;
+  if (reduced) return period == null || since < period ? 1 : 0;
+  var fade = MetraMotion.lightFade;
+  if (period != null && period ~/ 3 < fade) fade = period ~/ 3;
+  if (since >= fade || fade <= Duration.zero) return 0;
+  return 1 -
+      Curves.easeOut.transform(since.inMicroseconds / fade.inMicroseconds);
+}
+
 /// Beat blocks (ui-spec.md): one block per beat with a subdivision strip
 /// under it. Blocks show their type at rest (accent, regular, muted) and
-/// light only while sounding: a block for its whole beat, a tick for its own
-/// click. Driven by the engine clock (plus the visual offset), checked once
-/// per frame. Tapping a block cycles regular → accent → muted.
+/// light at their click: a block at its beat, a tick at its own click,
+/// each fading back at once ([beatLight]). Driven by the engine clock
+/// (plus the visual offset), read once per frame. Tapping a block cycles
+/// regular → accent → muted.
 class BeatIndicator extends StatefulWidget {
   const BeatIndicator({super.key, required this.controller});
 
@@ -27,6 +43,8 @@ class _BeatIndicatorState extends State<BeatIndicator>
 
   // Display-only: derived from the engine clock every frame.
   ScheduledStep? _step;
+  double _blockLight = 0;
+  double _tickLight = 0;
 
   MetronomeController get _controller => widget.controller;
 
@@ -53,17 +71,51 @@ class _BeatIndicatorState extends State<BeatIndicator>
       }
     } else {
       _ticker.stop();
-      if (_step != null) setState(() => _step = null);
+      if (_step != null) {
+        setState(() {
+          _step = null;
+          _blockLight = _tickLight = 0;
+        });
+      }
     }
   }
 
   // The frame timestamp, not the ticker's elapsed time: one clock shared
   // with the polyrhythm lane, which feeds the same smoother.
+  // Rebuilds only when something lit changes: a new step, or a fade.
   void _onTick(Duration _) {
-    final step = _controller.visualStepAt(
+    final now = _controller.visualTimeAt(
       SchedulerBinding.instance.currentFrameTimeStamp,
     );
-    if (step?.index != _step?.index) setState(() => _step = step);
+    final step = now == null ? null : _controller.stepAt(now);
+    var block = 0.0;
+    var tick = 0.0;
+    if (now != null && step != null) {
+      final reduced = MetraMotion.reduced(context);
+      final perBeat = step.pattern.stepsPerBeat;
+      final interval = _controller.stepInterval(step);
+      // The block lights at its beat's first click.
+      final beatStart = interval == null
+          ? step.time
+          : step.time - interval * (step.barPosition % perBeat);
+      block = beatLight(
+        now - beatStart,
+        interval == null ? null : interval * perBeat,
+        reduced: reduced,
+      );
+      tick = step.level == StepLevel.silent
+          ? 0
+          : beatLight(now - step.time, interval, reduced: reduced);
+    }
+    if (step?.index != _step?.index ||
+        block != _blockLight ||
+        tick != _tickLight) {
+      setState(() {
+        _step = step;
+        _blockLight = block;
+        _tickLight = tick;
+      });
+    }
   }
 
   @override
@@ -104,7 +156,9 @@ class _BeatIndicatorState extends State<BeatIndicator>
                   _block(
                     beat,
                     level,
-                    sounding: beat == soundingBeat && level != StepLevel.silent,
+                    light: beat == soundingBeat && level != StepLevel.silent
+                        ? _blockLight
+                        : 0,
                   ),
                   if (perBeat > 1) ...[
                     const SizedBox(height: 5),
@@ -116,7 +170,9 @@ class _BeatIndicatorState extends State<BeatIndicator>
                             child: _tick(
                               beat,
                               tick,
-                              sounding: beat * perBeat + tick == soundingStep,
+                              light: beat * perBeat + tick == soundingStep
+                                  ? _tickLight
+                                  : 0,
                             ),
                           ),
                         ],
@@ -163,15 +219,16 @@ class _BeatIndicatorState extends State<BeatIndicator>
     );
   }
 
-  Widget _block(int beat, StepLevel level, {required bool sounding}) {
+  Widget _block(int beat, StepLevel level, {required double light}) {
     final colors = context.colors;
     final muted = level == StepLevel.silent;
     final accent = level == StepLevel.accent;
+    final sounding = light > 0;
     final color = muted
         ? colors.mutedFill
         : accent
-        ? (sounding ? colors.accentSounding : colors.accentResting)
-        : (sounding ? colors.beatSounding : colors.beatResting);
+        ? Color.lerp(colors.accentResting, colors.accentSounding, light)!
+        : Color.lerp(colors.beatResting, colors.beatSounding, light)!;
     return ClipRRect(
       borderRadius: BorderRadius.circular(4),
       child: Container(
@@ -183,10 +240,14 @@ class _BeatIndicatorState extends State<BeatIndicator>
     );
   }
 
-  Widget _tick(int beat, int tick, {required bool sounding}) => Container(
-    key: ValueKey('tick-$beat-$tick-${sounding ? 'on' : 'off'}'),
+  Widget _tick(int beat, int tick, {required double light}) => Container(
+    key: ValueKey('tick-$beat-$tick-${light > 0 ? 'on' : 'off'}'),
     height: 5,
-    color: sounding ? context.colors.tickSounding : context.colors.tickResting,
+    color: Color.lerp(
+      context.colors.tickResting,
+      context.colors.tickSounding,
+      light,
+    ),
   );
 }
 

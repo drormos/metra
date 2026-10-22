@@ -24,14 +24,8 @@ Future<void> showMenuPanel(
     barrierDismissible: true,
     barrierLabel: 'Close menu',
     barrierColor: context.colors.dim,
-    transitionDuration: RowGestures.motion(
-      context,
-      const Duration(milliseconds: 200),
-    ),
-    reverseTransitionDuration: RowGestures.motion(
-      context,
-      const Duration(milliseconds: 150),
-    ),
+    transitionDuration: RowGestures.motion(context, MetraMotion.arrive),
+    reverseTransitionDuration: RowGestures.motion(context, MetraMotion.leave),
     pageBuilder: (_, _, _) =>
         MenuPanel(metronome: metronome, library: library, pages: context),
     transitionsBuilder: (_, animation, _, child) => SlideTransition(

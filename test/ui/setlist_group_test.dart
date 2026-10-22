@@ -18,6 +18,9 @@ import 'package:metra/src/ui/tabular_text.dart';
 import 'package:metra/src/ui/tempo_ruler.dart';
 
 import '../audio/fake_click_output.dart';
+
+import 'package:metra/src/ui/theme.dart';
+
 import 'test_theme.dart';
 
 void main() {
@@ -73,8 +76,9 @@ void main() {
       await tester.pump();
     }
 
+    // The newest title, while the old one cross-fades out.
     String title(WidgetTester tester) =>
-        tester.widget<Text>(find.byKey(MetronomeScreen.titleKey)).data!;
+        tester.widget<Text>(find.byKey(MetronomeScreen.titleKey).last).data!;
 
     bool enabled(WidgetTester tester, Key key) =>
         tester.widget<FilledButton>(find.byKey(key)).onPressed != null;
@@ -226,6 +230,8 @@ void main() {
         await tester.pump();
         expect(find.text(firstLoad), findsOneWidget);
         await tester.pump(const Duration(seconds: 4));
+        await tester.pump();
+        await tester.pump(MetraMotion.leave * 2); // past the fade
         expect(find.text(firstLoad), findsNothing);
         expect(find.byKey(MetronomeScreen.tempoNameKey), findsOneWidget);
         await tester.tap(find.byKey(SetlistGroup.nextKey)); // Two
@@ -254,6 +260,8 @@ void main() {
         await tester.pump();
         expect(find.text(firstLoad), findsOneWidget);
         await tester.pump(const Duration(seconds: 4));
+        await tester.pump();
+        await tester.pump(MetraMotion.leave * 2); // past the fade
         library.saveAsNewSong('Fresher', metronome, fresh: true);
         await tester.pump();
         expect(find.text(firstLoad), findsNothing, reason: 'once');
@@ -268,6 +276,8 @@ void main() {
         await tester.tap(find.byKey(SetlistGroup.nextKey));
         await tester.pump();
         await tester.pump(const Duration(seconds: 4));
+        await tester.pump();
+        await tester.pump(MetraMotion.leave * 2); // past the fade
         Rect at(Finder f) => tester.getRect(f);
         final ruler = at(find.byType(TempoRuler));
         final bpm = at(find.byKey(MetronomeScreen.bpmKey));
@@ -288,6 +298,8 @@ void main() {
         expect(find.text(firstChange), findsNothing);
         expect(find.text('Saved to the song'), findsOneWidget, reason: 'C');
         await tester.pump(const Duration(milliseconds: 1500));
+        await tester.pump();
+        await tester.pump(MetraMotion.leave * 2); // past the fade
         expect(find.byKey(MetronomeScreen.tempoNameKey), findsOneWidget);
         await tester.tap(find.text('+1'));
         await tester.pump();
@@ -307,6 +319,8 @@ void main() {
         await tester.pump();
         expect(find.text(firstChange), findsOneWidget);
         await tester.pump(const Duration(seconds: 8));
+        await tester.pump();
+        await tester.pump(MetraMotion.leave * 2); // past the fade
         expect(find.text(firstChange), findsNothing);
         expect(find.byKey(MetronomeScreen.revertKey), findsOneWidget);
       });
@@ -316,7 +330,7 @@ void main() {
       tester,
     ) async {
       await withSet(tester);
-      Rect title() => tester.getRect(find.byKey(MetronomeScreen.titleKey));
+      Rect title() => tester.getRect(find.byKey(MetronomeScreen.titleKey).last);
       Rect bar() => tester.getRect(find.byType(SetlistGroup));
       await tester.tap(find.byKey(SetlistGroup.nextKey));
       await tester.pump();
@@ -351,7 +365,7 @@ void main() {
         await tester.pump();
         expect(
           tester
-              .widget<Text>(find.byKey(MetronomeScreen.titleKey))
+              .widget<Text>(find.byKey(MetronomeScreen.titleKey).last)
               .style!
               .fontSize,
           lessThan(34),

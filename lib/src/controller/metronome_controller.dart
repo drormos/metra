@@ -120,6 +120,20 @@ class MetronomeController extends ChangeNotifier {
     return _scheduler.pulseAt(engineTime - _visualOffset);
   }
 
+  /// The engine time the lights show at [frameTime] (smoothed, minus the
+  /// visual offset), or null when stopped. One reading per frame feeds
+  /// [stepAt], [pulseAt] and the lights' fades.
+  Duration? visualTimeAt(Duration frameTime) => !_playing
+      ? null
+      : _smoother.estimate(_output.now(), frameTime) - _visualOffset;
+
+  ScheduledStep? stepAt(Duration time) => _scheduler.stepAt(time);
+
+  ScheduledPulse? pulseAt(Duration time) => _scheduler.pulseAt(time);
+
+  /// See [ClickScheduler.stepInterval].
+  Duration? stepInterval(ScheduledStep step) => _scheduler.stepInterval(step);
+
   /// Call when the frame-time source restarts (e.g. a new Ticker).
   void resetVisualClock() => _smoother = EngineClockSmoother();
 

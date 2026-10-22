@@ -13,6 +13,7 @@ import 'beat_indicator.dart';
 import 'fit_text.dart';
 import 'haptics.dart';
 import 'menu_panel.dart';
+import 'motion.dart';
 import 'poly_lane.dart';
 import 'setlist_group.dart';
 import 'save_as_new_dialog.dart';
@@ -350,17 +351,22 @@ class MetronomeScreen extends StatelessWidget {
           // never moves the subtitle.
           SizedBox(
             height: 34,
-            child: Align(
+            // A new name cross-fades in place.
+            child: Swap(
+              value: song?.name,
               alignment: Alignment.bottomLeft,
-              child: FitText(
-                song?.name ?? '',
-                textKey: titleKey,
-                minFontSize: 22,
-                style: const TextStyle(
-                  fontFamily: MetraFonts.condensed,
-                  fontSize: 34,
-                  fontWeight: FontWeight.w700,
-                  height: 1,
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: FitText(
+                  song?.name ?? '',
+                  textKey: titleKey,
+                  minFontSize: 22,
+                  style: const TextStyle(
+                    fontFamily: MetraFonts.condensed,
+                    fontSize: 34,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                  ),
                 ),
               ),
             ),
@@ -370,15 +376,22 @@ class MetronomeScreen extends StatelessWidget {
           // so the subtitle sits on the block's bottom in every mode.
           SizedBox(
             height: 17,
-            child: Text(
-              set?.name ?? '',
-              key: subtitleKey,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 14,
-                height: 17 / 14,
-                color: colors.muted,
+            child: Swap(
+              value: set?.name,
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: double.infinity,
+                child: Text(
+                  set?.name ?? '',
+                  key: subtitleKey,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 17 / 14,
+                    color: colors.muted,
+                  ),
+                ),
               ),
             ),
           ),
@@ -684,34 +697,51 @@ class _TempoLineState extends State<_TempoLine> {
     final colors = context.colors;
     final library = widget.library;
     final controller = widget.controller;
+    // One state at a time, cross-fading in place (the "swap" motion):
+    // the tempo name, A, "✓ Saved ...", or the actions.
     if (library == null || !library.songChanged(controller)) {
       final saved = _saved;
-      return Center(
-        child: saved != null
-            ? Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.check, size: 14, color: colors.muted),
-                  const SizedBox(width: 8),
-                  Text(
-                    saved,
-                    style: TextStyle(fontSize: 15, color: colors.muted),
-                  ),
-                ],
-              )
-            : _firstLoad
-            ? Text(
-                _TempoLine.firstLoadText,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 15, color: colors.text),
-              )
-            : Text(
-                tempoName(widget.bpm),
-                key: MetronomeScreen.tempoNameKey,
-                style: TextStyle(fontSize: 16, color: colors.muted),
-              ),
+      return Swap(
+        value: saved ?? (_firstLoad ? 'first-load' : tempoName(widget.bpm)),
+        child: _quiet(colors),
       );
     }
+    return Swap(value: 'actions', child: _actions(colors, library));
+  }
+
+  /// The tempo name, A's line, or C's confirmation.
+  Widget _quiet(MetraColors colors) {
+    final saved = _saved;
+    return Center(
+      child: saved != null
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.check, size: 14, color: colors.muted),
+                const SizedBox(width: 8),
+                Text(
+                  saved,
+                  style: TextStyle(fontSize: 15, color: colors.muted),
+                ),
+              ],
+            )
+          : _firstLoad
+          ? Text(
+              _TempoLine.firstLoadText,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 15, color: colors.text),
+            )
+          : Text(
+              tempoName(widget.bpm),
+              key: MetronomeScreen.tempoNameKey,
+              style: TextStyle(fontSize: 16, color: colors.muted),
+            ),
+    );
+  }
+
+  /// Revert · Save · Save as new; B's line floats below the first time.
+  Widget _actions(MetraColors colors, LibraryController library) {
+    final controller = widget.controller;
     // Plain grey text buttons, "Revert · Save · Save as new": quiet, one
     // tap each (ui-spec.md "Changes to a loaded song").
     Widget action(
@@ -772,8 +802,8 @@ class _TempoLineState extends State<_TempoLine> {
         ],
       ),
     );
-    if (!_firstChange) return Center(child: actions);
-    // B's line floats below, over the space above the ruler: nothing moves.
+    // B's line floats below, over the space above the ruler (nothing
+    // moves): it arrives and just fades away.
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -782,11 +812,16 @@ class _TempoLineState extends State<_TempoLine> {
           left: -24,
           right: -24,
           top: 40,
-          child: Text(
-            _TempoLine.firstChangeText,
-            key: MetronomeScreen.firstChangeKey,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: colors.muted),
+          child: ArriveLeave(
+            closes: false,
+            child: _firstChange
+                ? Text(
+                    _TempoLine.firstChangeText,
+                    key: MetronomeScreen.firstChangeKey,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 13, color: colors.muted),
+                  )
+                : null,
           ),
         ),
       ],

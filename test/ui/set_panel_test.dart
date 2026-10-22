@@ -190,6 +190,8 @@ void main() {
       expect(friday(), ['One', 'Two']);
       expect(find.byKey(QuickPick.undoKey), findsOneWidget);
       await tester.pump(QuickPick.undoFor + const Duration(seconds: 1));
+      await tester.pump();
+      await tester.pump(MetraMotion.leave * 2); // past the fade
       expect(find.byKey(QuickPick.undoKey), findsNothing);
     });
 
@@ -235,6 +237,8 @@ void main() {
         findsOneWidget,
       );
       await tester.pump(QuickPick.hintLineFor);
+      await tester.pump();
+      await tester.pump(MetraMotion.leave * 2); // past the fade
       expect(inPanel('Hold a song to move it · Swipe to remove'), findsNothing);
       // The sets view teaches its own, once.
       await tester.tap(find.byKey(QuickPick.changeSetKey));
@@ -245,6 +249,8 @@ void main() {
       );
       expect(library.setsHintSeen, isTrue);
       await tester.pump(QuickPick.hintLineFor);
+      await tester.pump();
+      await tester.pump(MetraMotion.leave * 2); // past the fade
       await tester.tap(find.byKey(QuickPick.backKey));
       await tester.pumpAndSettle();
       await tester.tapAt(const Offset(200, 60));

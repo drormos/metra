@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 /// Design tokens from `docs/design/ui-spec.md`. Every widget color comes
@@ -187,6 +188,55 @@ abstract final class CoverColors {
   static const minorTick = Color(0xFF4A4A4A);
   static const majorTick = Color(0xFF8C8C8C);
   static const needle = Color(0xFFFF3B30);
+}
+
+/// The motion tokens (ui-spec.md "Motion"): one set of values, used for
+/// every change on screen instead of ad-hoc durations. Nothing waits for
+/// them, and with "Remove animations" on they're all instant ([of]).
+abstract final class MetraMotion {
+  /// Text that changes in place: a cross-fade, no slide or size change.
+  static const swap = Duration(milliseconds: 120);
+  static const swapCurve = Curves.easeInOut;
+
+  /// Things going away: fade out (ease-in) while the height closes
+  /// (ease-in-out).
+  static const leave = Duration(milliseconds: 220);
+  static const leaveFade = Curves.easeIn;
+  static const leaveSize = Curves.easeInOut;
+
+  /// Things appearing: fade in with a small rise.
+  static const arrive = Duration(milliseconds: 200);
+  static const arriveCurve = Curves.easeOut;
+  static const arriveRise = 6.0;
+
+  /// A beat light's fade back to rest: this long at most, never more than
+  /// a third of the time to its next click.
+  static const lightFade = Duration(milliseconds: 90);
+
+  /// Above zero while a ±button is held or the tempo ruler moves: the BPM
+  /// then updates instantly, so fast changes never lag the finger.
+  static final tempoMoving = ValueNotifier<int>(0);
+
+  /// A hold or ruler move began (+1) or ended (−1); after the frame when
+  /// called mid-build (a button disabled at the end of the range).
+  static void moving(int delta) {
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      SchedulerBinding.instance.addPostFrameCallback(
+        (_) => tempoMoving.value += delta,
+      );
+    } else {
+      tempoMoving.value += delta;
+    }
+  }
+
+  /// Android's "Remove animations".
+  static bool reduced(BuildContext context) =>
+      MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+
+  /// [duration], or none with "Remove animations" on.
+  static Duration of(BuildContext context, Duration duration) =>
+      reduced(context) ? Duration.zero : duration;
 }
 
 abstract final class MetraFonts {

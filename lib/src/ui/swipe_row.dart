@@ -34,10 +34,11 @@ abstract final class RowGestures {
   static const settle = Duration(milliseconds: 150);
   static const springBack = Duration(milliseconds: 180);
 
-  /// A committed swipe: the row slides the rest of the way off, then the
-  /// gap closes as the rows below move up.
+  /// A committed swipe: the row slides the rest of the way off while it
+  /// fades and the gap closes ([MetraMotion.leave]) as the rows below
+  /// move up.
   static const slideOff = Duration(milliseconds: 120);
-  static const collapse = Duration(milliseconds: 150);
+  static const collapse = MetraMotion.leave;
 
   /// A release faster than this (dp/s) commits in its direction even short
   /// of [swipeCommit]; one back toward the start cancels.
@@ -74,11 +75,11 @@ abstract final class RowGestures {
   /// Android's "Remove animations": list, sheet and panel animations are
   /// instant (ui-spec.md "Reduced motion").
   static bool reduceMotion(BuildContext context) =>
-      MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+      MetraMotion.reduced(context);
 
   /// [duration], or none with "Remove animations" on.
   static Duration motion(BuildContext context, Duration duration) =>
-      reduceMotion(context) ? Duration.zero : duration;
+      MetraMotion.of(context, duration);
 }
 
 /// Running row animations that a new touch hurries along: each registers a
@@ -276,8 +277,8 @@ class HoldToReorder extends ReorderableDelayedDragStartListener {
 /// Where a committed row leaves the list (ui-spec.md "Swipe feel"): the
 /// data has already changed, so the row is gone from the list; the host
 /// draws a copy sliding the rest of the way off ([RowGestures.slideOff])
-/// while the rows below ([ExitShift]) keep the gap, then closes it
-/// ([RowGestures.collapse]). A new touch finishes it all in
+/// and fading, while the gap under the rows below ([ExitShift]) closes
+/// ([RowGestures.collapse], the "leave" motion). A new touch finishes it all in
 /// [RowGestures.catchUp].
 class RowExitHost extends StatefulWidget {
   const RowExitHost({super.key, required this.child});
@@ -293,7 +294,7 @@ class RowExitHost extends StatefulWidget {
 
 class RowExitHostState extends State<RowExitHost>
     with SingleTickerProviderStateMixin {
-  static final _total = RowGestures.slideOff + RowGestures.collapse;
+  static const _total = RowGestures.collapse;
   late final _exit = AnimationController(
     vsync: this,
     duration: _total,
@@ -302,13 +303,8 @@ class RowExitHostState extends State<RowExitHost>
   ({int index, Rect rect, Widget ghost, double from, double to})? _leaving;
   CatchUp? _catchUp;
 
-  /// How far the gap has closed (0 → 1), after the slide.
-  double get _closed => Curves.easeOut.transform(
-    ((_exit.value * _total.inMicroseconds -
-                RowGestures.slideOff.inMicroseconds) /
-            RowGestures.collapse.inMicroseconds)
-        .clamp(0.0, 1.0),
-  );
+  /// How far the gap has closed (0 → 1).
+  double get _closed => MetraMotion.leaveSize.transform(_exit.value);
 
   /// The row at list position [index] (drawn as [ghost], in [box], [from]
   /// pixels sideways) was just removed from the data: show it leaving.
@@ -374,9 +370,13 @@ class RowExitHostState extends State<RowExitHost>
                       if (slid >= 1) return const SizedBox.shrink();
                       final x =
                           leaving.from + (leaving.to - leaving.from) * slid;
-                      return Transform.translate(
-                        offset: Offset(x, 0),
-                        child: child,
+                      return Opacity(
+                        opacity:
+                            1 - MetraMotion.leaveFade.transform(_exit.value),
+                        child: Transform.translate(
+                          offset: Offset(x, 0),
+                          child: child,
+                        ),
                       );
                     },
                     child: leaving.ghost,

@@ -10,6 +10,7 @@ import '../platform/android_bridge.dart';
 import 'editor_scaffold.dart';
 import 'haptics.dart';
 import 'icons.dart';
+import 'motion.dart';
 import 'play_marker.dart';
 import 'search_match.dart';
 import 'swipe_row.dart';
@@ -45,14 +46,8 @@ Future<void> showQuickPick(
     context,
     PageRouteBuilder<void>(
       opaque: false,
-      transitionDuration: RowGestures.motion(
-        context,
-        const Duration(milliseconds: 150),
-      ),
-      reverseTransitionDuration: RowGestures.motion(
-        context,
-        const Duration(milliseconds: 100),
-      ),
+      transitionDuration: RowGestures.motion(context, MetraMotion.arrive),
+      reverseTransitionDuration: RowGestures.motion(context, MetraMotion.leave),
       pageBuilder: (_, _, _) => _QuickPickLayer(
         anchor: anchor,
         inset: inset,
@@ -211,6 +206,7 @@ class _QuickPickState extends State<QuickPick>
 
   // The Undo bar: the last removal or deletion, for [QuickPick.undoFor].
   ({String message, VoidCallback undo})? _undo;
+  int _undoSwiped = 0;
   Timer? _undoTimer;
 
   // ~6 s, or longer if Android's "Time to take action" asks for it.
@@ -441,12 +437,16 @@ class _QuickPickState extends State<QuickPick>
       catchUp: _catchUp,
       child: ListenableBuilder(
         listenable: _library,
-        builder: (context, _) => switch (_kind) {
-          _ when _pickFor != null => _pickerPanel(),
-          QuickPickKind.songs => _songsPanel(),
-          QuickPickKind.sets => _setsPanel(),
-          QuickPickKind.set => _setPanel(),
-        },
+        // Swapping lists in place, the new one arrives.
+        builder: (context, _) => Arrive(
+          value: _pickFor != null ? 'picker' : _kind,
+          child: switch (_kind) {
+            _ when _pickFor != null => _pickerPanel(),
+            QuickPickKind.songs => _songsPanel(),
+            QuickPickKind.sets => _setsPanel(),
+            QuickPickKind.set => _setPanel(),
+          },
+        ),
       ),
     ),
   );
@@ -540,8 +540,9 @@ class _QuickPickState extends State<QuickPick>
                         ),
               ],
             ),
-      note: _hintNote(colors),
-      bar: _undoBar(colors),
+      note: ArriveLeave(child: _hintNote(colors)),
+      // Swiped away, the bar is already gone: no leaving copy.
+      bar: ArriveLeave(key: ValueKey(_undoSwiped), child: _undoBar(colors)),
       actions: [
         _action(
           key: QuickPick.newSongKey,
@@ -900,8 +901,9 @@ class _QuickPickState extends State<QuickPick>
                         ),
               ],
             ),
-      note: _hintNote(colors),
-      bar: _undoBar(colors),
+      note: ArriveLeave(child: _hintNote(colors)),
+      // Swiped away, the bar is already gone: no leaving copy.
+      bar: ArriveLeave(key: ValueKey(_undoSwiped), child: _undoBar(colors)),
       actions: [
         _action(
           key: QuickPick.newSetlistKey,
@@ -990,8 +992,9 @@ class _QuickPickState extends State<QuickPick>
           );
         },
       ),
-      note: _hintNote(colors),
-      bar: _undoBar(colors),
+      note: ArriveLeave(child: _hintNote(colors)),
+      // Swiped away, the bar is already gone: no leaving copy.
+      bar: ArriveLeave(key: ValueKey(_undoSwiped), child: _undoBar(colors)),
       actions: [
         // The panel's main action, so an outlined button, not a row
         // (ui-spec.md "Adding songs to sets").
@@ -1358,7 +1361,10 @@ class _QuickPickState extends State<QuickPick>
       key: ObjectKey(undo),
       onDismissed: (_) {
         _undoTimer?.cancel();
-        setState(() => _undo = null);
+        setState(() {
+          _undo = null;
+          _undoSwiped++;
+        });
       },
       child: Semantics(
         liveRegion: true,

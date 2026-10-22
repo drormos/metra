@@ -4,6 +4,7 @@ import 'package:flutter/scheduler.dart';
 import '../audio/click_scheduler.dart';
 import '../controller/metronome_controller.dart';
 import '../model/metronome_pattern.dart';
+import 'beat_indicator.dart';
 import 'haptics.dart';
 import 'theme.dart';
 
@@ -30,6 +31,7 @@ class _PolyLaneState extends State<PolyLane>
 
   // Display-only: derived from the engine clock every frame.
   ScheduledPulse? _pulse;
+  double _light = 0;
 
   MetronomeController get _controller => widget.controller;
 
@@ -58,11 +60,25 @@ class _PolyLaneState extends State<PolyLane>
   }
 
   // The frame timestamp, shared with the beat blocks (same smoother).
+  // Lit at the pulse, then fading back (see [beatLight]).
   void _onTick(Duration _) {
-    final pulse = _controller.visualPulseAt(
+    final now = _controller.visualTimeAt(
       SchedulerBinding.instance.currentFrameTimeStamp,
     );
-    if (pulse?.time != _pulse?.time) setState(() => _pulse = pulse);
+    final pulse = now == null ? null : _controller.pulseAt(now);
+    final light = pulse == null
+        ? 0.0
+        : beatLight(
+            now! - pulse.time,
+            pulse.end - pulse.time,
+            reduced: MetraMotion.reduced(context),
+          );
+    if (pulse?.time != _pulse?.time || light != _light) {
+      setState(() {
+        _pulse = pulse;
+        _light = light;
+      });
+    }
   }
 
   @override
@@ -83,7 +99,11 @@ class _PolyLaneState extends State<PolyLane>
           for (var k = 0; k < n; k++) ...[
             if (k > 0) const SizedBox(width: 6),
             Expanded(
-              child: _cell(k, pattern.polyStates[k], sounding: k == sounding),
+              child: _cell(
+                k,
+                pattern.polyStates[k],
+                light: k == sounding ? _light : 0,
+              ),
             ),
           ],
         ],
@@ -91,15 +111,16 @@ class _PolyLaneState extends State<PolyLane>
     );
   }
 
-  Widget _cell(int k, StepLevel level, {required bool sounding}) {
+  Widget _cell(int k, StepLevel level, {required double light}) {
     final colors = context.colors;
     final muted = level == StepLevel.silent;
     final accent = level == StepLevel.accent;
+    final sounding = light > 0;
     final color = muted
         ? colors.background
         : accent
-        ? (sounding ? colors.accent : colors.pulseAccentResting)
-        : (sounding ? colors.beatSounding : colors.pulseResting);
+        ? Color.lerp(colors.pulseAccentResting, colors.accent, light)!
+        : Color.lerp(colors.pulseResting, colors.beatSounding, light)!;
     final kind = muted ? 'muted' : (accent ? 'accented' : 'regular');
     final n = _controller.pattern.polyrhythm;
     return Semantics(

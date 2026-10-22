@@ -82,7 +82,19 @@ class BpmReadout extends StatelessWidget {
         ),
         SizedBox(width: gap),
         // Fixed digit slots: the readout never changes width or shakes.
-        TabularText('$bpm', key: numberKey, style: numberStyle(fontSize)),
+        // Changed digits cross-fade, except while the tempo is being
+        // dragged or held (then instant, never behind the finger).
+        ValueListenableBuilder(
+          valueListenable: MetraMotion.tempoMoving,
+          builder: (context, moving, _) => TabularText(
+            '$bpm',
+            key: numberKey,
+            style: numberStyle(fontSize),
+            fade: moving > 0
+                ? Duration.zero
+                : MetraMotion.of(context, MetraMotion.swap),
+          ),
+        ),
         SizedBox(width: gap),
         Text('bpm', style: unit),
       ],

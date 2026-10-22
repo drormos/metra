@@ -126,6 +126,16 @@ class ClickScheduler {
     return null;
   }
 
+  /// The time from [step] to the next step (or from the one before, when
+  /// the next isn't scheduled yet), or null with nothing to compare.
+  Duration? stepInterval(ScheduledStep step) {
+    final i = _steps.indexWhere((s) => s.index == step.index);
+    if (i < 0) return null;
+    if (i + 1 < _steps.length) return _steps[i + 1].time - step.time;
+    if (i > 0) return step.time - _steps[i - 1].time;
+    return null;
+  }
+
   /// The latest polyrhythm pulse at or before engine time [time] that is
   /// still sounding (before the next pulse's start), or null.
   ScheduledPulse? pulseAt(Duration time) {
