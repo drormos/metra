@@ -4,7 +4,6 @@ import '../controller/metronome_controller.dart';
 import '../model/on_start.dart';
 import 'haptics.dart';
 import 'motion.dart';
-import 'segmented.dart';
 import 'theme.dart';
 import 'time_signature_sheet.dart';
 import 'value_stepper.dart';
@@ -37,6 +36,7 @@ class OnStartSheet extends StatelessWidget {
   static const changeLabel = 'Change by';
   static const everyLabel = 'Every';
   static const lengthLabel = 'Length';
+  static const countByLabel = 'Count by';
 
   /// The first tap from "No limit": the current tempo ± 20.
   static const limitJump = 20;
@@ -63,7 +63,6 @@ class OnStartSheet extends StatelessWidget {
       height: 1.4,
       color: context.colors.muted,
     );
-    const segmentStyle = TextStyle(fontSize: 15, fontWeight: FontWeight.w600);
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 24),
@@ -90,15 +89,12 @@ class OnStartSheet extends StatelessWidget {
                   summary: countInSummary(on),
                   onChanged: (v) => set(on.copyWith(countInOn: v)),
                   controls: [
-                    Segmented<int>(
+                    _Choices<int>(
                       key: countInBarsKey,
+                      label: lengthLabel,
                       options: const {1: '1 bar', 2: '2 bars'},
                       selected: on.countInBars,
-                      style: segmentStyle,
-                      onSelected: (bars) {
-                        Haptics.tick();
-                        set(on.copyWith(countInBars: bars));
-                      },
+                      onSelected: (bars) => set(on.copyWith(countInBars: bars)),
                     ),
                     const SizedBox(height: 8),
                     Text(countInHint, style: hint),
@@ -125,15 +121,12 @@ class OnStartSheet extends StatelessWidget {
                   summary: stopAfterSummary(on),
                   onChanged: (v) => set(on.copyWith(stopOn: v)),
                   controls: [
-                    Segmented<StopBy>(
+                    _Choices<StopBy>(
                       key: stopByKey,
+                      label: countByLabel,
                       options: const {StopBy.bars: 'Bars', StopBy.time: 'Time'},
                       selected: on.stopBy,
-                      style: segmentStyle,
-                      onSelected: (v) {
-                        Haptics.tick();
-                        set(on.copyWith(stopBy: v));
-                      },
+                      onSelected: (v) => set(on.copyWith(stopBy: v)),
                     ),
                     const SizedBox(height: 4),
                     _length(on, set),
@@ -180,7 +173,14 @@ class OnStartSheet extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(name, style: const TextStyle(fontSize: 16)),
+                      // The sheet's main headings.
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       if (on)
                         Text(
                           summary,
@@ -194,6 +194,20 @@ class OnStartSheet extends StatelessWidget {
                 Switch(
                   key: switchKey,
                   value: on,
+                  // Off is not disabled: a white outline and knob on a clear
+                  // track; on, a white track and a black knob.
+                  trackColor: WidgetStateProperty.resolveWith(
+                    (states) => states.contains(WidgetState.selected)
+                        ? colors.text
+                        : colors.sheet.withAlpha(0),
+                  ),
+                  trackOutlineColor: WidgetStatePropertyAll(colors.text),
+                  trackOutlineWidth: const WidgetStatePropertyAll(2),
+                  thumbColor: WidgetStateProperty.resolveWith(
+                    (states) => states.contains(WidgetState.selected)
+                        ? colors.background
+                        : colors.text,
+                  ),
                   onChanged: (v) {
                     Haptics.tick();
                     onChanged(v);
@@ -416,6 +430,89 @@ class OnStartSheet extends StatelessWidget {
         if (d == null) return;
         set(on.copyWith(stopTime: OnStart.clampTime(d)));
       },
+    );
+  }
+}
+
+/// Quiet choices laid out like a stepper row (ui-spec.md "Choices inside
+/// a part"): a label on the left, 36px pill chips sized to their text on
+/// the right. Selected: the tick-resting grey (#2A2A2A) with a 2px text
+/// color border and semibold text; the others clear with a 2px border and
+/// muted text. Each chip is a 48dp touch target.
+class _Choices<T> extends StatelessWidget {
+  const _Choices({
+    super.key,
+    required this.label,
+    required this.options,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String label;
+  final Map<T, String> options;
+  final T selected;
+  final ValueChanged<T> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Row(
+      children: [
+        Expanded(child: Text(label, style: const TextStyle(fontSize: 15))),
+        for (final (i, MapEntry(key: value, value: text))
+            in options.entries.indexed) ...[
+          if (i > 0) const SizedBox(width: 8),
+          _chip(colors, value, text, selected: value == selected),
+        ],
+      ],
+    );
+  }
+
+  Widget _chip(
+    MetraColors colors,
+    T value,
+    String text, {
+    required bool selected,
+  }) {
+    const shape = StadiumBorder();
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: InkWell(
+        key: ValueKey('chip-$value'),
+        customBorder: shape,
+        onTap: () {
+          Haptics.tick();
+          onSelected(value);
+        },
+        child: SizedBox(
+          height: 48,
+          child: Center(
+            child: Container(
+              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              alignment: Alignment.center,
+              decoration: ShapeDecoration(
+                color: selected ? colors.tickResting : null,
+                shape: StadiumBorder(
+                  side: BorderSide(
+                    color: selected ? colors.text : colors.border,
+                    width: 2,
+                  ),
+                ),
+              ),
+              child: Text(
+                text,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  color: selected ? colors.text : colors.muted,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

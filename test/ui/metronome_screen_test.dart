@@ -459,6 +459,50 @@ void main() {
       expect(inSheet('32 bars'), findsOneWidget);
     });
 
+    testWidgets('styling: 18px semibold headings; off switches outlined in '
+        'white, never greyed; choices are labelled chip rows', (tester) async {
+      tester.view
+        ..physicalSize = const Size(420, 1400)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final colors = testTheme.extension<MetraColors>()!;
+      controller.setOnStart(const OnStart(countInOn: true, stopOn: true));
+      await pumpScreen(tester);
+      await tester.tap(find.byKey(MetronomeScreen.onStartKey));
+      await tester.pumpAndSettle();
+      final heading = tester.widget<Text>(find.text('Speed up'));
+      expect(heading.style!.fontSize, 18);
+      expect(heading.style!.fontWeight, FontWeight.w600);
+      final off = tester.widget<Switch>(find.byKey(OnStartSheet.speedUpKey));
+      expect(off.trackOutlineColor!.resolve({}), colors.text);
+      expect(off.thumbColor!.resolve({}), colors.text);
+      expect(off.trackColor!.resolve({})!.a, 0);
+      expect(off.onChanged, isNotNull, reason: 'off is not disabled');
+      final on = tester.widget<Switch>(find.byKey(OnStartSheet.countInKey));
+      expect(on.trackColor!.resolve({WidgetState.selected}), colors.text);
+      expect(on.thumbColor!.resolve({WidgetState.selected}), colors.background);
+      expect(find.text(OnStartSheet.countByLabel), findsOneWidget);
+      expect(find.text(OnStartSheet.lengthLabel), findsNWidgets(2));
+      ShapeDecoration chip(String key) =>
+          tester
+                  .widget<Container>(
+                    find.descendant(
+                      of: find.byKey(ValueKey(key)),
+                      matching: find.byType(Container),
+                    ),
+                  )
+                  .decoration!
+              as ShapeDecoration;
+      expect(chip('chip-1').color, colors.tickResting);
+      expect((chip('chip-1').shape as StadiumBorder).side.color, colors.text);
+      expect(chip('chip-2').color, isNull);
+      expect((chip('chip-2').shape as StadiumBorder).side.color, colors.border);
+      expect(tester.getSize(find.byKey(const ValueKey('chip-1'))).height, 48);
+      await tester.tap(find.byKey(const ValueKey('chip-StopBy.bars')));
+      await tester.pump();
+      expect(controller.onStart.stopBy, StopBy.bars);
+    });
+
     group('editing values', () {
       Future<void> openSheet(WidgetTester tester, OnStart on) async {
         tester.view
