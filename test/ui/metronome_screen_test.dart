@@ -1055,23 +1055,32 @@ void main() {
       matching: find.byType(Text),
     );
 
-    testWidgets('only the digit that changes cross-fades; nothing moves', (
-      tester,
-    ) async {
-      await pumpScreen(tester);
-      Rect at(Finder f) => tester.getRect(f);
-      final bpm = at(find.byKey(MetronomeScreen.bpmKey));
-      final ruler = at(find.byType(TempoRuler));
-      expect(digits(), findsNWidgets(3));
-      controller.setBpm(121);
-      await tester.pump();
-      await tester.pump(MetraMotion.swap ~/ 2);
-      expect(digits(), findsNWidgets(4), reason: 'the units: 0 out, 1 in');
-      expect(at(find.byKey(MetronomeScreen.bpmKey)), bpm);
-      expect(at(find.byType(TempoRuler)), ruler);
-      await tester.pump(MetraMotion.swap);
-      expect(digits(), findsNWidgets(3));
-    });
+    for (final up in [true, false]) {
+      testWidgets('rolling digits ${up ? 'up' : 'down'}: only the changed '
+          'digit rolls, old and new apart; nothing else moves', (tester) async {
+        controller.setBpm(up ? 120 : 121);
+        await pumpScreen(tester);
+        Rect at(Finder f) => tester.getRect(f);
+        final bpm = at(find.byKey(MetronomeScreen.bpmKey));
+        final ruler = at(find.byType(TempoRuler));
+        final tens = at(find.text('2'));
+        expect(digits(), findsNWidgets(3));
+        controller.setBpm(up ? 121 : 120);
+        await tester.pump();
+        await tester.pump(MetraMotion.roll ~/ 3);
+        expect(digits(), findsNWidgets(4), reason: 'the units: old and new');
+        final old = at(find.text(up ? '0' : '1').last);
+        final now = at(find.text(up ? '1' : '0').last);
+        // Rising: the old goes up and the new comes from below.
+        expect(old.top < now.top, up);
+        expect(old.top, isNot(now.top), reason: 'never in the same place');
+        expect(at(find.text('2')), tens, reason: 'unchanged digits stay');
+        expect(at(find.byKey(MetronomeScreen.bpmKey)), bpm);
+        expect(at(find.byType(TempoRuler)), ruler);
+        await tester.pump(MetraMotion.roll);
+        expect(digits(), findsNWidgets(3));
+      });
+    }
 
     testWidgets('while the tempo is being held or dragged, instant', (
       tester,

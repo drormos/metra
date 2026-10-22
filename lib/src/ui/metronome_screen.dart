@@ -351,21 +351,21 @@ class MetronomeScreen extends StatelessWidget {
           // never moves the subtitle.
           SizedBox(
             height: 34,
-            // A new name cross-fades in place.
-            child: Swap(
+            // A new name fades through (old out, then new in), sized to
+            // fit before it shows; every size sits on one baseline at the
+            // left edge, where the full-size name's baseline is.
+            child: FadeThrough(
               value: song?.name,
-              alignment: Alignment.bottomLeft,
               child: Align(
-                alignment: Alignment.bottomLeft,
-                child: FitText(
-                  song?.name ?? '',
-                  textKey: titleKey,
-                  minFontSize: 22,
-                  style: const TextStyle(
-                    fontFamily: MetraFonts.condensed,
-                    fontSize: 34,
-                    fontWeight: FontWeight.w700,
-                    height: 1,
+                alignment: Alignment.topLeft,
+                child: Baseline(
+                  baseline: _baselineOf(context, _titleStyle),
+                  baselineType: TextBaseline.alphabetic,
+                  child: FitText(
+                    song?.name ?? '',
+                    textKey: titleKey,
+                    minFontSize: 22,
+                    style: _titleStyle,
                   ),
                 ),
               ),
@@ -376,9 +376,8 @@ class MetronomeScreen extends StatelessWidget {
           // so the subtitle sits on the block's bottom in every mode.
           SizedBox(
             height: 17,
-            child: Swap(
+            child: FadeThrough(
               value: set?.name,
-              alignment: Alignment.centerLeft,
               child: SizedBox(
                 width: double.infinity,
                 child: Text(
@@ -398,6 +397,29 @@ class MetronomeScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  static const _titleStyle = TextStyle(
+    fontFamily: MetraFonts.condensed,
+    fontSize: 34,
+    fontWeight: FontWeight.w700,
+    height: 1,
+  );
+
+  /// Where [style]'s baseline sits below the top of its line.
+  static double _baselineOf(BuildContext context, TextStyle style) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: 'Ag',
+        style: DefaultTextStyle.of(context).style.merge(style),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final baseline = painter.computeDistanceToActualBaseline(
+      TextBaseline.alphabetic,
+    );
+    painter.dispose();
+    return baseline;
   }
 
   Widget _topRow(BuildContext context) {

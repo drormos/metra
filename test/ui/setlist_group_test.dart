@@ -78,7 +78,7 @@ void main() {
 
     // The newest title, while the old one cross-fades out.
     String title(WidgetTester tester) =>
-        tester.widget<Text>(find.byKey(MetronomeScreen.titleKey).last).data!;
+        tester.widget<Text>(find.byKey(MetronomeScreen.titleKey)).data!;
 
     bool enabled(WidgetTester tester, Key key) =>
         tester.widget<FilledButton>(find.byKey(key)).onPressed != null;
@@ -330,7 +330,7 @@ void main() {
       tester,
     ) async {
       await withSet(tester);
-      Rect title() => tester.getRect(find.byKey(MetronomeScreen.titleKey).last);
+      Rect title() => tester.getRect(find.byKey(MetronomeScreen.titleKey));
       Rect bar() => tester.getRect(find.byType(SetlistGroup));
       await tester.tap(find.byKey(SetlistGroup.nextKey));
       await tester.pump();
@@ -363,9 +363,11 @@ void main() {
           library.updateSong(s.copyWith(name: '$long ${s.name}'));
         }
         await tester.pump();
+        await tester.pump();
+        await tester.pump(MetraMotion.fadeOut * 2); // the new name is in
         expect(
           tester
-              .widget<Text>(find.byKey(MetronomeScreen.titleKey).last)
+              .widget<Text>(find.byKey(MetronomeScreen.titleKey))
               .style!
               .fontSize,
           lessThan(34),
@@ -529,6 +531,8 @@ void main() {
 
       await tester.tap(find.byKey(SetlistGroup.nextKey));
       await tester.pump();
+      await tester.pump();
+      await tester.pump(MetraMotion.fadeOut * 2); // the new name is in
       expect(title(tester), 'One');
       expect(metronome.bpm, 100);
       expect(position('1/3'), findsOneWidget);
@@ -538,11 +542,15 @@ void main() {
       await tester.tap(find.byKey(SetlistGroup.nextKey));
       await tester.tap(find.byKey(SetlistGroup.nextKey));
       await tester.pump();
+      await tester.pump();
+      await tester.pump(MetraMotion.fadeOut * 2); // the new name is in
       expect(title(tester), 'Three');
       expect(enabled(tester, SetlistGroup.nextKey), isFalse);
 
       await tester.tap(find.byKey(SetlistGroup.previousKey));
       await tester.pump();
+      await tester.pump();
+      await tester.pump(MetraMotion.fadeOut * 2); // the new name is in
       expect(title(tester), 'Two');
       expect(
         find.bySemanticsLabel('Previous song: One, 100 BPM'),

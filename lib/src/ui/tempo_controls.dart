@@ -10,7 +10,7 @@ import 'theme.dart';
 
 /// The BPM number with "bpm" hanging off its right: the number alone is
 /// centred (main screen 172–240px, song editor 84px).
-class BpmReadout extends StatelessWidget {
+class BpmReadout extends StatefulWidget {
   const BpmReadout({
     super.key,
     required this.bpm,
@@ -64,8 +64,24 @@ class BpmReadout extends StatelessWidget {
   }
 
   @override
+  State<BpmReadout> createState() => _BpmReadoutState();
+}
+
+class _BpmReadoutState extends State<BpmReadout> {
+  // Which way the last change went: digits roll up when the tempo rose.
+  bool _up = true;
+
+  @override
+  void didUpdateWidget(BpmReadout old) {
+    super.didUpdateWidget(old);
+    if (widget.bpm != old.bpm) _up = widget.bpm > old.bpm;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final unit = _unitStyle(unitSize).copyWith(color: context.colors.muted);
+    final unitSize = widget.unitSize;
+    final unit = BpmReadout._unitStyle(unitSize)
+        .copyWith(color: context.colors.muted);
     final gap = unitSize * 0.45;
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -82,17 +98,19 @@ class BpmReadout extends StatelessWidget {
         ),
         SizedBox(width: gap),
         // Fixed digit slots: the readout never changes width or shakes.
-        // Changed digits cross-fade, except while the tempo is being
-        // dragged or held (then instant, never behind the finger).
+        // Changed digits roll (single steps, Tap tempo, a song load),
+        // except while the tempo is being dragged or held: then instant,
+        // never behind the finger.
         ValueListenableBuilder(
           valueListenable: MetraMotion.tempoMoving,
           builder: (context, moving, _) => TabularText(
-            '$bpm',
-            key: numberKey,
-            style: numberStyle(fontSize),
-            fade: moving > 0
+            '${widget.bpm}',
+            key: widget.numberKey,
+            style: BpmReadout.numberStyle(widget.fontSize),
+            roll: moving > 0
                 ? Duration.zero
-                : MetraMotion.of(context, MetraMotion.swap),
+                : MetraMotion.of(context, MetraMotion.roll),
+            rollUp: _up,
           ),
         ),
         SizedBox(width: gap),
