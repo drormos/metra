@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -11,8 +12,8 @@ import 'theme.dart';
 /// The polyrhythm lane (ui-spec.md "Polyrhythm", `polyrhythm.reference
 /// .html`): n cells placed by time across the bar's width, with the beat
 /// blocks' 6px gaps, so cell 1 lines up with beat 1. Cells show their
-/// state at rest and only the sounding one lights, for the length of its
-/// pulse (engine clock plus the visual offset, once per frame). Tapping a
+/// state at rest and each one pulses when it sounds ([beatPulse]; engine
+/// clock plus the visual offset, once per frame). Tapping a
 /// cell cycles regular → accent → muted.
 class PolyLane extends StatefulWidget {
   const PolyLane({super.key, required this.controller});
@@ -31,7 +32,9 @@ class _PolyLaneState extends State<PolyLane>
 
   // Display-only: derived from the engine clock every frame.
   ScheduledPulse? _pulse;
-  double _light = 0;
+  // Lights by cell (one can rise before its pulse while the last comes
+  // down).
+  Map<int, double> _lights = const {};
 
   MetronomeController get _controller => widget.controller;
 
@@ -60,23 +63,30 @@ class _PolyLaneState extends State<PolyLane>
   }
 
   // The frame timestamp, shared with the beat blocks (same smoother).
-  // Lit at the pulse, then fading back (see [beatLight]).
+  // Each cell pulses at its own pulse ([beatPulse]).
   void _onTick(Duration _) {
     final now = _controller.visualTimeAt(
       SchedulerBinding.instance.currentFrameTimeStamp,
     );
     final pulse = now == null ? null : _controller.pulseAt(now);
-    final light = pulse == null
-        ? 0.0
-        : beatLight(
-            now! - pulse.time,
-            pulse.end - pulse.time,
-            reduced: MetraMotion.reduced(context),
-          );
-    if (pulse?.time != _pulse?.time || light != _light) {
+    final lights = <int, double>{};
+    if (now != null) {
+      final reduced = MetraMotion.reduced(context);
+      final next = _controller.pulseAt(now + MetraMotion.lightLead);
+      for (final p in {?pulse, ?next}) {
+        // Only a pulse of the lane being drawn lights, never a muted one.
+        if (p.level == StepLevel.silent ||
+            p.count != _controller.pattern.polyrhythm) {
+          continue;
+        }
+        final v = beatPulse(now - p.time, p.end - p.time, reduced: reduced);
+        if (v > (lights[p.pulse] ?? 0)) lights[p.pulse] = v;
+      }
+    }
+    if (pulse?.time != _pulse?.time || !mapEquals(lights, _lights)) {
       setState(() {
         _pulse = pulse;
-        _light = light;
+        _lights = lights;
       });
     }
   }
@@ -85,12 +95,6 @@ class _PolyLaneState extends State<PolyLane>
   Widget build(BuildContext context) {
     final pattern = _controller.pattern;
     final n = pattern.polyrhythm;
-    final pulse = _pulse;
-    // Only a pulse of the lane being drawn lights, and never a muted one.
-    final sounding =
-        pulse != null && pulse.count == n && pulse.level != StepLevel.silent
-        ? pulse.pulse
-        : null;
     return Semantics(
       label: '$n against ${pattern.beatsPerBar}',
       container: true,
@@ -99,11 +103,7 @@ class _PolyLaneState extends State<PolyLane>
           for (var k = 0; k < n; k++) ...[
             if (k > 0) const SizedBox(width: 6),
             Expanded(
-              child: _cell(
-                k,
-                pattern.polyStates[k],
-                light: k == sounding ? _light : 0,
-              ),
+              child: _cell(k, pattern.polyStates[k], light: _lights[k] ?? 0),
             ),
           ],
         ],

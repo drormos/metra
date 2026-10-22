@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -7,25 +8,36 @@ import '../model/metronome_pattern.dart';
 import 'haptics.dart';
 import 'theme.dart';
 
-/// How lit a beat light is [since] its click (ui-spec.md "Motion"): fully
-/// on at the click, never a fade-in, then back to rest over
-/// [MetraMotion.lightFade] (ease-out), or a third of [period] (the time to
-/// its next click) if shorter. [reduced] ("Remove animations"): on until
-/// the next click, then off.
-double beatLight(Duration since, Duration? period, {required bool reduced}) {
-  if (since.isNegative) return 0;
-  if (reduced) return period == null || since < period ? 1 : 0;
-  var fade = MetraMotion.lightFade;
-  if (period != null && period ~/ 3 < fade) fade = period ~/ 3;
-  if (since >= fade || fade <= Duration.zero) return 0;
-  return 1 -
-      Curves.easeOut.transform(since.inMicroseconds / fade.inMicroseconds);
+/// How lit a beat light is [since] its click (negative: before it), for a
+/// light whose next click is [interval] later (ui-spec.md "Beat lights: a
+/// short pulse, not a flash"): up over [MetraMotion.lightRise] from
+/// [MetraMotion.lightLead] before the click (full on the sound), lit for
+/// 35% of the interval, down over 35% (ease-in-out), each part at most
+/// [MetraMotion.lightCap]; then at rest. [reduced] ("Remove animations"):
+/// fully on from the click for the same time, then off.
+double beatPulse(Duration since, Duration? interval, {required bool reduced}) {
+  final share = interval == null
+      ? MetraMotion.lightCap
+      : interval * MetraMotion.lightShare;
+  final part = share < MetraMotion.lightCap ? share : MetraMotion.lightCap;
+  final rise = MetraMotion.lightRise;
+  final litEnd = rise - MetraMotion.lightLead + part;
+  if (reduced) return since >= Duration.zero && since < litEnd ? 1 : 0;
+  final t = since + MetraMotion.lightLead; // from the start of the rise
+  if (t.isNegative) return 0;
+  double of(Duration a, Duration b) => a.inMicroseconds / b.inMicroseconds;
+  // A strong ease-out: ~90% on the sound itself.
+  if (t < rise) return Curves.easeOutCubic.transform(of(t, rise));
+  final down = since - litEnd;
+  if (down.isNegative) return 1;
+  if (down >= part || part <= Duration.zero) return 0;
+  return 1 - Curves.easeInOut.transform(of(down, part));
 }
 
 /// Beat blocks (ui-spec.md): one block per beat with a subdivision strip
 /// under it. Blocks show their type at rest (accent, regular, muted) and
-/// light at their click: a block at its beat, a tick at its own click,
-/// each fading back at once ([beatLight]). Driven by the engine clock
+/// pulse at their click: a block at its beat, a tick at its own click
+/// ([beatPulse]). Driven by the engine clock
 /// (plus the visual offset), read once per frame. Tapping a block cycles
 /// regular → accent → muted.
 class BeatIndicator extends StatefulWidget {
@@ -41,10 +53,12 @@ class _BeatIndicatorState extends State<BeatIndicator>
     with SingleTickerProviderStateMixin {
   late final Ticker _ticker = createTicker(_onTick);
 
-  // Display-only: derived from the engine clock every frame.
+  // Display-only: derived from the engine clock every frame. Lights by
+  // beat and by bar position (a light can rise before its click while the
+  // one before it is still coming down).
   ScheduledStep? _step;
-  double _blockLight = 0;
-  double _tickLight = 0;
+  Map<int, double> _blocks = const {};
+  Map<int, double> _ticks = const {};
 
   MetronomeController get _controller => widget.controller;
 
@@ -74,7 +88,7 @@ class _BeatIndicatorState extends State<BeatIndicator>
       if (_step != null) {
         setState(() {
           _step = null;
-          _blockLight = _tickLight = 0;
+          _blocks = _ticks = const {};
         });
       }
     }
@@ -82,38 +96,54 @@ class _BeatIndicatorState extends State<BeatIndicator>
 
   // The frame timestamp, not the ticker's elapsed time: one clock shared
   // with the polyrhythm lane, which feeds the same smoother.
-  // Rebuilds only when something lit changes: a new step, or a fade.
+  // Rebuilds only when something lit changes.
   void _onTick(Duration _) {
     final now = _controller.visualTimeAt(
       SchedulerBinding.instance.currentFrameTimeStamp,
     );
     final step = now == null ? null : _controller.stepAt(now);
-    var block = 0.0;
-    var tick = 0.0;
-    if (now != null && step != null) {
+    final blocks = <int, double>{};
+    final ticks = <int, double>{};
+    if (now != null) {
       final reduced = MetraMotion.reduced(context);
-      final perBeat = step.pattern.stepsPerBeat;
-      final interval = _controller.stepInterval(step);
-      // The block lights at its beat's first click.
-      final beatStart = interval == null
-          ? step.time
-          : step.time - interval * (step.barPosition % perBeat);
-      block = beatLight(
-        now - beatStart,
-        interval == null ? null : interval * perBeat,
-        reduced: reduced,
-      );
-      tick = step.level == StepLevel.silent
-          ? 0
-          : beatLight(now - step.time, interval, reduced: reduced);
+      // The step sounding now, and the next one if its light is rising.
+      final next = _controller.stepAt(now + MetraMotion.lightLead);
+      for (final s in {?step, ?next}) {
+        final perBeat = s.pattern.stepsPerBeat;
+        final interval = _controller.stepInterval(s);
+        void light(Map<int, double> lights, int key, double v) {
+          if (v > (lights[key] ?? 0)) lights[key] = v;
+        }
+
+        // The block pulses at its beat's first click, over the beat.
+        final beatStart = interval == null
+            ? s.time
+            : s.time - interval * (s.barPosition % perBeat);
+        light(
+          blocks,
+          s.barPosition ~/ perBeat,
+          beatPulse(
+            now - beatStart,
+            interval == null ? null : interval * perBeat,
+            reduced: reduced,
+          ),
+        );
+        if (s.level != StepLevel.silent) {
+          light(
+            ticks,
+            s.barPosition,
+            beatPulse(now - s.time, interval, reduced: reduced),
+          );
+        }
+      }
     }
     if (step?.index != _step?.index ||
-        block != _blockLight ||
-        tick != _tickLight) {
+        !mapEquals(blocks, _blocks) ||
+        !mapEquals(ticks, _ticks)) {
       setState(() {
         _step = step;
-        _blockLight = block;
-        _tickLight = tick;
+        _blocks = blocks;
+        _ticks = ticks;
       });
     }
   }
@@ -133,11 +163,6 @@ class _BeatIndicatorState extends State<BeatIndicator>
         ? latest
         : heard;
     final perBeat = pattern.stepsPerBeat;
-    final soundingBeat = step == null ? null : step.barPosition ~/ perBeat;
-    // Silent steps (a muted beat's own click) don't light anything.
-    final soundingStep = step == null || step.level == StepLevel.silent
-        ? null
-        : step.barPosition;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -147,7 +172,6 @@ class _BeatIndicatorState extends State<BeatIndicator>
             child: _tapTarget(
               beat,
               level,
-              sounding: beat == soundingBeat && level != StepLevel.silent,
               child: Column(
                 // Blocks fill the beat's width (a muted block has no colored
                 // fill to size it otherwise).
@@ -156,9 +180,8 @@ class _BeatIndicatorState extends State<BeatIndicator>
                   _block(
                     beat,
                     level,
-                    light: beat == soundingBeat && level != StepLevel.silent
-                        ? _blockLight
-                        : 0,
+                    // A muted block never lights.
+                    light: level == StepLevel.silent ? 0 : _blocks[beat] ?? 0,
                   ),
                   if (perBeat > 1) ...[
                     const SizedBox(height: 5),
@@ -170,9 +193,7 @@ class _BeatIndicatorState extends State<BeatIndicator>
                             child: _tick(
                               beat,
                               tick,
-                              light: beat * perBeat + tick == soundingStep
-                                  ? _tickLight
-                                  : 0,
+                              light: _ticks[beat * perBeat + tick] ?? 0,
                             ),
                           ),
                         ],
@@ -190,12 +211,7 @@ class _BeatIndicatorState extends State<BeatIndicator>
 
   /// The whole beat column (block and strip) is the tap target, padded to
   /// at least 48dp tall.
-  Widget _tapTarget(
-    int beat,
-    StepLevel level, {
-    required bool sounding,
-    required Widget child,
-  }) {
+  Widget _tapTarget(int beat, StepLevel level, {required Widget child}) {
     final kind = switch (level) {
       StepLevel.silent => 'muted',
       StepLevel.accent => 'accented',

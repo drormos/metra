@@ -320,8 +320,11 @@ void main() {
       output.time = const Duration(milliseconds: 140);
       await tester.pump(const Duration(milliseconds: 16));
       expect(find.byKey(const ValueKey('beat-0-on')), findsOneWidget);
-      output.time = const Duration(milliseconds: 400); // the eighth
-      await tester.pump(const Duration(milliseconds: 16));
+      // After its pulse, in frames, as the clock moves.
+      while (output.time < const Duration(milliseconds: 520)) {
+        output.time += const Duration(milliseconds: 20);
+        await tester.pump(const Duration(milliseconds: 20));
+      }
       expect(find.byKey(const ValueKey('beat-0-off')), findsOneWidget);
       await tester.tap(find.byKey(MetronomeScreen.playKey));
       await tester.pump();
@@ -392,37 +395,33 @@ void main() {
       expect(key('tick-3-2-off'), findsOneWidget);
     });
 
-    testWidgets('lights come on at their click and fade back at once: the '
-        'block at its beat, a tick at its own click', (tester) async {
+    testWidgets('lights pulse: up just before the click, lit ~35% of their '
+        'interval, then down; a block over its beat, a tick over its own '
+        'click', (tester) async {
       await startTwoPerBeat(tester);
-      await playAt(tester, 140); // 20 ms after beat 1
+      // Beat 1 at 120 ms; beats 500 ms apart, eighths 250 ms.
+      await playAt(tester, 140);
       expect(key('beat-0-on'), findsOneWidget);
       expect(key('tick-0-0-on'), findsOneWidget);
       expect(key('tick-0-1-off'), findsOneWidget);
-      final lit = tester.widget<Container>(key('beat-0-on')).color!;
-      await playAt(tester, 180);
-      expect(key('beat-0-on'), findsOneWidget, reason: 'still fading');
-      expect(
-        tester.widget<Container>(key('beat-0-on')).color,
-        isNot(lit),
-        reason: 'dimmer than at the click',
-      );
-      await playAt(tester, 220); // 100 ms on: past the 90 ms fade
-      expect(key('beat-0-off'), findsOneWidget);
+      final full = tester.widget<Container>(key('beat-0-on')).color;
+      await playAt(tester, 300); // still within 15 + 175 ms
+      expect(tester.widget<Container>(key('beat-0-on')).color, full);
+      await playAt(tester, 400); // coming down; the eighth is up
+      expect(key('beat-0-on'), findsOneWidget);
+      expect(tester.widget<Container>(key('beat-0-on')).color, isNot(full));
       expect(key('tick-0-0-off'), findsOneWidget);
-
-      await playAt(tester, 380); // the eighth
-      expect(key('beat-0-off'), findsOneWidget, reason: 'not relit');
       expect(key('tick-0-1-on'), findsOneWidget);
-
-      await playAt(tester, 640);
+      await playAt(tester, 500);
+      expect(key('beat-0-off'), findsOneWidget, reason: 'resting');
+      await playAt(tester, 610); // 10 ms before beat 2: already rising
       expect(key('beat-1-on'), findsOneWidget);
       await stop(tester);
       expect(key('beat-1-off'), findsOneWidget);
     });
 
-    testWidgets('300 bpm in 16ths: each tick lights at its click and is '
-        'back at rest before the next (no blur, no lag)', (tester) async {
+    testWidgets('300 bpm in 16ths: each tick pulses at its click and is '
+        'back at rest by the next', (tester) async {
       controller
         ..setBpm(300)
         ..setPattern(MetronomePattern.simple(beatsPerBar: 4, stepsPerBeat: 4))
@@ -431,33 +430,32 @@ void main() {
       await tester.tap(find.byKey(MetronomeScreen.playKey));
       await tester.pump();
       // 16ths at 300 bpm are 50 ms apart, from 120 ms.
-      for (var n = 0; n < 8; n++) {
+      for (var n = 1; n < 8; n++) {
         final at = 120 + n * 50;
         final (beat, tick) = (n ~/ 4, n % 4);
+        final (pb, pt) = ((n - 1) ~/ 4, (n - 1) % 4);
         await playAt(tester, at + 4);
         expect(key('tick-$beat-$tick-on'), findsOneWidget, reason: 'step $n');
-        await playAt(tester, at + 20); // past a third of 50 ms
-        expect(key('tick-$beat-$tick-off'), findsOneWidget, reason: 'step $n');
+        expect(key('tick-$pb-$pt-off'), findsOneWidget, reason: 'rested');
       }
       await stop(tester);
     });
 
-    testWidgets('"Remove animations": a block stays on for its beat, then '
-        'off (no fade)', (tester) async {
+    testWidgets('"Remove animations": fully on at the click for the same lit '
+        'time, then off (no ramp)', (tester) async {
       tester.platformDispatcher.accessibilityFeaturesTestValue =
           const FakeAccessibilityFeatures(disableAnimations: true);
       addTearDown(
         tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
       );
       await startTwoPerBeat(tester);
+      await playAt(tester, 110);
+      expect(key('beat-0-off'), findsOneWidget, reason: 'no early rise');
       await playAt(tester, 140);
       final lit = tester.widget<Container>(key('beat-0-on')).color;
-      await playAt(tester, 400);
-      expect(key('beat-0-on'), findsOneWidget);
+      await playAt(tester, 300);
       expect(tester.widget<Container>(key('beat-0-on')).color, lit);
-      await playAt(tester, 600);
-      expect(key('beat-0-on'), findsOneWidget);
-      await playAt(tester, 640);
+      await playAt(tester, 320);
       expect(key('beat-0-off'), findsOneWidget);
       await stop(tester);
     });

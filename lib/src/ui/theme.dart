@@ -214,9 +214,15 @@ abstract final class MetraMotion {
   static const arriveCurve = Curves.easeOut;
   static const arriveRise = 6.0;
 
-  /// A beat light's fade back to rest: this long at most, never more than
-  /// a third of the time to its next click.
-  static const lightFade = Duration(milliseconds: 90);
+  /// A beat light's pulse (ui-spec.md "Beat lights: a short pulse"),
+  /// against the time to its own next click: up over [lightRise] (ease-
+  /// out) starting [lightLead] before the click, lit for [lightShare] of
+  /// the interval, down over the same share (ease-in-out); each capped at
+  /// [lightCap]; resting for the rest.
+  static const lightRise = Duration(milliseconds: 30);
+  static const lightLead = Duration(milliseconds: 15);
+  static const lightShare = 0.35;
+  static const lightCap = Duration(milliseconds: 250);
 
   /// Above zero while a ±button is held or the tempo ruler moves: the BPM
   /// then updates instantly, so fast changes never lag the finger.
