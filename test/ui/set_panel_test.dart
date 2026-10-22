@@ -123,10 +123,12 @@ void main() {
       expect(find.byKey(QuickPick.changeSetKey), findsOneWidget);
       await tester.tap(find.byKey(QuickPick.addSongsKey));
       await tester.pumpAndSettle();
-      expect(find.byType(LibraryPick), findsOneWidget);
-      await tester.binding.handlePopRoute();
+      expect(find.byType(LibraryPick), findsNothing, reason: 'in the panel');
+      expect(inPanel('Add to Friday set'), findsOneWidget);
+      await tester.binding.handlePopRoute(); // Back: nothing added
       await tester.pumpAndSettle();
       expect(find.byType(QuickPick), findsOneWidget, reason: 'back here');
+      expect(find.byKey(QuickPick.changeSetKey), findsOneWidget);
     });
 
     testWidgets('long-press lifts and drags to reorder; saved, position '
@@ -317,11 +319,20 @@ void main() {
       await tester.enterText(find.byKey(QuickPick.renameFieldKey), 'Gig');
       await tester.tap(find.byKey(QuickPick.renameDoneKey));
       await tester.pumpAndSettle();
-      expect(find.byType(LibraryPick), findsOneWidget);
-      await tester.binding.handlePopRoute();
+      expect(inPanel('Add to Gig'), findsOneWidget, reason: 'the picker');
+      await tester.tap(find.byKey(QuickPick.pickBackKey));
       await tester.pumpAndSettle();
-      expect(find.byType(QuickPick), findsOneWidget);
+      expect(
+        find.byKey(QuickPick.newSetlistKey),
+        findsOneWidget,
+        reason: 'back to the sets view',
+      );
       expect(inPanel('Gig'), findsOneWidget);
+      expect(
+        library.setlists.firstWhere((l) => l.name == 'Gig').songIds,
+        isEmpty,
+        reason: 'Back adds nothing',
+      );
     });
 
     testWidgets('more than 8 sets: "Search setlists" filters; × clears', (
@@ -880,6 +891,122 @@ void main() {
       await tester.pumpAndSettle();
       expect(friday(), ['Two', 'Three'], reason: 'removed, as by a swipe');
       handle.dispose();
+    });
+  });
+
+  group('song picker', () {
+    Finder pick(String name) => find.byKey(
+      ValueKey('pick-${library.songs.firstWhere((s) => s.name == name).id}'),
+    );
+
+    Future<void> openPicker(WidgetTester tester) async {
+      for (final (name, bpm) in [('Alpha', 90), ('Zulu', 95), ('Echo', 130)]) {
+        library.addSong(
+          name: name,
+          bpm: bpm,
+          pattern: const MetronomePattern.standard(),
+        );
+      }
+      await openPanel(tester);
+      await tester.tap(find.byKey(QuickPick.addSongsKey));
+      await tester.pumpAndSettle();
+    }
+
+    String addLabel(WidgetTester tester) =>
+        (tester.widget<FilledButton>(find.byKey(QuickPick.pickAddKey)).child!
+                as Text)
+            .data!;
+
+    testWidgets('tick and untick; songs in the set are greyed and not '
+        'tappable; the button follows', (tester) async {
+      await pump(tester);
+      await openPicker(tester);
+      expect(addLabel(tester), 'Choose songs to add');
+      expect(
+        tester.widget<FilledButton>(find.byKey(QuickPick.pickAddKey)).onPressed,
+        isNull,
+      );
+      expect(inPanel('In this set'), findsNWidgets(3));
+      await tester.tap(pick('One'));
+      await tester.pump();
+      expect(addLabel(tester), 'Choose songs to add', reason: 'in the set');
+      await tester.tap(pick('Zulu'));
+      await tester.pump();
+      expect(haptics.last, 'HapticFeedbackType.lightImpact');
+      expect(addLabel(tester), 'Add 1 song to Friday set');
+      await tester.tap(pick('Alpha'));
+      await tester.pump();
+      expect(addLabel(tester), 'Add 2 songs to Friday set');
+      await tester.tap(pick('Zulu'));
+      await tester.pump();
+      expect(addLabel(tester), 'Add 1 song to Friday set', reason: 'untick');
+    });
+
+    testWidgets('adding: to the end in tick order, position kept, back to '
+        'the songs marked "Added"', (tester) async {
+      await pump(tester);
+      await openPicker(tester);
+      await tester.tap(pick('Zulu'));
+      await tester.tap(pick('Alpha'));
+      await tester.pump();
+      await tester.tap(find.byKey(QuickPick.pickAddKey));
+      await tester.pumpAndSettle();
+      expect(friday(), ['One', 'Two', 'Three', 'Zulu', 'Alpha']);
+      expect(library.currentSong?.name, 'Two');
+      expect(library.currentIndex, 1, reason: 'position unchanged');
+      expect(inPanel('Song 2 of 5'), findsOneWidget);
+      expect(find.byKey(const ValueKey('added-3')), findsOneWidget);
+      expect(find.byKey(const ValueKey('added-4')), findsOneWidget);
+      expect(find.byKey(QuickPick.undoKey), findsNothing, reason: 'no Undo');
+      await tester.pump(QuickPick.addedFor + const Duration(milliseconds: 100));
+      expect(find.byKey(const ValueKey('added-3')), findsNothing);
+    });
+
+    testWidgets('search filters the picker', (tester) async {
+      await pump(tester);
+      for (var i = 0; i < 6; i++) {
+        library.addSong(
+          name: 'Extra $i',
+          bpm: 100,
+          pattern: const MetronomePattern.standard(),
+        );
+      }
+      await openPicker(tester);
+      expect(find.byKey(QuickPick.pickSearchKey), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'zul');
+      await tester.pump();
+      expect(pick('Zulu'), findsOneWidget);
+      expect(pick('Alpha'), findsNothing);
+    });
+
+    testWidgets('a new set: Done opens the picker; adding returns to the '
+        'sets view', (tester) async {
+      await pump(tester);
+      await openPanel(tester);
+      await tester.tap(find.byKey(QuickPick.changeSetKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(QuickPick.newSetlistKey));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(QuickPick.renameFieldKey), 'Gig');
+      await tester.tap(find.byKey(QuickPick.renameDoneKey));
+      await tester.pumpAndSettle();
+      expect(inPanel('Add to Gig'), findsOneWidget);
+      expect(inPanel('In this set'), findsNothing, reason: 'a new set');
+      await tester.tap(pick('One'));
+      await tester.tap(pick('Three'));
+      await tester.pump();
+      await tester.tap(find.byKey(QuickPick.pickAddKey));
+      await tester.pumpAndSettle();
+      expect(find.byKey(QuickPick.newSetlistKey), findsOneWidget);
+      expect(
+        [
+          for (final id
+              in library.setlists.firstWhere((l) => l.name == 'Gig').songIds)
+            library.songById(id)!.name,
+        ],
+        ['One', 'Three'],
+      );
+      expect(library.activeSetlist?.name, 'Friday set', reason: 'not loaded');
     });
   });
 }

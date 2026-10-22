@@ -9,7 +9,6 @@ import '../model/library.dart';
 import 'editor_scaffold.dart';
 import 'haptics.dart';
 import 'icons.dart';
-import 'library_pick.dart';
 import 'metronome_screen.dart';
 import 'play_marker.dart';
 import 'setlist_picker.dart';
@@ -168,6 +167,12 @@ class QuickPick extends StatefulWidget {
   static const songLibraryKey = Key('quick-pick-song-library');
   static const setHeaderKey = Key('quick-pick-set-header');
   static const changeSetKey = Key('quick-pick-change-set');
+  static const pickBackKey = Key('quick-pick-picker-back');
+  static const pickAddKey = Key('quick-pick-picker-add');
+  static const pickSearchKey = Key('quick-pick-picker-search');
+
+  /// How long rows just added from the picker show "Added".
+  static const addedFor = Duration(seconds: 2);
   static const setSearchKey = Key('quick-pick-set-search');
   static const backKey = Key('quick-pick-back');
   static const addSongsKey = Key('quick-pick-add-songs');
@@ -218,6 +223,18 @@ class _QuickPickState extends State<QuickPick>
   final _proxyKey = GlobalKey();
   int? _dragFrom;
   bool _reordering = false;
+
+  // The song picker (ui-spec.md "Song picker"): the set it adds to, the
+  // ticked songs in tick order, its search and list, and where Back goes.
+  String? _pickFor;
+  bool _pickReturnsToSets = false;
+  final _picked = <String>[];
+  final _pickSearch = TextEditingController();
+  final _pickScroll = ScrollController();
+
+  // Rows just added from the picker, marked "Added" for a moment.
+  ({int from, int count})? _justAdded;
+  Timer? _addedTimer;
   ({int index, double fromTop})? _settle;
   final _catchUp = CatchUp();
 
@@ -280,6 +297,9 @@ class _QuickPickState extends State<QuickPick>
   @override
   void dispose() {
     _undoTimer?.cancel();
+    _addedTimer?.cancel();
+    _pickSearch.dispose();
+    _pickScroll.dispose();
     _hint.dispose();
     _rename.dispose();
     _search.dispose();
@@ -331,12 +351,15 @@ class _QuickPickState extends State<QuickPick>
   // renaming cancels the rename. Otherwise Back closes the panel.
   bool get _backStaysOpen =>
       _renaming != null ||
+      _pickFor != null ||
       (_kind == QuickPickKind.sets && _library.activeSetlist != null);
 
   void _back() => setState(() {
     if (_renaming != null) {
       _renaming = null;
       _renameKind = null;
+    } else if (_pickFor != null) {
+      _pickFor = null; // nothing added
     } else {
       _kind = QuickPickKind.set;
     }
@@ -355,6 +378,7 @@ class _QuickPickState extends State<QuickPick>
       child: ListenableBuilder(
         listenable: _library,
         builder: (context, _) => switch (_kind) {
+          _ when _pickFor != null => _pickerPanel(),
           QuickPickKind.songs => _songsPanel(),
           QuickPickKind.sets => _setsPanel(),
           QuickPickKind.set => _setPanel(),
@@ -459,6 +483,244 @@ class _QuickPickState extends State<QuickPick>
                 onTap: _newSong,
               ),
       ],
+    );
+  }
+
+  bool _isJustAdded(int i) {
+    final added = _justAdded;
+    return added != null && i >= added.from && i < added.from + added.count;
+  }
+
+  /// The panel turns into the song picker for set [id], in place.
+  void _openPicker(String id, {bool returnsToSets = false}) => setState(() {
+    _pickFor = id;
+    _pickReturnsToSets = returnsToSets;
+    _picked.clear();
+    _pickSearch.clear();
+  });
+
+  /// The ticked songs go to the end of the set in tick order (position and
+  /// current song unchanged); back to the set's songs, scrolled to the end,
+  /// the new rows marked "Added" — or, for a new set, back to the sets.
+  void _addPicked() {
+    final set = _library.setlists.where((l) => l.id == _pickFor).firstOrNull;
+    if (set == null || _picked.isEmpty) return;
+    final from = set.id == _library.activeSetlist?.id
+        ? _library.visibleSongs.length
+        : set.songIds.length;
+    final count = _picked.length;
+    _library.updateSetlist(set.copyWith(songIds: [...set.songIds, ..._picked]));
+    final toSets = _pickReturnsToSets;
+    setState(() {
+      _pickFor = null;
+      _generation++;
+      if (!toSets) _justAdded = (from: from, count: count);
+    });
+    if (toSets) return;
+    _addedTimer?.cancel();
+    _addedTimer = Timer(QuickPick.addedFor, () {
+      if (mounted) setState(() => _justAdded = null);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _scroll.hasClients) {
+        _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      }
+    });
+  }
+
+  /// "‹ Back" and "Add to Friday set", search above 8 songs, every song A–Z with
+  /// a checkbox (songs already in the set greyed), and the add button.
+  Widget _pickerPanel() {
+    final colors = context.colors;
+    final set = _library.setlists.where((l) => l.id == _pickFor).firstOrNull;
+    if (set == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _pickFor = null);
+      });
+      return const SizedBox.shrink();
+    }
+    final all = _library.songsAZ;
+    final query = _pickSearch.text.trim().toLowerCase();
+    final inSet = set.songIds.toSet();
+    final count = _picked.length;
+    return _Panel(
+      top: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: 44,
+            child: Row(
+              children: [
+                TextButton(
+                  key: QuickPick.pickBackKey,
+                  style: TextButton.styleFrom(
+                    foregroundColor: colors.muted,
+                    minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  onPressed: _back,
+                  child: const Text('‹ Back', style: TextStyle(fontSize: 14)),
+                ),
+                const Spacer(),
+                Flexible(
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Text(
+                      'Add to ${set.name}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 14, color: colors.muted),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (all.length > QuickPick.searchAbove)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
+              child: SearchField(
+                key: QuickPick.pickSearchKey,
+                controller: _pickSearch,
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+        ],
+      ),
+      list: ListView(
+        shrinkWrap: true,
+        controller: _pickScroll,
+        padding: EdgeInsets.zero,
+        children: [
+          for (final song in all)
+            if (query.isEmpty || song.name.toLowerCase().contains(query))
+              _pickRow(colors, song, inSet: inSet.contains(song.id)),
+        ],
+      ),
+      actions: [
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: SizedBox(
+            height: 52,
+            child: FilledButton(
+              key: QuickPick.pickAddKey,
+              onPressed: count == 0 ? null : _addPicked,
+              child: Text(
+                count == 0
+                    ? 'Choose songs to add'
+                    : 'Add $count ${count == 1 ? 'song' : 'songs'} '
+                          'to ${set.name}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// One song to pick, 52px: tap anywhere ticks or unticks (light
+  /// haptic). Already in the set: greyed, "In this set", not tappable.
+  Widget _pickRow(MetraColors colors, Song song, {required bool inSet}) {
+    final ticked = _picked.contains(song.id);
+    final faint = inSet ? colors.slot : null;
+    return Material(
+      color: ticked ? colors.surface : colors.sheet,
+      child: InkWell(
+        key: ValueKey('pick-${song.id}'),
+        enableFeedback: false,
+        onTap: inSet
+            ? null
+            : () {
+                Haptics.tick();
+                setState(
+                  () => ticked ? _picked.remove(song.id) : _picked.add(song.id),
+                );
+              },
+        child: Container(
+          height: _rowHeight,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: colors.divider)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: ticked
+                      ? colors.text
+                      : inSet
+                      ? colors.surface
+                      : null,
+                  borderRadius: BorderRadius.circular(3),
+                  border: Border.all(
+                    color: ticked
+                        ? colors.text
+                        : inSet
+                        ? colors.lifted
+                        : colors.slot,
+                    width: 2,
+                  ),
+                ),
+                child: ticked
+                    ? Icon(Icons.check, size: 14, color: colors.background)
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      song.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 16, color: faint),
+                    ),
+                    if (inSet)
+                      Text(
+                        'In this set',
+                        style: TextStyle(fontSize: 12, color: faint),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 34,
+                child: Text(
+                  '${song.bpm}',
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: inSet ? colors.beatResting : colors.muted,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 30,
+                child: Text(
+                  song.pattern.timeSignature,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: inSet ? colors.beatResting : colors.slot,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -643,7 +905,7 @@ class _QuickPickState extends State<QuickPick>
           key: QuickPick.addSongsKey,
           label: '+ Add songs',
           opens: true,
-          onTap: () => _addSongsTo(setlist.id),
+          onTap: () => _openPicker(setlist.id),
         ),
       ],
     );
@@ -760,6 +1022,8 @@ class _QuickPickState extends State<QuickPick>
         ? colors.lifted
         : current
         ? colors.selectedRow
+        : _isJustAdded(i)
+        ? colors.divider
         : colors.sheet,
     child: InkWell(
       key: ValueKey('quick-set-song-$i'),
@@ -796,6 +1060,14 @@ class _QuickPickState extends State<QuickPick>
                 ),
               ),
             ),
+            if (_isJustAdded(i)) ...[
+              const SizedBox(width: 8),
+              Text(
+                'Added',
+                key: ValueKey('added-$i'),
+                style: TextStyle(fontSize: 12, color: colors.muted),
+              ),
+            ],
             const SizedBox(width: 12),
             Text(
               '${song.bpm}',
@@ -895,7 +1167,7 @@ class _QuickPickState extends State<QuickPick>
         _library.renameSetlist(id, _rename.text);
       case _Rename.newSet:
         _library.renameSetlist(id, _rename.text);
-        _addSongsTo(id);
+        _openPicker(id, returnsToSets: true);
       case _Rename.song:
         _library.renameSong(id, _rename.text);
       case _Rename.newSong:
@@ -925,10 +1197,6 @@ class _QuickPickState extends State<QuickPick>
   /// "+ New song ›": a row on top, being named "Song N".
   void _newSong() =>
       _startRename(_newSongId, _library.newSongName(), _Rename.newSong);
-
-  /// The library in pick mode for the set; back here after.
-  Future<void> _addSongsTo(String id) =>
-      addSongsToSet(context, _library, widget.metronome, id);
 
   /// The row being renamed: a field with the name selected, and "Done".
   Widget _renameRow(MetraColors colors, {required Widget leading}) => Container(
