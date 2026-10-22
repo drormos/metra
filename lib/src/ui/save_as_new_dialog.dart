@@ -46,6 +46,15 @@ class _SaveAsNewDialogState extends State<_SaveAsNewDialog> {
   }();
   SongPlacement _placement = SongPlacement.replace;
 
+  // Outside setlist mode: "Add to a setlist" (ui-spec.md "Adding songs to
+  // sets", `new-song-dialog.reference.html`). A set id, [_newSet], or
+  // [_none]; open in place once tapped, "More setlists" shows the rest.
+  static const _none = '';
+  static const _newSet = '+new';
+  String _target = _none;
+  bool _choosing = false;
+  bool _more = false;
+
   @override
   void dispose() {
     _name.dispose();
@@ -63,13 +72,19 @@ class _SaveAsNewDialogState extends State<_SaveAsNewDialog> {
   void _save() {
     if (_error != null) return;
     Haptics.tick();
-    widget.library.saveAsNewSong(
+    final library = widget.library;
+    final song = library.saveAsNewSong(
       _name.text.trim(),
       widget.metronome,
       placement: _set == null ? SongPlacement.none : _placement,
       // Free play's "+ New song from this" is a new song, not a copy.
       fresh: _song == null,
     );
+    // At the end of the chosen set; the app stays where it is.
+    if (_target != _none) {
+      final setId = _target == _newSet ? library.createSetlist().id : _target;
+      library.addToSetlist(setId, song.id);
+    }
     Navigator.pop(context, true);
   }
 
@@ -105,6 +120,7 @@ class _SaveAsNewDialogState extends State<_SaveAsNewDialog> {
                 errorStyle: TextStyle(color: colors.accentSounding),
               ),
             ),
+            if (set == null) ..._addToSet(colors),
             if (set != null && song != null) ...[
               const SizedBox(height: 20),
               Text(
@@ -152,6 +168,114 @@ class _SaveAsNewDialogState extends State<_SaveAsNewDialog> {
     );
   }
 
+  /// "Add to a setlist": a closed field showing the choice; tapped, the
+  /// choices open in place (None, the 3 most recently played sets, "More
+  /// setlists ⌄" for the rest, "+ New setlist").
+  List<Widget> _addToSet(MetraColors colors) {
+    final library = widget.library;
+    final sets = library.setlistsRecentlyPlayed;
+    final label = Text(
+      'Add to a setlist',
+      style: TextStyle(fontSize: 14, color: colors.muted),
+    );
+    if (!_choosing) {
+      final chosen = switch (_target) {
+        _none => 'None',
+        _newSet => library.newSetlistName(),
+        final id => sets.firstWhere((s) => s.id == id).name,
+      };
+      return [
+        const SizedBox(height: 20),
+        label,
+        const SizedBox(height: 8),
+        InkWell(
+          key: SaveAsNewKeys.addToSet,
+          borderRadius: BorderRadius.circular(4),
+          onTap: () => setState(() => _choosing = true),
+          child: Container(
+            height: 50,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: colors.controlOutline, width: 2),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    chosen,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                ),
+                Icon(Icons.expand_more, color: colors.muted),
+              ],
+            ),
+          ),
+        ),
+      ];
+    }
+    final shown = _more ? sets : sets.take(3);
+    String count(int n) => n == 1 ? '1 song' : '$n songs';
+    return [
+      const SizedBox(height: 20),
+      label,
+      RadioGroup<String>(
+        groupValue: _target,
+        onChanged: (value) => setState(() => _target = value!),
+        child: Column(
+          children: [
+            _setOption(_none, 'None', 'Just save the song'),
+            for (final s in shown)
+              _setOption(
+                s.id,
+                s.name,
+                _target == s.id
+                    ? 'Added at the end · ${count(s.songIds.length)}'
+                    : count(s.songIds.length),
+              ),
+            if (!_more && sets.length > 3)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  key: SaveAsNewKeys.moreSets,
+                  style: TextButton.styleFrom(
+                    foregroundColor: colors.muted,
+                    padding: const EdgeInsets.only(left: 32, right: 12),
+                    minimumSize: const Size(0, 48),
+                  ),
+                  onPressed: () => setState(() => _more = true),
+                  child: const Text(
+                    'More setlists ⌄',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                ),
+              ),
+            _setOption(
+              _newSet,
+              '+ New setlist',
+              'Named ${library.newSetlistName()}; rename it later',
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  Widget _setOption(String value, String title, String detail) =>
+      RadioListTile<String>(
+        key: ValueKey('add-to-set-$value'),
+        value: value,
+        contentPadding: EdgeInsets.zero,
+        activeColor: context.colors.accent,
+        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: Text(
+          detail,
+          style: TextStyle(fontSize: 13, color: context.colors.muted),
+        ),
+      );
+
   Widget _option(SongPlacement value, String title, String detail) =>
       RadioListTile<SongPlacement>(
         key: ValueKey('placement-${value.name}'),
@@ -169,4 +293,8 @@ class _SaveAsNewDialogState extends State<_SaveAsNewDialog> {
 abstract final class SaveAsNewKeys {
   static const name = Key('save-as-new-name');
   static const save = Key('save-as-new-save');
+  static const addToSet = Key('save-as-new-add-to-set');
+  static const moreSets = Key('save-as-new-more-sets');
+  static const newSet = ValueKey('add-to-set-+new');
+  static const noSet = ValueKey('add-to-set-');
 }

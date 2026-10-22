@@ -578,9 +578,18 @@ class _QuickPickState extends State<QuickPick>
     final count = _picked.length;
     _library.updateSetlist(set.copyWith(songIds: [...set.songIds, ..._picked]));
     final toSets = _pickReturnsToSets;
+    // A set just built from "+ New setlist": stopped, it loads at song 1
+    // and the panel shows its songs; playing, nothing switches and the
+    // sets view shows it on top (ui-spec.md "Adding songs to sets").
+    final load = toSets && !widget.metronome.isPlaying;
+    if (load) {
+      Haptics.medium();
+      _library.loadSetlist(set.id, widget.metronome);
+    }
     setState(() {
       _pickFor = null;
       _generation++;
+      if (load) _kind = QuickPickKind.set;
       if (!toSets) _justAdded = (from: from, count: count);
     });
     if (toSets) return;
@@ -984,11 +993,23 @@ class _QuickPickState extends State<QuickPick>
       note: _hintNote(colors),
       bar: _undoBar(colors),
       actions: [
-        _action(
-          key: QuickPick.addSongsKey,
-          label: '+ Add songs',
-          opens: true,
-          onTap: () => _openPicker(setlist.id),
+        // The panel's main action, so an outlined button, not a row
+        // (ui-spec.md "Adding songs to sets").
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: OutlinedButton.icon(
+            key: QuickPick.addSongsKey,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              side: BorderSide(color: colors.border, width: 2),
+            ),
+            onPressed: () => _openPicker(setlist.id),
+            icon: const SetlistIcon(),
+            label: const Text(
+              'Add songs',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
         ),
       ],
     );

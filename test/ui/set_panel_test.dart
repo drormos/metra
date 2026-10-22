@@ -1004,35 +1004,65 @@ void main() {
       expect(pick('Alpha'), findsNothing);
     });
 
-    testWidgets('a new set: Done opens the picker; adding returns to the '
-        'sets view', (tester) async {
-      await pump(tester);
-      await openPanel(tester);
-      await tester.tap(find.byKey(QuickPick.changeSetKey));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(QuickPick.newSetlistKey));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byKey(QuickPick.renameFieldKey), 'Gig');
-      await tester.tap(find.byKey(QuickPick.renameDoneKey));
-      await tester.pumpAndSettle();
-      expect(inPanel('Add to Gig'), findsOneWidget);
-      expect(inPanel('In this set'), findsNothing, reason: 'a new set');
-      await tester.tap(pick('One'));
-      await tester.tap(pick('Three'));
-      await tester.pump();
-      await tester.tap(find.byKey(QuickPick.pickAddKey));
-      await tester.pumpAndSettle();
-      expect(find.byKey(QuickPick.newSetlistKey), findsOneWidget);
-      expect(
-        [
-          for (final id
-              in library.setlists.firstWhere((l) => l.name == 'Gig').songIds)
-            library.songById(id)!.name,
-        ],
-        ['One', 'Three'],
+    for (final playing in [false, true]) {
+      testWidgets(
+        'a new set: Done opens the picker; Add then '
+        '${playing ? 'keeps playing: back to the sets view, new set on top' : 'loads it at song 1 and shows its songs'}',
+        (tester) async {
+          await pump(tester);
+          // Not pumpAndSettle while the click plays.
+          Future<void> settle() async {
+            for (var i = 0; i < 8; i++) {
+              await tester.pump(const Duration(milliseconds: 100));
+            }
+          }
+
+          await openPanel(tester);
+          if (playing) await metronome.play();
+          await tester.tap(find.byKey(QuickPick.changeSetKey));
+          await settle();
+          await tester.tap(find.byKey(QuickPick.newSetlistKey));
+          await settle();
+          await tester.enterText(find.byKey(QuickPick.renameFieldKey), 'Gig');
+          await tester.tap(find.byKey(QuickPick.renameDoneKey));
+          await settle();
+          expect(inPanel('Add to Gig'), findsOneWidget);
+          expect(inPanel('In this set'), findsNothing, reason: 'a new set');
+          await tester.tap(pick('One'));
+          await tester.tap(pick('Three'));
+          await tester.pump();
+          await tester.tap(find.byKey(QuickPick.pickAddKey));
+          await settle();
+          expect(
+            [
+              for (final id
+                  in library.setlists
+                      .firstWhere((l) => l.name == 'Gig')
+                      .songIds)
+                library.songById(id)!.name,
+            ],
+            ['One', 'Three'],
+          );
+          expect(find.byType(QuickPick), findsOneWidget, reason: 'stays open');
+          if (playing) {
+            expect(find.byKey(QuickPick.newSetlistKey), findsOneWidget);
+            expect(library.activeSetlist?.name, 'Friday set', reason: 'kept');
+            expect(
+              library.setlistsRecentlyPlayed.first.name,
+              'Gig',
+              reason: 'on top',
+            );
+            metronome.stop();
+            await tester.pump();
+          } else {
+            expect(library.activeSetlist?.name, 'Gig');
+            expect(library.currentSong?.name, 'One', reason: 'song 1');
+            expect(find.byKey(QuickPick.changeSetKey), findsOneWidget);
+            expect(inPanel('Song 1 of 2'), findsOneWidget);
+          }
+        },
       );
-      expect(library.activeSetlist?.name, 'Friday set', reason: 'not loaded');
-    });
+    }
   });
 
   group('Back, one level at a time', () {

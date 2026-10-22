@@ -843,6 +843,139 @@ void main() {
       expect(find.byKey(QuickPick.changeSetKey), findsOneWidget);
     });
 
+    group('New song dialog: "Add to a setlist"', () {
+      Future<void> openDialog(WidgetTester tester) async {
+        await tester.tap(find.byKey(SetlistGroup.freePlayTabKey));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(SetlistGroup.newSongKey));
+        await tester.pumpAndSettle();
+      }
+
+      Finder option(String setName) => find.byKey(
+        ValueKey(
+          'add-to-set-${library.setlists.firstWhere((l) => l.name == setName).id}',
+        ),
+      );
+
+      Future<void> save(WidgetTester tester) async {
+        await tester.tap(find.byKey(SaveAsNewKeys.save));
+        await tester.pumpAndSettle();
+      }
+
+      List<String> names(String setName) => [
+        for (final id
+            in library.setlists.firstWhere((l) => l.name == setName).songIds)
+          library.songById(id)!.name,
+      ];
+
+      testWidgets('None by default: just a name and Save', (tester) async {
+        await withLibrary(tester);
+        await openDialog(tester);
+        expect(
+          find.descendant(
+            of: find.byKey(SaveAsNewKeys.addToSet),
+            matching: find.text('None'),
+          ),
+          findsOneWidget,
+        );
+        await save(tester);
+        expect(library.songs, hasLength(4));
+        expect(library.setlists, hasLength(2));
+        expect(names('Friday set'), ['One', 'Two', 'Three']);
+        expect(names('Saturday set'), ['Three']);
+      });
+
+      testWidgets('a recent set: added at its end; nothing switches', (
+        tester,
+      ) async {
+        await withLibrary(tester);
+        await openDialog(tester);
+        await tester.tap(find.byKey(SaveAsNewKeys.addToSet));
+        await tester.pumpAndSettle();
+        expect(find.text('Just save the song'), findsOneWidget);
+        await tester.tap(option('Friday set'));
+        await tester.pumpAndSettle();
+        expect(find.text('Added at the end · 3 songs'), findsOneWidget);
+        await save(tester);
+        expect(names('Friday set'), ['One', 'Two', 'Three', 'Song 1']);
+        expect(library.activeSetlist, isNull, reason: 'no switch');
+        expect(library.currentSong?.name, 'Song 1');
+      });
+
+      testWidgets('3 recent sets, "More setlists ⌄" for the rest', (
+        tester,
+      ) async {
+        await withLibrary(tester);
+        for (final name in ['Gig A', 'Gig B']) {
+          library.saveSetlist(name: name, songIds: const []);
+        }
+        await tester.pump();
+        await openDialog(tester);
+        await tester.tap(find.byKey(SaveAsNewKeys.addToSet));
+        await tester.pumpAndSettle();
+        final hidden = library.setlistsRecentlyPlayed.last.name;
+        expect(option(hidden), findsNothing);
+        await tester.tap(find.byKey(SaveAsNewKeys.moreSets));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(option(hidden));
+        await tester.tap(option(hidden));
+        await tester.pumpAndSettle();
+        await save(tester);
+        expect(names(hidden).last, 'Song 1');
+      });
+
+      testWidgets('"+ New setlist": made on Save as "Setlist N", with the '
+          'song', (tester) async {
+        await withLibrary(tester);
+        await openDialog(tester);
+        await tester.tap(find.byKey(SaveAsNewKeys.addToSet));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.byKey(SaveAsNewKeys.newSet));
+        await tester.tap(find.byKey(SaveAsNewKeys.newSet));
+        await tester.pumpAndSettle();
+        expect(library.setlists, hasLength(2), reason: 'not before Save');
+        await save(tester);
+        expect(names('Setlist 1'), ['Song 1']);
+        expect(library.activeSetlist, isNull, reason: 'no switch');
+      });
+
+      testWidgets('no sets yet: only None and "+ New setlist"', (tester) async {
+        await pumpScreen(tester);
+        await openDialog(tester);
+        await tester.tap(find.byKey(SaveAsNewKeys.addToSet));
+        await tester.pumpAndSettle();
+        expect(find.byKey(SaveAsNewKeys.noSet), findsOneWidget);
+        expect(find.byKey(SaveAsNewKeys.newSet), findsOneWidget);
+        expect(find.byType(RadioListTile<String>), findsNWidgets(2));
+        expect(find.byKey(SaveAsNewKeys.moreSets), findsNothing);
+        await tester.tap(find.byKey(SaveAsNewKeys.newSet));
+        await tester.pumpAndSettle();
+        await save(tester);
+        expect(library.setlists.single.name, 'Setlist 1');
+        expect(names('Setlist 1'), ['Song 1']);
+      });
+
+      testWidgets('Single song "Save as new" has it; setlist mode keeps '
+          'Replace / Add after', (tester) async {
+        await withLibrary(tester, loaded: true);
+        await tester.tap(find.text('+1'));
+        await tester.pump();
+        await tester.tap(find.byKey(MetronomeScreen.saveAsNewKey));
+        await tester.pumpAndSettle();
+        expect(find.byKey(SaveAsNewKeys.addToSet), findsNothing);
+        expect(find.text('Replace Two'), findsOneWidget);
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+        library.playSingleSong(library.songs.first, metronome);
+        await tester.pump();
+        await tester.tap(find.text('+1'));
+        await tester.pump();
+        await tester.tap(find.byKey(MetronomeScreen.saveAsNewKey));
+        await tester.pumpAndSettle();
+        expect(find.byKey(SaveAsNewKeys.addToSet), findsOneWidget);
+      });
+    });
+
     testWidgets('no "Free play" rows in the dropdowns', (tester) async {
       await withLibrary(tester);
       library.playSingleSong(library.songs.first, metronome);
