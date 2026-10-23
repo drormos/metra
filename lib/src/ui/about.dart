@@ -63,6 +63,31 @@ Future<Uri> feedbackUri() async {
   );
 }
 
+/// The privacy policy (PRIVACY.md in the public repo), also the store
+/// listing's policy link.
+const privacyPolicyUrl =
+    'https://github.com/drormos/metra/blob/main/PRIVACY.md';
+
+/// Opens the privacy policy in the browser (the app itself has no network
+/// access); says where to find it if no browser opens.
+Future<void> openPrivacyPolicy(BuildContext context) async {
+  final messenger = ScaffoldMessenger.of(context);
+  var opened = false;
+  try {
+    opened = await launchUrl(
+      Uri.parse(privacyPolicyUrl),
+      mode: LaunchMode.externalApplication,
+    );
+  } on PlatformException {
+    opened = false;
+  }
+  if (!opened) {
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Privacy policy: $privacyPolicyUrl')),
+    );
+  }
+}
+
 /// Opens an email app; says where to write if there's none.
 Future<void> sendFeedback(BuildContext context) async {
   final messenger = ScaffoldMessenger.of(context);

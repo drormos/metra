@@ -132,6 +132,7 @@ void main() {
       'All updates',
       'About Metra',
       'Why this app exists',
+      'Privacy policy',
     ]) {
       expect(find.text(text), findsOneWidget, reason: text);
     }
@@ -146,6 +147,10 @@ void main() {
     );
     expect(
       top(SettingsScreen.aboutKey),
+      lessThan(top(SettingsScreen.privacyKey)),
+    );
+    expect(
+      top(SettingsScreen.privacyKey),
       lessThan(top(SettingsScreen.versionKey)),
     );
     expect(
@@ -160,6 +165,11 @@ void main() {
     expectMain();
     expect(metronome.isPlaying, isTrue);
     metronome.stop();
+  });
+
+  test('the privacy policy link is https and the one Play is given', () {
+    expect(privacyPolicyUrl, startsWith('https://'));
+    expect(File('RELEASING.md').readAsStringSync(), contains(privacyPolicyUrl));
   });
 
   testWidgets('About: the version line, copied on long-press', (tester) async {

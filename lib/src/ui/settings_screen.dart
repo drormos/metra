@@ -50,6 +50,7 @@ class SettingsScreen extends StatelessWidget {
   static const feedbackKey = Key('settings-feedback');
   static const allUpdatesRowKey = Key('settings-all-updates-row');
   static const aboutKey = Key('settings-about');
+  static const privacyKey = Key('settings-privacy');
   static const versionKey = Key('settings-version');
 
   static const _themes = {
@@ -227,6 +228,8 @@ class SettingsScreen extends StatelessWidget {
           ),
           detail: 'Why this app exists',
         ),
+        // Google Play requires the policy to be linked in the app too.
+        row(privacyKey, 'Privacy policy', () => openPrivacyPolicy(context)),
         const SizedBox(height: 6),
         const VersionLine(key: versionKey),
       ],

@@ -2,6 +2,14 @@
 
 Newest first. The top version's lines are also the Play Store release notes.
 
+## 1.5.2 · Oct 2026
+- Count-in, speed up and stop after, from the stopwatch
+- Subdivision now lives in the Rhythm panel ("4/4")
+- Settings replaces the menu (gear, top right)
+- Panels open from the button you tap and close with a swipe
+- Your songs and settings are saved more safely
+- Steadier click when you change something right before a bar line
+
 ## 1.5.1 · Oct 2026
 - Count-in, speed up and stop after, from the stopwatch
 - Subdivision now lives in the Rhythm panel ("4/4")

@@ -4,6 +4,11 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-10-23
+
+### Added
+- Settings → About → Privacy policy (Google Play requires the link in the app too).
+
 ### Fixed
 - A stray click from the old bar could play next to the new beat 1, or the rest of a bar could switch pattern early, when a tempo change, beat tap or song change came just before a bar-line change (a speed-up step, a count-in's end, a time signature or subdivision change).
 - Changing the time signature and tapping a beat within a fraction of a second, with a polyrhythm on, could stop the click with an error.
@@ -88,7 +93,8 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 - Song editor with live preview; Revert / Save for changes to a loaded song.
 - Stage Black and Daylight themes, per-level click volumes, visual offset.
 
-[Unreleased]: https://github.com/drormos/metra/compare/v1.5.1...HEAD
+[Unreleased]: https://github.com/drormos/metra/compare/v1.5.2...HEAD
+[1.5.2]: https://github.com/drormos/metra/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/drormos/metra/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/drormos/metra/compare/v1.3.0...v1.5.0
 [1.3.0]: https://github.com/drormos/metra/compare/687e31e...v1.3.0

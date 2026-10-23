@@ -76,6 +76,11 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Settings > Privacy policy opens a browser. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
         <!-- Menu > Send feedback opens an email app. -->
         <intent>
             <action android:name="android.intent.action.SENDTO"/>
