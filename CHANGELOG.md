@@ -4,6 +4,9 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Changed
+- A bolder app icon that reads at home-screen size, with a themed (monochrome) version for Android 13+.
+
 ### Fixed
 - A polyrhythm cell could stay lit after Stop.
 

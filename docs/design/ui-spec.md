@@ -317,7 +317,7 @@ A full page opened from the **gear button** at the top right of the main screen 
 
 ## App icon
 
-The tempo needle: the main screen's ruler ticks with the red needle through the middle, on black. Sources (vector, 1024×1024):
+The tempo needle: the main screen's ruler ticks with the red needle through the middle, on black. Redrawn Oct 2026 to work at real home-screen size (48px): 9 thick ticks (6/240 wide, majors #B0B0B0 every 4th, minors #5A5A5A), a bold 14/240-wide red needle, all inside the circular mask, filling most of the icon. Sources (vector, 1024×1024):
 - `app-icon.svg`: the full icon, square with no rounded corners (the OS applies its own mask). Use for iOS and as the Android legacy icon.
 - `app-icon-foreground.svg`: transparent foreground for Android adaptive icons, with the artwork scaled into the safe center area so any mask shape keeps it intact. The adaptive background is solid #000000.
 
