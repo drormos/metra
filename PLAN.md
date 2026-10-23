@@ -4,7 +4,7 @@
 A sample-accurate metronome for Android (and macOS / iOS), built with Flutter and `flutter_soloud`. Click timing comes from the C++ engine clock, so playback doesn't drift. Map of the code: [ARCHITECTURE.md](ARCHITECTURE.md). How it was built, phase by phase, with every decision: [docs/history.md](docs/history.md).
 
 ## Status (2026-10-23)
-- Released: 1.5.0 (build 48) on GitHub; the AAB goes to Play by hand. Build 49 (unreleased) adds versioned storage (two files, migrations, repair, Auto Backup rules).
+- Released: 1.5.1 (build 50) on GitHub (versioned storage: two files, migrations, repair, Auto Backup rules; its What's new repeats 1.5.0's lines, since 1.5.0 may not have reached Play). The AAB goes to Play by hand.
 - Next: the closed test on Play. Testers only ever move up a build (a build older than 49 can't read the version 2 files).
 - Waiting on the user since Phase 1: headphones unplugged while playing, and the macOS app hidden for 60 s (both in the device-qa skill).
 - Open: iOS lock-screen controls and headphone-unplug stop (not planned yet); predictive back checked only in tests (needs the phone's gesture on).

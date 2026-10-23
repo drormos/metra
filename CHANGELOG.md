@@ -4,6 +4,8 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-10-23
+
 ### Changed
 - Saved data is versioned: older files are migrated step by step on load, and songs and setlists (`library.json`) are stored apart from settings (`settings.json`). The original single file is kept until the first successful save.
 - Android Auto Backup carries only the library and settings files.
@@ -81,7 +83,8 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 - Song editor with live preview; Revert / Save for changes to a loaded song.
 - Stage Black and Daylight themes, per-level click volumes, visual offset.
 
-[Unreleased]: https://github.com/drormos/metra/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/drormos/metra/compare/v1.5.1...HEAD
+[1.5.1]: https://github.com/drormos/metra/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/drormos/metra/compare/v1.3.0...v1.5.0
 [1.3.0]: https://github.com/drormos/metra/compare/687e31e...v1.3.0
 [1.2.0]: https://github.com/drormos/metra/compare/v1.1.0...687e31e
