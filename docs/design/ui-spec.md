@@ -1,7 +1,7 @@
 # Metra UI Spec
 
 Design references (design-tool files: read them for exact sizes and colors, don't port their markup):
-- `main-screen.reference.html`: main screen with a setlist loaded.
+- `main-screen.reference.html`: main screen with a setlist loaded (stopwatch, 4/4 with subdivision, gear).
 - `free-play.reference.html`: main screen in Free play.
 - `free-play-song.reference.html`: Single song mode (a library song loaded without a setlist; same bar as Free play, the title shows the song, no subtitle).
 - `beat-states.reference.html`: the beat blocks at three moments in a bar.
@@ -11,9 +11,8 @@ Design references (design-tool files: read them for exact sizes and colors, don'
 - `save-as-new.reference.html`: the Save as new song dialog (in a setlist).
 - `media-controls.reference.html`: lock-screen media card and compact notification (setlist, playing).
 - `media-cover.reference.html`: media card in Free play (stopped) and the generated cover image.
-- `time-signature.reference.html`: the time signature sheet.
-- `menu.reference.html`: the Menu side panel open over the main screen.
-- `settings.reference.html`: the Settings page at full scroll length.
+- `time-signature.reference.html`: the Rhythm sheet (time signature, subdivision, polyrhythm).
+- `settings.reference.html`: the Settings page at full scroll length (What's new on top, About at the bottom).
 - `set-panel.reference.html`, `sets-view.reference.html`, `sets-search.reference.html`, `add-songs-panel.reference.html`, `songs-panel.reference.html`, `delete-confirm.reference.html`: the lists on the main screen, where songs and sets are chosen and managed.
 - `drop-songs.reference.html`, `drop-sets.reference.html`, `drop-set.reference.html`: older versions of those lists (layout and sizes only; the newer references win).
 
@@ -91,7 +90,7 @@ Things never pop in or vanish; they arrive and leave quickly and softly, and not
 ## Icons
 
 - **Setlist:** "note queue": three lines (the last one short) with a music note at the lower right. Used on the Setlists button, the setlist header, set rows, and the Setlists dropdown. Distinct from the Menu icon.
-- **Menu:** ☰, three equal lines.
+- **Settings:** a gear (the top row's right button). There is no ☰ menu.
 - **Song:** a single music note (Songs button).
 - **Free play:** the metronome (the Free play row in dropdowns, Free play buttons and rows).
 
@@ -107,8 +106,9 @@ Labels are sentence case ("Start", "Stop", "Tap"), not all caps. Every interacti
 
 Top to bottom:
 
-1. **Top row.** Current song title on the left (Saira Extra Condensed 700, one line). **Shrink to fit:** it starts at 34px and, if the name doesn't fit, shrinks step by step down to 22px; only if it still doesn't fit at 22px does it end with "…". That keeps around five words readable without ever wrapping. **Fixed lines:** the title has a fixed-height line box (sized for 34px) and the subtitle line is anchored to the bottom of the 54px block, so the subtitle never moves when the title shrinks; a smaller title sits at the bottom of its line box, right above the subtitle (aligned on the baseline). It shows the loaded song's name in setlist and Single song mode, and is empty in Free play. Under it, a small muted subtitle (Saira 14px, #8C8C8C, one line, ellipsis), like a song's artist line: the setlist's name in setlist mode; empty in Single song mode (it blends in; the subtitle line still reserves its height so the title sits in the same place). In Free play the title block is empty (saving lives in the context row: "+ New song from this"). The title block is a fixed 54px tall in every mode, so nothing shifts. The title has no buttons next to it. Long-press the title (medium haptic) to open the song editor for that song. Taps do nothing. These are small targets on purpose: shortcuts, not the main route. On the right, three outlined 44×44 buttons, 4px radius: subdivision, time signature ("4/4"; with a polyrhythm on it reads "4/4 · 3" and widens to fit), Menu (☰).
-   - **Subdivision button** shows the current value as a vector music-note icon: quarter note (1), beamed eighths (2), triplet (3, beamed with a small "3"), beamed sixteenths (4). Tapping cycles 1 → 2 → 3 → 4 → 1. No menu.
+1. **Top row.** Current song title on the left (Saira Extra Condensed 700, one line). **Shrink to fit:** it starts at 34px and, if the name doesn't fit, shrinks step by step down to 22px; only if it still doesn't fit at 22px does it end with "…". That keeps around five words readable without ever wrapping. **Fixed lines:** the title has a fixed-height line box (sized for 34px) and the subtitle line is anchored to the bottom of the 54px block, so the subtitle never moves when the title shrinks; a smaller title sits at the bottom of its line box, right above the subtitle (aligned on the baseline). It shows the loaded song's name in setlist and Single song mode, and is empty in Free play. Under it, a small muted subtitle (Saira 14px, #8C8C8C, one line, ellipsis), like a song's artist line: the setlist's name in setlist mode; empty in Single song mode (it blends in; the subtitle line still reserves its height so the title sits in the same place). In Free play the title block is empty (saving lives in the context row: "+ New song from this"). The title block is a fixed 54px tall in every mode, so nothing shifts. The title has no buttons next to it. Long-press the title (medium haptic) to open the song editor for that song. Taps do nothing. These are small targets on purpose: shortcuts, not the main route. On the right, three outlined 44×44 buttons, 4px radius: the stopwatch ("When I press Start"), time signature ("4/4"; with a polyrhythm on it reads "4/4 · 3" and widens to fit), Settings (gear).
+   - **Stopwatch button** (replaces the old subdivision button) opens the "When I press Start" sheet (see that section). Outlined white when everything in it is off; red outline and red icon when anything is on (count-in, speed up or stop after), so Start never does something you can't see.
+   - **Time signature button** shows the time signature and the subdivision note next to it ("4/4 ♪♪"; quarter-note subdivision shows no note), plus " · 3" when a polyrhythm is on. It widens to fit, but its height is exactly the same as the other two buttons (44px visible, same 2px border and 4px radius, vertically centered on the same line); the 48dp touch area comes from invisible padding, never from a bigger box. Subdivision is now chosen in its sheet (see "Rhythm sheet"). Subdivision icons as before: quarter (1), beamed eighths (2), triplet (3, small "3"), beamed sixteenths (4).
 2. **Beat blocks.** One whole block per beat, equal widths filling the row, 6px gaps, ~36px tall, 4px radius. Never split. Must work from 2 to 12+ beats.
    - Each block always shows its type in its resting color, so the pattern is visible even when stopped. Only the sounding block switches to its sounding color, for the duration of that beat, then returns to resting. Nothing stays lit.
    - **Beat types** (tapping a block cycles regular → accent → muted → regular; stored per song; the change is heard from the very next click):
@@ -217,7 +217,7 @@ Choosing what to play never leaves the main screen. The context row's center but
   - **From the New song dialog** ("+ New song from this" in Free play, and "Save as new" in Single song): under the name, a row "Add to a setlist" set to **None** by default. Ignored, the dialog is still just a name and Save. Tapped, it opens in place: None ("Just save the song"), the 3 most recently played sets ("Added at the end · 12 songs"), "More setlists ⌄" for the rest, and "+ New setlist" (created on Save, named "Setlist N"). With no sets yet, the row still shows, with only None and "+ New setlist", so a first song and a first set can be made together. The song goes to the end of the chosen set; the app doesn't switch into the set. In setlist mode, Save as new keeps its own choices (Replace / Add after / Don't add). See `new-song-dialog.reference.html`.
   - **From the set (set-first), easier to see:** the pinned "+ Add songs" at the bottom of the set panel becomes an outlined button (48px, 2px border, setlist icon + "Add songs") instead of a plain row, so it reads as the panel's main action. After "+ New setlist" → name → picking songs → Add: if the click is stopped, the new set **loads** at song 1 (you just built it to play it) and the panel shows its songs; if it's playing, nothing switches (the click is never interrupted by creating something) and you're back in the sets view with the new set on top.
 - **One-time hints (Principle 7).** Long-press and swipe have no visible button, so each list teaches them once. After the swipe nudge (see Set ⌄), a small muted line appears under the list for ~3 s: "Hold a song to move it · Swipe to remove" (set panel), "Hold a set to rename it · Swipe to delete" (sets view), "Hold a song to rename it · Swipe to delete" (Songs list). Once per list (stored flag), skipped with Remove animations. Screen readers get the same actions as custom actions (see Accessibility).
-- **Delete asks, remove undoes.** One rule for every list: swiping something that deletes your own work (a song from the library, a whole set) asks first in a small dialog, because a song can hold real work (and later trainer settings) and is shared by sets; after confirming, the same Undo bar still appears as a second chance for a mistaken tap. Swiping that only takes something out of a list (a song out of a set) deletes nothing, so it's immediate with the Undo bar. See `delete-confirm.reference.html`.
+- **Delete asks, remove undoes.** One rule for every list: swiping something that deletes your own work (a song from the library, a whole set) asks first in a small dialog, because a song can hold real work (and its Start settings: count-in, speed up, stop after) and is shared by sets; after confirming, the same Undo bar still appears as a second chance for a mistaken tap. Swiping that only takes something out of a list (a song out of a set) deletes nothing, so it's immediate with the Undo bar. See `delete-confirm.reference.html`.
 - **Taller panel (drag to expand):** every list panel (set panel, sets view, Songs list, song picker) has a small grab handle at its top edge (36×4px, #3A3A3A, centered, inside a 24px tall drag area). Dragging it up expands the panel to the full space above the context row (top: just under the status bar), for longer editing; it follows the finger and snaps to whichever height is nearer on release, or by flick direction. Two heights only: normal (as today) and tall. Dragging down from normal closes the panel, like tapping outside. Each panel opens at normal height every time (it never remembers tall), so on stage it always looks the same. Back from tall closes the panel (one level, not "back to normal"). With the keyboard up, the panel is already as tall as it can be; the handle does nothing. The context row and tabs stay visible below in both heights. See the "Taller panel" board.
 - **No "Free play" rows in the dropdowns:** Free play is the middle mode tab, always visible.
 - **Panel structure:** the search field (when shown) is pinned at the top and the action rows ("+ New song ›", "+ New setlist ›", "+ Add songs ›") are pinned at the bottom; only the list between them scrolls. The pinned action group is separated from the list by a 2px #2E2E2E line, and its rows by 1px #1F1F1F lines, so actions never read as list items.
@@ -254,12 +254,27 @@ A full screen (not a sheet), used for setup rather than on stage. See `song-edit
 - **Usage note:** below the pattern, muted text listing which setlists use the song ("In 2 setlists: Friday set, Rehearsal. Changes apply to both."), since songs are shared.
 - **Delete song:** red text button at the very bottom, far from everything else. Always asks for confirmation, naming the setlists it will be removed from.
 
-## Time signature sheet
+## Top panels (things open from where you tap)
 
-A bottom sheet opened from the "4/4" button on the main screen. See `time-signature.reference.html`.
+The two top-row buttons (stopwatch and "4/4") open a **panel that drops down from the top row**, not a sheet from the bottom of the screen. Lists opened from the context row (bottom) open upward from there; settings opened from the top row open downward from there. Your eye and finger stay in the same place.
+- **Shape:** 12px from the screen edges, its top edge just under the top row (the top row stays visible and sharp above it), 14px radius, #111111, 1px #2E2E2E border, a soft shadow. Height fits the content (never fixed), and it may grow all the way down to 16px above the bottom of the screen (above the gesture bar), covering the dimmed context row and tabs: nothing down there is needed while you adjust. Only content taller than that scrolls inside.
+- **Behind it:** the main screen below the top row is dimmed (60% black). The click keeps playing.
+- **Open and close from the button (all panels):** a panel grows out of the button that opened it: it starts at 96% size with its transform origin at that button (the stopwatch, "4/4", or the context row's center button) and opacity 0, and reaches full size and opacity in ~200ms (ease-out). Closing by tap on the dim, tapping the button again, or Back plays the reverse (shrinks slightly toward the button while fading, ~180ms). Closing by swipe follows the swipe instead (below), because the motion should go where the finger pushes. Not a full morph into the button: a large panel collapsing into a 44px button looks slow and heavy.
+- **The grab handle has a generous grab area (all panels):** the whole width of the panel, from ~24dp inside the edge with the handle to ~24dp outside it, onto the dim (below the bottom edge for top panels, above the top edge for bottom panels). A drag that starts anywhere in that strip grabs the panel and it follows the finger, even if the finger is a little outside the panel. Taps in the outside part still close as a dim tap does.
+- **Predictive back (all panels):** during an Android back gesture, the open panel follows the gesture's progress, scaling 1 → 0.9 toward its button and dimming slightly; on commit it finishes closing (as above), on cancel it springs back to full size. With Remove animations on, all panel motion is instant.
+- **Swipe to close never pauses (all panels):** while dragging, the panel follows the finger 1:1. On release past the threshold (or on a flick), it keeps moving in the same direction from exactly where it is, at least as fast as the finger was moving, until it's off the edge (up for top panels, down for bottom ones), fading out as it travels (opacity follows the distance left, reaching 0 as it leaves); ~180ms, ease-in. No stop, no separate fade afterwards. Released before the threshold, it springs back (~180ms ease-out). The dim fades out together with the panel.
+- **The dimmed area closes it (all panels, top and bottom):** any touch that *starts* on the dim (a tap, or a swipe in any direction) closes the panel on touch-up, exactly like Back. Touches on the dim never reach the main screen underneath (so a swipe there can't move the ruler or tap a button).
+- **Closing:** tap or swipe on the dim, tap the same top-row button again, Back, or swipe the panel up (a 40×4px handle sits at its bottom edge). It opens with the arrive motion downward (fade + 6px drop) and leaves with the leave motion.
+- **Contents** are unchanged: "When I press Start" (see `on-start-sheet.reference.html`, `on-start-sheet-off.reference.html`) and Rhythm (time signature, subdivision, polyrhythm). Wherever this spec says "sheet" for these two, it means this top panel.
 
-- **Sheet behavior (Android standard):** drag the sheet (or its handle) down to close; it follows the finger and closes past about a third of its height or on a downward flick, otherwise it springs back. Tapping the dimmed area above and Back also close it. The click keeps playing.
-- Title "Time signature".
+## Rhythm sheet (time signature, subdivision, polyrhythm)
+
+A top panel (see "Top panels") opened from the "4/4" button on the main screen, titled "Rhythm". See `on-start.reference.html` (column 1; it supersedes `time-signature.reference.html`).
+
+- **Subdivision** (between Custom and Polyrhythm): a 4-part segmented control with the note icons (quarter · eighths · triplet · sixteenths). Applies as you change it; the sheet stays open. While playing, it takes effect at the next beat (as before).
+
+- **Panel behavior:** see "Top panels" (it drops from the top row; swipe up, tap outside, tap 4/4 again, or Back to close).
+- Title "Rhythm".
 - **Common:** eight one-tap buttons in a 4×2 grid: 2/4, 3/4, 4/4, 5/4, 6/8, 7/8, 9/8, 12/8. The current one is filled white with black text. Tapping one applies it and closes the sheet.
 - **Custom:** beats with − / + (1–16), "/", and a 4 | 8 segmented control, same as the song editor. Applies as you change it; the sheet stays open.
 - Changing the number of beats keeps existing beat states where possible (new beats are regular; beat 1 keeps its state).
@@ -281,23 +296,13 @@ A second pulse that divides each bar evenly, against the main beats (e.g. 3 agai
 - **Saved in songs** like the rest of the bar: song fields `polyrhythm` (0 = off, 2–7) and `polyStates` (one state per pulse). Changing it while a song is loaded follows "Changes to a loaded song" (Revert / Save / Save as new). Free play keeps it across launches with the other click settings.
 - **Volume:** a fourth slider "Polyrhythm" in Settings → Volume, default 70%; "Reset" includes it.
 - **Visual offset** applies to the lane exactly as to the beat blocks.
-- Media controls, setlists, and the trainer are unchanged by it.
-
-## Menu
-
-The ☰ button at the top right of the main screen opens a **side panel** that slides in from the right (304px wide, #111111, 1px #2E2E2E left border) over the dimmed main screen. It's a short list of places to go: Settings, Send feedback, About. Songs and sets are managed in the lists on the main screen. The click keeps playing. Tap outside, swipe it right, or use back to close it. Opening it gives no haptic. See `menu.reference.html`.
-
-- **Title** "Menu" at the top.
-- **"Settings"** (gear icon, muted line "Sound, volume, theme", ›), **"Send feedback"** (muted line "Tell Dror what works and what doesn't"), **"About Metra"** (muted line "Why this app exists"). Rows without an icon keep the icon column empty so the labels line up.
-- At the bottom of the panel, centered and muted: "Metra 1.0.0 (2)" (version and build). Long-pressing it copies it.
-- **Panel behavior (Android standard):** swipe it toward the right edge to close (it follows the finger, closes past about a third or on a flick); tap outside or Back also close it. Max width 360dp. While it's open, a screen reader stays inside it and reads it as "Menu".
-- Rows are 56px, separated by 1px #1F1F1F lines. Tapping a row closes the panel and opens that page; back from any of these pages returns to the main screen.
-- "Send feedback" opens the phone's share/email with an email to metra.application@gmail.com, subject "Metra feedback (v1.0.0 build 2)", and a body that starts with the app version, phone model, and Android version, then an empty line for the message.
-- "About Metra" opens a simple page with Dror's short note on why he made it (written by him), plus one line: "No ads, no account, no tracking. Your songs stay on your phone."
+- Media controls, setlists, and the "When I press Start" settings are unchanged by it (a count-in plays beats only, without the polyrhythm).
 
 ## Settings
 
-A full page opened from Menu → Settings. See `settings.reference.html` (full scroll length).
+A full page opened from the **gear button** at the top right of the main screen (it replaced the ☰ menu: with the song and set pages gone, the menu only held Settings, Send feedback and About, so they're one page now). See `settings.reference.html` (full scroll length). The click keeps playing; back returns to the main screen.
+
+- **What's new block** (top of the page, only after an update): see "First launch and updates".
 
 - **Top bar:** back chevron and "Settings". Changes apply immediately; there's no Save.
 - **Theme:** System / Dark / Light segmented control.
@@ -306,6 +311,9 @@ A full page opened from Menu → Settings. See `settings.reference.html` (full s
 - **Volume:** four sliders (Accent, Beat, Subdivision, Polyrhythm) with percentages, and a small "Reset" text button on the right of the section heading that resets only the volumes to their defaults: Accent 100%, Beat 80%, Subdivision 45%, Polyrhythm 70%.
 - **Visual offset** (stored as `visualOffset`): a large block that flashes on every click, − / + buttons around the current value in ms, and a Start test / Stop test button (primary color). Range −200 to +500 ms, default 0 ms (right for built-in speakers; Bluetooth headsets typically need a positive value, e.g. about 20 ms on the user's headset). The test plays the click on this screen so you can adjust while listening until the flash lands on the sound; if the click is already playing, the test uses it instead of starting its own. Leaving the screen stops a test it started. A short hint explains it's for Bluetooth headphones and doesn't change the sound.
 - No reset for the other settings.
+- **About** (last section, muted heading): rows "Send feedback" (muted line "Tell Dror what works and what doesn't"), "All updates", "About Metra" (muted line "Why this app exists"), 56px each with ›; then a centered muted version line "Metra 1.0.0 (2)" (long-press copies it).
+  - "Send feedback" opens the phone's share/email with an email to metra.application@gmail.com, subject "Metra feedback (v1.0.0 build 2)", and a body that starts with the app version, phone model, and Android version, then an empty line for the message.
+  - "About Metra" opens a simple page with Dror's short note on why he made it (written by him), plus one line: "No ads, no account, no tracking. Your songs stay on your phone."
 
 ## App icon
 
@@ -343,8 +351,8 @@ Generate all platform sizes from these (e.g. with `flutter_launcher_icons`, afte
   - Songs: "Example · Rock" (120, 4/4, beat 1 accented), "Example · Waltz" (90, 3/4), "Example · Shuffle" (100, 4/4, triplet subdivision), "Example · Odd" (140, 7/8, accents on 1, 3, 5).
   - Set: "Try me" with all four, in that order.
   - They're ordinary songs and sets: play, rename, reorder, delete. Never re-created once deleted (stored flag), and never added to a library that already has songs (an update or a restore from backup doesn't add them).
-- **What's new (after each update):** the first time the app opens after an update, the ☰ button shows a small red dot (8px, top-right corner of the button). Opening the menu shows, above Settings, a muted block: "New in 1.0.3", up to 3 short lines ("Add a new song straight to a set", …), and two quiet text buttons: "All updates ›" and "Got it" (hides the block and the dot until the next update). Opening the menu also clears the dot. A fresh install shows no block. Never a popup.
-  - **All updates:** a simple page, newest version first: each version as a small heading ("1.0.3 · Oct 2026") with its lines under it. Reached from "All updates ›" in the block and from a row "All updates" on the About Metra page, so it's always findable after "Got it".
+- **What's new (after each update):** the first time the app opens after an update, the gear button shows a small red dot (8px, top-right corner of the button). Settings then shows, at the top, a muted block: "New in 1.0.3", up to 3 short lines ("Add a new song straight to a set", …), and two quiet text buttons: "All updates ›" and "Got it" (hides the block and the dot until the next update). Opening Settings also clears the dot. A fresh install shows no block. Never a popup.
+  - **All updates:** a simple page, newest version first: each version as a small heading ("1.0.3 · Oct 2026") with its lines under it. Reached from "All updates ›" in the block and from the "All updates" row in Settings → About, so it's always findable after "Got it".
   - **One source:** `assets/whats_new.md` holds every version, newest first (a "## 1.0.3 · Oct 2026" heading, then "- " lines). The block shows the top version; the page shows all of it; the top version's lines are also the Play Store release notes.
 
 ## Haptics
@@ -352,7 +360,7 @@ Generate all platform sizes from these (e.g. with `flutter_launcher_icons`, afte
 Haptics confirm a touch, so you can trust a press on stage without looking. Use the platform's standard haptic types. Haptics play only when both the phone's system vibration setting and the app's "Vibrate on touch" setting (Settings, default on) allow it.
 
 - **Medium** (important stage actions): Start/Stop; next/previous and choosing a song in the picker (the song changed); any "Free play" button (the song detached); choosing a set in the sets view; long-press lifting a row to reorder.
-- **Light tick** (small adjustments and selections): every −5/−1/+1/+5 step, whether tapped or produced by holding (a held button feels like a ratchet; a medium bump when a hold hits 30 or 300); the beats −/+ steps; each Tap tempo tap; the ruler crossing a multiple of 5 (only fives, since a drag passes values too fast to tick each one); tapping a beat block, the subdivision button, a time signature, or a cell in the song editor; Save to song, Save as new, and Revert; marking or unmarking a row (removing songs, deleting sets); a swipe crossing its commit point in a list, either way (none on release, so a swipe never buzzes twice).
+- **Light tick** (small adjustments and selections; also a swipe crossing its commit point): every −5/−1/+1/+5 step, whether tapped or produced by holding (a held button feels like a ratchet; a medium bump when a hold hits 30 or 300); the beats −/+ steps; each Tap tempo tap; the ruler crossing a multiple of 5 (only fives, since a drag passes values too fast to tick each one); tapping a beat block, the subdivision button, a time signature, or a cell in the song editor; Save to song, Save as new, and Revert; marking or unmarking a row (removing songs, deleting sets); a swipe crossing its commit point in a list, either way (none on release, so a swipe never buzzes twice).
 - **None:** never on the beat itself or any automatic event; not for scrolling, opening sheets, volume sliders, or ordinary navigation.
 
 ## Media controls (notification and lock screen)
@@ -398,7 +406,7 @@ Most Bluetooth page-turner pedals send keys, so these work with them as well as 
 - **Backup:** Android's automatic backup is on for the library (songs, setlists, settings), so a reinstall or a new phone restores it from the user's Google backup. No permission or sign-in in the app.
 - **Language and direction:** English only. The layout never mirrors, even on a Hebrew or Arabic phone (always left to right).
 - **Quick Settings tile:** a "Metra" tile users can add to the pull-down panel. It shows Playing / Stopped and tapping it starts or stops the click with the current song and tempo. No permission needed. If Android doesn't allow starting audio from the tile without the app, the tile opens the app and starts.
-- **Back (predictive back, Android 16 target):** Back always closes one level at a time, and the system's back preview shows that level, never the home screen while something is open. Order, innermost first: rename field (cancels the rename) → delete dialog (Cancel) → song picker or sets view (back to the set's songs) → the panel itself (closes) → time signature sheet / ☰ side panel (closes) → a page (back to where it was opened from). Only on the bare main screen does Back leave the app. Back never stops the click.
+- **Back (predictive back, Android 16 target):** Back always closes one level at a time, and the system's back preview shows that level, never the home screen while something is open. Order, innermost first: rename field (cancels the rename) → delete dialog (Cancel) → song picker or sets view (back to the set's songs) → the panel itself (closes) → Rhythm sheet / When I press Start sheet (closes) → a page (back to where it was opened from). Only on the bare main screen does Back leave the app. Back never stops the click.
 
 ## Accessibility
 
@@ -416,7 +424,7 @@ Target: Android's own accessibility checks and WCAG AA, without changing the sta
 - Check Daylight the same way.
 
 **3. Screen reader (TalkBack)**
-- Every control has a spoken name and state. Icon-only buttons: "Subdivision: eighth notes", "Time signature 4/4, polyrhythm 3", "Menu", "Start" / "Stop", "Tap tempo".
+- Every control has a spoken name and state. Icon-only buttons: "Time signature 4/4, eighth notes, polyrhythm 3", "When I press Start (count-in on)", "Settings", "Start" / "Stop", "Tap tempo".
 - Beat blocks: "Beat 1, accented" (regular / muted), with the hint "Double-tap to change". Polyrhythm cells the same ("Pulse 2 of 3, regular").
 - BPM and ruler: one adjustable control, "Tempo, 120 BPM, Allegro"; swipe up/down changes by 1. The −5/−1/+1/+5 buttons announce the new tempo.
 - Context row: "Previous song: Iron Lung, 98 BPM", "Friday set, song 4 of 12, opens song list", "Next song: …". Tabs announce as tabs with "selected".
@@ -429,17 +437,35 @@ Target: Android's own accessibility checks and WCAG AA, without changing the sta
 **5. Reduced motion**
 - With Android's "Remove animations" on, list and sheet animations become instant and the one-time swipe hint is skipped (its flag is still set). The beat lights are not animations and stay as they are.
 
-## Trainer (designed, not built yet)
+## When I press Start (count-in, speed up, stop after)
 
-Do not build this yet; it's here so the layout leaves room for it. One sheet, opened from a ramp icon button in the main screen's top row, with two independent parts, both off by default:
-- **Tempo steps:** change by (+1 to +20, or negative to slow down) every (1–64) bars, with an optional "until" tempo. Starts from the tempo shown when you press Start. Each change lands exactly on a bar line. At the "until" tempo it holds and keeps playing. Changing the tempo by hand while it runs makes that the new current tempo; the steps continue from it.
-- **Stop after:** N bars, or a time (mm:ss). The click stops at the next bar line after the limit, never mid-bar.
-- **Combined:** both run together ("+5 every 8 bars until 160, stop after 10:00" climbs to 160, holds, stops at 10 minutes).
-- **Reset:** Stop, or reaching the limit, resets: the tempo returns to the starting tempo, so the next Start replays the same exercise. Start always runs it from the beginning.
-- **On screen:** the BPM and ruler follow the live tempo. The trainer icon is red while active. While playing, the line under the BPM shows progress ("↗ +5 every 8 bars · next in 3 · 4:12 left"); stopped, it shows the summary. Revert / Save to song take that line while stopped if the song has unsaved changes; progress takes it while playing.
-- **In songs:** a song can save its trainer settings like its tempo; loading the song loads them; changing them is an unsaved change (Revert / Save). Free play can use a trainer without saving.
-- **In a setlist:** when "Stop after" ends, the click stops and stays on the same song (it never advances by itself).
-- **Open before building:** the top row is full (title + three buttons); adding a fourth button squeezes long titles. **Proposed direction (not sealed):** move subdivision into the time signature sheet (the "4/4" button opens one sheet for time signature and subdivision, and its label could show both, e.g. "4/4 ♪♪"), freeing a top-row slot for the trainer button. See the A3 board on the canvas.
+Everything that happens over time after Start, in one top panel (see "Top panels") opened from the stopwatch button. See `on-start.reference.html` (columns 2 and 3).
+
+**Premise: these belong to the song, like its tempo.** Everything on the main screen, including this sheet, describes the current song. Changing count-in, speed up or stop after while a song is loaded is an ordinary change: Revert / Save / Save as new appear, and Save stores it in the song. In Free play they're Free play's own settings and are remembered like its tempo. There is no separate global setting, so "what will Start do?" always has one answer: whatever this song (or Free play) says, shown by the red stopwatch.
+
+Sheet title "When I press Start", three parts, all off by default.
+
+**Every part looks the same when off:** one 56px row, the part's name on the left (18px, semibold, white: these are the sheet's main headings) and a switch on the right. **Off is not disabled:** an off switch is a clear outlined control in white (2px white border, white knob, transparent track), never greyed out; the row's name stays white. On: white track, black knob. Switching it on opens the part's controls under the row (arrive motion); switching it off folds them away (leave motion) and keeps the values for next time. When a part is on, a muted one-line summary sits under its name ("1 bar", "+5 every 8 bars, up to 160", "10:00"). So the closed sheet is three equal rows, and only what's on takes space.
+
+**Choices inside a part are quiet chips, not big white blocks,** laid out like the stepper rows: a label on the left, the chips on the right ("Length  [1 bar] [2 bars]" in Count-in, "Count by  [Bars] [Time]" in Stop after). 36px pill chips sized to their text. Selected: #2A2A2A fill, 2px white border, white 600 text. Not selected: transparent, 2px #2E2E2E border, muted text. Nothing in this sheet is filled solid white except an on switch, so no single control shouts.
+- **Count-in** (switch; when on: a "Length" row with 1 bar · 2 bars chips, default 1 bar). Plays the song's own click sound, **beats only** (no subdivisions, no polyrhythm), beat 1 accented, at the song's tempo and time signature. Then the song starts on beat 1. Hint: "Beats only, before the song. Not counted in the steps or the limit."
+  - **On screen:** the beat blocks show their numbers (1 2 3 4) in the block, muted, and light as they sound; subdivision ticks stay dark; the line under the BPM reads "Count-in · 3 of 4" (bar 2 of 2: "Count-in · 2 · 3 of 4"). When the song starts, the numbers disappear and everything is normal. Nothing moves.
+  - **When it plays:** every time playback starts from stopped (Start, media controls, the Quick Settings tile), and when a song is loaded while playing (Next/Previous, choosing a song), if **that** song has a count-in. A song without one starts right away, as today.
+  - Stop during a count-in stops; Start again counts in again.
+- **Speed up** (switch, then three steppers): "Change by" (+1 to +20, or negative to slow down), "Every" (1–64 bars; bars only, never beats: a change mid-bar would break "changes land on bar lines", and +1 every bar is already a smooth climb), "Up to" ("Down to" when Change by is negative; a tempo, or "No limit"). Starts from the tempo when Start is pressed. **Timing:** the new tempo starts exactly on beat 1 of the new bar: the last beat of the old bar keeps the old tempo all the way to the bar line (the interval from the last beat to the next beat 1 is the old tempo); the first interval at the new tempo is beat 1 → beat 2. At "Up to" it holds and keeps playing. **Up to vs Stop after:** they work together: Up to is how fast, Stop after is how long ("climb to 160, then keep playing there until 10:00"). Up to must be beyond the starting tempo: when editing, it can't be set at or below the current tempo (above it for Down to); if the tempo is later changed past it, at Start the progress line says "Up to 160 · already there" and no steps happen. Changing the tempo by hand while it runs makes that the new current tempo; the steps continue from it. Hint: "Each change lands on a bar line."
+- **Stop after** (switch; when on: a "Count by" row with Bars · Time chips, default Time), then the "Length" stepper (bars 1–999, or mm:ss), so it reads "Stop after · Length 10:00". The click stops at the next bar line after the limit, never mid-bar. In a set it stays on the same song (never advances by itself). Hint: "Stops at the next bar line after the limit."
+- **Editing the values (all steppers in this sheet):** three ways, from fastest to finest, so no value ever takes many taps:
+  - **Tap the value to type it.** The value sits in an outlined field between − and + (looks editable). Tapping opens the number keyboard with the value selected; type and press Done (or tap outside). Out-of-range values snap to the nearest allowed one. Time fills from the right like a microwave: typing 1, 2, 3, 0 gives 12:30.
+  - **− / + with steps that fit the unit:** Change by ±1. Every: ±1 up to 16 bars, then ±4. Up to: ±5 (the ruler's grid), between the current tempo + 1 and 300 (Down to: 30 to the current tempo − 1), and the first tap from "No limit" starts at the current tempo + 20 (− 20 for Down to). Stop after, bars: ±1 up to 16, ±4 up to 64, then ±8. Stop after, time: ±15 s up to 2:00, ±30 s up to 10:00, then ±1 min.
+  - **Hold − / + to repeat, accelerating** (the same feel as the main screen's tempo buttons): ~0.4 s before repeating, then faster the longer you hold; one medium haptic at a limit.
+  - No drag-to-scrub on values: it's hidden, and it would fight the panel's own swipe to close.
+  - **Up to** shows "No limit" by default; − from its lowest allowed value or clearing the field returns to "No limit".
+- **Engine requirement (for later):** the click scheduler must be able to change tempo on any beat, not only on bar lines, so a future smooth ramp in song sections needs no timing rework. Speed up itself still changes only on bar lines.
+- **Together:** "+5 every 8 bars up to 160, stop after 10:00" climbs to 160, holds, stops at 10 minutes.
+- **Reset:** Stop, or reaching the limit, returns the tempo to where it started, so the next Start replays the same exercise.
+- **While playing:** the line under the BPM shows progress when speed up or stop after is on ("↗ +5 every 8 bars · next in 3 · 4:12 left"). Unsaved changes still show Revert / Save there while stopped; progress takes the line while playing.
+- **Build order:** step 1 = Rhythm sheet with subdivision, stopwatch button, sheet with Count-in only (Speed up and Stop after not shown yet). Step 2 = Speed up and Stop after.
+- **Later (parked, see "Song maps"):** a song made of sections (tempo, time signature, subdivision and bar count per part). Speed up and Stop after are the first, simple form of that; the full version needs a real song editor.
 
 ## Parked ideas
 
@@ -467,3 +493,4 @@ Not planned; recorded so they aren't lost.
 - **One-line note per song:** a short note ("start on hi-hat, 2 bars", "capo 3") shown quietly under the title on the main screen.
 - **Removed (Oct 2026):** the set page, the Setlists ("What to play") page and the song library page. Everything they did lives in the main-screen lists. Bulk delete and the library's sort went with them; bring them back to the lists if people miss them.
 - **Add an existing song to a set from the Songs list** (swipe right = "Add to a set" with a set chooser; designed Oct 2026, board "Songs list: swipe right…"). Parked: the set-first picker already adds existing songs (several at once), the New song dialog covers new ones, and a second swipe meaning would break the "both directions do the same" rule. Revisit if testers still look for a song-first way.
+- **Smooth tempo ramps in song sections** (accelerando / ritardando): "from 120 to 140 over 8 bars", easing the tempo a little on every beat. Belongs to Song maps (needs a real song editor). The engine already supports per-beat tempo changes for it.
