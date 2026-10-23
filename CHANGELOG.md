@@ -4,6 +4,8 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-10-23
+
 ### Changed
 - A bolder app icon that reads at home-screen size, with a themed (monochrome) version for Android 13+.
 
@@ -99,7 +101,8 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 - Song editor with live preview; Revert / Save for changes to a loaded song.
 - Stage Black and Daylight themes, per-level click volumes, visual offset.
 
-[Unreleased]: https://github.com/drormos/metra/compare/v1.5.2...HEAD
+[Unreleased]: https://github.com/drormos/metra/compare/v1.5.3...HEAD
+[1.5.3]: https://github.com/drormos/metra/compare/v1.5.2...v1.5.3
 [1.5.2]: https://github.com/drormos/metra/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/drormos/metra/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/drormos/metra/compare/v1.3.0...v1.5.0
