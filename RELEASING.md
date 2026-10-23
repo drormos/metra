@@ -15,7 +15,7 @@ Phones that installed Metra from Play can only be updated through Play (Google s
 ## Play Console answers
 - **Privacy policy URL:** https://github.com/drormos/metra/blob/main/PRIVACY.md
 - **Data safety:** "Does your app collect or share any of the required user data types?" → **No**. The app has no internet permission, so nothing leaves the phone through Metra; Send feedback only opens the user's own email app with a draft, and the user sends it themselves (Metra doesn't transmit it). Must stay consistent with PRIVACY.md (Google checks the two against each other).
-- **Privacy policy content** (Google's User Data policy): developer name as on the store listing, contact, what's collected (nothing) and shared (no one), how stored data is protected, retention and deletion. All in PRIVACY.md; if the developer name on the listing changes, change it there too.
+- **Privacy policy content** (Google's User Data policy): developer name as on the store listing ("Dror Makes"), contact, what's collected (nothing) and shared (no one), how stored data is protected, retention and deletion. All in PRIVACY.md; if the developer name on the listing changes, change it there too.
 - **No prominent disclosure, consent dialog or account deletion needed:** Metra collects no personal or sensitive data and has no accounts.
 - **Foreground service:** `mediaPlayback` (the click keeps playing with the screen off; declared with a short video).
 - **Ads:** none. **Target audience:** not directed at children.

@@ -2,7 +2,7 @@
 
 Effective 23 October 2026.
 
-Metra is a metronome app for Android, made by Dror (the developer named on Metra's Google Play listing). It has no ads, no account and no tracking, and your songs stay on your phone.
+Metra is a metronome app for Android by Dror Makes, the developer of Metra on Google Play. It has no ads, no account and no tracking, and your songs stay on your phone.
 
 **What Metra collects:** nothing. Metra doesn't access, collect, use or share personal or sensitive user data. The app has no internet access (it doesn't request Android's internet permission), so it can't send anything anywhere. There is no analytics, no crash reporting, no advertising and no other third-party code that collects or sends data.
 
