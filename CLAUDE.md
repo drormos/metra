@@ -31,3 +31,11 @@ See `PLAN.md` for phases and scope. Work one step at a time and stop for review 
 - **VERSION CONTROL:** Commit after every completed step.
 - **RUN:** `flutter devices` to list device IDs, then `flutter run -d <id>`.
 - **QUALITY GATES:** `flutter test` and `flutter analyze` must pass before a step is considered done. Each step ships its own tests; there is no separate testing step.
+
+## Runbooks (project skills in `.agents/skills/`)
+- For building a feature from the spec, use the feature-from-spec skill.
+- For a bug, use the bugfix skill (a failing test first).
+- For any change to saved data (toJson/fromJson, stored files) or a failing schema guard, use the data-format-change skill.
+- For releases, use the release skill (`tool/release.sh` runs the mechanical steps).
+- For what to check on a phone, use the device-qa skill.
+- Record user-visible changes under `[Unreleased]` in CHANGELOG.md.

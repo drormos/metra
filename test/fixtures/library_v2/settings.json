@@ -3,12 +3,18 @@
   "lastBpm": 96,
   "lastPattern": {
     "beatsPerBar": 3,
-    "stepsPerBeat": 1,
+    "stepsPerBeat": 3,
     "beatUnit": 4,
     "steps": [
       "accent",
+      "soft",
+      "soft",
       "normal",
-      "normal"
+      "soft",
+      "soft",
+      "normal",
+      "soft",
+      "soft"
     ],
     "polyrhythm": 0,
     "polyStates": []
@@ -16,7 +22,7 @@
   "lastOnStart": {
     "countInOn": true,
     "countInBars": 1,
-    "speedUp": true,
+    "speedUp": false,
     "changeBy": 5,
     "every": 8,
     "upTo": null,
@@ -26,8 +32,8 @@
     "stopTimeS": 300
   },
   "visualOffsetMs": 20,
-  "clickSound": "cowbell",
-  "themeMode": "dark",
+  "clickSound": "bell",
+  "themeMode": "light",
   "vibrate": false,
   "volumes": {
     "accent": 0.9,
@@ -35,12 +41,11 @@
     "subdivision": 0.3,
     "polyrhythm": 0.6
   },
-  "activeSetlistId": "set1",
-  "currentSongId": "s2",
-  "currentPosition": 1,
+  "activeSetlistId": "set-1",
+  "currentSongId": "song-a",
+  "currentPosition": 2,
   "tipsSeen": [
     "edit-first-load",
-    "set-swipe-hint",
-    "sets-swipe-hint"
+    "set-swipe-hint"
   ]
 }

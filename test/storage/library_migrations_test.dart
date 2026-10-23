@@ -143,32 +143,38 @@ void main() {
     );
   });
 
-  test('builds 40–47 and version 2 load the same library; v2 output is the '
-      'golden pair exactly', () async {
-    final v1 = await loadAndResave('library_v1_build47.json');
-    expect(v1.songs[0].onStart, migrated);
-    expect(
-      store.file.readAsStringSync(),
-      jsonEncode(decode(File('test/fixtures/v2/library.json'))),
-    );
-    expect(
-      store.settingsFile.readAsStringSync(),
-      jsonEncode(decode(File('test/fixtures/v2/settings.json'))),
-    );
-    final fresh = Directory('${dir.path}/v2')..createSync();
-    File('test/fixtures/v2/library.json')
-        .copySync('${fresh.path}/library.json');
-    File('test/fixtures/v2/settings.json')
-        .copySync('${fresh.path}/settings.json');
-    final v2Store = LibraryStore(File('${fresh.path}/library.json'));
-    final v2 = await v2Store.load();
-    expect(v2.toJson(), v1.toJson());
-    expect(
-      v2Store.backupFile.existsSync(),
-      isFalse,
-      reason: 'no backup for v2',
-    );
+  test('builds 40–47: today\'s keys in a version 1 file', () async {
+    final l = await loadAndResave('library_v1_build47.json');
+    expectCommon(l);
+    expect(l.songs[0].onStart, migrated);
   });
+
+  // Every snapshot of a later format (library_v<N>/: library.json +
+  // settings.json) loads and re-saves losslessly as the latest version.
+  final snapshots = Directory('test/fixtures')
+      .listSync()
+      .whereType<Directory>()
+      .where((d) => RegExp(r'library_v\d+$').hasMatch(d.path))
+      .toList();
+  test('there is a snapshot for every version from 2 on', () {
+    expect(snapshots.length, Library.version - 1);
+  });
+  for (final snapshot in snapshots) {
+    final name = snapshot.uri.pathSegments.where((s) => s.isNotEmpty).last;
+    test('$name loads and re-saves losslessly', () async {
+      for (final f in ['library.json', 'settings.json']) {
+        File('${snapshot.path}/$f').copySync('${dir.path}/$f');
+      }
+      final first = await store.load();
+      expect(first.songs, isNotEmpty);
+      expect(store.backupFile.existsSync(), isFalse, reason: 'not version 1');
+      await store.save(first.copyWith(lastBpm: first.lastBpm + 1));
+      await store.save(first);
+      expect(decode(store.file)['version'], Library.version);
+      final again = await LibraryStore(store.file).load();
+      expect(again.toJson(), first.toJson());
+    });
+  }
 
   test('every step runs in order up to the latest; unknown versions throw', () {
     expect(migrate({'version': 1, 'songs': [], 'setlists': []})['version'], 2);
