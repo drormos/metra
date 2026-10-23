@@ -4,6 +4,9 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Fixed
+- A polyrhythm cell could stay lit after Stop.
+
 ## [1.5.2] - 2026-10-23
 
 ### Added

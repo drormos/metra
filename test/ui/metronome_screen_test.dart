@@ -203,6 +203,24 @@ void main() {
       expect(find.bySemanticsLabel('Rhythm 4/4, polyrhythm 3'), findsOneWidget);
     });
 
+    testWidgets('Stop leaves no polyrhythm cell lit, even mid-pulse', (
+      tester,
+    ) async {
+      controller
+        ..setVisualOffset(Duration.zero)
+        ..setPolyrhythm(3);
+      await pumpScreen(tester);
+      await tester.tap(find.byKey(MetronomeScreen.playKey));
+      await tester.pump();
+      // Beat 1 and pulse 1 at 120 ms; pulse 1 is lit just after.
+      output.time = const Duration(milliseconds: 200);
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(find.byKey(const ValueKey('pulse-0-on')), findsOneWidget);
+      await tester.tap(find.byKey(MetronomeScreen.playKey));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('pulse-0-off')), findsOneWidget);
+    });
+
     testWidgets('lane: cells by time, cell 1 under beat 1; taps cycle; '
         'the BPM never moves', (tester) async {
       await pumpScreen(tester);

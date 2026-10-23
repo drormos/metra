@@ -58,7 +58,13 @@ class _PolyLaneState extends State<PolyLane>
       if (!_ticker.isActive) _ticker.start();
     } else {
       _ticker.stop();
-      if (_pulse != null) setState(() => _pulse = null);
+      // Nothing stays lit after Stop, mid-fade included.
+      if (_pulse != null || _lights.isNotEmpty) {
+        setState(() {
+          _pulse = null;
+          _lights = const {};
+        });
+      }
     }
   }
 
