@@ -1,0 +1,14 @@
+# Monthly update PRs for Dart packages and GitHub Actions. CI checks each
+# one; merge only what passes (and re-check timing on a phone for audio
+# packages: flutter_soloud, audio_service, audio_session).
+version: 2
+updates:
+  - package-ecosystem: pub
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

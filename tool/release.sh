@@ -32,10 +32,25 @@ fi
   exit 1
 }
 
+# The exact Flutter pinned in pubspec.yaml (environment: flutter).
+pinned=$(grep -E '^  flutter: [0-9]+\.[0-9]+\.[0-9]+$' pubspec.yaml | awk '{print $2}')
+installed=$(flutter --version --machine | python3 -c "import json,sys;print(json.load(sys.stdin)['frameworkVersion'])")
+if [[ "$pinned" != "$installed" ]]; then
+  echo "Flutter $installed is installed; pubspec.yaml pins $pinned." >&2
+  exit 1
+fi
+
 flutter analyze
 flutter test
 flutter build appbundle --release
 flutter build apk --release
+
+# PRIVACY.md promises no network access: no dependency may add it.
+merged=build/app/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml
+if grep -q 'android.permission.INTERNET' "$merged"; then
+  echo "The release build requests INTERNET: update PRIVACY.md and Play's Data safety first." >&2
+  exit 1
+fi
 
 if $tag; then
   git tag "v$name"

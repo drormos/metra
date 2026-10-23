@@ -1,0 +1,34 @@
+# Format, analyze and test on every push and pull request, with the exact
+# Flutter version pinned in pubspec.yaml (environment: flutter).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - run: flutter pub get
+      - name: Format
+        run: dart format --output=none --set-exit-if-changed lib test integration_test tool
+      - name: Analyze
+        run: flutter analyze
+      - name: Test
+        run: flutter test

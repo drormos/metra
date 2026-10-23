@@ -14,4 +14,4 @@ Runbooks (also used as Claude Code skills, in `.agents/skills/`):
 
 Start with [ARCHITECTURE.md](ARCHITECTURE.md) (code map, glossary) and [TESTING.md](TESTING.md) (test pitfalls).
 
-Every change ships with its tests; `flutter analyze` and `flutter test` must pass before it's committed. Record user-visible changes under `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md).
+Every change ships with its tests; `dart format`, `flutter analyze` and `flutter test` must pass before it's committed, and CI (`.github/workflows/ci.yml`) runs the same on every push. The Flutter version is pinned in `pubspec.yaml` (`environment: flutter`); upgrading it is a deliberate commit (check layout and text on a phone after). Dependabot opens monthly update PRs; audio packages need a timing check on a phone before merging. The app must never gain network access without updating [PRIVACY.md](PRIVACY.md) (`tool/release.sh` checks). Record user-visible changes under `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md).
