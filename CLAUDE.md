@@ -37,5 +37,8 @@ See `PLAN.md` for phases and scope. Work one step at a time and stop for review 
 - For a bug, use the bugfix skill (a failing test first).
 - For any change to saved data (toJson/fromJson, stored files) or a failing schema guard, use the data-format-change skill.
 - For releases, use the release skill (`tool/release.sh` runs the mechanical steps).
-- For what to check on a phone, use the device-qa skill.
+- For what to check on a phone, use the device-qa skill; for installing on it, screenshots and its files, the phone skill.
+- For a few-pixels-off layout or text alignment, use the visual-check skill.
+- Before digging into Flutter framework source (custom routes, predictive back, gestures, semantics), check the flutter-internals skill.
+- Code map and glossary: ARCHITECTURE.md. Test pitfalls: TESTING.md. Decisions: PLAN.md (recent) and docs/history.md (before 2026-10-23).
 - Record user-visible changes under `[Unreleased]` in CHANGELOG.md.

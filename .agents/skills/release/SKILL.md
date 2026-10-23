@@ -12,7 +12,7 @@ Mechanical steps are in `tool/release.sh`; this is the full order. Ask before pu
 3. **Data snapshot.** `flutter test test/storage/` must pass. If the schema guard fails, stop and follow the data-format-change skill before releasing.
 4. **Gates.** `flutter analyze` and `flutter test` clean (the release-consistency test checks pubspec, What's new and CHANGELOG agree).
 5. **Build.** `tool/release.sh` (or by hand: `flutter build appbundle --release`, plus `flutter build apk --release` for a sideload copy). Signing needs `android/key.properties` (gitignored; see PLAN.md "Release builds").
-6. **Record and tag.** Add a line to PLAN.md, commit `release: X.Y.Z (build N)`, then with the user's go-ahead: `git push`, `git tag vX.Y.Z && git push origin vX.Y.Z`, `gh release create vX.Y.Z --title "Metra X.Y.Z" --notes-file <notes>`.
+6. **Record and tag.** Update PLAN.md's Status (and a "Recent decisions" line if anything was decided), commit `release: X.Y.Z (build N)`, then with the user's go-ahead: `git push`, `git tag vX.Y.Z && git push origin vX.Y.Z`, `gh release create vX.Y.Z --title "Metra X.Y.Z" --notes-file <notes>`.
 7. **Hand over.** Print the Play Console notes (the What's new lines) and the path `build/app/outputs/bundle/release/app-release.aab`. Print the device-qa checklist sections touched by this release.
 
 Installing on the user's phone: `adb install -r` only (never `flutter install`, it wipes data). A Play-installed Metra can't be sideloaded over (different signing key); the debug app `com.dror.metra.debug` installs beside it.

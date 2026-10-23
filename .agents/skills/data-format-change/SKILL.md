@@ -12,6 +12,6 @@ Saved files must load forever: testers only ever move up, and an Auto Backup can
 3. **Snapshot of the new format.** Give the new field a non-default value in `test/storage/sample_library.dart`, then run `WRITE_SNAPSHOT=1 flutter test test/storage/schema_guard_test.dart`: it writes `test/fixtures/library_v<N>/` (`library.json` + `settings.json`) for the new version and refuses to overwrite an existing one. Keep every older fixture as it is.
 4. **Golden tests.** `test/storage/library_migrations_test.dart` loads every fixture through the store and re-saves it losslessly; add assertions that the migrated values are right for the new field.
 5. **Store / backup.** If files are added or renamed, update `LibraryStore` and both rules files in `android/app/src/main/res/xml/` (the backup rules test checks they match).
-6. `flutter analyze`, `flutter test`, commit, and note the format change in PLAN.md.
+6. `flutter analyze`, `flutter test`, commit, and note the format change under "Recent decisions" in PLAN.md.
 
 The schema guard (`test/storage/schema_guard_test.dart`) fails when the sample's JSON differs from the snapshot for the current version: that means steps 1–4 are due.
