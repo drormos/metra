@@ -171,4 +171,19 @@ void main() {
     );
     expect(store.settingsFile.readAsStringSync(), newer);
   });
+
+  test(
+    'settings with values of the wrong kind: the songs stay, the settings '
+    'file is kept aside; a lone broken settings file never stops loading',
+    () async {
+      await store.save(withSong());
+      store.settingsFile.writeAsStringSync('{"version": "two", "tipsSeen": 3}');
+      var loaded = await LibraryStore(file).load();
+      expect(loaded.songs.single.name, 'A');
+      file.deleteSync();
+      store.settingsFile.writeAsStringSync('{"version": [], "lastBpm": "x"}');
+      loaded = await LibraryStore(file).load();
+      expect(loaded.songs, isEmpty);
+    },
+  );
 }

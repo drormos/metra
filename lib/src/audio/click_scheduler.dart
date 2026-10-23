@@ -143,10 +143,10 @@ class ClickScheduler {
   Duration? _runStart;
   // Where the run ends (the bar line not scheduled), once decided.
   Duration? _endAt;
-  // The step whose tempo the run last changed, and the tempo before it,
-  // so scheduling that step again (after a cancel) doesn't add twice.
-  int? _planStep;
-  double _planFrom = 0;
+  // The state before each change applied at a step (a switch, a run's
+  // tempo change), newest last: when steps from there are cancelled to be
+  // placed again, the state that was in force for them comes back.
+  final List<_Before> _undo = [];
   // The run's tempo changes not yet reached by the engine clock, by step:
   // (when it plays, the new tempo).
   final Map<int, (Duration, double)> _tempoChanges = {};
@@ -257,7 +257,7 @@ class ClickScheduler {
     _run = run;
     _runBegin = step;
     _runStart = null;
-    _planStep = null;
+    _undo.clear();
     _tempoChanges.clear();
     _switchAt = null;
     _nextGrid = null;
@@ -276,7 +276,7 @@ class ClickScheduler {
       final end = step + countInBars * first.stepsPerBar;
       _countInEnd = end;
       _countInBars = countInBars;
-      _scheduleSwitch(_grid!, end, bpm: bpm, pattern: pattern, barStart: end);
+      _scheduleSwitch(end, bpm: bpm, pattern: pattern, barStart: end);
     } else {
       refill();
     }
@@ -292,6 +292,7 @@ class ClickScheduler {
     _countInEnd = null;
     _run = null;
     _endAt = null;
+    _undo.clear();
     _tempoChanges.clear();
     if (_steps.isNotEmpty || _pulses.isNotEmpty) {
       final now = _output.now();
@@ -313,42 +314,40 @@ class ClickScheduler {
   /// position, carries over.
   /// No-op while stopped; [start] takes the tempo.
   void setTempo(double bpm) {
-    final grid = _grid;
-    if (grid == null) return;
-    final switchAt = _switchAt;
-    if (switchAt != null) {
+    if (_grid == null) return;
+    final firstOpen = _firstOpenStep();
+    _undoFrom(firstOpen);
+    if (_switchAt case final at?) {
       // The current bar keeps its tempo; the pending one takes the change.
-      _nextGrid = grid.retempo(
-        pivotStep: switchAt,
+      _nextGrid = _grid!.retempo(
+        pivotStep: at,
         bpm: bpm,
         stepsPerBeat: _nextPattern!.stepsPerBeat,
       );
-      return;
+      return refill();
     }
 
     final cutoff = _output.now() + guard;
-    final lastCommitted = min(_nextStep - 1, grid.lastStepAtOrBefore(cutoff));
-    _steps.removeWhere((step) {
-      if (step.index <= lastCommitted) return false;
-      _cancel(step);
-      return true;
-    });
-    _cancelPulses((p) => p.time > cutoff);
-
+    final grid = _grid!;
+    final lastCommitted = firstOpen - 1;
     // Before anything is committed in this segment, its anchor step keeps
     // its time; otherwise the last committed step does.
     final pivot = max(lastCommitted, grid.anchorStep);
     var next = grid.retempo(pivotStep: pivot, bpm: bpm);
-    _rewindTo(lastCommitted + 1);
-    if (next.stepTime(_nextStep) < cutoff) {
+    if (next.stepTime(firstOpen) < cutoff) {
       // Speeding up past steps that are already gone: start the new
       // segment as soon as safely possible.
-      next = next.reanchor(step: _nextStep, at: cutoff);
+      next = next.reanchor(step: firstOpen, at: cutoff);
+    }
+    // Pulses between the last committed step and the next one follow the
+    // new tempo too, when the new grid covers that step; otherwise they
+    // stay where they are.
+    final reemit = _canReemit(lastCommitted, next, null);
+    if (reemit) {
+      _cancelPulses((p) => p.step == lastCommitted && p.time > cutoff);
     }
     _grid = next;
-    // Pulses between the last committed step and the next one follow the
-    // new tempo too.
-    _reemitTail(lastCommitted, after: cutoff);
+    if (reemit) _reemitTail(lastCommitted, after: cutoff);
     refill();
   }
 
@@ -359,18 +358,18 @@ class ClickScheduler {
     required double bpm,
     required MetronomePattern pattern,
   }) {
-    final grid = _grid;
-    if (grid == null) return;
+    if (_grid == null) return;
+    final firstOpen = _firstOpenStep();
+    _undoFrom(firstOpen);
 
     var at = _switchAt;
     if (at == null) {
-      final firstOpen = _firstOpenStep(grid);
       final intoBar = (firstOpen - _barStart) % _pattern.stepsPerBar;
       at = intoBar == 0
           ? firstOpen
           : firstOpen + _pattern.stepsPerBar - intoBar;
     }
-    _scheduleSwitch(grid, at, bpm: bpm, pattern: pattern, barStart: at);
+    _scheduleSwitch(at, bpm: bpm, pattern: pattern, barStart: at);
   }
 
   /// Continue with [pattern] from the next beat (a subdivision or
@@ -382,26 +381,19 @@ class ClickScheduler {
     required MetronomePattern pattern,
     required bool restartBar,
   }) {
-    final grid = _grid;
-    if (grid == null) return;
+    if (_grid == null) return;
+    final firstOpen = _firstOpenStep();
+    _undoFrom(firstOpen);
     // A count-in plays out; the song starts with the change.
     if (_countInEnd case final end?) {
-      return _scheduleSwitch(
-        grid,
-        end,
-        bpm: bpm,
-        pattern: pattern,
-        barStart: end,
-      );
+      return _scheduleSwitch(end, bpm: bpm, pattern: pattern, barStart: end);
     }
 
-    final firstOpen = _firstOpenStep(grid);
     final perBeat = _pattern.stepsPerBeat;
     final intoBeat = (firstOpen - _barStart) % perBeat;
     final at = intoBeat == 0 ? firstOpen : firstOpen + perBeat - intoBeat;
     final beat = ((at - _barStart) ~/ perBeat) % _pattern.beatsPerBar;
     _scheduleSwitch(
-      grid,
       at,
       bpm: bpm,
       pattern: pattern,
@@ -419,9 +411,8 @@ class ClickScheduler {
     int countInBars = 0,
     RunPlan? run,
   }) {
-    final grid = _grid;
-    if (grid == null) return;
-    final firstOpen = _firstOpenStep(grid);
+    if (_grid == null) return;
+    final firstOpen = _firstOpenStep();
     _cancelFrom(firstOpen);
     _cancelPulses((p) => p.time > _output.now() + guard); // the old bar's
     _begin(
@@ -438,31 +429,62 @@ class ClickScheduler {
   /// not committed yet. With a switch pending, it updates the pending
   /// pattern instead. No-op while stopped.
   void replaceLevels(MetronomePattern pattern) {
-    final grid = _grid;
-    if (grid == null) return;
+    if (_grid == null) return;
+    final firstOpen = _firstOpenStep();
+    _undoFrom(firstOpen);
     if (_switchAt != null) {
       _nextPattern = pattern;
-      return;
+      return refill();
     }
     assert(
       pattern.stepsPerBar == _pattern.stepsPerBar &&
           pattern.stepsPerBeat == _pattern.stepsPerBeat,
       'replaceLevels keeps the pattern shape',
     );
-    final firstOpen = _firstOpenStep(grid);
-    _cancelFrom(firstOpen);
     final cutoff = _output.now() + guard;
-    _cancelPulses((p) => p.time > cutoff);
+    // Pulse states (and a polyrhythm turned off) apply from the next pulse:
+    // the last committed step's remaining pulses are placed again when
+    // they're from a bar of this shape on this grid.
+    final reemit = _canReemit(firstOpen - 1, _grid!, pattern);
+    if (reemit) {
+      _cancelPulses((p) => p.step == firstOpen - 1 && p.time > cutoff);
+    }
     _pattern = pattern;
-    _rewindTo(firstOpen);
-    // Pulse states (and a polyrhythm turned off) apply from the next pulse.
-    _reemitTail(firstOpen - 1, after: cutoff, pattern: pattern);
+    if (reemit) _reemitTail(firstOpen - 1, after: cutoff, pattern: pattern);
     refill();
   }
 
-  /// The first step that can still be changed: not yet within the guard.
-  int _firstOpenStep(BeatGrid grid) =>
-      min(_nextStep - 1, grid.lastStepAtOrBefore(_output.now() + guard)) + 1;
+  /// The first step that can still be changed: the first one handed over
+  /// that plays after the guard, else the next to hand over. From the
+  /// scheduled times, never from grid math: a grid anchored at a later
+  /// change doesn't know when the steps before it play.
+  int _firstOpenStep() {
+    final cutoff = _output.now() + guard;
+    for (final s in _steps) {
+      if (s.time > cutoff) return s.index;
+    }
+    return _nextStep;
+  }
+
+  /// Takes back every step from [step] on (and its pulses): they'll be
+  /// placed again, under the state that was in force for them.
+  void _undoFrom(int step) {
+    _cancelFrom(step);
+    _cancelPulses((p) => p.step >= step);
+    _rewindTo(step);
+  }
+
+  void _save(int at) => _undo.add((
+    at: at,
+    grid: _grid!,
+    pattern: _pattern,
+    barStart: _barStart,
+    switchAt: _switchAt,
+    nextGrid: _nextGrid,
+    nextPattern: _nextPattern,
+    nextBarStart: _nextBarStart,
+    countInEnd: _countInEnd,
+  ));
 
   void _cancelFrom(int step) => _steps.removeWhere((s) {
     if (s.index < step) return false;
@@ -518,6 +540,18 @@ class ClickScheduler {
 
   /// Re-places the pulses of the committed [step] that are still ahead
   /// (after [after]) on the current grid, with [pattern] if given.
+  /// Whether the committed [step]'s remaining pulses can be placed again
+  /// on [grid] with [pattern] (null: the step's own): the grid covers the
+  /// step, and the step's bar has the pattern's shape.
+  bool _canReemit(int step, BeatGrid grid, MetronomePattern? pattern) {
+    if (grid.anchorStep > step) return false;
+    final s = _steps.where((x) => x.index == step).lastOrNull;
+    if (s == null) return false;
+    final p = pattern ?? s.pattern;
+    return s.pattern.stepsPerBar == p.stepsPerBar &&
+        s.barPosition < p.stepsPerBar;
+  }
+
   void _reemitTail(
     int step, {
     required Duration after,
@@ -537,19 +571,16 @@ class ClickScheduler {
   }
 
   void _scheduleSwitch(
-    BeatGrid grid,
     int at, {
     required double bpm,
     required MetronomePattern pattern,
     required int barStart,
   }) {
-    _cancelFrom(at);
-    _cancelPulses((p) => p.step >= at);
-    _rewindTo(min(_nextStep, at));
+    _undoFrom(min(_nextStep, at));
     _switchAt = at;
     _nextPattern = pattern;
     _nextBarStart = barStart;
-    _nextGrid = grid.retempo(
+    _nextGrid = _grid!.retempo(
       pivotStep: at,
       bpm: bpm,
       stepsPerBeat: pattern.stepsPerBeat,
@@ -587,6 +618,7 @@ class ClickScheduler {
     final switchAt = _switchAt;
     if (switchAt != null && _grid!.stepTime(switchAt) <= cutoff) {
       _nextStep = max(_nextStep, switchAt);
+      _save(switchAt);
       _applySwitch();
     }
     // shortcut: bar lines skipped here aren't counted by a run; only a
@@ -595,7 +627,14 @@ class ClickScheduler {
 
     final horizon = now + lookahead;
     while (_endAt == null) {
-      if (_nextStep == _switchAt) _applySwitch();
+      // A switch or a run's tempo change keeps its step's time, so the grid
+      // in force says when the next step plays; changes apply only to steps
+      // about to be handed over.
+      if (_grid!.stepTime(_nextStep) > horizon) break;
+      if (_nextStep == _switchAt) {
+        _save(_nextStep);
+        _applySwitch();
+      }
       final barPosition = (_nextStep - _barStart) % _pattern.stepsPerBar;
       final song = _countInEnd == null;
       final bar = song && barPosition == 0 ? _bar + 1 : _bar;
@@ -611,7 +650,6 @@ class ClickScheduler {
         _plan(run, bar, barPosition ~/ _pattern.stepsPerBeat);
       }
       final time = _grid!.stepTime(_nextStep);
-      if (time > horizon) break;
       if (song && bar == 0 && barPosition == 0) _runStart = time;
       final level = _pattern.steps[barPosition];
       final handle = level == StepLevel.silent
@@ -638,21 +676,30 @@ class ClickScheduler {
       _emitPulses(_nextStep, barPosition, _pattern, _grid!);
       _nextStep++;
     }
+    // Changes at committed steps can't be taken back any more.
+    final open = _firstOpenStep();
+    _undo.removeWhere((before) => before.at < open);
   }
 
-  /// [run]'s tempo from the next step (a beat of song bar [bar]): placed
-  /// with that step kept where it is, and only once per step.
+  /// [run]'s tempo from the next step (a beat of song bar [bar]), placed
+  /// with that step kept where it is. Taking the step back restores the
+  /// tempo before it, so placing it again never adds twice.
   void _plan(RunPlan run, int bar, int beat) {
     final grid = _grid!;
     final step = _nextStep;
-    final again = _planStep == step && grid.anchorStep == step;
-    final before = again ? _planFrom : grid.bpm;
-    final bpm = run.tempoAt(bar, beat, before) ?? before;
-    if (bpm != before) _tempoChanges[step] = (grid.stepTime(step), bpm);
-    if (bpm == grid.bpm) return;
-    _planStep = step;
-    _planFrom = before;
+    final bpm = run.tempoAt(bar, beat, grid.bpm);
+    if (bpm == null || bpm == grid.bpm) return;
+    _save(step);
+    _tempoChanges[step] = (grid.stepTime(step), bpm);
     _grid = grid.retempo(pivotStep: step, bpm: bpm);
+    // A switch waiting further on starts where this tempo puts it.
+    if (_switchAt case final at? when at > step) {
+      _nextGrid = _grid!.retempo(
+        pivotStep: at,
+        bpm: _nextGrid!.bpm,
+        stepsPerBeat: _nextGrid!.stepsPerBeat,
+      );
+    }
   }
 
   void _reportTempo(Duration now) {
@@ -668,6 +715,17 @@ class ClickScheduler {
   /// Steps from [step] on will be (re)scheduled: the bar count and the end
   /// go back to just before it.
   void _rewindTo(int step) {
+    while (_undo.isNotEmpty && _undo.last.at >= step) {
+      final before = _undo.removeLast();
+      _grid = before.grid;
+      _pattern = before.pattern;
+      _barStart = before.barStart;
+      _switchAt = before.switchAt;
+      _nextGrid = before.nextGrid;
+      _nextPattern = before.nextPattern;
+      _nextBarStart = before.nextBarStart;
+      _countInEnd = before.countInEnd;
+    }
     _nextStep = step;
     _endAt = null;
     _tempoChanges.removeWhere((at, _) => at >= step);
@@ -684,3 +742,16 @@ class ClickScheduler {
     if (handle != null) _output.cancel(handle);
   }
 }
+
+/// The scheduler's state just before a change applied at step [at].
+typedef _Before = ({
+  int at,
+  BeatGrid grid,
+  MetronomePattern pattern,
+  int barStart,
+  int? switchAt,
+  BeatGrid? nextGrid,
+  MetronomePattern? nextPattern,
+  int nextBarStart,
+  int? countInEnd,
+});

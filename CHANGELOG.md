@@ -4,6 +4,11 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Fixed
+- A stray click from the old bar could play next to the new beat 1, or the rest of a bar could switch pattern early, when a tempo change, beat tap or song change came just before a bar-line change (a speed-up step, a count-in's end, a time signature or subdivision change).
+- Changing the time signature and tapping a beat within a fraction of a second, with a polyrhythm on, could stop the click with an error.
+- A damaged settings file could stop the app from loading; now the damaged file is kept aside and the other one still loads.
+
 ## [1.5.1] - 2026-10-23
 
 ### Changed

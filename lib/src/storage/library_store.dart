@@ -62,26 +62,31 @@ class LibraryStore {
       return Library.empty;
     }
     final settings = await _read(settingsFile);
-    final settingsPart = <String, Object?>{
+    const base = <String, Object?>{
       'version': latestVersion,
-      'songs': const [],
-      'setlists': const [],
-      ...?_settingsPart(settings),
+      'songs': [],
+      'setlists': [],
     };
-    final parsed = _parse({...settingsPart, ...?library});
-    if (parsed != null) return parsed;
-    // The library itself was broken: keep it aside, keep the settings.
+    // The library file's version is the format's; the settings carry
+    // nothing else that's the library's.
+    final settingsPart = {
+      for (final MapEntry(:key, :value) in (settings ?? const {}).entries)
+        if (!libraryKeys.contains(key) && key != 'version') key: value,
+    };
+    final both = _parse({...base, ...settingsPart, ...?library});
+    if (both != null) return both;
+    // One of them is broken: keep it aside and the other one.
+    final songsOnly = library == null ? null : _parse({...base, ...library});
+    if (songsOnly != null) {
+      await _setAside(settingsFile);
+      return songsOnly;
+    }
     await _setAside(file);
-    return _parse(settingsPart) ?? Library.empty;
+    final settingsOnly = _parse({...base, ...settingsPart});
+    if (settingsOnly != null) return settingsOnly;
+    await _setAside(settingsFile);
+    return Library.empty;
   }
-
-  Map<String, Object?>? _settingsPart(Map<String, Object?>? settings) =>
-      settings == null
-      ? null
-      : {
-          for (final MapEntry(:key, :value) in settings.entries)
-            if (!libraryKeys.contains(key)) key: value,
-        };
 
   /// The file's JSON, or null when it's missing or unreadable (then it's
   /// moved aside). A newer version throws.
@@ -113,6 +118,7 @@ class LibraryStore {
   }
 
   Future<void> _setAside(File f) async {
+    if (!await f.exists()) return;
     await corruptDir.create(recursive: true);
     final name = f.uri.pathSegments.last;
     final aside = File(

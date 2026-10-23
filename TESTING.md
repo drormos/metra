@@ -31,5 +31,9 @@
 - Golden fixtures in `test/fixtures/` (one per shipped format) must load and re-save losslessly; the schema guard compares a sample library with the current version's snapshot. Changing the format: the data-format-change skill.
 - Files written on the fake clock inside `testWidgets` may never finish; persistence is covered in controller and storage tests (plain `test`), and `library.flush()` before deleting a temp folder.
 
+## Stress tests
+- `test/audio/scheduler_fuzz_test.dart` and `test/storage/load_fuzz_test.dart` run seeded random sessions (300 and 400 in CI). Before a release, or after touching the scheduler or the store, run more: `flutter test test/audio/scheduler_fuzz_test.dart --dart-define=FUZZ_SESSIONS=5000` and `flutter test test/storage/load_fuzz_test.dart --dart-define=LOAD_FUZZ=4000`. A failure prints what was asked and when; replay that seed alone (`--plain-name "random session N"`).
+- The real engine: `flutter test integration_test/drift_test.dart -d macos` (add `--dart-define=DRIFT_SECONDS=300` for 5-minute runs) after any scheduler change.
+
 ## Proving a test
 Before trusting a new test for a fix, run it against the old code (`git stash push <file>`, run, `git stash pop`) and see it fail for the right reason.

@@ -13,6 +13,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:metra/src/audio/soloud_click_output.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
+import 'package:metra/src/model/on_start.dart';
 
 const _seconds = int.fromEnvironment('DRIFT_SECONDS', defaultValue: 20);
 const _sampleRate = 44100; // engine default
@@ -109,6 +110,44 @@ void main() {
     _expectOnGrid(after, framesPerBeat(90), allowGaps: false);
     final peaks = recorder.peaks.sublist(switchAt + 1);
     expect(peaks[0], greaterThan(peaks[1]), reason: 'beat 1 accented');
+  });
+
+  test('a count-in leads into the song on the same grid, beat 1 '
+      'accented both times', () async {
+    final recorder = _OnsetRecorder()..start();
+    controller
+      ..setBpm(120)
+      ..setOnStart(const OnStart(countInOn: true));
+    await controller.play();
+    await _waitForOnsets(recorder, 10);
+    controller.stop();
+    await recorder.stop();
+
+    // 4 count-in beats then the song, with no gap between them.
+    _expectOnGrid(recorder.onsets, framesPerBeat(120), allowGaps: false);
+    _expectAccentsEvery(4, recorder);
+  });
+
+  test('speed up keeps the old interval up to the bar line and the new '
+      'one from beat 1', () async {
+    final recorder = _OnsetRecorder()..start();
+    controller
+      ..setBpm(120)
+      ..setOnStart(const OnStart(speedUp: true, changeBy: 60, every: 1));
+    await controller.play();
+    await _waitForOnsets(recorder, 9);
+    controller.stop();
+    await recorder.stop();
+
+    final intervals = recorder.intervals;
+    // Bar 1 at 120 (beat 4 → beat 1 included), bar 2 at 180.
+    for (var i = 0; i < 4; i++) {
+      expect(intervals[i], closeTo(framesPerBeat(120), _toleranceFrames));
+    }
+    for (var i = 4; i < 8; i++) {
+      expect(intervals[i], closeTo(framesPerBeat(180), _toleranceFrames));
+    }
+    expect(controller.bpm, 120, reason: 'Stop returns to where it started');
   });
 
   test('a 1 s stall skips beats but never plays off the grid', () async {
