@@ -1,0 +1,623 @@
+{
+  "version": 2,
+  "songs": [
+    {
+      "id": "demo-0",
+      "name": "Midnight Engine",
+      "bpm": 148,
+      "pattern": {
+        "beatsPerBar": 4,
+        "stepsPerBeat": 2,
+        "beatUnit": 4,
+        "steps": [
+          "accent",
+          "soft",
+          "normal",
+          "soft",
+          "normal",
+          "soft",
+          "normal",
+          "soft"
+        ],
+        "polyrhythm": 0,
+        "polyStates": []
+      },
+      "onStart": {
+        "countInOn": false,
+        "countInBars": 1,
+        "speedUp": false,
+        "changeBy": 5,
+        "every": 8,
+        "upTo": null,
+        "stopOn": false,
+        "stopBy": "time",
+        "stopBars": 32,
+        "stopTimeS": 300
+      },
+      "editedAt": 1792486800000,
+      "playedAt": null
+    },
+    {
+      "id": "demo-1",
+      "name": "Copper Sky",
+      "bpm": 98,
+      "pattern": {
+        "beatsPerBar": 4,
+        "stepsPerBeat": 2,
+        "beatUnit": 4,
+        "steps": [
+          "accent",
+          "soft",
+          "normal",
+          "soft",
+          "normal",
+          "soft",
+          "normal",
+          "soft"
+        ],
+        "polyrhythm": 0,
+        "polyStates": []
+      },
+      "onStart": {
+        "countInOn": false,
+        "countInBars": 1,
+        "speedUp": false,
+        "changeBy": 5,
+        "every": 8,
+        "upTo": null,
+        "stopOn": false,
+        "stopBy": "time",
+        "stopBars": 32,
+        "stopTimeS": 300
+      },
+      "editedAt": 1792486800000,
+      "playedAt": null
+    },
+    {
+      "id": "demo-2",
+      "name": "Static Bloom",
+      "bpm": 132,
+      "pattern": {
+        "beatsPerBar": 4,
+        "stepsPerBeat": 2,
+        "beatUnit": 4,
+        "steps": [
+          "accent",
+          "soft",
+          "normal",
+          "soft",
+          "normal",
+          "soft",
+          "normal",
+          "soft"
+        ],
+        "polyrhythm": 0,
+        "polyStates": []
+      },
+      "onStart": {
+        "countInOn": false,
+        "countInBars": 1,
+        "speedUp": false,
+        "changeBy": 5,
+        "every": 8,
+        "upTo": null,
+        "stopOn": false,
+        "stopBy": "time",
+        "stopBars": 32,
+        "stopTimeS": 300
+      },
+      "editedAt": 1792486800000,
+      "playedAt": null
+    },
+    {
+      "id": "demo-3",
+      "name": "Northbound",
+      "bpm": 120,
+      "pattern": {
+        "beatsPerBar": 4,
+        "stepsPerBeat": 2,
+        "beatUnit": 4,
+        "steps": [
+          "accent",
+          "soft",
+          "normal",
+          "soft",
+          "normal",
+          "soft",
+          "normal",
+          "soft"
+        ],
+        "polyrhythm": 0,
+        "polyStates": []
+      },
+      "onStart": {
+        "countInOn": false,
+        "countInBars": 1,
+        "speedUp": false,
+        "changeBy": 5,
+        "every": 8,
+        "upTo": null,
+        "stopOn": false,
+        "stopBy": "time",
+        "stopBars": 32,
+        "stopTimeS": 300
+      },
+      "editedAt": 1792486800000,
+      "playedAt": null
+    },
+    {
+      "id": "demo-4",
+      "name": "Paper Crowns",
+      "bpm": 92,
+      "pattern": {
+        "beatsPerBar": 4,
+        "stepsPerBeat": 3,
+        "beatUnit": 4,
+        "steps": [
+          "accent",
+          "soft",
+          "soft",
+          "normal",
+          "soft",
+          "soft",
+          "normal",
+          "soft",
+          "soft",
+          "normal",
+          "soft",
+          "soft"
+        ],
+        "polyrhythm": 0,
+        "polyStates": []
+      },
+      "onStart": {
+        "countInOn": false,
+        "countInBars": 1,
+        "speedUp": false,
+        "changeBy": 5,
+        "every": 8,
+        "upTo": null,
+        "stopOn": false,
+        "stopBy": "time",
+        "stopBars": 32,
+        "stopTimeS": 300
+      },
+      "editedAt": 1792486800000,
+      "playedAt": null
+    },
+    {
+      "id": "demo-5",
+      "name": "Seven Lanterns",
+      "bpm": 140,
+      "pattern": {
+        "beatsPerBar": 7,
+        "stepsPerBeat": 2,
+        "beatUnit": 8,
+        "steps": [
+          "accent",
+          "soft",
+          "normal",
+          "soft",
+          "accent",
+          "soft",
+          "normal",
+          "soft",
+          "accent",
+          "soft",
+          "normal",
+          "soft",
+          "normal",
+          "soft"
+        ],
+        "polyrhythm": 3,
+        "polyStates": [
+          "normal",
+          "normal",
+          "normal"
+        ]
+      },
+      "onStart": {
+        "countInOn": false,
+        "countInBars": 1,
+        "speedUp": false,
+        "changeBy": 5,
+        "every": 8,
+        "upTo": null,
+        "stopOn": false,
+        "stopBy": "time",
+        "stopBars": 32,
+        "stopTimeS": 300
+      },
+      "editedAt": 1792486800000,
+      "playedAt": null
+    },
+    {
+      "id": "demo-6",
+      "name": "Slow Burn",
+      "bpm": 68,
+      "pattern": {
+        "beatsPerBar": 12,
+        "stepsPerBeat": 1,
+        "beatUnit": 8,
+        "steps": [
+          "accent",
+          "normal",
+          "normal",
+          "accent",
+          "normal",
+          "normal",
+          "accent",
+          "normal",
+          "normal",
+          "accent",
+          "normal",
+          "normal"
+        ],
+        "polyrhythm": 0,
+        "polyStates": []
+      },
+      "onStart": {
+        "countInOn": false,
+        "countInBars": 1,
+        "speedUp": false,
+        "changeBy": 5,
+        "every": 8,
+        "upTo": null,
+        "stopOn": false,
+        "stopBy": "time",
+        "stopBars": 32,
+        "stopTimeS": 300
+      },
+      "editedAt": 1792486800000,
+      "playedAt": null
+    },
+    {
+      "id": "demo-7",
+      "name": "Ghost Lights",
+      "bpm": 116,
+      "pattern": {
+        "beatsPerBar": 6,
+        "stepsPerBeat": 1,
+        "beatUnit": 8,
+        "steps": [
+          "accent",
+          "normal",
+          "normal",
+          "accent",
+          "normal",
+          "normal"
+        ],
+        "polyrhythm": 0,
+        "polyStates": []
+      },
+      "onStart": {
+        "countInOn": false,
+        "countInBars": 1,
+        "speedUp": false,
+        "changeBy": 5,
+        "every": 8,
+        "upTo": null,
+        "stopOn": false,
+        "stopBy": "time",
+        "stopBars": 32,
+        "stopTimeS": 300
+      },
+      "editedAt": 1792486800000,
+      "playedAt": null
+    },
+    {
+      "id": "demo-8",
+      "name": "Hollow Pines",
+      "bpm": 84,
+      "pattern": {
+        "beatsPerBar": 6,
+        "stepsPerBeat": 1,
+        "beatUnit": 8,
+        "steps": [
+          "accent",
+          "normal",
+          "normal",
+          "accent",
+          "normal",
+          "normal"
+        ],
+        "polyrhythm": 0,
+        "polyStates": []
+      },
+      "onStart": {
+        "countInOn": false,
+        "countInBars": 1,
+        "speedUp": false,
+        "changeBy": 5,
+        "every": 8,
+        "upTo": null,
+        "stopOn": false,
+        "stopBy": "time",
+        "stopBars": 32,
+        "stopTimeS": 300
+      },
+      "editedAt": 1792486800000,
+      "playedAt": null
+    },
+    {
+      "id": "demo-9",
+      "name": "Red Line",
+      "bpm": 160,
+      "pattern": {
+        "beatsPerBar": 4,
+        "stepsPerBeat": 2,
+        "beatUnit": 4,
+        "steps": [
+          "accent",
+          "soft",
+          "normal",
+          "soft",
+          "normal",
+          "soft",
+          "normal",
+          "soft"
+        ],
+        "polyrhythm": 0,
+        "polyStates": []
+      },
+      "onStart": {
+        "countInOn": false,
+        "countInBars": 1,
+        "speedUp": false,
+        "changeBy": 5,
+        "every": 8,
+        "upTo": null,
+        "stopOn": false,
+        "stopBy": "time",
+        "stopBars": 32,
+        "stopTimeS": 300
+      },
+      "editedAt": 1792486800000,
+      "playedAt": null
+    },
+    {
+      "id": "demo-10",
+      "name": "Last Dance",
+      "bpm": 104,
+      "pattern": {
+        "beatsPerBar": 3,
+        "stepsPerBeat": 1,
+        "beatUnit": 4,
+        "steps": [
+          "accent",
+          "normal",
+          "normal"
+        ],
+        "polyrhythm": 0,
+        "polyStates": []
+      },
+      "onStart": {
+        "countInOn": false,
+        "countInBars": 1,
+        "speedUp": false,
+        "changeBy": 5,
+        "every": 8,
+        "upTo": null,
+        "stopOn": false,
+        "stopBy": "time",
+        "stopBars": 32,
+        "stopTimeS": 300
+      },
+      "editedAt": 1792486800000,
+      "playedAt": null
+    },
+    {
+      "id": "demo-11",
+      "name": "Breakdown",
+      "bpm": 174,
+      "pattern": {
+        "beatsPerBar": 4,
+        "stepsPerBeat": 4,
+        "beatUnit": 4,
+        "steps": [
+          "accent",
+          "soft",
+          "soft",
+          "soft",
+          "normal",
+          "soft",
+          "soft",
+          "soft",
+          "normal",
+          "soft",
+          "soft",
+          "soft",
+          "normal",
+          "soft",
+          "soft",
+          "soft"
+        ],
+        "polyrhythm": 0,
+        "polyStates": []
+      },
+      "onStart": {
+        "countInOn": false,
+        "countInBars": 1,
+        "speedUp": false,
+        "changeBy": 5,
+        "every": 8,
+        "upTo": null,
+        "stopOn": false,
+        "stopBy": "time",
+        "stopBars": 32,
+        "stopTimeS": 300
+      },
+      "editedAt": 1792486800000,
+      "playedAt": null
+    },
+    {
+      "id": "demo-12",
+      "name": "Paradiddle Ladder",
+      "bpm": 80,
+      "pattern": {
+        "beatsPerBar": 4,
+        "stepsPerBeat": 4,
+        "beatUnit": 4,
+        "steps": [
+          "accent",
+          "soft",
+          "soft",
+          "soft",
+          "normal",
+          "soft",
+          "soft",
+          "soft",
+          "normal",
+          "soft",
+          "soft",
+          "soft",
+          "normal",
+          "soft",
+          "soft",
+          "soft"
+        ],
+        "polyrhythm": 0,
+        "polyStates": []
+      },
+      "onStart": {
+        "countInOn": true,
+        "countInBars": 1,
+        "speedUp": true,
+        "changeBy": 5,
+        "every": 4,
+        "upTo": 120,
+        "stopOn": false,
+        "stopBy": "time",
+        "stopBars": 32,
+        "stopTimeS": 300
+      },
+      "editedAt": 1792486800000,
+      "playedAt": null
+    },
+    {
+      "id": "demo-13",
+      "name": "Single Strokes",
+      "bpm": 100,
+      "pattern": {
+        "beatsPerBar": 4,
+        "stepsPerBeat": 4,
+        "beatUnit": 4,
+        "steps": [
+          "accent",
+          "soft",
+          "soft",
+          "soft",
+          "normal",
+          "soft",
+          "soft",
+          "soft",
+          "normal",
+          "soft",
+          "soft",
+          "soft",
+          "normal",
+          "soft",
+          "soft",
+          "soft"
+        ],
+        "polyrhythm": 0,
+        "polyStates": []
+      },
+      "onStart": {
+        "countInOn": false,
+        "countInBars": 1,
+        "speedUp": false,
+        "changeBy": 5,
+        "every": 8,
+        "upTo": null,
+        "stopOn": true,
+        "stopBy": "time",
+        "stopBars": 32,
+        "stopTimeS": 300
+      },
+      "editedAt": 1792486800000,
+      "playedAt": null
+    },
+    {
+      "id": "demo-14",
+      "name": "Three Over Four",
+      "bpm": 90,
+      "pattern": {
+        "beatsPerBar": 4,
+        "stepsPerBeat": 1,
+        "beatUnit": 4,
+        "steps": [
+          "accent",
+          "normal",
+          "normal",
+          "normal"
+        ],
+        "polyrhythm": 3,
+        "polyStates": [
+          "normal",
+          "normal",
+          "normal"
+        ]
+      },
+      "onStart": {
+        "countInOn": false,
+        "countInBars": 1,
+        "speedUp": false,
+        "changeBy": 5,
+        "every": 8,
+        "upTo": null,
+        "stopOn": false,
+        "stopBy": "time",
+        "stopBars": 32,
+        "stopTimeS": 300
+      },
+      "editedAt": 1792486800000,
+      "playedAt": null
+    }
+  ],
+  "setlists": [
+    {
+      "id": "set-blue-room",
+      "name": "Fri · The Blue Room",
+      "songIds": [
+        "demo-0",
+        "demo-1",
+        "demo-2",
+        "demo-3",
+        "demo-4",
+        "demo-5",
+        "demo-6",
+        "demo-7",
+        "demo-8",
+        "demo-9",
+        "demo-10",
+        "demo-11"
+      ],
+      "playedAt": 1792774800000
+    },
+    {
+      "id": "set-wedding",
+      "name": "Sat · Wedding",
+      "songIds": [
+        "demo-10",
+        "demo-4",
+        "demo-3",
+        "demo-7",
+        "demo-1",
+        "demo-0",
+        "demo-9"
+      ],
+      "playedAt": 1792681200000
+    },
+    {
+      "id": "set-practice",
+      "name": "Daily practice",
+      "songIds": [
+        "demo-12",
+        "demo-13",
+        "demo-14"
+      ],
+      "playedAt": 1792562400000
+    }
+  ]
+}

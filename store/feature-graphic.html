@@ -1,0 +1,33 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: SEC; src: url('../assets/fonts/SairaExtraCondensed-Bold.ttf'); font-weight: 700; }
+@font-face { font-family: Saira; src: url('../assets/fonts/Saira-Medium.ttf'); font-weight: 500; }
+html, body { margin: 0; width: 1024px; height: 500px; background: #000; overflow: hidden; }
+.wrap { position: relative; width: 1024px; height: 500px; }
+.title { position: absolute; left: 88px; top: 92px; font-family: SEC; font-weight: 700; font-size: 200px; line-height: 1; color: #fff; letter-spacing: 1px; }
+.tag { position: absolute; left: 92px; top: 312px; font-family: Saira; font-size: 30px; color: #8C8C8C; }
+svg { position: absolute; left: 560px; top: 70px; }
+</style></head>
+<body><div class="wrap">
+<div class="title">Metra</div>
+<div class="tag">The metronome for the stage</div>
+<svg width="400" height="360" viewBox="0 0 400 360" id="ruler"></svg>
+</div>
+<script>
+const s = document.getElementById('ruler'), ns = 'http://www.w3.org/2000/svg';
+const add = (tag, attrs) => { const e = document.createElementNS(ns, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); s.appendChild(e); return e; };
+// Ticks every 1 bpm, longer every 5, labels every 10, centred on 120.
+const mid = 200, px = 14;
+for (let b = 106; b <= 134; b++) {
+  const x = mid + (b - 120) * px;
+  const major = b % 5 === 0;
+  add('rect', { x: x - 1.5, y: major ? 110 : 140, width: 3, height: major ? 90 : 50, fill: major ? '#8C8C8C' : '#3A3A3A' });
+  if (b % 10 === 0) {
+    const t = add('text', { x, y: 250, 'text-anchor': 'middle', 'font-family': 'SEC', 'font-weight': 700, 'font-size': 40, fill: b === 120 ? '#fff' : '#8C8C8C' });
+    t.textContent = b;
+  }
+}
+add('rect', { x: mid - 3, y: 60, width: 6, height: 160, rx: 3, fill: '#FF3B30' });
+</script>
+</body></html>
