@@ -18,4 +18,4 @@ Phones that installed Metra from Play can only be updated through Play (Google s
 - **Foreground service:** `mediaPlayback` (the click keeps playing with the screen off; declared with a short video).
 - **Ads:** none. **Target audience:** not directed at children.
 
-If a dependency ever adds the internet permission (check the merged release manifest: `build/app/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml`), PRIVACY.md and the Data safety answers must change before release.
+If a dependency ever adds the internet or notification permission (check the merged release manifest: `build/app/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml`), PRIVACY.md and the Data safety answers must change before release.

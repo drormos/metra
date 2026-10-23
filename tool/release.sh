@@ -45,12 +45,15 @@ flutter test
 flutter build appbundle --release
 flutter build apk --release
 
-# PRIVACY.md promises no network access: no dependency may add it.
+# PRIVACY.md promises no network access and no permission prompts: no
+# dependency may add them.
 merged=build/app/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml
-if grep -q 'android.permission.INTERNET' "$merged"; then
-  echo "The release build requests INTERNET: update PRIVACY.md and Play's Data safety first." >&2
-  exit 1
-fi
+for permission in INTERNET POST_NOTIFICATIONS; do
+  if grep -q "android.permission.$permission" "$merged"; then
+    echo "The release build requests $permission: update PRIVACY.md and Play's Data safety first." >&2
+    exit 1
+  fi
+done
 
 if $tag; then
   git tag "v$name"

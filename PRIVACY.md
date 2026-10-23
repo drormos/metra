@@ -12,7 +12,7 @@ Metra is a metronome. It has no ads, no account and no tracking, and your songs 
 
 **Sending feedback:** "Send feedback" in Settings opens your own email app with a message to the developer that starts with Metra's version, your phone model and your Android version. Nothing is sent unless you send that email yourself. Emails are used only to reply and to improve the app, and aren't shared.
 
-**Permissions:** Metra asks for no permission you have to approve. It uses Android's media playback service so the click keeps playing with the screen off.
+**Permissions:** Metra asks for no permission you have to approve, including notifications. It uses Android's media playback service so the click keeps playing with the screen off; its playback card on the lock screen and in the notification shade is a media control, which Android shows without asking. (Early test builds before version 1.1 asked for the notification permission; current versions don't.)
 
 **Children:** Metra collects no data from anyone, including children.
 
