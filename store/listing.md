@@ -2,29 +2,29 @@
 
 App name (30): **Metra**
 
-## Short description (77 / 80)
+## Short description (79 / 80)
 
-A precise stage metronome: setlists, count-in, speed up. No ads, no tracking.
+A precise metronome for practice, rehearsal and the stage. No ads, no tracking.
 
-## Full description (1773 / 4000)
+## Full description (1783 / 4000)
 
-Metra is a metronome built for playing live: a click that stays exactly on time, big enough to read at a glance from the drum stool, and quick to change between songs.
+Metra is a metronome for every hour you play: practice, rehearsal and the stage. The click stays exactly on time, the screen reads at a glance, and changing songs takes one tap.
 
 ON TIME, EVERY TIME
 • The click comes from the audio engine's own clock, so it doesn't drift, from 30 to 300 bpm.
 • Beat lights follow the sound exactly, with an adjustable offset for Bluetooth headphones.
 • Keeps playing with the screen off, from the lock screen and notification, and from a Quick Settings tile.
 
-SONGS AND SETLISTS
-• Save each song with its tempo, time signature, subdivision, accents and polyrhythm.
-• Build setlists, reorder them, and step through a set with Previous / Next, the lock screen, or a Bluetooth page-turner pedal.
-• Change anything right on the main screen while it plays, then Save, Revert, or Save as a new song.
-
 PRACTICE
 • Count-in of 1 or 2 bars before the song.
 • Speed up: add a few bpm every few bars, up to a target tempo.
 • Stop after a number of bars or a length of time.
 • Tap tempo, a fast tempo ruler, and ±1 / ±5 buttons.
+
+SONGS AND SETLISTS
+• Save each song with its tempo, time signature, subdivision, accents and polyrhythm.
+• Build setlists, reorder them, and step through a set with Previous / Next, the lock screen, or a Bluetooth page-turner pedal.
+• Change anything right on the main screen while it plays, then Save, Revert, or Save as a new song.
 
 RHYTHM
 • Any time signature, 2/4 to 12/8 and custom.
