@@ -6,7 +6,7 @@ App name (30): **Metra**
 
 A precise metronome for practice, rehearsal and the stage. No ads, no tracking.
 
-## Full description (1783 / 4000)
+## Full description (1809 / 4000)
 
 Metra is a metronome for every hour you play: practice, rehearsal and the stage. The click stays exactly on time, the screen reads at a glance, and changing songs takes one tap.
 
@@ -40,7 +40,7 @@ MADE FOR THE STAGE
 PRIVATE AND FREE
 No ads, no account, no tracking. Metra has no internet access: your songs stay on your phone.
 
-Made by a drummer who wanted a metronome that just works on stage.
+Made by a drummer who wanted a metronome that just works, in the practice room and on stage.
 
 ## Graphics
 - App icon (512×512): `store/icon-512.png` (from `tool/icon/app-icon.png`)
