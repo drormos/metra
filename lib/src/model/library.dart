@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' show ThemeMode, immutable;
 
 import 'click_sound.dart';
 import 'click_volumes.dart';
+import 'library_migrations.dart';
 import 'metronome_pattern.dart';
 import 'on_start.dart';
 
@@ -65,25 +66,25 @@ class Song {
     id: json['id'] as String,
     name: json['name'] as String,
     bpm: json['bpm'] as int,
-    pattern: MetronomePattern.fromJson(json['pattern'] as Map<String, Object?>),
-    onStart: _onStartOf(json['onStart'], json['countIn']),
+    // A broken pattern doesn't cost the song (its name and tempo).
+    pattern:
+        Library._orNull(
+          () => MetronomePattern.fromJson(
+            json['pattern'] as Map<String, Object?>,
+          ),
+        ) ??
+        const MetronomePattern.standard(),
+    onStart: OnStart.fromJson(json['onStart'] as Map<String, Object?>),
     editedAt: switch (json['editedAt']) {
       final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
       _ => null,
     },
     playedAt: switch (json['playedAt']) {
       final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
-      _ => null, // never played, or an older file
+      _ => null, // never played
     },
   );
 }
-
-/// Stored "When I press Start" settings; files from builds 37–38 had only
-/// a count-in, older ones nothing (all off).
-OnStart _onStartOf(Object? json, Object? countIn) => switch (json) {
-  final Map<String, Object?> map => OnStart.fromJson(map),
-  _ => OnStart.fromJson({'countIn': countIn}),
-};
 
 /// An ordered list of songs, by id.
 @immutable
@@ -146,9 +147,6 @@ class Library {
     this.activeSetlistId,
     this.currentSongId,
     this.currentPosition = -1,
-    this.swipeHintSeen = false,
-    this.songsHintSeen = false,
-    this.setsHintSeen = false,
     this.tipsSeen = const {},
   });
 
@@ -160,8 +158,9 @@ class Library {
     visualOffset: Duration.zero,
   );
 
-  /// Bump when the format changes incompatibly.
-  static const version = 1;
+  /// The saved format's version (see library_migrations.dart; older files
+  /// are migrated on load, saving always writes this one).
+  static const version = latestVersion;
 
   final List<Song> songs;
   final List<Setlist> setlists;
@@ -191,17 +190,8 @@ class Library {
   final String? currentSongId;
   final int currentPosition;
 
-  /// The set panel's one-time swipe hint has been shown (never again).
-  final bool swipeHintSeen;
-
-  /// The same, for the Songs list (its own flag).
-  final bool songsHintSeen;
-
-  /// The same, for the sets view.
-  final bool setsHintSeen;
-
   /// One-time tips already shown, by name (e.g. the main screen's
-  /// "edit right here" lines).
+  /// "edit right here" lines, each list's swipe hint).
   final Set<String> tipsSeen;
 
   Library copyWith({
@@ -215,9 +205,6 @@ class Library {
     ThemeMode? themeMode,
     bool? vibrate,
     ClickVolumes? volumes,
-    bool? swipeHintSeen,
-    bool? songsHintSeen,
-    bool? setsHintSeen,
     Set<String>? tipsSeen,
   }) => Library(
     songs: songs ?? this.songs,
@@ -233,9 +220,6 @@ class Library {
     activeSetlistId: activeSetlistId,
     currentSongId: currentSongId,
     currentPosition: currentPosition,
-    swipeHintSeen: swipeHintSeen ?? this.swipeHintSeen,
-    songsHintSeen: songsHintSeen ?? this.songsHintSeen,
-    setsHintSeen: setsHintSeen ?? this.setsHintSeen,
     tipsSeen: tipsSeen ?? this.tipsSeen,
   );
 
@@ -259,9 +243,6 @@ class Library {
     activeSetlistId: setlistId,
     currentSongId: songId,
     currentPosition: position,
-    swipeHintSeen: swipeHintSeen,
-    songsHintSeen: songsHintSeen,
-    setsHintSeen: setsHintSeen,
     tipsSeen: tipsSeen,
   );
 
@@ -278,53 +259,59 @@ class Library {
     'activeSetlistId': activeSetlistId,
     'currentSongId': currentSongId,
     'currentPosition': currentPosition,
-    'swipeHintSeen': swipeHintSeen,
-    'songsHintSeen': songsHintSeen,
-    'setsHintSeen': setsHintSeen,
     'tipsSeen': tipsSeen.toList(),
     'songs': [for (final song in songs) song.toJson()],
     'setlists': [for (final setlist in setlists) setlist.toJson()],
   };
 
-  /// Throws on a malformed file, and on files from a newer app version. A
-  /// bad song, setlist or setting is skipped or falls back, so one broken
-  /// entry doesn't hide the rest of the library.
+  /// Any saved version, as one map (both files' contents): migrated to the
+  /// latest format, parsed, then [repaired]. Throws on a file from a newer
+  /// app version, and on a malformed one (no song or setlist lists). A bad
+  /// song, setlist or setting is skipped or falls back, so one broken entry
+  /// doesn't hide the rest of the library.
   factory Library.fromJson(Map<String, Object?> json) {
     final fileVersion = json['version'] as int;
     if (fileVersion > version) throw NewerLibraryException(fileVersion);
-    final songs = json['songs'] as List;
-    final setlists = json['setlists'] as List;
+    final latest = migrate(json);
+    final songs = latest['songs'] as List;
+    final setlists = latest['setlists'] as List;
+    T read<T>(String key, T fallback) =>
+        _orNull(() => latest[key] as T) ?? fallback;
     return Library(
-      lastBpm: _orNull(() => json['lastBpm'] as int) ?? empty.lastBpm,
+      lastBpm: read('lastBpm', empty.lastBpm),
       lastPattern:
           _orNull(
             () => MetronomePattern.fromJson(
-              json['lastPattern'] as Map<String, Object?>,
+              latest['lastPattern'] as Map<String, Object?>,
             ),
           ) ??
           empty.lastPattern,
-      lastOnStart: _onStartOf(json['lastOnStart'], json['lastCountIn']),
-      visualOffset: Duration(milliseconds: json['visualOffsetMs'] as int? ?? 0),
-      // Optional (older files lack it); an unknown name falls back rather
-      // than discarding the whole library.
+      lastOnStart:
+          _orNull(
+            () =>
+                OnStart.fromJson(latest['lastOnStart'] as Map<String, Object?>),
+          ) ??
+          OnStart.off,
+      visualOffset: Duration(milliseconds: read('visualOffsetMs', 0)),
       clickSound:
-          ClickSound.values.asNameMap()[json['clickSound']] ??
+          ClickSound.values.asNameMap()[latest['clickSound']] ??
           ClickSound.woodblock,
       themeMode:
-          ThemeMode.values.asNameMap()[json['themeMode']] ?? ThemeMode.system,
-      vibrate: json['vibrate'] as bool? ?? true, // older files: on
-      volumes: switch (json['volumes']) {
-        final Map<String, Object?> v => ClickVolumes.fromJson(v),
-        _ => ClickVolumes.defaults, // older files
+          ThemeMode.values.asNameMap()[latest['themeMode']] ?? ThemeMode.system,
+      vibrate: read('vibrate', true),
+      volumes:
+          _orNull(
+            () => ClickVolumes.fromJson(
+              latest['volumes'] as Map<String, Object?>,
+            ),
+          ) ??
+          ClickVolumes.defaults,
+      activeSetlistId: read<String?>('activeSetlistId', null),
+      currentSongId: read<String?>('currentSongId', null),
+      currentPosition: read('currentPosition', -1),
+      tipsSeen: {
+        ...?_orNull(() => (latest['tipsSeen'] as List).whereType<String>()),
       },
-      // Optional: older files open in Free play.
-      activeSetlistId: json['activeSetlistId'] as String?,
-      currentSongId: json['currentSongId'] as String?,
-      currentPosition: json['currentPosition'] as int? ?? -1,
-      swipeHintSeen: json['swipeHintSeen'] as bool? ?? false,
-      songsHintSeen: json['songsHintSeen'] as bool? ?? false,
-      setsHintSeen: json['setsHintSeen'] as bool? ?? false,
-      tipsSeen: {...?(json['tipsSeen'] as List?)?.cast<String>()},
       songs: [
         for (final song in songs)
           ?_orNull(() => Song.fromJson(song as Map<String, Object?>)),
@@ -333,8 +320,90 @@ class Library {
         for (final setlist in setlists)
           ?_orNull(() => Setlist.fromJson(setlist as Map<String, Object?>)),
       ],
+    ).repaired();
+  }
+
+  /// The library made consistent (never throws): duplicate song or setlist
+  /// ids keep their first entry; set entries for songs that don't exist are
+  /// dropped (a song listed twice stays); tempos, time signatures and the
+  /// flash offset are clamped into range; the session (set, song,
+  /// position) points at what exists or is cleared.
+  Library repaired() {
+    int bpm(int v) => v.clamp(30, 300);
+    final songIds = <String>{};
+    final fixedSongs = [
+      for (final song in songs)
+        if (songIds.add(song.id))
+          song.copyWith(bpm: bpm(song.bpm), pattern: _fixPattern(song.pattern)),
+    ];
+    final setIds = <String>{};
+    final fixedSets = [
+      for (final set in setlists)
+        if (setIds.add(set.id))
+          set.copyWith(
+            songIds: [
+              for (final id in set.songIds)
+                if (songIds.contains(id)) id,
+            ],
+          ),
+    ];
+    final active = fixedSets.where((s) => s.id == activeSetlistId).firstOrNull;
+    final songId = songIds.contains(currentSongId) ? currentSongId : null;
+    var position = -1;
+    if (active != null && songId != null) {
+      final ids = active.songIds;
+      position =
+          currentPosition >= 0 &&
+              currentPosition < ids.length &&
+              ids[currentPosition] == songId
+          ? currentPosition
+          : ids.indexOf(songId);
+    }
+    final offset = visualOffset.inMilliseconds.clamp(-200, 500);
+    return Library(
+      songs: fixedSongs,
+      setlists: fixedSets,
+      lastBpm: bpm(lastBpm),
+      lastPattern: _fixPattern(lastPattern),
+      lastOnStart: lastOnStart,
+      visualOffset: Duration(milliseconds: offset),
+      clickSound: clickSound,
+      themeMode: themeMode,
+      vibrate: vibrate,
+      volumes: volumes,
+      activeSetlistId: active?.id,
+      currentSongId: songId,
+      currentPosition: position,
+      tipsSeen: tipsSeen,
     );
   }
+
+  /// 1–16 beats, 1–4 clicks per beat, a 4 or 8 unit.
+  static MetronomePattern _fixPattern(MetronomePattern p) {
+    var fixed = p;
+    if (fixed.beatsPerBar > maxBeats) fixed = fixed.withBeats(maxBeats);
+    if (fixed.stepsPerBeat > 4) fixed = fixed.withSubdivision(4);
+    if (fixed.beatUnit != 4 && fixed.beatUnit != 8) {
+      fixed = fixed.withBeats(fixed.beatsPerBar, beatUnit: 4);
+    }
+    return fixed;
+  }
+
+  /// The most beats a bar can have (the time signature controls' limit).
+  static const maxBeats = 16;
+
+  /// The settings file's part of [toJson] (everything but songs and sets).
+  Map<String, Object?> settingsJson() => {
+    for (final MapEntry(:key, :value) in toJson().entries)
+      if (!libraryKeys.contains(key)) key: value,
+  };
+
+  /// The library file's part of [toJson].
+  Map<String, Object?> libraryJson() => {
+    'version': version,
+    'songs': [for (final song in songs) song.toJson()],
+    'setlists': [for (final setlist in setlists) setlist.toJson()],
+  };
 
   static T? _orNull<T>(T Function() read) {
     try {

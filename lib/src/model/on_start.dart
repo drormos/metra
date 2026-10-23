@@ -267,32 +267,27 @@ class OnStart implements RunPlan {
     'stopTimeS': stopTime.inSeconds,
   };
 
-  /// Missing or bad fields fall back to their defaults. Reads build 37–39
-  /// files too ("countIn" 0–2, "until", "stopAfter" off/bars/time).
+  /// Out-of-range or bad values fall back to their defaults (older shapes
+  /// are migrated before this: library_migrations.dart).
   factory OnStart.fromJson(Map<String, Object?> json) {
     T read<T>(String key, T fallback) =>
         json[key] is T ? json[key] as T : fallback;
     const d = OnStart.off;
     final change = read('changeBy', d.changeBy);
-    final oldCountIn = read('countIn', 0);
-    final oldStop = StopAfter.values.asNameMap()[json['stopAfter']];
-    final bars = read('countInBars', oldCountIn == 2 ? 2 : 1);
     return OnStart(
-      countInOn: read('countInOn', oldCountIn == 1 || oldCountIn == 2),
-      countInBars: bars == 2 ? 2 : 1,
+      countInOn: read('countInOn', false),
+      countInBars: read('countInBars', 1) == 2 ? 2 : 1,
       speedUp: read('speedUp', false),
       changeBy: change == 0
           ? d.changeBy
           : clampInt(change, minChange, maxChange),
       every: clampInt(read('every', d.every), minEvery, maxEvery),
-      upTo: switch (json['upTo'] ?? json['until']) {
+      upTo: switch (json['upTo']) {
         final int v => clampInt(v, 30, 300),
         _ => null,
       },
-      stopOn: read('stopOn', oldStop != null && oldStop != StopAfter.off),
-      stopBy:
-          StopBy.values.asNameMap()[json['stopBy']] ??
-          (oldStop == StopAfter.bars ? StopBy.bars : StopBy.time),
+      stopOn: read('stopOn', false),
+      stopBy: StopBy.values.asNameMap()[json['stopBy']] ?? StopBy.time,
       stopBars: clampInt(read('stopBars', d.stopBars), minBars, maxBars),
       stopTime: clampTime(
         Duration(seconds: read('stopTimeS', d.stopTime.inSeconds)),

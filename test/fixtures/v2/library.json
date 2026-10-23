@@ -1,0 +1,96 @@
+{
+  "version": 2,
+  "songs": [
+    {
+      "id": "s1",
+      "name": "Dead Weight",
+      "bpm": 128,
+      "pattern": {
+        "beatsPerBar": 4,
+        "stepsPerBeat": 2,
+        "beatUnit": 4,
+        "steps": [
+          "accent",
+          "soft",
+          "normal",
+          "soft",
+          "normal",
+          "soft",
+          "normal",
+          "soft"
+        ],
+        "polyrhythm": 3,
+        "polyStates": [
+          "accent",
+          "normal",
+          "silent"
+        ]
+      },
+      "onStart": {
+        "countInOn": true,
+        "countInBars": 2,
+        "speedUp": true,
+        "changeBy": 5,
+        "every": 8,
+        "upTo": 160,
+        "stopOn": true,
+        "stopBy": "bars",
+        "stopBars": 32,
+        "stopTimeS": 300
+      },
+      "editedAt": 1760000000000,
+      "playedAt": 1760200000000
+    },
+    {
+      "id": "s2",
+      "name": "Slow Blues",
+      "bpm": 64,
+      "pattern": {
+        "beatsPerBar": 12,
+        "stepsPerBeat": 1,
+        "beatUnit": 8,
+        "steps": [
+          "accent",
+          "normal",
+          "normal",
+          "accent",
+          "normal",
+          "normal",
+          "accent",
+          "normal",
+          "normal",
+          "accent",
+          "normal",
+          "normal"
+        ],
+        "polyrhythm": 0,
+        "polyStates": []
+      },
+      "onStart": {
+        "countInOn": false,
+        "countInBars": 1,
+        "speedUp": true,
+        "changeBy": 5,
+        "every": 8,
+        "upTo": null,
+        "stopOn": false,
+        "stopBy": "time",
+        "stopBars": 32,
+        "stopTimeS": 300
+      },
+      "editedAt": null,
+      "playedAt": null
+    }
+  ],
+  "setlists": [
+    {
+      "id": "set1",
+      "name": "Friday set",
+      "songIds": [
+        "s1",
+        "s2"
+      ],
+      "playedAt": 1760100000000
+    }
+  ]
+}

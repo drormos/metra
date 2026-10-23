@@ -84,23 +84,6 @@ void main() {
     expect(copy.visualOffset, const Duration(milliseconds: 20));
   });
 
-  test('older songs and files load with everything off; build 37–38 '
-      'count-ins carry over', () {
-    final json = Song(id: 'a', name: 'A', bpm: 90, pattern: waltz).toJson()
-      ..remove('onStart');
-    expect(Song.fromJson(json).onStart, OnStart.off);
-    expect(
-      Song.fromJson({...json, 'countIn': 2}).onStart,
-      const OnStart(countInOn: true, countInBars: 2),
-    );
-    final file = Library.empty.toJson()..remove('lastOnStart');
-    expect(Library.fromJson(file).lastOnStart, OnStart.off);
-    expect(
-      Library.fromJson({...file, 'lastCountIn': 1}).lastOnStart,
-      const OnStart(countInOn: true, countInBars: 1),
-    );
-  });
-
   test('empty library has app defaults', () {
     const library = Library.empty;
     expect(library.songs, isEmpty);
@@ -205,13 +188,19 @@ void main() {
     expect(Library.fromJson(old).vibrate, isTrue);
   });
 
-  test('session (setlist, song, position) survives JSON; old files are '
-      'Free play', () {
-    final session = Library.empty.withSession(
-      setlistId: 's',
-      songId: 'a',
-      position: 3,
-    );
+  test('session (setlist, song, position) survives JSON; missing is Free '
+      'play', () {
+    final session = Library.empty
+        .copyWith(
+          songs: [
+            Song(id: 'a', name: 'A', bpm: 90, pattern: waltz),
+            Song(id: 'b', name: 'B', bpm: 90, pattern: waltz),
+          ],
+          setlists: [
+            const Setlist(id: 's', name: 'S', songIds: ['b', 'b', 'b', 'a']),
+          ],
+        )
+        .withSession(setlistId: 's', songId: 'a', position: 3);
     final copy = roundTrip(session);
     expect(copy.activeSetlistId, 's');
     expect(copy.currentSongId, 'a');

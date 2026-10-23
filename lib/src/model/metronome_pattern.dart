@@ -258,20 +258,16 @@ class MetronomePattern {
       MetronomePattern(
         beatsPerBar: json['beatsPerBar'] as int,
         stepsPerBeat: json['stepsPerBeat'] as int,
-        // Absent in files saved before time signatures existed.
-        beatUnit: json['beatUnit'] as int? ?? 4,
+        beatUnit: json['beatUnit'] as int,
         steps: [
           for (final name in json['steps'] as List)
             StepLevel.values.byName(name as String),
         ],
-        // Absent in files saved before polyrhythms existed: off.
-        polyrhythm: json['polyrhythm'] as int? ?? 0,
-        polyStates: switch (json['polyStates']) {
-          final List<Object?> names => [
-            for (final name in names) StepLevel.values.byName(name as String),
-          ],
-          _ => null,
-        },
+        polyrhythm: json['polyrhythm'] as int,
+        polyStates: [
+          for (final name in json['polyStates'] as List)
+            StepLevel.values.byName(name as String),
+        ],
       );
 
   static void _validateSizes(int beatsPerBar, int stepsPerBeat) {

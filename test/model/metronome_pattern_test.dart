@@ -73,16 +73,13 @@ void main() {
       expect(triplets.timeSignature, '7/8');
     });
 
-    test('JSON keeps the beat unit; old files default to 4', () {
+    test('JSON keeps the beat unit', () {
       final sevenEight = MetronomePattern.simple(
         beatsPerBar: 7,
         stepsPerBeat: 1,
         beatUnit: 8,
       );
       expect(MetronomePattern.fromJson(sevenEight.toJson()), sevenEight);
-      final old = const MetronomePattern.standard().toJson()
-        ..remove('beatUnit');
-      expect(MetronomePattern.fromJson(old), const MetronomePattern.standard());
     });
 
     test('levelAt wraps absolute step indices into the bar', () {
@@ -233,14 +230,9 @@ void main() {
       expect(three.cyclePulse(1).cyclePulse(1).cyclePulse(1), three);
     });
 
-    test('survives JSON; older patterns load as off', () {
+    test('survives JSON (older shapes: library_migrations_test)', () {
       final p = four.withPolyrhythm(5).cyclePulse(2);
       expect(MetronomePattern.fromJson(p.toJson()), p);
-      final old = four.toJson()
-        ..remove('polyrhythm')
-        ..remove('polyStates');
-      expect(MetronomePattern.fromJson(old).polyrhythm, 0);
-      expect(MetronomePattern.fromJson(old), four);
     });
   });
 }

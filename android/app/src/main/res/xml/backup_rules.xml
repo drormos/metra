@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android Auto Backup up to Android 11 (fullBackupContent). Only the
+     library and the settings are backed up: their temp files (*.tmp), the
+     version-1 safety copy and the corrupt/ folder are left out. Keep in
+     sync with data_extraction_rules.xml and LibraryStore. -->
+<full-backup-content>
+    <include domain="file" path="library.json" />
+    <include domain="file" path="settings.json" />
+</full-backup-content>

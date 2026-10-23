@@ -163,19 +163,6 @@ void main() {
     expect(back.stopAfter, StopAfter.time, reason: 'Time by default');
   });
 
-  test('build 37–39 files carry over', () {
-    expect(
-      OnStart.fromJson({'countIn': 2, 'until': 150, 'stopAfter': 'bars'}),
-      const OnStart(
-        countInOn: true,
-        countInBars: 2,
-        upTo: 150,
-        stopOn: true,
-        stopBy: StopBy.bars,
-      ),
-    );
-  });
-
   test('JSON round trip; bad values fall back', () {
     const all = OnStart(
       countInOn: true,
@@ -191,7 +178,12 @@ void main() {
     );
     expect(OnStart.fromJson(all.toJson()), all);
     expect(
-      OnStart.fromJson({'countIn': 5, 'changeBy': 0, 'every': 500, 'until': 9}),
+      OnStart.fromJson({
+        'countInBars': 5,
+        'changeBy': 0,
+        'every': 500,
+        'upTo': 9,
+      }),
       const OnStart(every: 64, upTo: 30),
     );
   });

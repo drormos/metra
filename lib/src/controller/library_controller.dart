@@ -4,6 +4,7 @@ import 'package:flutter/material.dart'
     show ChangeNotifier, ThemeMode, debugPrint, visibleForTesting;
 
 import '../model/library.dart';
+import '../model/library_migrations.dart';
 import '../model/metronome_pattern.dart';
 import '../model/on_start.dart';
 import '../storage/library_store.dart';
@@ -616,25 +617,19 @@ class LibraryController extends ChangeNotifier {
   }
 
   /// The set panel's one-time swipe hint (stored, never repeats).
-  bool get swipeHintSeen => _library.swipeHintSeen;
+  bool get swipeHintSeen => tipSeen(swipeHintTip);
 
-  void markSwipeHintSeen() {
-    if (!swipeHintSeen) _update(_library.copyWith(swipeHintSeen: true));
-  }
+  void markSwipeHintSeen() => markTipSeen(swipeHintTip);
 
   /// The Songs list's own one-time swipe hint.
-  bool get songsHintSeen => _library.songsHintSeen;
+  bool get songsHintSeen => tipSeen(songsHintTip);
 
-  void markSongsHintSeen() {
-    if (!songsHintSeen) _update(_library.copyWith(songsHintSeen: true));
-  }
+  void markSongsHintSeen() => markTipSeen(songsHintTip);
 
   /// The sets view's own one-time hint.
-  bool get setsHintSeen => _library.setsHintSeen;
+  bool get setsHintSeen => tipSeen(setsHintTip);
 
-  void markSetsHintSeen() {
-    if (!setsHintSeen) _update(_library.copyWith(setsHintSeen: true));
-  }
+  void markSetsHintSeen() => markTipSeen(setsHintTip);
 
   /// Whether the one-time tip [name] was shown.
   bool tipSeen(String name) => _library.tipsSeen.contains(name);

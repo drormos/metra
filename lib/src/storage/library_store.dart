@@ -2,42 +2,151 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../model/library.dart';
+import '../model/library_migrations.dart';
 
-/// Saves the [Library] as one JSON file.
+/// Saves the [Library] in two JSON files side by side: [file]
+/// (`library.json`: songs and setlists) and [settingsFile]
+/// (`settings.json`: app settings, the session and one-time flags).
 ///
-/// Writes go to a temp file that is then renamed over the real one, so a
-/// crash mid-write never leaves a half-written library. Saves run one at a
-/// time in call order.
+/// Each write goes to a temp file that is then renamed over the real one,
+/// so a crash mid-write never leaves a half-written file; a file whose
+/// content hasn't changed isn't rewritten (a tempo drag only touches
+/// settings). Saves run one at a time in call order.
+///
+/// Loading migrates any older format (library_migrations.dart). A version
+/// 1 file (one combined `library.json`) is copied to [backupFile] first,
+/// and the copy is deleted after the next successful save. An unreadable
+/// file is moved into [corruptDir] (the newest [keepCorrupt] are kept) and
+/// the rest still loads: broken settings keep the songs, a broken library
+/// keeps the settings.
 class LibraryStore {
-  LibraryStore(this.file);
+  LibraryStore(this.file)
+    : settingsFile = File('${file.parent.path}/settings.json');
 
   final File file;
-  Future<void> _writes = Future.value();
+  final File settingsFile;
 
-  /// An unreadable file is moved aside (kept for recovery) and an empty
-  /// library is returned, so the app still starts. Throws, touching
-  /// nothing, for a file from a newer app version
+  File get backupFile => File('${file.path}.v1-backup');
+  Directory get corruptDir => Directory('${file.parent.path}/corrupt');
+
+  /// Unreadable files kept for recovery, newest first.
+  static const keepCorrupt = 3;
+
+  Future<void> _writes = Future.value();
+  // What's on disk now, so unchanged files aren't rewritten.
+  String? _onDiskLibrary;
+  String? _onDiskSettings;
+  bool _backupPending = false;
+
+  /// Whether anything was ever saved here (false on a fresh install).
+  Future<bool> exists() async =>
+      await file.exists() || await settingsFile.exists();
+
+  /// Throws, touching nothing, for a file from a newer app version
   /// ([NewerLibraryException]) or one that can't be kept aside: saving
   /// over it would lose it.
-  /// Whether a library was ever saved here (false on a fresh install).
-  Future<bool> exists() => file.exists();
-
   Future<Library> load() async {
-    if (!await file.exists()) return Library.empty;
+    // Whatever is on disk now wasn't necessarily written by this store.
+    _onDiskLibrary = null;
+    _onDiskSettings = null;
+    await _tidyCorrupt();
+    final library = await _read(file);
+    if (library != null && library['version'] == 1) {
+      // One combined file, from before the split: keep the original until
+      // the migrated library has been saved.
+      if (!await backupFile.exists()) await file.copy(backupFile.path);
+      _backupPending = true;
+      final parsed = _parse(library);
+      if (parsed != null) return parsed;
+      await _setAside(file);
+      return Library.empty;
+    }
+    final settings = await _read(settingsFile);
+    final settingsPart = <String, Object?>{
+      'version': latestVersion,
+      'songs': const [],
+      'setlists': const [],
+      ...?_settingsPart(settings),
+    };
+    final parsed = _parse({...settingsPart, ...?library});
+    if (parsed != null) return parsed;
+    // The library itself was broken: keep it aside, keep the settings.
+    await _setAside(file);
+    return _parse(settingsPart) ?? Library.empty;
+  }
+
+  Map<String, Object?>? _settingsPart(Map<String, Object?>? settings) =>
+      settings == null
+      ? null
+      : {
+          for (final MapEntry(:key, :value) in settings.entries)
+            if (!libraryKeys.contains(key)) key: value,
+        };
+
+  /// The file's JSON, or null when it's missing or unreadable (then it's
+  /// moved aside). A newer version throws.
+  Future<Map<String, Object?>?> _read(File f) async {
+    if (!await f.exists()) return null;
     try {
-      final json = jsonDecode(await file.readAsString());
-      return Library.fromJson(json as Map<String, Object?>);
+      final json = jsonDecode(await f.readAsString()) as Map<String, Object?>;
+      final version = json['version'];
+      if (version is int && version > Library.version) {
+        throw NewerLibraryException(version);
+      }
+      return json;
     } on NewerLibraryException {
       rethrow;
     } catch (_) {
-      final aside =
-          '${file.path}.corrupt-${DateTime.now().millisecondsSinceEpoch}';
-      try {
-        await file.rename(aside);
-      } on FileSystemException {
-        await file.copy(aside);
+      await _setAside(f);
+      return null;
+    }
+  }
+
+  static Library? _parse(Map<String, Object?> json) {
+    try {
+      return Library.fromJson(json);
+    } on NewerLibraryException {
+      rethrow;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _setAside(File f) async {
+    await corruptDir.create(recursive: true);
+    final name = f.uri.pathSegments.last;
+    final aside = File(
+      '${corruptDir.path}/$name.corrupt-${DateTime.now().microsecondsSinceEpoch}',
+    );
+    try {
+      await f.rename(aside.path);
+    } on FileSystemException {
+      await f.copy(aside.path);
+    }
+    // Newest = set aside most recently (a rename keeps the old time).
+    await aside.setLastModified(DateTime.now());
+    await _tidyCorrupt();
+  }
+
+  /// Moves older `*.corrupt-*` files from beside the library into
+  /// [corruptDir], then keeps only the newest [keepCorrupt].
+  Future<void> _tidyCorrupt() async {
+    final dir = file.parent;
+    if (!await dir.exists()) return;
+    await for (final entity in dir.list()) {
+      if (entity is File && entity.path.contains('.corrupt-')) {
+        await corruptDir.create(recursive: true);
+        final name = entity.uri.pathSegments.last;
+        await entity.rename('${corruptDir.path}/$name');
       }
-      return Library.empty;
+    }
+    if (!await corruptDir.exists()) return;
+    final files = (await corruptDir.list().toList()).whereType<File>().toList();
+    if (files.length <= keepCorrupt) return;
+    final stamped = [for (final f in files) (f, await f.lastModified())]
+      ..sort((a, b) => b.$2.compareTo(a.$2));
+    for (final (f, _) in stamped.skip(keepCorrupt)) {
+      await f.delete();
     }
   }
 
@@ -49,8 +158,25 @@ class LibraryStore {
   }
 
   Future<void> _write(Library library) async {
-    final temp = File('${file.path}.tmp');
-    await temp.writeAsString(jsonEncode(library.toJson()), flush: true);
-    await temp.rename(file.path);
+    final settings = jsonEncode(library.settingsJson());
+    final songs = jsonEncode(library.libraryJson());
+    if (settings != _onDiskSettings) {
+      await _atomic(settingsFile, settings);
+      _onDiskSettings = settings;
+    }
+    if (songs != _onDiskLibrary) {
+      await _atomic(file, songs);
+      _onDiskLibrary = songs;
+    }
+    if (_backupPending) {
+      _backupPending = false;
+      if (await backupFile.exists()) await backupFile.delete();
+    }
+  }
+
+  static Future<void> _atomic(File target, String content) async {
+    final temp = File('${target.path}.tmp');
+    await temp.writeAsString(content, flush: true);
+    await temp.rename(target.path);
   }
 }
