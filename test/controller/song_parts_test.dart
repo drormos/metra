@@ -1,0 +1,301 @@
+import 'dart:io';
+
+import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:metra/src/controller/library_controller.dart';
+import 'package:metra/src/controller/metronome_controller.dart';
+import 'package:metra/src/model/library.dart';
+import 'package:metra/src/model/metronome_pattern.dart';
+import 'package:metra/src/model/on_start.dart';
+import 'package:metra/src/storage/library_store.dart';
+
+import '../audio/fake_click_output.dart';
+
+const _ms = Duration(milliseconds: 1);
+const _four = MetronomePattern.standard();
+final _three = MetronomePattern.simple(beatsPerBar: 3, stepsPerBeat: 1);
+final _two = MetronomePattern.simple(beatsPerBar: 2, stepsPerBeat: 1);
+
+SongPart _part(
+  String id,
+  int? bars,
+  int from, [
+  int? to,
+  MetronomePattern? p,
+]) => SongPart(
+  id: id,
+  name: id,
+  bars: bars,
+  tempoStart: from,
+  tempoEnd: to ?? from,
+  pattern: p ?? _four,
+);
+
+/// Songs with parts (ui-spec.md "Song parts"), on the fake engine clock.
+void main() {
+  late FakeClickOutput output;
+  late MetronomeController controller;
+
+  setUp(() {
+    output = FakeClickOutput()..time = _ms * 1000;
+    controller = MetronomeController(output);
+  });
+  tearDown(() => controller.dispose());
+
+  // Tops the scheduler up at the fake engine time.
+  void runTo(int ms) {
+    while (output.time < _ms * ms) {
+      output.time += _ms * 25;
+      controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    }
+  }
+
+  /// Live clicks up to [ms], as (ms, accent?), rounded to 0.1 ms.
+  List<(double, bool)> clicks(int ms) => [
+    for (final c in output.live)
+      if (c.at <= _ms * ms)
+        ((c.at.inMicroseconds / 100).round() / 10, c.level == StepLevel.accent),
+  ];
+
+  void load(List<SongPart> parts, {SongEnd end = SongEnd.stop}) =>
+      controller.loadSong(
+        bpm: 0,
+        pattern: _four,
+        parts: parts,
+        end: end,
+        onStart: controller.onStart,
+      );
+
+  test('one part: nothing changes (no parts held, the song\'s own tempo)', () {
+    controller.loadSong(
+      bpm: 90,
+      pattern: _three,
+      parts: [_part('a', null, 90, null, _three)],
+    );
+    expect(controller.parts, isNull);
+    expect(controller.partPosition, isNull);
+    expect(controller.bpm, 90);
+  });
+
+  test('each part starts on a bar line in its own time signature and '
+      'tempo; an odd one-bar part; the open last part runs on', () async {
+    load([
+      _part('a', 1, 120),
+      _part('b', 1, 120, null, _two),
+      _part('c', null, 60, null, _three),
+    ]);
+    expect(controller.bpm, 120);
+    await controller.play(); // beat 1 at 1120
+    runTo(7300);
+    expect(clicks(7200), [
+      (1120, true), (1620, false), (2120, false), (2620, false), // a, 4/4
+      (3120, true), (3620, false), // b, 2/4
+      (4120, true), (5120, false), (6120, false), // c, 3/4 at 60
+      (7120, true),
+    ]);
+    expect(controller.bpm, 60);
+    expect(controller.pattern, _three);
+    expect(controller.partPosition, (part: 2, bar: 1));
+    runTo(30000);
+    expect(controller.isPlaying, isTrue);
+    controller.stop();
+    expect(controller.bpm, 120, reason: 'ready to start over');
+    expect(controller.pattern, _four);
+  });
+
+  test('Gradual changes tempo on every beat, reaching To on the last beat; '
+      'the next part starts at its own tempo', () async {
+    load([_part('a', 1, 60, 120), _part('b', null, 90)]);
+    await controller.play();
+    runTo(4500);
+    // 60, 80, 100, 120 bpm: 1000, 750, 600, 500 ms; then 90 bpm.
+    expect(clicks(4000).map((c) => c.$1), [1120, 2120, 2870, 3470, 3970]);
+    runTo(3000);
+    controller.stop();
+  });
+
+  test('the BPM follows the live tempo beat by beat', () async {
+    load([_part('a', 1, 60, 120), _part('b', null, 90)]);
+    await controller.play();
+    runTo(2200);
+    expect(controller.bpm, 80);
+    runTo(3500);
+    expect(controller.bpm, 120);
+    runTo(4000);
+    expect(controller.bpm, 90);
+  });
+
+  test('loop: back to part 1 on the bar line; the count-in plays once, in '
+      'the first part\'s meter', () async {
+    controller.setCountIn(1);
+    load([
+      _part('a', 1, 120, null, _two),
+      _part('b', 1, 120, null, _three),
+    ], end: SongEnd.loop);
+    await controller.play();
+    runTo(6200);
+    expect(clicks(6000), [
+      (1120, true), (1620, false), // count-in, 2/4
+      (2120, true), (2620, false), // a
+      (3120, true), (3620, false), (4120, false), // b
+      (4620, true), (5120, false), // a again
+      (5620, true), // b again
+    ]);
+    expect(controller.countingIn, isFalse);
+    expect(controller.isPlaying, isTrue);
+  });
+
+  test('End: Stop stops at the end of the last part and says the song '
+      'ended; Stop after says nothing', () async {
+    var ended = 0;
+    controller.onSongEnd = () => ended++;
+    load([_part('a', 1, 120), _part('b', 1, 120)]);
+    await controller.play();
+    runTo(5300);
+    expect(output.live.last.at, _ms * 4620, reason: 'eight beats');
+    expect(controller.isPlaying, isFalse);
+    expect(ended, 1);
+
+    controller.setOnStart(
+      const OnStart(stopOn: true, stopBy: StopBy.bars, stopBars: 1),
+    );
+    await controller.play();
+    runTo(9000);
+    expect(controller.isPlaying, isFalse);
+    expect(ended, 1);
+  });
+
+  test('speed up is ignored for a song with parts', () async {
+    controller.setOnStart(const OnStart(speedUp: true, changeBy: 10, every: 1));
+    load([_part('a', 4, 120), _part('b', null, 120)]);
+    await controller.play();
+    runTo(9000);
+    expect(controller.bpm, 120);
+    expect(controller.startBpm, 120);
+  });
+
+  group('going to a part', () {
+    test('playing: on the next bar line', () async {
+      load([_part('a', 4, 120), _part('b', 4, 90, null, _three)]);
+      await controller.play();
+      runTo(1700); // in bar 1
+      controller.jumpToPart(1);
+      runTo(5300);
+      expect(clicks(5200).where((c) => c.$2).map((c) => c.$1), [
+        1120,
+        3120, // b, the next bar line
+        5120, // 3 beats at 90
+      ]);
+      expect(controller.partPosition, (part: 1, bar: 1));
+    });
+
+    test('stopped: Start begins there, the count-in in its tempo and '
+        'time signature', () async {
+      controller.setCountIn(1);
+      load([_part('a', 4, 120), _part('b', 4, 90, null, _three)]);
+      controller.jumpToPart(1);
+      expect(controller.partPosition, (part: 1, bar: 0));
+      expect(controller.bpm, 90);
+      expect(controller.pattern, _three);
+      await controller.play();
+      runTo(3300);
+      expect(clicks(3200).map((c) => c.$1), [1120, 1786.7, 2453.3, 3120]);
+      expect(controller.countingIn, isFalse);
+      controller.stop();
+      expect(controller.bpm, 90, reason: 'still starts there');
+    });
+  });
+
+  test('a tempo change moves the current part, both ends of a Gradual one; '
+      'the change holds until the part ends', () async {
+    load([_part('a', 2, 100), _part('b', 2, 60, 120), _part('c', null, 80)]);
+    controller.setBpm(110);
+    expect(controller.parts![0].tempoStart, 110);
+    controller.jumpToPart(1);
+    controller.setBpm(70);
+    expect(
+      (controller.parts![1].tempoStart, controller.parts![1].tempoEnd),
+      (70, 130),
+    );
+    controller.jumpToPart(0);
+    await controller.play();
+    runTo(1300);
+    controller.setBpm(150); // part a, while it plays
+    runTo(3000);
+    expect(controller.bpm, 150, reason: 'holds through the part');
+    expect(controller.parts![0].tempoStart, 150);
+    controller.stop();
+  });
+
+  test('an edit just before the next part, already on its way, changes only '
+      'the current part; the next one plays as it is', () async {
+    load([_part('a', 1, 120), _part('b', 2, 60, null, _two)]);
+    await controller.play();
+    runTo(3050); // b's first beat (3120) is handed over, not yet heard
+    expect(controller.partPosition, (part: 0, bar: 0));
+    controller
+      ..cycleBeat(1)
+      ..setBpm(150);
+    expect(controller.parts![0].tempoStart, 150);
+    expect(controller.parts![0].pattern.beatLevels[1], StepLevel.accent);
+    runTo(5300);
+    expect(clicks(5200), [
+      (1120, true), (1620, false), (2120, false), (2620, false),
+      (3120, true), (4120, false), (5120, true), // b: 2/4 at 60
+    ]);
+    expect(controller.parts![1], _part('b', 2, 60, null, _two));
+  });
+
+  group('with the library', () {
+    late Directory dir;
+    late LibraryController library;
+
+    setUp(() async {
+      dir = Directory.systemTemp.createTempSync('metra_parts');
+      library = await LibraryController.load(
+        LibraryStore(File('${dir.path}/library.json')),
+      );
+      library.attach(controller);
+    });
+    tearDown(() async {
+      await library.flush();
+      dir.deleteSync(recursive: true);
+    });
+
+    Song addParts(String name, List<SongPart> parts) =>
+        library.addSong(name: name, bpm: 0, pattern: _four, parts: parts);
+
+    test('in a set, a song whose parts end leaves the next song ready; it '
+        'never starts by itself', () async {
+      final first = addParts('First', [_part('a', 1, 120), _part('b', 1, 120)]);
+      final next = library.addSong(name: 'Next', bpm: 90, pattern: _three);
+      final set = library.saveSetlist(
+        name: 'Set',
+        songIds: [first.id, next.id],
+      );
+      library.loadSetlist(set.id, controller);
+      await controller.play();
+      runTo(5300);
+      expect(controller.isPlaying, isFalse);
+      expect(library.currentSong!.name, 'Next');
+      expect(controller.bpm, 90);
+    });
+
+    test('changes are unsaved changes: Revert brings the parts back, Save '
+        'stores them', () {
+      final song = addParts('Song', [_part('a', 2, 100), _part('b', 2, 140)]);
+      library.playSingleSong(song, controller);
+      expect(library.songChanged(controller), isFalse);
+      controller.setBpm(104);
+      expect(library.songChanged(controller), isTrue);
+      library.revertSong(controller);
+      expect(library.songChanged(controller), isFalse);
+      expect(controller.parts![0].tempoStart, 100);
+      controller.setBpm(104);
+      library.saveToSong(controller);
+      expect(library.songById(song.id)!.parts[0].tempoStart, 104);
+      expect(library.songById(song.id)!.parts, hasLength(2));
+      expect(library.songChanged(controller), isFalse);
+    });
+  });
+}

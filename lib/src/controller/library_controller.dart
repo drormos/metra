@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart'
     show ChangeNotifier, ThemeMode, debugPrint, visibleForTesting;
 
@@ -336,6 +337,8 @@ class LibraryController extends ChangeNotifier {
       bpm: song.bpm,
       pattern: song.pattern,
       onStart: song.onStart,
+      parts: song.parts,
+      end: song.end,
     );
     _emptyTab = null;
     _update(
@@ -355,6 +358,8 @@ class LibraryController extends ChangeNotifier {
       bpm: song.bpm,
       pattern: song.pattern,
       onStart: song.onStart,
+      parts: song.parts,
+      end: song.end,
     );
     _emptyTab = null;
     _update(
@@ -395,6 +400,8 @@ class LibraryController extends ChangeNotifier {
       bpm: metronome.startBpm,
       pattern: metronome.pattern,
       onStart: metronome.onStart,
+      parts: metronome.parts,
+      end: metronome.songEnd,
     );
     final list = activeSetlist;
     if (list != null) addToSetlist(list.id, song.id);
@@ -413,10 +420,15 @@ class LibraryController extends ChangeNotifier {
   /// aren't stored until [saveToSong]; loading a song discards them.
   bool songChanged(MetronomeController metronome) {
     final song = currentSong;
-    return song != null &&
-        (song.bpm != metronome.startBpm ||
-            song.pattern != metronome.pattern ||
-            song.onStart != metronome.onStart);
+    if (song == null) return false;
+    if (metronome.parts case final parts?) {
+      return !listEquals(song.parts, parts) ||
+          song.end != metronome.songEnd ||
+          song.onStart != metronome.onStart;
+    }
+    return song.bpm != metronome.startBpm ||
+        song.pattern != metronome.pattern ||
+        song.onStart != metronome.onStart;
   }
 
   /// Stores the main-screen changes in the loaded song (every set gets them).
@@ -428,11 +440,15 @@ class LibraryController extends ChangeNotifier {
   /// applies as on the main screen (no restart on beat 1).
   void revertSong(MetronomeController metronome) {
     if (currentSong case final song?) {
-      metronome.applyEdit(
-        bpm: song.bpm,
-        pattern: song.pattern,
-        onStart: song.onStart,
-      );
+      if (song.parts.length > 1) {
+        metronome.applyParts(song.parts, song.end, onStart: song.onStart);
+      } else {
+        metronome.applyEdit(
+          bpm: song.bpm,
+          pattern: song.pattern,
+          onStart: song.onStart,
+        );
+      }
     }
   }
 
@@ -454,6 +470,8 @@ class LibraryController extends ChangeNotifier {
       bpm: metronome.startBpm,
       pattern: metronome.pattern,
       onStart: metronome.onStart,
+      parts: metronome.parts,
+      end: metronome.songEnd,
     );
     _freshSongId = fresh ? song.id : null;
     if (list == null || index < 0 || placement == SongPlacement.none) {
@@ -485,11 +503,17 @@ class LibraryController extends ChangeNotifier {
   /// Overwrites [song]'s tempo and pattern with the metronome's.
   void updateSongFromMetronome(Song song, MetronomeController metronome) =>
       updateSong(
-        song.copyWith(
-          bpm: metronome.startBpm,
-          pattern: metronome.pattern,
-          onStart: metronome.onStart,
-        ),
+        metronome.parts != null
+            ? song.copyWith(
+                parts: metronome.parts,
+                end: metronome.songEnd,
+                onStart: metronome.onStart,
+              )
+            : song.copyWith(
+                bpm: metronome.startBpm,
+                pattern: metronome.pattern,
+                onStart: metronome.onStart,
+              ),
       );
 
   void addToSetlist(String setlistId, String songId) {
@@ -808,15 +832,26 @@ class LibraryController extends ChangeNotifier {
     required int bpm,
     required MetronomePattern pattern,
     OnStart onStart = OnStart.off,
+    List<SongPart>? parts,
+    SongEnd end = SongEnd.stop,
   }) {
-    final song = Song(
-      id: _newId(),
-      name: name,
-      bpm: bpm,
-      pattern: pattern,
-      onStart: onStart,
-      editedAt: DateTime.now(),
-    );
+    final song = parts != null
+        ? Song.withParts(
+            id: _newId(),
+            name: name,
+            parts: parts,
+            end: end,
+            onStart: onStart,
+            editedAt: DateTime.now(),
+          )
+        : Song(
+            id: _newId(),
+            name: name,
+            bpm: bpm,
+            pattern: pattern,
+            onStart: onStart,
+            editedAt: DateTime.now(),
+          );
     _update(_library.copyWith(songs: [...songs, song]));
     return song;
   }
@@ -989,6 +1024,11 @@ class LibraryController extends ChangeNotifier {
   /// sound and volumes into [metronome], then saves them whenever they
   /// change.
   void attach(MetronomeController metronome) {
+    // In a set, a song whose parts ended leaves the next song ready
+    // (ui-spec.md "Song parts"); it never starts by itself.
+    metronome.onSongEnd = () {
+      if (activeSetlist != null && hasNext) nextSong(metronome);
+    };
     metronome
       ..setBpm(_library.lastBpm)
       ..setPattern(_library.lastPattern)

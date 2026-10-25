@@ -57,6 +57,13 @@ abstract interface class RunPlan {
   bool endsAt(int bar, Duration elapsed);
 }
 
+/// A run that also changes the bar's shape (a song's parts): asked at
+/// every song bar line, before [RunPlan.tempoAt].
+abstract interface class PatternPlan implements RunPlan {
+  /// The pattern from song bar [bar] (from 0) on, or null to keep it.
+  MetronomePattern? patternAt(int bar);
+}
+
 /// One polyrhythm pulse that has been handed to the engine.
 @immutable
 class ScheduledPulse {
@@ -141,8 +148,10 @@ class ClickScheduler {
   int _runBegin = 0;
   int _bar = -1;
   Duration? _runStart;
-  // Where the run ends (the bar line not scheduled), once decided.
+  // Where the run ends (the bar line not scheduled) and that bar, once
+  // decided.
   Duration? _endAt;
+  int? _endBar;
   // The state before each change applied at a step (a switch, a run's
   // tempo change), newest last: when steps from there are cancelled to be
   // placed again, the state that was in force for them comes back.
@@ -150,6 +159,8 @@ class ClickScheduler {
   // The run's tempo changes not yet reached by the engine clock, by step:
   // (when it plays, the new tempo).
   final Map<int, (Duration, double)> _tempoChanges = {};
+  // Likewise its pattern changes (a song's next part).
+  final Map<int, (Duration, MetronomePattern)> _patternChanges = {};
   Timer? _timer;
   bool _prepared = false;
 
@@ -168,6 +179,26 @@ class ClickScheduler {
   void Function(double bpm)? onRunTempo;
   void Function()? onRunEnd;
 
+  /// Called when the engine clock reaches a bar line where the run changed
+  /// the pattern.
+  void Function(MetronomePattern pattern)? onRunPattern;
+
+  /// The song bar (from 0) of the first step that can still change; null
+  /// in a count-in or while stopped.
+  int? get openBar {
+    if (_grid == null) return null;
+    final cutoff = _output.now() + guard;
+    for (final s in _steps) {
+      if (s.time > cutoff) return s.bar;
+    }
+    if (_countInEnd case final end? when _nextStep < end) return null;
+    final position = (_nextStep - _barStart) % _pattern.stepsPerBar;
+    return position == 0 ? _bar + 1 : _bar;
+  }
+
+  /// The song bar whose line ended the run (from 0), once decided.
+  int? get endBar => _endAt == null ? null : _endBar;
+
   /// When the song's beat 1 plays in this run, or null before it's known.
   Duration? get runStart => _runStart;
 
@@ -175,6 +206,17 @@ class ClickScheduler {
   set run(RunPlan? run) {
     _run = run;
     _endAt = null;
+    refill();
+  }
+
+  /// The run changes from the next bar line not yet committed: steps from
+  /// the first open one are taken back, [change] gets that bar (the song
+  /// bar it starts, from 0) and they're placed again under the changed
+  /// run. No-op while stopped.
+  void replan(void Function(int nextBar) change) {
+    if (_grid == null) return;
+    _undoFrom(_firstOpenStep());
+    change(_bar + 1);
     refill();
   }
 
@@ -259,6 +301,7 @@ class ClickScheduler {
     _runStart = null;
     _undo.clear();
     _tempoChanges.clear();
+    _patternChanges.clear();
     _switchAt = null;
     _nextGrid = null;
     _nextPattern = null;
@@ -294,6 +337,7 @@ class ClickScheduler {
     _endAt = null;
     _undo.clear();
     _tempoChanges.clear();
+    _patternChanges.clear();
     if (_steps.isNotEmpty || _pulses.isNotEmpty) {
       final now = _output.now();
       for (final step in _steps) {
@@ -436,11 +480,13 @@ class ClickScheduler {
       _nextPattern = pattern;
       return refill();
     }
-    assert(
-      pattern.stepsPerBar == _pattern.stepsPerBar &&
-          pattern.stepsPerBeat == _pattern.stepsPerBeat,
-      'replaceLevels keeps the pattern shape',
-    );
+    // A song's next part may already be in force there, in another
+    // shape: the change was for the part before it, which has no step
+    // left to change.
+    if (pattern.stepsPerBar != _pattern.stepsPerBar ||
+        pattern.stepsPerBeat != _pattern.stepsPerBeat) {
+      return refill();
+    }
     final cutoff = _output.now() + guard;
     // Pulse states (and a polyrhythm turned off) apply from the next pulse:
     // the last committed step's remaining pulses are placed again when
@@ -645,8 +691,10 @@ class ClickScheduler {
             bar > 0 &&
             run.endsAt(bar, at - (_runStart ?? at))) {
           _endAt = at; // this bar line is silence
+          _endBar = bar;
           break;
         }
+        if (barPosition == 0) _planPattern(run, bar);
         _plan(run, bar, barPosition ~/ _pattern.stepsPerBeat);
       }
       final time = _grid!.stepTime(_nextStep);
@@ -702,7 +750,33 @@ class ClickScheduler {
     }
   }
 
+  /// [run]'s pattern from the next step (song bar [bar]'s line): a new bar
+  /// starts there in it, at the tempo in force. Undone like [_plan].
+  void _planPattern(RunPlan run, int bar) {
+    if (run is! PatternPlan) return;
+    final pattern = run.patternAt(bar);
+    if (pattern == null || pattern == _pattern) return;
+    final grid = _grid!;
+    final step = _nextStep;
+    _save(step);
+    _patternChanges[step] = (grid.stepTime(step), pattern);
+    _pattern = pattern;
+    _barStart = step;
+    _grid = grid.retempo(
+      pivotStep: step,
+      bpm: grid.bpm,
+      stepsPerBeat: pattern.stepsPerBeat,
+    );
+  }
+
   void _reportTempo(Duration now) {
+    final patterns = [
+      for (final MapEntry(key: step, value: (at, _)) in _patternChanges.entries)
+        if (at <= now) step,
+    ]..sort();
+    for (final step in patterns) {
+      onRunPattern?.call(_patternChanges.remove(step)!.$2);
+    }
     final due = [
       for (final MapEntry(key: step, value: (at, _)) in _tempoChanges.entries)
         if (at <= now) step,
@@ -729,6 +803,7 @@ class ClickScheduler {
     _nextStep = step;
     _endAt = null;
     _tempoChanges.removeWhere((at, _) => at >= step);
+    _patternChanges.removeWhere((at, _) => at >= step);
     _bar = -1;
     for (final s in _steps.reversed) {
       if (s.index >= step) continue;

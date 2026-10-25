@@ -10,7 +10,7 @@ flutter_soloud engine clock
        └─ controller/  MetronomeController (ChangeNotifier: tempo, pattern, transport, runs)
                        LibraryController (songs, sets, session, saving) ── storage/LibraryStore
             └─ ui/    MetronomeScreen and its panels; widgets read the controllers, hold no metronome state
-model/ (pure Dart, no Flutter UI): MetronomePattern, Library/Song/Setlist, OnStart, ClickVolumes, migrations
+model/ (pure Dart, no Flutter UI): MetronomePattern, Library/Song/Setlist, SongPart/SongPlan, OnStart, ClickVolumes, migrations
 timing/ (pure Dart): BeatGrid, TapTempo, EngineClockSmoother
 platform/: AndroidBridge (MainActivity, Quick Settings tile, calls)
 ```
@@ -28,7 +28,7 @@ Timing never comes from Dart timers: the scheduler hands every click to the engi
 
 | Area | Files | Notes |
 |---|---|---|
-| Click scheduling | `audio/click_scheduler.dart`, `timing/beat_grid.dart` | Steps are absolute indices; `BeatGrid` maps them to engine times (doubles, re-anchored on tempo changes). Pending switches (`switchAtNextBar/Beat`), count-in (`_begin`), runs (`RunPlan`: tempo on any beat, end at a bar line), polyrhythm pulses. |
+| Click scheduling | `audio/click_scheduler.dart`, `timing/beat_grid.dart` | Steps are absolute indices; `BeatGrid` maps them to engine times (doubles, re-anchored on tempo changes). Pending switches (`switchAtNextBar/Beat`), count-in (`_begin`), runs (`RunPlan`: tempo on any beat, end at a bar line; `PatternPlan`: a new bar shape at a bar line, for song parts), `replan` (jumps from the next bar line), polyrhythm pulses. |
 | Transport and state | `controller/metronome_controller.dart` | `play/stop/loadSong/applyEdit`; `onStart` (count-in, speed up, stop after); `startBpm` (the tempo outside a run: what songs compare and save). |
 | Library and session | `controller/library_controller.dart` | Modes (Free play, Single song, setlist), next/previous, unsaved changes (`songChanged`, Revert, Save, Save as new), one-time tips (`tipSeen`). Every change saves (coalesced). |
 | Saved data | `model/library.dart`, `model/library_migrations.dart`, `storage/library_store.dart` | Two files (`library.json`, `settings.json`), versioned; migrations on raw JSON; `Library.repaired()`. Any change: the data-format-change skill. |
@@ -51,6 +51,7 @@ Timing never comes from Dart timers: the scheduler hands every click to the engi
 | Mode tabs, context row, center button | `SetlistGroup` |
 | Set panel, sets view, Songs list, song picker | `QuickPick` (`QuickPickKind.set` / `sets` / `songs`, `_pickerPanel`) |
 | Top panel, Rhythm panel, When I press Start | `TopPanel.toggle`, `TimeSignatureSheet`, `OnStartSheet` |
+| Song parts, part, when the song ends | `SongPart`, `Song.parts` / `Song.end` (`SongEnd`), `SongPlan` (a `PatternPlan`), `MetronomeController.parts` / `partPosition` / `jumpToPart` |
 | Count-in, speed up, stop after ("a run") | `OnStart` (`countIn`, `speedUp`, `stopAfter`; `runs`), scheduler `RunPlan` |
 | Up to / Down to | `OnStart.upTo`, `limitLabel` |
 | Step, beat, bar, pulse | `ScheduledStep` (index, `barPosition`, `bar`), `ScheduledPulse` |
