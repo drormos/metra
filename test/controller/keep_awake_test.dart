@@ -59,7 +59,7 @@ void main() {
     library.loadSetlist(set.id, metronome);
     final calls = <bool>[];
     keepScreenAwake(metronome, library, (awake) async => calls.add(awake));
-    library.enterStageMode();
+    library.enterStageMode(metronome);
     library.exitStageMode();
     expect(calls, [false, true, false]);
   });

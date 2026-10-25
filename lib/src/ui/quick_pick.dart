@@ -1216,17 +1216,24 @@ class _QuickPickState extends State<QuickPick>
                 ),
               ),
               const SizedBox(width: 8),
+              // An empty set has nothing to play: dimmed, with the hint.
               Expanded(
-                child: _outlined(
-                  key: QuickPick.stageModeKey,
-                  colors: colors,
-                  onPressed: () {
-                    Haptics.medium();
-                    Navigator.pop(context);
-                    _library.enterStageMode();
-                  },
-                  icon: const StageIcon(),
-                  label: 'Stage mode',
+                child: _hintWhen(
+                  songs.isEmpty,
+                  'Add songs first',
+                  _outlined(
+                    key: QuickPick.stageModeKey,
+                    colors: colors,
+                    onPressed: songs.isEmpty
+                        ? null
+                        : () {
+                            Haptics.medium();
+                            Navigator.pop(context);
+                            _library.enterStageMode(widget.metronome);
+                          },
+                    icon: const StageIcon(),
+                    label: 'Stage mode',
+                  ),
                 ),
               ),
             ],
@@ -1236,11 +1243,20 @@ class _QuickPickState extends State<QuickPick>
     );
   }
 
+  /// [child] with a tooltip shown on tap, only when [on].
+  static Widget _hintWhen(bool on, String hint, Widget child) => on
+      ? Tooltip(
+          message: hint,
+          triggerMode: TooltipTriggerMode.tap,
+          child: child,
+        )
+      : child;
+
   /// A 48px outlined button of the set panel's pinned row.
   Widget _outlined({
     required Key key,
     required MetraColors colors,
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
     required Widget icon,
     required String label,
   }) => OutlinedButton.icon(

@@ -238,7 +238,7 @@ class MetronomeScreen extends StatelessWidget {
                         // Fixed height: the tempo name, or Revert / Save to song.
                         SizedBox(
                           height: 44,
-                          child: _RunLine(
+                          child: RunLine(
                             controller: controller,
                             child: _TempoLine(
                               controller: controller,
@@ -970,8 +970,8 @@ class _TempoLineState extends State<_TempoLine> {
 /// 4" ("Count-in · 2 · 3 of 4" in bar 2 of 2); during a run, its progress
 /// ("↗ +5 every 8 bars · next in 3 · 4:12 left"); otherwise it is [child].
 /// Read per frame from the engine clock, like the beat blocks.
-class _RunLine extends StatefulWidget {
-  const _RunLine({required this.controller, required this.child});
+class RunLine extends StatefulWidget {
+  const RunLine({super.key, required this.controller, required this.child});
 
   final MetronomeController controller;
   final Widget child;
@@ -1001,11 +1001,10 @@ class _RunLine extends StatefulWidget {
   }
 
   @override
-  State<_RunLine> createState() => _RunLineState();
+  State<RunLine> createState() => _RunLineState();
 }
 
-class _RunLineState extends State<_RunLine>
-    with SingleTickerProviderStateMixin {
+class _RunLineState extends State<RunLine> with SingleTickerProviderStateMixin {
   late final Ticker _ticker = createTicker(_onTick);
   String? _label;
 
@@ -1034,7 +1033,7 @@ class _RunLineState extends State<_RunLine>
   }
 
   void _onTick(Duration _) {
-    final label = _RunLine.labelFor(
+    final label = RunLine.labelFor(
       widget.controller,
       widget.controller.visualTimeAt(
         SchedulerBinding.instance.currentFrameTimeStamp,

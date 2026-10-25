@@ -11,6 +11,7 @@ import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/top_panel.dart';
 import 'package:metra/src/ui/quick_pick.dart';
 import 'package:metra/src/ui/setlist_group.dart';
+import 'package:metra/src/ui/stage_screen.dart';
 import 'package:metra/src/ui/theme.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -46,6 +47,7 @@ void main() {
     WidgetTester tester, {
     required MetraColors colors,
     double textScale = 1,
+    bool stage = false,
   }) async {
     tester.view
       ..physicalSize = const Size(412, 915)
@@ -87,7 +89,9 @@ void main() {
           colors,
           colors == MetraColors.stageBlack ? Brightness.dark : Brightness.light,
         ),
-        home: MetronomeScreen(controller: metronome, library: library),
+        home: stage
+            ? StageScreen(controller: metronome, library: library)
+            : MetronomeScreen(controller: metronome, library: library),
       ),
     );
   }
@@ -190,6 +194,40 @@ void main() {
       await tester.tap(find.byKey(MetronomeScreen.settingsKey));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull, reason: 'settings');
+    });
+  }
+
+  // Stage mode: the guidelines in both themes, and large text.
+  for (final (theme, colors) in [
+    ('dark', MetraColors.stageBlack),
+    ('daylight', MetraColors.daylight),
+  ]) {
+    testWidgets('$theme: stage mode', (tester) async {
+      final handle = tester.ensureSemantics();
+      failures.clear();
+      await pump(tester, colors: colors, stage: true);
+      await checkAll(tester, '$theme stage mode');
+      handle.dispose();
+      expect(failures, isEmpty);
+      await tester.pump(const Duration(seconds: 6)); // the tip's timer
+    });
+  }
+  for (final (scale, size) in [
+    (2.0, const Size(412, 915)),
+    (2.0, const Size(320, 690)),
+  ]) {
+    testWidgets('stage mode, text at ${(scale * 100).round()}% on '
+        '${size.width.toInt()}dp: nothing breaks', (tester) async {
+      await pump(
+        tester,
+        colors: MetraColors.stageBlack,
+        textScale: scale,
+        stage: true,
+      );
+      tester.view.physicalSize = size;
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      await tester.pump(const Duration(seconds: 6));
     });
   }
 }

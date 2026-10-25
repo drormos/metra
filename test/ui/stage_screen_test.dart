@@ -13,6 +13,8 @@ import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/quick_pick.dart';
 import 'package:metra/src/ui/setlist_group.dart';
 import 'package:metra/src/ui/stage_screen.dart';
+import 'package:metra/src/ui/tempo_controls.dart';
+import 'package:metra/src/ui/theme.dart';
 
 import '../audio/fake_click_output.dart';
 
@@ -21,6 +23,7 @@ void main() {
   late Directory dir;
   late MetronomeController metronome;
   late LibraryController library;
+  late FakeClickOutput output;
   late List<String> systemCalls;
 
   setUp(() => dir = Directory.systemTemp.createTempSync('metra_stage'));
@@ -33,11 +36,13 @@ void main() {
   });
 
   /// "Friday set" with four songs, loaded at the first; [stage] enters
-  /// stage mode before the app starts; [tipSeen] skips the one-time tip.
+  /// stage mode before the app starts; [tipSeen] skips the one-time tip;
+  /// [before] runs just before that (e.g. a theme, an edit).
   Future<void> pump(
     WidgetTester tester, {
     bool stage = true,
     bool tipSeen = true,
+    void Function()? before,
   }) async {
     tester.view
       ..physicalSize = const Size(400, 860)
@@ -57,7 +62,8 @@ void main() {
         null,
       ),
     );
-    metronome = MetronomeController(FakeClickOutput());
+    output = FakeClickOutput();
+    metronome = MetronomeController(output);
     addTearDown(metronome.dispose);
     library = (await tester.runAsync(
       () => LibraryController.load(
@@ -85,7 +91,8 @@ void main() {
       ..markSwipeHintSeen()
       ..loadSetlist(set.id, metronome);
     if (tipSeen) library.markTipSeen(LibraryController.stageTip);
-    if (stage) library.enterStageMode();
+    before?.call();
+    if (stage) library.enterStageMode(metronome);
     await tester.pumpWidget(MetraApp(controller: metronome, library: library));
   }
 
@@ -129,7 +136,7 @@ void main() {
     library
       ..exitStageMode()
       ..detachSong()
-      ..enterStageMode();
+      ..enterStageMode(metronome);
     await tester.pumpAndSettle();
     expect(library.stageMode, isFalse);
     expect(find.byType(MetronomeScreen), findsOneWidget);
@@ -272,6 +279,119 @@ void main() {
     expect(hint(tester), '');
   });
 
+  group('details', () {
+    testWidgets('an empty set: the button is disabled, with a hint', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        stage: false,
+        before: () => library.loadSetlist(
+          library.saveSetlist(name: 'Empty', songIds: []).id,
+          metronome,
+        ),
+      );
+      // "Add songs" opens the picker; Back shows the (empty) set.
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(SetlistGroup.emptySetKey),
+          matching: find.text('Add songs'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(QuickPick.pickBackKey));
+      await tester.pumpAndSettle();
+      final button = tester.widget<OutlinedButton>(
+        find.ancestor(
+          of: find.text('Stage mode'),
+          matching: find.byType(OutlinedButton),
+        ),
+      );
+      expect(button.onPressed, isNull);
+      expect(find.byTooltip('Add songs first'), findsOneWidget);
+    });
+
+    testWidgets('colors follow the app theme', (tester) async {
+      await pump(tester, before: () => library.setThemeMode(ThemeMode.light));
+      final scaffold = tester.widget<Scaffold>(
+        find.descendant(
+          of: find.byType(StageScreen),
+          matching: find.byType(Scaffold),
+        ),
+      );
+      expect(scaffold.backgroundColor, MetraColors.daylight.background);
+    });
+
+    testWidgets('while playing, the line under the BPM shows the run\'s '
+        'progress; the BPM follows the live tempo', (tester) async {
+      await pump(
+        tester,
+        before: () {
+          final one = library.songs.first;
+          library.updateSong(
+            one.copyWith(
+              onStart: const OnStart(
+                speedUp: true,
+                changeBy: 5,
+                every: 2,
+                upTo: 140,
+              ),
+            ),
+          );
+          library.revertSong(metronome);
+        },
+      );
+      expect(find.text('4/4 · speed up'), findsOneWidget);
+      await tester.tap(find.byKey(StageScreen.playKey));
+      await tester.pump();
+      // 100 bpm 4/4: two bars are 4.8 s.
+      while (output.time < const Duration(milliseconds: 5000)) {
+        output.time += const Duration(milliseconds: 20);
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+      expect(
+        tester.widget<Text>(find.byKey(MetronomeScreen.countInLineKey)).data,
+        startsWith('↗ +5 every 2 bars'),
+      );
+      expect(metronome.bpm, 105);
+      expect(tester.widget<BpmReadout>(find.byType(BpmReadout)).bpm, 105);
+      metronome.stop();
+      await tester.pump(const Duration(seconds: 1));
+    });
+
+    for (final playing in [false, true]) {
+      testWidgets('entering reverts unsaved changes and says so '
+          '(${playing ? 'playing: no restart' : 'stopped'})', (tester) async {
+        await pump(tester, stage: false);
+        if (playing) {
+          await metronome.play(); // first click at 120 ms
+          output.time = const Duration(milliseconds: 1500);
+          await tester.pump();
+        }
+        metronome.setBpm(150);
+        expect(library.songChanged(metronome), isTrue);
+        library.enterStageMode(metronome);
+        await tester.pump();
+        expect(metronome.bpm, 100);
+        expect(library.songChanged(metronome), isFalse);
+        expect(metronome.isPlaying, playing);
+        expect(hint(tester), 'Playing the saved version of One');
+        if (playing) {
+          expect(
+            output.live.where(
+              (c) => c.at == const Duration(milliseconds: 1560),
+            ),
+            isEmpty,
+            reason: 'no restart one guard later',
+          );
+          metronome.stop();
+        }
+        await tester.pump(const Duration(seconds: 4));
+        expect(hint(tester), '');
+      });
+    }
+  });
+
   test('remembered across a relaunch until exited, on the same song', () async {
     Future<LibraryController> load() =>
         LibraryController.load(LibraryStore(File('${dir.path}/library.json')));
@@ -292,7 +412,7 @@ void main() {
     first
       ..loadSetlist(set.id, player)
       ..nextSong(player) // Two
-      ..enterStageMode();
+      ..enterStageMode(player);
     await first.flush();
 
     final again = await load();

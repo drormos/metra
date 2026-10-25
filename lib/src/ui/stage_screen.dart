@@ -81,11 +81,17 @@ class _StageScreenState extends State<StageScreen>
       const Duration(seconds: 10),
       (_) => setState(() {}),
     );
-    if (!_library.tipSeen(LibraryController.stageTip)) {
-      _hint = StageScreen.tipText;
-      _hintTimer = Timer(const Duration(seconds: 5), () {
+    // Reverted changes are said first; the tip then waits for the next
+    // entry.
+    final notice = _library.takeStageNotice();
+    final tip = !_library.tipSeen(LibraryController.stageTip);
+    if (notice != null || tip) {
+      _hint = notice ?? StageScreen.tipText;
+      _hintTimer = Timer(Duration(seconds: notice != null ? 3 : 5), () {
         if (mounted) setState(() => _hint = null);
       });
+    }
+    if (notice == null && tip) {
       // Saved after this build: it notifies the app.
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _library.markTipSeen(LibraryController.stageTip),
@@ -242,7 +248,16 @@ class _StageScreenState extends State<StageScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _exitPill(colors),
+            // Large text: the pill shrinks rather than pushing the time
+            // off the screen.
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: _exitPill(colors),
+              ),
+            ),
+            const SizedBox(width: 8),
             Text(
               TimeOfDay.now().format(context),
               style: TextStyle(
@@ -294,10 +309,21 @@ class _StageScreenState extends State<StageScreen>
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      _meterLine(pattern.timeSignature, onStart),
-                      key: StageScreen.meterKey,
-                      style: TextStyle(fontSize: 15, color: colors.muted),
+                    // While playing, a count-in / speed up / stop after
+                    // shows its progress here, as on the main screen.
+                    SizedBox(
+                      height: 24,
+                      width: box.maxWidth,
+                      child: RunLine(
+                        controller: _metronome,
+                        child: Center(
+                          child: Text(
+                            _meterLine(pattern.timeSignature, onStart),
+                            key: StageScreen.meterKey,
+                            style: TextStyle(fontSize: 15, color: colors.muted),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -465,8 +491,11 @@ class _StageScreenState extends State<StageScreen>
     required CrossAxisAlignment alignment,
     required VoidCallback onTap,
   }) {
+    // Tight lines: three of them fit 104px with large text.
     final muted = TextStyle(
+      overflow: TextOverflow.ellipsis,
       fontSize: 13,
+      height: 1.2,
       fontWeight: FontWeight.w600,
       color: colors.muted,
     );
@@ -481,7 +510,7 @@ class _StageScreenState extends State<StageScreen>
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           key: key,
-          // Inert at the ends, but a tap there is still not a bounce.
+          // Inert at the ends ("Start of set", "End of set").
           onTap: song == null ? null : onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -490,20 +519,22 @@ class _StageScreenState extends State<StageScreen>
               crossAxisAlignment: alignment,
               children: [
                 if (song == null)
-                  Text(end, style: muted)
+                  Text(end, maxLines: 1, style: muted)
                 else ...[
-                  Text(label, style: muted),
+                  Text(label, maxLines: 1, style: muted),
                   Text(
                     song.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 19,
+                      height: 1.2,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   Text(
                     '${song.bpm} BPM',
+                    maxLines: 1,
                     style: muted.copyWith(fontWeight: FontWeight.w700),
                   ),
                 ],
@@ -519,7 +550,8 @@ class _StageScreenState extends State<StageScreen>
   /// 1 s. Releasing early resets it and says how to leave.
   Widget _exitPill(MetraColors colors) => Semantics(
     button: true,
-    label: 'Hold to exit stage mode',
+    // TalkBack's double-tap-and-hold is the hold.
+    label: 'Exit stage mode, double-tap and hold',
     onLongPress: _exit,
     excludeSemantics: true,
     child: Listener(

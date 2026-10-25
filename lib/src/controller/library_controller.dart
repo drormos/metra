@@ -115,11 +115,25 @@ class LibraryController extends ChangeNotifier {
 
   static const stageTip = 'stage-dnd-tip';
 
-  /// Enters stage mode on the active set; the song and click stay.
-  void enterStageMode() {
-    if (activeSetlist != null && !stageMode) {
-      _update(_library.copyWith(stageMode: true));
+  /// Enters stage mode on the active set; the song stays. Stage mode
+  /// plays songs exactly as saved, so unsaved changes are reverted (while
+  /// playing, like any edit: no restart) and [takeStageNotice] says so.
+  void enterStageMode(MetronomeController metronome) {
+    if (activeSetlist == null || stageMode) return;
+    if (songChanged(metronome)) {
+      revertSong(metronome);
+      _stageNotice = 'Playing the saved version of ${currentSong!.name}';
     }
+    _update(_library.copyWith(stageMode: true));
+  }
+
+  String? _stageNotice;
+
+  /// What entering stage mode last had to say, once.
+  String? takeStageNotice() {
+    final notice = _stageNotice;
+    _stageNotice = null;
+    return notice;
   }
 
   /// Back to the main screen, same song, click unchanged.
