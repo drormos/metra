@@ -136,6 +136,15 @@ void main() {
     final v1 = (withSong().toJson()..['version'] = 1)
       ..remove('tipsSeen')
       ..remove('lastOnStart');
+    // Songs in version 1's shape: a tempo and a pattern, no parts.
+    v1['songs'] = [
+      for (final song in v1['songs']! as List<Map<String, Object?>>)
+        {
+          ...song..remove('end'),
+          'bpm': (song.remove('parts')! as List).first['tempoStart'],
+          'pattern': withSong().songs.first.pattern.toJson(),
+        },
+    ];
     file.writeAsStringSync(jsonEncode(v1));
     final loaded = await store.load();
     expect(loaded.songs.single.name, 'A');

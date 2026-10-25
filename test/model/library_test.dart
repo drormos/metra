@@ -123,7 +123,9 @@ void main() {
             .toJson(),
       ),
     );
-    (json['songs'] as List)[1]['bpm'] = 'fast';
+    (json['songs'] as List)[1]['parts'] = [
+      {'tempoStart': 'fast'},
+    ];
     (json['setlists'] as List)[1]['songIds'] = null;
     json['lastPattern'] = {'steps': 'garbage'};
     json['visualOffsetMs'] = null;

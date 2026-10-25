@@ -5,23 +5,71 @@ import 'click_volumes.dart';
 import 'library_migrations.dart';
 import 'metronome_pattern.dart';
 import 'on_start.dart';
+import 'song_part.dart';
 
+export 'song_part.dart';
+
+/// A song: its parts, played in order (ui-spec.md "Song parts"), what
+/// happens at its end, and its "When I press Start". Most songs have one
+/// part, and then [bpm] and [pattern] are simply that part's.
 @immutable
 class Song {
+  /// A one-part song: one open part of [bpm] and [pattern].
   const Song({
     required this.id,
     required this.name,
-    required this.bpm,
-    required this.pattern,
+    required this._bpm,
+    required MetronomePattern this._pattern,
     this.onStart = OnStart.off,
     this.editedAt,
     this.playedAt,
-  });
+  }) : _parts = null,
+       end = SongEnd.stop;
+
+  /// A song of [parts] (at least one).
+  const Song.withParts({
+    required this.id,
+    required this.name,
+    required List<SongPart> this._parts,
+    this.end = SongEnd.stop,
+    this.onStart = OnStart.off,
+    this.editedAt,
+    this.playedAt,
+  }) : _bpm = 0,
+       _pattern = null;
 
   final String id;
   final String name;
-  final int bpm;
-  final MetronomePattern pattern;
+
+  // A one-part song keeps its tempo and pattern here (so it can be
+  // const), otherwise its parts.
+  final int _bpm;
+  final MetronomePattern? _pattern;
+  final List<SongPart>? _parts;
+
+  /// The parts in order; one open part for a one-part song.
+  List<SongPart> get parts =>
+      _parts ??
+      [
+        SongPart.steady(
+          id: firstPartId,
+          name: firstPartName,
+          bars: null,
+          bpm: _bpm,
+          pattern: _pattern!,
+        ),
+      ];
+
+  /// What a one-part song's (or a migrated song's) part is called.
+  static const firstPartId = 'part-1';
+  static const firstPartName = 'Part 1';
+
+  /// "When the song ends": stop or loop to the first part.
+  final SongEnd end;
+
+  /// The first part's tempo and pattern: a one-part song's own.
+  int get bpm => _parts?.first.tempoStart ?? _bpm;
+  MetronomePattern get pattern => _parts?.first.pattern ?? _pattern!;
 
   /// Count-in, speed up, stop after: part of the song like its tempo
   /// (ui-spec.md "When I press Start").
@@ -35,55 +83,76 @@ class Song {
   /// this was recorded (they sort as oldest in "Recently edited").
   final DateTime? editedAt;
 
+  /// [bpm] and [pattern] change the first part (a Gradual one keeps its
+  /// change: both ends shift); [parts] replaces them all.
   Song copyWith({
     String? name,
     int? bpm,
     MetronomePattern? pattern,
+    List<SongPart>? parts,
+    SongEnd? end,
     OnStart? onStart,
     DateTime? editedAt,
     DateTime? playedAt,
-  }) => Song(
-    id: id,
-    name: name ?? this.name,
-    bpm: bpm ?? this.bpm,
-    pattern: pattern ?? this.pattern,
-    onStart: onStart ?? this.onStart,
-    editedAt: editedAt ?? this.editedAt,
-    playedAt: playedAt ?? this.playedAt,
-  );
+  }) {
+    var list = parts ?? this.parts;
+    if (bpm != null || pattern != null) {
+      final first = list.first;
+      final shift = bpm == null ? 0 : bpm - first.tempoStart;
+      list = [
+        first.copyWith(
+          tempoStart: first.tempoStart + shift,
+          tempoEnd: first.tempoEnd + shift,
+          pattern: pattern,
+        ),
+        ...list.skip(1),
+      ];
+    }
+    return Song.withParts(
+      id: id,
+      name: name ?? this.name,
+      parts: list,
+      end: end ?? this.end,
+      onStart: onStart ?? this.onStart,
+      editedAt: editedAt ?? this.editedAt,
+      playedAt: playedAt ?? this.playedAt,
+    );
+  }
 
   Map<String, Object?> toJson() => {
     'id': id,
     'name': name,
-    'bpm': bpm,
-    'pattern': pattern.toJson(),
+    'parts': [for (final part in parts) part.toJson()],
+    'end': end.name,
     'onStart': onStart.toJson(),
     'editedAt': editedAt?.millisecondsSinceEpoch,
     'playedAt': playedAt?.millisecondsSinceEpoch,
   };
 
-  factory Song.fromJson(Map<String, Object?> json) => Song(
-    id: json['id'] as String,
-    name: json['name'] as String,
-    bpm: json['bpm'] as int,
-    // A broken pattern doesn't cost the song (its name and tempo).
-    pattern:
-        Library._orNull(
-          () => MetronomePattern.fromJson(
-            json['pattern'] as Map<String, Object?>,
-          ),
-        ) ??
-        const MetronomePattern.standard(),
-    onStart: OnStart.fromJson(json['onStart'] as Map<String, Object?>),
-    editedAt: switch (json['editedAt']) {
-      final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
-      _ => null,
-    },
-    playedAt: switch (json['playedAt']) {
-      final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
-      _ => null, // never played
-    },
-  );
+  /// A broken part doesn't cost the song (its name and other parts); a
+  /// song with no part left is skipped by the caller.
+  factory Song.fromJson(Map<String, Object?> json) {
+    final parts = [
+      for (final part in json['parts'] as List)
+        ?Library._orNull(() => SongPart.fromJson(part as Map<String, Object?>)),
+    ];
+    if (parts.isEmpty) throw const FormatException('A song with no parts');
+    return Song.withParts(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      parts: parts,
+      end: SongEnd.values.asNameMap()[json['end']] ?? SongEnd.stop,
+      onStart: OnStart.fromJson(json['onStart'] as Map<String, Object?>),
+      editedAt: switch (json['editedAt']) {
+        final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
+        _ => null,
+      },
+      playedAt: switch (json['playedAt']) {
+        final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
+        _ => null, // never played
+      },
+    );
+  }
 }
 
 /// An ordered list of songs, by id.
@@ -354,8 +423,7 @@ class Library {
     final songIds = <String>{};
     final fixedSongs = [
       for (final song in songs)
-        if (songIds.add(song.id))
-          song.copyWith(bpm: bpm(song.bpm), pattern: _fixPattern(song.pattern)),
+        if (songIds.add(song.id)) song.copyWith(parts: _fixParts(song.parts)),
     ];
     final setIds = <String>{};
     final fixedSets = [
@@ -401,6 +469,23 @@ class Library {
       stageMode: stageMode && active != null,
     );
   }
+
+  /// Tempos and patterns in range, 1–999 bars, only the last part open
+  /// (an earlier open one plays 1 bar), and an open part steady.
+  static List<SongPart> _fixParts(List<SongPart> parts) => [
+    for (final (i, part) in parts.indexed)
+      () {
+        final last = i == parts.length - 1;
+        final bars = part.bars == null && !last ? 1 : part.bars?.clamp(1, 999);
+        final start = part.tempoStart.clamp(30, 300);
+        return part.copyWith(
+          bars: bars,
+          tempoStart: start,
+          tempoEnd: bars == null ? start : part.tempoEnd.clamp(30, 300),
+          pattern: _fixPattern(part.pattern),
+        );
+      }(),
+  ];
 
   /// 1–16 beats, 1–4 clicks per beat, a 4 or 8 unit.
   static MetronomePattern _fixPattern(MetronomePattern p) {

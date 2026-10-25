@@ -11,15 +11,31 @@ import 'package:metra/src/model/on_start.dart';
 /// non-default value here (see the data-format-change skill).
 final sampleLibrary = Library(
   songs: [
-    Song(
+    Song.withParts(
       id: 'song-a',
       name: 'Dead Weight',
-      bpm: 128,
-      pattern: MetronomePattern.simple(
-        beatsPerBar: 7,
-        stepsPerBeat: 2,
-        beatUnit: 8,
-      ).cycleBeat(2).toggleCell(3, 1).withPolyrhythm(3).cyclePulse(1),
+      parts: [
+        SongPart(
+          id: 'p-intro',
+          name: 'Intro',
+          bars: 4,
+          tempoStart: 120,
+          tempoEnd: 128,
+          pattern: const MetronomePattern.standard(),
+        ),
+        SongPart.steady(
+          id: 'p-verse',
+          name: 'Verse',
+          bars: 16,
+          bpm: 128,
+          pattern: MetronomePattern.simple(
+            beatsPerBar: 7,
+            stepsPerBeat: 2,
+            beatUnit: 8,
+          ).cycleBeat(2).toggleCell(3, 1).withPolyrhythm(3).cyclePulse(1),
+        ),
+      ],
+      end: SongEnd.loop,
       onStart: const OnStart(
         countInOn: true,
         countInBars: 2,

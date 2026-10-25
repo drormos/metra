@@ -176,9 +176,32 @@ void main() {
     });
   }
 
+  test(
+    'version 3: each song becomes one open part, ending with Stop',
+    () async {
+      for (final f in ['library.json', 'settings.json']) {
+        File('test/fixtures/library_v3/$f').copySync('${dir.path}/$f');
+      }
+      final raw = decode(File('test/fixtures/library_v3/library.json'));
+      final l = await store.load();
+      for (final (i, song) in l.songs.indexed) {
+        final old = (raw['songs']! as List)[i] as Map<String, Object?>;
+        expect(song.parts, hasLength(1));
+        final part = song.parts.single;
+        expect(part.name, 'Part 1');
+        expect(part.open, isTrue);
+        expect(part.tempoStart, old['bpm']);
+        expect(part.tempoEnd, old['bpm']);
+        expect(part.pattern.toJson(), old['pattern']);
+        expect(song.end, SongEnd.stop);
+      }
+      expect(l.songs, isNotEmpty);
+    },
+  );
+
   test('every step runs in order up to the latest; unknown versions throw', () {
     final latest = migrate({'version': 1, 'songs': [], 'setlists': []});
-    expect(latest['version'], 3);
+    expect(latest['version'], Library.version);
     expect(latest['keepScreenOn'], 'whileOpen');
     expect(latest['stageMode'], false);
     expect(() => migrate({'version': 0}), throwsFormatException);

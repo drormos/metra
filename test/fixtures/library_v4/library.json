@@ -1,0 +1,133 @@
+{
+  "version": 4,
+  "songs": [
+    {
+      "id": "song-a",
+      "name": "Dead Weight",
+      "parts": [
+        {
+          "id": "p-intro",
+          "name": "Intro",
+          "bars": 4,
+          "tempoStart": 120,
+          "tempoEnd": 128,
+          "pattern": {
+            "beatsPerBar": 4,
+            "stepsPerBeat": 1,
+            "beatUnit": 4,
+            "steps": [
+              "accent",
+              "normal",
+              "normal",
+              "normal"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        },
+        {
+          "id": "p-verse",
+          "name": "Verse",
+          "bars": 16,
+          "tempoStart": 128,
+          "tempoEnd": 128,
+          "pattern": {
+            "beatsPerBar": 7,
+            "stepsPerBeat": 2,
+            "beatUnit": 8,
+            "steps": [
+              "accent",
+              "soft",
+              "normal",
+              "soft",
+              "accent",
+              "soft",
+              "normal",
+              "silent",
+              "normal",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft"
+            ],
+            "polyrhythm": 3,
+            "polyStates": [
+              "normal",
+              "accent",
+              "normal"
+            ]
+          }
+        }
+      ],
+      "end": "loop",
+      "onStart": {
+        "countInOn": true,
+        "countInBars": 2,
+        "speedUp": true,
+        "changeBy": -3,
+        "every": 4,
+        "upTo": 90,
+        "stopOn": true,
+        "stopBy": "bars",
+        "stopBars": 64,
+        "stopTimeS": 450
+      },
+      "editedAt": 1760000000000,
+      "playedAt": 1760100000000
+    },
+    {
+      "id": "song-b",
+      "name": "Slow Blues",
+      "parts": [
+        {
+          "id": "part-1",
+          "name": "Part 1",
+          "bars": null,
+          "tempoStart": 64,
+          "tempoEnd": 64,
+          "pattern": {
+            "beatsPerBar": 4,
+            "stepsPerBeat": 1,
+            "beatUnit": 4,
+            "steps": [
+              "accent",
+              "normal",
+              "normal",
+              "normal"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        }
+      ],
+      "end": "stop",
+      "onStart": {
+        "countInOn": false,
+        "countInBars": 1,
+        "speedUp": false,
+        "changeBy": 5,
+        "every": 8,
+        "upTo": null,
+        "stopOn": false,
+        "stopBy": "time",
+        "stopBars": 32,
+        "stopTimeS": 300
+      },
+      "editedAt": null,
+      "playedAt": null
+    }
+  ],
+  "setlists": [
+    {
+      "id": "set-1",
+      "name": "Friday set",
+      "songIds": [
+        "song-a",
+        "song-b",
+        "song-a"
+      ],
+      "playedAt": 1760200000000
+    }
+  ]
+}

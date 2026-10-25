@@ -13,10 +13,12 @@
 ///   `settings.json` holds the app settings, the session and one-time
 ///   flags.
 /// - 3 (build 56 on): settings gain `keepScreenOn` and `stageMode`.
+/// - 4 (build 58 on): a song is a list of parts and an `end`; its `bpm`
+///   and `pattern` became one open part.
 library;
 
 /// The latest format, and the two files' shapes in it.
-const latestVersion = 3;
+const latestVersion = 4;
 
 typedef Json = Map<String, Object?>;
 
@@ -39,7 +41,7 @@ Json migrate(Json json) {
   return current;
 }
 
-final List<Json Function(Json)> _steps = [_v1ToV2, _v2ToV3];
+final List<Json Function(Json)> _steps = [_v1ToV2, _v2ToV3, _v3ToV4];
 
 /// Version 1, in all the shapes it shipped in, to version 2:
 /// - fields added after build 2 get their defaults (time signature unit,
@@ -139,6 +141,35 @@ Json _v2ToV3(Json v2) => {
   'version': 3,
   'keepScreenOn': 'whileOpen',
   'stageMode': false,
+};
+
+/// Version 3 to 4: every song becomes one open part with its tempo and
+/// pattern ("Part 1"), ending with Stop. Entries that aren't songs are
+/// left for the parser to skip.
+Json _v3ToV4(Json v3) => {
+  ...v3,
+  'version': 4,
+  'songs': [
+    for (final raw in v3['songs']! as List)
+      if (raw is Json)
+        {
+          for (final MapEntry(:key, :value) in raw.entries)
+            if (key != 'bpm' && key != 'pattern') key: value,
+          'parts': [
+            {
+              'id': 'part-1',
+              'name': 'Part 1',
+              'bars': null,
+              'tempoStart': raw['bpm'],
+              'tempoEnd': raw['bpm'],
+              'pattern': raw['pattern'],
+            },
+          ],
+          'end': 'stop',
+        }
+      else
+        raw,
+  ],
 };
 
 /// The one-time hints' names in `tipsSeen` (version 1 had a flag each).
