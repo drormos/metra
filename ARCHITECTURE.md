@@ -39,6 +39,7 @@ Timing never comes from Dart timers: the scheduler hands every click to the engi
 | Panel motion | `ui/panel_motion.dart` | Shared by top and bottom panels: grow from the button, 1:1 drag, continuous fling, grab strip, predictive back. |
 | Text and motion | `ui/motion.dart` (`BrightenSwap`, `ArriveLeave`, `Arrive`), `ui/fit_text.dart`, `ui/tabular_text.dart` | "Snap in, soft brighten"; fixed digit slots. |
 | Theme | `ui/theme.dart` (`MetraColors`, `MetraMotion`, `MetraFonts`) | Every color is a token; a test forbids hardcoded colors in widgets. |
+| Stage mode | `ui/stage_screen.dart`, `controller/keep_awake.dart` | Shown instead of the main screen while `LibraryController.stageMode`; taps settle into one restart. |
 | Settings, About | `ui/settings_screen.dart`, `ui/about.dart`, `model/whats_new.dart` (`assets/whats_new.md`) | |
 | Android | `android/app/src/main/kotlin/.../MainActivity.kt`, `PlaybackTile.kt`, `res/xml/` (backup rules) | |
 
@@ -55,6 +56,7 @@ Timing never comes from Dart timers: the scheduler hands every click to the engi
 | Step, beat, bar, pulse | `ScheduledStep` (index, `barPosition`, `bar`), `ScheduledPulse` |
 | Visual offset | `MetronomeController.visualOffset` |
 | Beat types accent / regular / muted | `StepLevel.accent` / `normal` / `silent` (subdivisions `soft`) |
+| Stage mode | `StageScreen`, `LibraryController.stageMode` / `enterStageMode` / `exitStageMode` |
 | One-time hints and tips | `Library.tipsSeen` |
 | Tempo line (under the BPM) | `_TempoLine` (tempo name, Revert · Save · Save as new, tips), `_RunLine` (count-in, progress) |
 

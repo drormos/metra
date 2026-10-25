@@ -57,6 +57,7 @@ final sampleLibrary = Library(
   clickSound: ClickSound.bell,
   themeMode: ThemeMode.light,
   vibrate: false,
+  keepScreenOn: KeepScreenOn.whilePlaying,
   volumes: const ClickVolumes(
     accent: 0.9,
     beat: 0.7,
@@ -67,4 +68,5 @@ final sampleLibrary = Library(
   currentSongId: 'song-a',
   currentPosition: 2,
   tipsSeen: const {'edit-first-load', 'set-swipe-hint'},
+  stageMode: true,
 );

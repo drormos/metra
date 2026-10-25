@@ -22,6 +22,7 @@ import 'src/storage/library_store.dart';
 import 'src/ui/haptics.dart';
 import 'src/ui/media_cover.dart';
 import 'src/ui/metronome_screen.dart';
+import 'src/ui/stage_screen.dart';
 import 'src/ui/theme.dart';
 
 Future<void> main() async {
@@ -38,10 +39,6 @@ Future<void> main() async {
   try {
     controller = MetronomeController(await SoloudClickOutput.create());
     AppLifecycleListener(onStateChange: controller.didChangeAppLifecycleState);
-    keepAwakeWhilePlaying(
-      controller,
-      (awake) => WakelockPlus.toggle(enable: awake),
-    );
   } catch (e) {
     engineError = e;
   }
@@ -56,8 +53,18 @@ Future<void> main() async {
     }
     library?.attach(controller);
     // A fresh launch is always Free play, with the click as it last
-    // sounded; the song stays as stored (ui-spec.md "Modes").
-    library?.detachSong();
+    // sounded; the song stays as stored (ui-spec.md "Modes"). Stage mode
+    // is the one exception: it returns on the same set and song.
+    if (library != null && library.stageMode) {
+      library.resumeStageMode(controller);
+    } else {
+      library?.detachSong();
+    }
+    keepScreenAwake(
+      controller,
+      library,
+      (awake) => WakelockPlus.toggle(enable: awake),
+    );
     if (library case final library?) {
       // "Vibrate on touch" gates every haptic.
       void syncHaptics() => Haptics.enabled = library.vibrate;
@@ -200,7 +207,9 @@ class MetraApp extends StatelessWidget {
             child: child!,
           ),
         ),
-        home: controller != null
+        home: controller != null && library != null && library.stageMode
+            ? StageScreen(controller: controller, library: library)
+            : controller != null
             ? MetronomeScreen(
                 controller: controller,
                 library: library,

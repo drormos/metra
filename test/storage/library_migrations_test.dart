@@ -40,8 +40,8 @@ void main() {
     );
     await store.save(first);
     expect(store.backupFile.existsSync(), isFalse, reason: 'saved: dropped');
-    expect(decode(store.file)['version'], 2);
-    expect(decode(store.settingsFile)['version'], 2);
+    expect(decode(store.file)['version'], Library.version);
+    expect(decode(store.settingsFile)['version'], Library.version);
     expect(
       decode(store.file).keys,
       unorderedEquals(['version', 'songs', 'setlists']),
@@ -177,7 +177,10 @@ void main() {
   }
 
   test('every step runs in order up to the latest; unknown versions throw', () {
-    expect(migrate({'version': 1, 'songs': [], 'setlists': []})['version'], 2);
+    final latest = migrate({'version': 1, 'songs': [], 'setlists': []});
+    expect(latest['version'], 3);
+    expect(latest['keepScreenOn'], 'whileOpen');
+    expect(latest['stageMode'], false);
     expect(() => migrate({'version': 0}), throwsFormatException);
     expect(latestVersion, Library.version);
   });

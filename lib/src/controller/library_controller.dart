@@ -100,6 +100,41 @@ class LibraryController extends ChangeNotifier {
     if (on != vibrate) _update(_library.copyWith(vibrate: on));
   }
 
+  /// Settings → "Keep screen on".
+  KeepScreenOn get keepScreenOn => _library.keepScreenOn;
+
+  void setKeepScreenOn(KeepScreenOn value) {
+    if (value != keepScreenOn) {
+      _update(_library.copyWith(keepScreenOn: value));
+    }
+  }
+
+  /// Stage mode (ui-spec.md "Stage mode"): on the active set until exited,
+  /// remembered across a relaunch. Without a set it's over.
+  bool get stageMode => _library.stageMode && activeSetlist != null;
+
+  static const stageTip = 'stage-dnd-tip';
+
+  /// Enters stage mode on the active set; the song and click stay.
+  void enterStageMode() {
+    if (activeSetlist != null && !stageMode) {
+      _update(_library.copyWith(stageMode: true));
+    }
+  }
+
+  /// Back to the main screen, same song, click unchanged.
+  void exitStageMode() {
+    if (_library.stageMode) _update(_library.copyWith(stageMode: false));
+  }
+
+  /// A relaunch in stage mode: the set's song (its first if none) loads,
+  /// stopped, instead of the usual fresh start in Free play.
+  void resumeStageMode(MetronomeController metronome) {
+    final songs = visibleSongs;
+    final index = currentIndex >= 0 ? currentIndex : 0;
+    if (songs.isNotEmpty) playSong(songs[index], metronome, index: index);
+  }
+
   List<Song> get songs => _library.songs;
   List<Setlist> get setlists => _library.setlists;
 

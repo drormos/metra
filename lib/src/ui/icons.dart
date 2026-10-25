@@ -134,3 +134,55 @@ class _StopwatchPainter extends CustomPainter {
   @override
   bool shouldRepaint(_StopwatchPainter old) => old.color != color;
 }
+
+/// Stage mode: a stage (floor and riser) with an arrow up onto it.
+class StageIcon extends StatelessWidget {
+  const StageIcon({super.key, this.size = 16, this.color});
+
+  final double size;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+    size: Size.square(size),
+    painter: _StagePainter(color ?? IconTheme.of(context).color!),
+  );
+}
+
+class _StagePainter extends CustomPainter {
+  _StagePainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 24);
+    final stroke = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas
+      ..drawLine(const Offset(3, 20), const Offset(21, 20), stroke)
+      ..drawPath(
+        Path()
+          ..moveTo(6, 20)
+          ..lineTo(6, 14)
+          ..lineTo(18, 14)
+          ..lineTo(18, 20),
+        stroke,
+      )
+      ..drawPath(
+        Path()
+          ..moveTo(8, 8)
+          ..lineTo(12, 4)
+          ..lineTo(16, 8),
+        stroke,
+      )
+      ..drawLine(const Offset(12, 4), const Offset(12, 12), stroke);
+  }
+
+  @override
+  bool shouldRepaint(_StagePainter old) => old.color != color;
+}

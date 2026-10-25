@@ -41,9 +41,20 @@ double beatPulse(Duration since, Duration? interval, {required bool reduced}) {
 /// (plus the visual offset), read once per frame. Tapping a block cycles
 /// regular → accent → muted.
 class BeatIndicator extends StatefulWidget {
-  const BeatIndicator({super.key, required this.controller});
+  const BeatIndicator({
+    super.key,
+    required this.controller,
+    this.blockHeight = 36,
+    this.editable = true,
+  });
 
   final MetronomeController controller;
+
+  /// 36px on the main screen, 64px in stage mode.
+  final double blockHeight;
+
+  /// Tapping a beat cycles it; off in stage mode, where nothing edits.
+  final bool editable;
 
   @override
   State<BeatIndicator> createState() => _BeatIndicatorState();
@@ -225,6 +236,12 @@ class _BeatIndicatorState extends State<BeatIndicator>
   /// The whole beat column (block and strip) is the tap target, padded to
   /// at least 48dp tall.
   Widget _tapTarget(int beat, StepLevel level, {required Widget child}) {
+    if (!widget.editable) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: child,
+      );
+    }
     final kind = switch (level) {
       StepLevel.silent => 'muted',
       StepLevel.accent => 'accented',
@@ -262,7 +279,7 @@ class _BeatIndicatorState extends State<BeatIndicator>
       borderRadius: BorderRadius.circular(4),
       child: Container(
         key: ValueKey('beat-$beat-${sounding ? 'on' : 'off'}'),
-        height: 36,
+        height: widget.blockHeight,
         color: color,
         child: muted ? CustomPaint(painter: MutedLine(colors.mutedLine)) : null,
       ),
@@ -278,7 +295,7 @@ class _BeatIndicatorState extends State<BeatIndicator>
       borderRadius: BorderRadius.circular(4),
       child: Container(
         key: ValueKey('beat-$beat-${light > 0 ? 'on' : 'off'}'),
-        height: 36,
+        height: widget.blockHeight,
         alignment: Alignment.center,
         color: Color.lerp(
           colors.tickResting,

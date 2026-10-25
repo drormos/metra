@@ -12,10 +12,11 @@
 /// - 2 (build 49 on): `library.json` holds songs and setlists;
 ///   `settings.json` holds the app settings, the session and one-time
 ///   flags.
+/// - 3 (build 56 on): settings gain `keepScreenOn` and `stageMode`.
 library;
 
 /// The latest format, and the two files' shapes in it.
-const latestVersion = 2;
+const latestVersion = 3;
 
 typedef Json = Map<String, Object?>;
 
@@ -38,7 +39,7 @@ Json migrate(Json json) {
   return current;
 }
 
-final List<Json Function(Json)> _steps = [_v1ToV2];
+final List<Json Function(Json)> _steps = [_v1ToV2, _v2ToV3];
 
 /// Version 1, in all the shapes it shipped in, to version 2:
 /// - fields added after build 2 get their defaults (time signature unit,
@@ -130,6 +131,15 @@ Json _v1ToV2(Json v1) {
     'tipsSeen': tips.toList()..sort(),
   };
 }
+
+/// Version 2 to 3: the screen stays on while Metra is open (the new
+/// default), and stage mode starts off.
+Json _v2ToV3(Json v2) => {
+  ...v2,
+  'version': 3,
+  'keepScreenOn': 'whileOpen',
+  'stageMode': false,
+};
 
 /// The one-time hints' names in `tipsSeen` (version 1 had a flag each).
 const swipeHintTip = 'set-swipe-hint';

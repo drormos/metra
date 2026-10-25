@@ -4,6 +4,10 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+- Stage mode: a full-screen, play-only view of the set for gigs (from the set panel's "Stage mode" button). Big Previous / Next / Start, hold to exit, remembered across a restart.
+- Settings → Keep screen on: while Metra is open (new default) or only while playing.
+
 ## [1.5.3] - 2026-10-23
 
 ### Changed

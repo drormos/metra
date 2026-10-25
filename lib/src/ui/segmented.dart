@@ -58,12 +58,23 @@ class Segmented<T> extends StatelessWidget {
                                   ),
                                   child: icon!(value),
                                 )
-                              : Text(
-                                  label,
-                                  style: (style ?? const TextStyle()).copyWith(
-                                    color: value == selected
-                                        ? colors.background
-                                        : colors.text,
+                              // Long labels with large text shrink to fit
+                              // the fixed height instead of overflowing.
+                              : Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                  ),
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      label,
+                                      style: (style ?? const TextStyle())
+                                          .copyWith(
+                                            color: value == selected
+                                                ? colors.background
+                                                : colors.text,
+                                          ),
+                                    ),
                                   ),
                                 ),
                         ),

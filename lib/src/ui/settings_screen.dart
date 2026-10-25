@@ -6,6 +6,7 @@ import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/click_sound.dart';
 import '../model/click_volumes.dart';
+import '../model/library.dart';
 import '../model/metronome_pattern.dart';
 import '../model/whats_new.dart';
 import 'about.dart';
@@ -41,6 +42,7 @@ class SettingsScreen extends StatelessWidget {
   final LibraryController? library;
 
   static const vibrateKey = Key('settings-vibrate');
+  static const keepScreenOnKey = Key('settings-keep-screen-on');
   static const resetKey = Key('settings-volume-reset');
   static const offsetKey = Key('settings-offset');
   static const testKey = Key('settings-offset-test');
@@ -57,6 +59,11 @@ class SettingsScreen extends StatelessWidget {
     ThemeMode.system: 'System',
     ThemeMode.dark: 'Dark',
     ThemeMode.light: 'Light',
+  };
+
+  static const _screenOn = {
+    KeepScreenOn.whileOpen: 'While Metra is open',
+    KeepScreenOn.whilePlaying: 'Only while playing',
   };
 
   @override
@@ -93,8 +100,23 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ],
                     _section(context, 'Click sound', _clickSound(context)),
-                    if (library != null)
+                    if (library != null) ...[
                       _section(context, 'Vibration', _vibration(context)),
+                      _section(
+                        context,
+                        'Keep screen on',
+                        Segmented(
+                          key: keepScreenOnKey,
+                          options: _screenOn,
+                          selected: library.keepScreenOn,
+                          onSelected: library.setKeepScreenOn,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                     _volumeSection(context),
                     _section(context, 'Visual offset', _offset(context)),
                     _about(context),

@@ -143,11 +143,13 @@ class Library {
     this.clickSound = ClickSound.woodblock,
     this.themeMode = ThemeMode.system,
     this.vibrate = true,
+    this.keepScreenOn = KeepScreenOn.whileOpen,
     this.volumes = ClickVolumes.defaults,
     this.activeSetlistId,
     this.currentSongId,
     this.currentPosition = -1,
     this.tipsSeen = const {},
+    this.stageMode = false,
   });
 
   static const empty = Library(
@@ -180,6 +182,9 @@ class Library {
   /// vibration setting still applies.
   final bool vibrate;
 
+  /// "Keep screen on": while Metra is open, or only while playing.
+  final KeepScreenOn keepScreenOn;
+
   final ClickVolumes volumes;
 
   /// The loaded setlist; null is Free play (the first-launch default).
@@ -194,6 +199,10 @@ class Library {
   /// "edit right here" lines, each list's swipe hint).
   final Set<String> tipsSeen;
 
+  /// In stage mode (on the active set) until it's exited, even across a
+  /// relaunch (ui-spec.md "Stage mode").
+  final bool stageMode;
+
   Library copyWith({
     List<Song>? songs,
     List<Setlist>? setlists,
@@ -204,8 +213,10 @@ class Library {
     ClickSound? clickSound,
     ThemeMode? themeMode,
     bool? vibrate,
+    KeepScreenOn? keepScreenOn,
     ClickVolumes? volumes,
     Set<String>? tipsSeen,
+    bool? stageMode,
   }) => Library(
     songs: songs ?? this.songs,
     setlists: setlists ?? this.setlists,
@@ -216,11 +227,13 @@ class Library {
     clickSound: clickSound ?? this.clickSound,
     themeMode: themeMode ?? this.themeMode,
     vibrate: vibrate ?? this.vibrate,
+    keepScreenOn: keepScreenOn ?? this.keepScreenOn,
     volumes: volumes ?? this.volumes,
     activeSetlistId: activeSetlistId,
     currentSongId: currentSongId,
     currentPosition: currentPosition,
     tipsSeen: tipsSeen ?? this.tipsSeen,
+    stageMode: stageMode ?? this.stageMode,
   );
 
   /// The mode and current song; nulls here are meaningful (Free play, no
@@ -239,11 +252,13 @@ class Library {
     clickSound: clickSound,
     themeMode: themeMode,
     vibrate: vibrate,
+    keepScreenOn: keepScreenOn,
     volumes: volumes,
     activeSetlistId: setlistId,
     currentSongId: songId,
     currentPosition: position,
     tipsSeen: tipsSeen,
+    stageMode: stageMode,
   );
 
   Map<String, Object?> toJson() => {
@@ -255,11 +270,13 @@ class Library {
     'clickSound': clickSound.name,
     'themeMode': themeMode.name,
     'vibrate': vibrate,
+    'keepScreenOn': keepScreenOn.name,
     'volumes': volumes.toJson(),
     'activeSetlistId': activeSetlistId,
     'currentSongId': currentSongId,
     'currentPosition': currentPosition,
     'tipsSeen': tipsSeen.toList(),
+    'stageMode': stageMode,
     'songs': [for (final song in songs) song.toJson()],
     'setlists': [for (final setlist in setlists) setlist.toJson()],
   };
@@ -299,6 +316,9 @@ class Library {
       themeMode:
           ThemeMode.values.asNameMap()[latest['themeMode']] ?? ThemeMode.system,
       vibrate: read('vibrate', true),
+      keepScreenOn:
+          KeepScreenOn.values.asNameMap()[latest['keepScreenOn']] ??
+          KeepScreenOn.whileOpen,
       volumes:
           _orNull(
             () => ClickVolumes.fromJson(
@@ -312,6 +332,7 @@ class Library {
       tipsSeen: {
         ...?_orNull(() => (latest['tipsSeen'] as List).whereType<String>()),
       },
+      stageMode: read('stageMode', false),
       songs: [
         for (final song in songs)
           ?_orNull(() => Song.fromJson(song as Map<String, Object?>)),
@@ -370,11 +391,14 @@ class Library {
       clickSound: clickSound,
       themeMode: themeMode,
       vibrate: vibrate,
+      keepScreenOn: keepScreenOn,
       volumes: volumes,
       activeSetlistId: active?.id,
       currentSongId: songId,
       currentPosition: position,
       tipsSeen: tipsSeen,
+      // Stage mode plays a set: without one it's over.
+      stageMode: stageMode && active != null,
     );
   }
 
@@ -413,6 +437,9 @@ class Library {
     }
   }
 }
+
+/// Settings → "Keep screen on" (ui-spec.md "Behavior").
+enum KeepScreenOn { whileOpen, whilePlaying }
 
 /// The file was saved by a newer app version (after a downgrade). It is
 /// left as it is, so updating the app again opens it.

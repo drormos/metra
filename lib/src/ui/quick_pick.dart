@@ -379,6 +379,7 @@ class QuickPick extends StatefulWidget {
   static const setSearchKey = Key('quick-pick-set-search');
   static const backKey = Key('quick-pick-back');
   static const addSongsKey = Key('quick-pick-add-songs');
+  static const stageModeKey = Key('quick-pick-stage-mode');
   static const undoKey = Key('quick-pick-undo');
   static const renameFieldKey = Key('quick-pick-rename');
   static const renameDoneKey = Key('quick-pick-rename-done');
@@ -1199,25 +1200,65 @@ class _QuickPickState extends State<QuickPick>
       actions: [
         // The panel's main action, so an outlined button, not a row
         // (ui-spec.md "Adding songs to sets").
+        // "Add songs" and "Stage mode" share the row, half width each
+        // (ui-spec.md "Stage mode").
         Padding(
           padding: const EdgeInsets.all(8),
-          child: OutlinedButton.icon(
-            key: QuickPick.addSongsKey,
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-              side: BorderSide(color: colors.border, width: 2),
-            ),
-            onPressed: () => _openPicker(setlist.id),
-            icon: const SetlistIcon(),
-            label: const Text(
-              'Add songs',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-            ),
+          child: Row(
+            children: [
+              Expanded(
+                child: _outlined(
+                  key: QuickPick.addSongsKey,
+                  colors: colors,
+                  onPressed: () => _openPicker(setlist.id),
+                  icon: const SetlistIcon(),
+                  label: 'Add songs',
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _outlined(
+                  key: QuickPick.stageModeKey,
+                  colors: colors,
+                  onPressed: () {
+                    Haptics.medium();
+                    Navigator.pop(context);
+                    _library.enterStageMode();
+                  },
+                  icon: const StageIcon(),
+                  label: 'Stage mode',
+                ),
+              ),
+            ],
           ),
         ),
       ],
     );
   }
+
+  /// A 48px outlined button of the set panel's pinned row.
+  Widget _outlined({
+    required Key key,
+    required MetraColors colors,
+    required VoidCallback onPressed,
+    required Widget icon,
+    required String label,
+  }) => OutlinedButton.icon(
+    key: key,
+    style: OutlinedButton.styleFrom(
+      minimumSize: const Size.fromHeight(48),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      side: BorderSide(color: colors.border, width: 2),
+    ),
+    onPressed: onPressed,
+    icon: icon,
+    label: Text(
+      label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+    ),
+  );
 
   /// TalkBack's "Move up" / "Move down": one place, saved at once.
   void _move(Setlist setlist, int from, int to) {
