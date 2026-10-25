@@ -259,12 +259,20 @@ void main() {
       await tester.pump(const Duration(seconds: 3));
     });
 
-    testWidgets('Android Back never leaves; it shows the hint', (tester) async {
+    testWidgets('Back (the second swipe; Android takes the first) exits '
+        'to the main screen, same song, click unchanged', (tester) async {
       await pump(tester);
+      library.nextSong(metronome); // Two
+      await tester.tap(find.byKey(StageScreen.playKey));
+      await tester.pump();
       await tester.binding.handlePopRoute();
       await tester.pump();
-      expect(find.byType(StageScreen), findsOneWidget);
-      expect(hint(tester), StageScreen.holdHint);
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(MetronomeScreen), findsOneWidget);
+      expect(library.stageMode, isFalse);
+      expect(library.currentSong!.name, 'Two');
+      expect(metronome.isPlaying, isTrue);
+      metronome.stop();
       await tester.pump(const Duration(seconds: 3));
     });
   });

@@ -185,8 +185,10 @@ class _StageScreenState extends State<StageScreen>
     final colors = context.colors;
     return PopScope(
       canPop: false,
+      // In immersive mode Android takes the first back swipe itself (it
+      // shows the bars); a Back that reaches us is the second: it exits.
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _say(StageScreen.holdHint);
+        if (!didPop) _exit();
       },
       child: CallbackShortcuts(
         bindings: {
