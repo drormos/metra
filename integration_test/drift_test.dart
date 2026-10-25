@@ -14,6 +14,7 @@ import 'package:metra/src/audio/soloud_click_output.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/model/on_start.dart';
+import 'package:metra/src/model/song_part.dart';
 
 const _seconds = int.fromEnvironment('DRIFT_SECONDS', defaultValue: 20);
 const _sampleRate = 44100; // engine default
@@ -148,6 +149,60 @@ void main() {
       expect(intervals[i], closeTo(framesPerBeat(180), _toleranceFrames));
     }
     expect(controller.bpm, 120, reason: 'Stop returns to where it started');
+  });
+
+  test('song parts: a part change on a bar line, a one-bar 2/4 part, a '
+      'gradual ramp, then an open part', () async {
+    SongPart part(String id, int? bars, int from, int to, int beats) =>
+        SongPart(
+          id: id,
+          name: id,
+          bars: bars,
+          tempoStart: from,
+          tempoEnd: to,
+          pattern: MetronomePattern.simple(beatsPerBar: beats, stepsPerBeat: 1),
+        );
+    final recorder = _OnsetRecorder()..start();
+    controller.loadSong(
+      bpm: 120,
+      pattern: const MetronomePattern.standard(),
+      parts: [
+        part('a', 1, 120, 120, 4),
+        part('b', 1, 120, 120, 2), // the odd bar
+        part('c', 1, 60, 120, 4), // 60, 80, 100, 120 a beat
+        part('d', null, 90, 90, 4),
+      ],
+    );
+    await controller.play();
+    await _wait(const Duration(seconds: 7));
+    await _waitForOnsets(recorder, 15);
+    controller.stop();
+    await recorder.stop();
+
+    final f120 = framesPerBeat(120), f90 = framesPerBeat(90);
+    final expected = [
+      f120, f120, f120, f120, // a, then into b
+      f120, f120, // b, then into c
+      framesPerBeat(60), framesPerBeat(80), framesPerBeat(100), f120, // c
+      f90, f90, f90, f90, // d
+    ];
+    final intervals = recorder.intervals;
+    for (var i = 0; i < expected.length; i++) {
+      expect(
+        intervals[i],
+        closeTo(expected[i], _toleranceFrames),
+        reason: 'interval $i',
+      );
+    }
+    // Every part starts on its own beat 1; d accents every 4 beats.
+    final peaks = recorder.peaks;
+    for (var i = 0; i < 15; i++) {
+      expect(
+        peaks[i] > 0.9 * peaks[0],
+        {0, 4, 6, 10, 14}.contains(i),
+        reason: 'click $i accent',
+      );
+    }
   });
 
   test('a 1 s stall skips beats but never plays off the grid', () async {
