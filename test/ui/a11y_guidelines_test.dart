@@ -8,6 +8,7 @@ import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/model/on_start.dart';
 import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
+import 'package:metra/src/ui/parts_page.dart';
 import 'package:metra/src/ui/top_panel.dart';
 import 'package:metra/src/ui/quick_pick.dart';
 import 'package:metra/src/ui/setlist_group.dart';
@@ -137,7 +138,7 @@ void main() {
       await tester.tap(find.byKey(MetronomeScreen.meterKey));
       await tester.pumpAndSettle();
       await checkAll(tester, '$theme rhythm sheet');
-      await tester.tapAt(const Offset(200, 700));
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       metronome.setOnStart(const OnStart(speedUp: true, stopOn: true));
       await tester.tap(find.byKey(MetronomeScreen.onStartKey));
@@ -228,6 +229,46 @@ void main() {
       await tester.pump();
       expect(tester.takeException(), isNull);
       await tester.pump(const Duration(seconds: 6));
+    });
+  }
+
+  // The parts page, with two parts and the second one open.
+  Future<void> openParts(WidgetTester tester) async {
+    openPartsPage(
+      tester.element(find.byType(SetlistGroup)),
+      library,
+      metronome,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(PartsPage.addKey));
+    await tester.pumpAndSettle();
+  }
+
+  for (final (theme, colors) in [
+    ('dark', MetraColors.stageBlack),
+    ('daylight', MetraColors.daylight),
+  ]) {
+    testWidgets('$theme: parts page', (tester) async {
+      final handle = tester.ensureSemantics();
+      failures.clear();
+      await pump(tester, colors: colors);
+      await openParts(tester);
+      await checkAll(tester, '$theme parts page');
+      handle.dispose();
+      expect(failures, isEmpty);
+    });
+  }
+  for (final (scale, size) in [
+    (2.0, const Size(412, 915)),
+    (2.0, const Size(320, 690)),
+  ]) {
+    testWidgets('parts page, text at ${(scale * 100).round()}% on '
+        '${size.width.toInt()}dp: nothing breaks', (tester) async {
+      await pump(tester, colors: MetraColors.stageBlack, textScale: scale);
+      tester.view.physicalSize = size;
+      await tester.pumpAndSettle();
+      await openParts(tester);
+      expect(tester.takeException(), isNull);
     });
   }
 }

@@ -7,6 +7,7 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 ### Added
 - Stage mode: a full-screen, play-only view of the set for gigs (from the set panel's "Stage mode" button). Big Previous / Next / Start, hold to exit, remembered across a restart.
 - Settings → Keep screen on: while Metra is open (new default) or only while playing.
+- Song parts: a song can be a list of parts, each with its own length, tempo (steady or gradual) and rhythm, for tempo changes, odd bars and song structure. Edited on the new parts page ("Song parts ›" in the Rhythm panel, or long-press the title), which replaces the song editor.
 
 ## [1.5.3] - 2026-10-23
 

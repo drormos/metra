@@ -10,7 +10,7 @@ import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/quick_pick.dart';
 import 'package:metra/src/ui/setlist_group.dart';
-import 'package:metra/src/ui/song_editor.dart';
+import 'package:metra/src/ui/parts_page.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../audio/fake_click_output.dart';
@@ -112,13 +112,14 @@ void main() {
     handle.dispose();
   });
 
-  testWidgets('song editor', (tester) async {
+  testWidgets('parts page, a part open', (tester) async {
     final handle = tester.ensureSemantics();
     await pump(tester);
+    library.playSingleSong(library.songs.first, metronome);
     final context = tester.element(find.byType(SetlistGroup));
-    openSongEditor(context, library, metronome, song: library.songs.first);
+    openPartsPage(context, library, metronome);
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(SongEditor.patternKey));
+    await tester.tap(find.byKey(PartsPage.cardKey(0)));
     await tester.pumpAndSettle();
     await expectLabeled(tester);
     handle.dispose();

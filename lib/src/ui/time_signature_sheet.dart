@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controller/metronome_controller.dart';
+import '../controller/rhythm_target.dart';
 import '../model/metronome_pattern.dart';
 import 'haptics.dart';
 import 'meter_control.dart';
@@ -16,19 +17,22 @@ import 'top_panel.dart';
 /// playing, the next beat starts a bar; a subdivision lands on the next
 /// beat.
 /// Opens (or, open already, closes) the Rhythm panel under the top row.
+/// [footer] goes under the controls (the main screen's "Song parts ›").
 Future<void> showTimeSignatureSheet(
   BuildContext context,
-  MetronomeController metronome,
-) => TopPanel.toggle(
+  MetronomeController metronome, {
+  Widget? footer,
+}) => TopPanel.toggle(
   context,
   id: TimeSignatureSheet,
-  child: TimeSignatureSheet(metronome: metronome),
+  child: TimeSignatureSheet(rhythm: metronome, footer: footer),
 );
 
 class TimeSignatureSheet extends StatelessWidget {
-  const TimeSignatureSheet({super.key, required this.metronome});
+  const TimeSignatureSheet({super.key, required this.rhythm, this.footer});
 
-  final MetronomeController metronome;
+  final RhythmTarget rhythm;
+  final Widget? footer;
 
   static const subdivisionKey = Key('subdivision');
 
@@ -59,9 +63,9 @@ class TimeSignatureSheet extends StatelessWidget {
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
         child: ListenableBuilder(
-          listenable: metronome,
+          listenable: rhythm,
           builder: (context, _) {
-            final pattern = metronome.pattern;
+            final pattern = rhythm.pattern;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -105,7 +109,7 @@ class TimeSignatureSheet extends StatelessWidget {
                   unit: pattern.beatUnit,
                   onChanged: (beats, unit) {
                     Haptics.tick();
-                    metronome.setMeter(beats, unit);
+                    rhythm.setMeter(beats, unit);
                   },
                 ),
                 const SizedBox(height: 24),
@@ -118,7 +122,7 @@ class TimeSignatureSheet extends StatelessWidget {
                   icon: (steps) => SubdivisionIcon(steps, size: 24),
                   onSelected: (steps) {
                     Haptics.tick();
-                    metronome.setSubdivision(steps);
+                    rhythm.setSubdivision(steps);
                   },
                 ),
                 const SizedBox(height: 24),
@@ -130,6 +134,10 @@ class TimeSignatureSheet extends StatelessWidget {
                   polyrhythmHint(pattern.polyrhythm, pattern.beatsPerBar),
                   style: label.copyWith(height: 1.4),
                 ),
+                if (footer case final footer?) ...[
+                  const SizedBox(height: 16),
+                  footer,
+                ],
               ],
             );
           },
@@ -201,7 +209,7 @@ class TimeSignatureSheet extends StatelessWidget {
         onTap: enabled
             ? () {
                 Haptics.tick();
-                metronome.setPolyrhythm(n);
+                rhythm.setPolyrhythm(n);
               }
             : null,
         child: Container(
@@ -245,7 +253,7 @@ class TimeSignatureSheet extends StatelessWidget {
       ),
       onPressed: () {
         Haptics.tick();
-        metronome.setMeter(beats, unit);
+        rhythm.setMeter(beats, unit);
         Navigator.pop(context);
       },
       child: Text(

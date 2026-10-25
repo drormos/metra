@@ -440,7 +440,7 @@ class LibraryController extends ChangeNotifier {
   /// applies as on the main screen (no restart on beat 1).
   void revertSong(MetronomeController metronome) {
     if (currentSong case final song?) {
-      if (song.parts.length > 1) {
+      if (!partsPlain(song.parts) || metronome.parts != null) {
         metronome.applyParts(song.parts, song.end, onStart: song.onStart);
       } else {
         metronome.applyEdit(

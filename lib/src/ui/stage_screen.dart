@@ -8,6 +8,7 @@ import '../controller/metronome_controller.dart';
 import '../model/library.dart';
 import '../model/on_start.dart';
 import 'beat_indicator.dart';
+import 'dashed_outline.dart';
 import 'fit_text.dart';
 import 'haptics.dart';
 import 'metronome_screen.dart';
@@ -568,7 +569,7 @@ class _StageScreenState extends State<StageScreen>
         height: 48,
         child: Center(
           child: CustomPaint(
-            painter: _DashedPill(colors.controlOutline),
+            painter: DashedOutline(colors.controlOutline, radius: 18),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(18),
               child: AnimatedBuilder(
@@ -605,33 +606,6 @@ class _StageScreenState extends State<StageScreen>
     _hold.value = 0;
     _say(StageScreen.holdHint);
   }
-}
-
-/// The exit pill's dashed outline.
-class _DashedPill extends CustomPainter {
-  _DashedPill(this.color);
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(rect.deflate(0.5), const Radius.circular(18)),
-      );
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke;
-    for (final metric in path.computeMetrics()) {
-      for (var d = 0.0; d < metric.length; d += 7) {
-        canvas.drawPath(metric.extractPath(d, d + 4), paint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_DashedPill old) => old.color != color;
 }
 
 /// The hold's progress, filled from the left.

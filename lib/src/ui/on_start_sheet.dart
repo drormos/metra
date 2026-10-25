@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../controller/metronome_controller.dart';
 import '../model/on_start.dart';
+import 'choices.dart';
 import 'haptics.dart';
 import 'motion.dart';
 import 'theme.dart';
@@ -93,7 +94,7 @@ class OnStartSheet extends StatelessWidget {
                   summary: countInSummary(on),
                   onChanged: (v) => set(on.copyWith(countInOn: v)),
                   controls: [
-                    _Choices<int>(
+                    Choices<int>(
                       key: countInBarsKey,
                       label: lengthLabel,
                       options: const {1: '1 bar', 2: '2 bars'},
@@ -104,19 +105,23 @@ class OnStartSheet extends StatelessWidget {
                     Text(countInHint, style: hint),
                   ],
                 ),
-                _part(
-                  context,
-                  switchKey: speedUpKey,
-                  name: 'Speed up',
-                  on: on.speedUp,
-                  summary: speedUpSummary(on),
-                  onChanged: (v) => set(on.copyWith(speedUp: v)),
-                  controls: [
-                    ..._speedUp(on, set),
-                    const SizedBox(height: 4),
-                    Text(speedUpHint, style: hint),
-                  ],
-                ),
+                // The parts decide the tempo (ui-spec.md "Song parts").
+                if ((metronome.parts?.length ?? 1) > 1)
+                  _notForParts(context)
+                else
+                  _part(
+                    context,
+                    switchKey: speedUpKey,
+                    name: 'Speed up',
+                    on: on.speedUp,
+                    summary: speedUpSummary(on),
+                    onChanged: (v) => set(on.copyWith(speedUp: v)),
+                    controls: [
+                      ..._speedUp(on, set),
+                      const SizedBox(height: 4),
+                      Text(speedUpHint, style: hint),
+                    ],
+                  ),
                 _part(
                   context,
                   switchKey: stopAfterKey,
@@ -125,7 +130,7 @@ class OnStartSheet extends StatelessWidget {
                   summary: stopAfterSummary(on),
                   onChanged: (v) => set(on.copyWith(stopOn: v)),
                   controls: [
-                    _Choices<StopBy>(
+                    Choices<StopBy>(
                       key: stopByKey,
                       label: countByLabel,
                       options: const {StopBy.bars: 'Bars', StopBy.time: 'Time'},
@@ -141,6 +146,37 @@ class OnStartSheet extends StatelessWidget {
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+
+  static const notForParts = 'Not for songs with parts';
+
+  /// Speed up for a song with parts: its name and why it's not there.
+  Widget _notForParts(BuildContext context) {
+    final colors = context.colors;
+    return Container(
+      constraints: const BoxConstraints(minHeight: 56),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: colors.divider)),
+      ),
+      child: MergeSemantics(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Speed up',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            Text(
+              notForParts,
+              key: speedUpKey,
+              style: TextStyle(fontSize: 13, color: colors.muted),
+            ),
+          ],
         ),
       ),
     );
@@ -434,89 +470,6 @@ class OnStartSheet extends StatelessWidget {
         if (d == null) return;
         set(on.copyWith(stopTime: OnStart.clampTime(d)));
       },
-    );
-  }
-}
-
-/// Quiet choices laid out like a stepper row (ui-spec.md "Choices inside
-/// a part"): a label on the left, 36px pill chips sized to their text on
-/// the right. Selected: the tick-resting grey (#2A2A2A) with a 2px text
-/// color border and semibold text; the others clear with a 2px border and
-/// muted text. Each chip is a 48dp touch target.
-class _Choices<T> extends StatelessWidget {
-  const _Choices({
-    super.key,
-    required this.label,
-    required this.options,
-    required this.selected,
-    required this.onSelected,
-  });
-
-  final String label;
-  final Map<T, String> options;
-  final T selected;
-  final ValueChanged<T> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Row(
-      children: [
-        Expanded(child: Text(label, style: const TextStyle(fontSize: 15))),
-        for (final (i, MapEntry(key: value, value: text))
-            in options.entries.indexed) ...[
-          if (i > 0) const SizedBox(width: 8),
-          _chip(colors, value, text, selected: value == selected),
-        ],
-      ],
-    );
-  }
-
-  Widget _chip(
-    MetraColors colors,
-    T value,
-    String text, {
-    required bool selected,
-  }) {
-    const shape = StadiumBorder();
-    return Semantics(
-      button: true,
-      selected: selected,
-      child: InkWell(
-        key: ValueKey('chip-$value'),
-        customBorder: shape,
-        onTap: () {
-          Haptics.tick();
-          onSelected(value);
-        },
-        child: SizedBox(
-          height: 48,
-          child: Center(
-            child: Container(
-              height: 36,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              alignment: Alignment.center,
-              decoration: ShapeDecoration(
-                color: selected ? colors.tickResting : null,
-                shape: StadiumBorder(
-                  side: BorderSide(
-                    color: selected ? colors.text : colors.border,
-                    width: 2,
-                  ),
-                ),
-              ),
-              child: Text(
-                text,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                  color: selected ? colors.text : colors.muted,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

@@ -213,9 +213,14 @@ class ClickScheduler {
   /// the first open one are taken back, [change] gets that bar (the song
   /// bar it starts, from 0) and they're placed again under the changed
   /// run. No-op while stopped.
-  void replan(void Function(int nextBar) change) {
+  /// With [run], that run takes over there.
+  void replan(void Function(int nextBar) change, {RunPlan? run}) {
     if (_grid == null) return;
     _undoFrom(_firstOpenStep());
+    if (run != null) {
+      _run = run;
+      _endAt = null;
+    }
     change(_bar + 1);
     refill();
   }

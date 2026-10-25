@@ -17,12 +17,12 @@ import 'fit_text.dart';
 import 'haptics.dart';
 import 'motion.dart';
 import 'on_start_sheet.dart';
+import 'parts_page.dart';
 import 'poly_lane.dart';
 import 'setlist_group.dart';
 import 'save_as_new_dialog.dart';
 import 'settings_screen.dart';
 import 'icons.dart';
-import 'song_editor.dart';
 import 'subdivision_icon.dart';
 import 'tempo_controls.dart';
 import 'tempo_ruler.dart';
@@ -366,13 +366,14 @@ class MetronomeScreen extends StatelessWidget {
       open();
     }
 
-    // One 54px long-press target (at least the 48dp minimum): the song
-    // editor, the only way in (ui-spec.md "Song editor"). No song: nothing.
+    // One 54px long-press target (at least the 48dp minimum): the parts
+    // page, a shortcut to the Rhythm panel's "Song parts ›" (ui-spec.md
+    // "The parts page"). No song: nothing.
     final VoidCallback? onLongPress = library == null || song == null
         ? null
         : () => longPress(() {
             TopPanel.close();
-            openSongEditor(context, library, controller, song: song);
+            openPartsPage(context, library, controller);
           });
     return GestureDetector(
       key: titleBlockKey,
@@ -487,7 +488,17 @@ class MetronomeScreen extends StatelessWidget {
                   fixedSize: const Size.fromHeight(44),
                   tapTargetSize: MaterialTapTargetSize.padded,
                 ),
-                onPressed: () => showTimeSignatureSheet(context, controller),
+                onPressed: () => showTimeSignatureSheet(
+                  context,
+                  controller,
+                  footer: library == null
+                      ? null
+                      : SongPartsRow(
+                          library: library,
+                          metronome: controller,
+                          opener: context,
+                        ),
+                ),
                 child: Semantics(
                   label: [
                     'Rhythm ${pattern.timeSignature}',

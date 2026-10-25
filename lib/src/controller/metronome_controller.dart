@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show AppLifecycleState;
@@ -13,10 +14,11 @@ import '../model/song_part.dart';
 import '../model/song_plan.dart';
 import '../timing/engine_clock_smoother.dart';
 import '../timing/tap_tempo.dart';
+import 'rhythm_target.dart';
 
 /// App-facing metronome state: tempo, pattern, transport and audio errors.
 /// Widgets read and drive this; they hold no metronome state themselves.
-class MetronomeController extends ChangeNotifier {
+class MetronomeController extends ChangeNotifier implements RhythmTarget {
   MetronomeController(this._output) : _scheduler = ClickScheduler(_output) {
     _scheduler
       ..lookahead = foregroundLookahead
@@ -67,16 +69,25 @@ class MetronomeController extends ChangeNotifier {
   // What the main screen was doing before a song editor preview took over.
   ({int bpm, MetronomePattern pattern, bool playing, List<SongPart>? parts})?
   _beforePreview;
-  // A song of 2+ parts (null: one part, or Free play), what happens at its
-  // end, the part Start begins with, and the plan while it plays.
+  // The loaded song's parts unless it's a plain one-part song (null: that,
+  // or Free play), what happens at its end, the part Start begins with,
+  // and the plan while it plays parts.
   List<SongPart>? _parts;
   SongEnd _end = SongEnd.stop;
   int _startPart = 0;
   SongPlan? _plan;
 
-  /// The loaded song's parts while it has 2 or more, with the changes made
-  /// here (unsaved until saved to the song); null otherwise.
+  /// The loaded song's parts with the changes made here (unsaved until
+  /// saved to the song); null for a plain one-part song (one open "Part
+  /// 1": its tempo and pattern are [bpm] and [pattern]) and in Free play.
   List<SongPart>? get parts => _parts;
+
+  /// Whether the song plays as parts (2 or more, or a length), not as one
+  /// open part with "When I press Start" as before.
+  bool get playsParts => _parts != null && partsPlay(_parts!);
+
+  // While the page's parts apply, the edits they make don't edit them.
+  bool _applying = false;
 
   /// "When the song ends" of the loaded song with parts.
   SongEnd get songEnd => _end;
@@ -87,6 +98,7 @@ class MetronomeController extends ChangeNotifier {
   bool _offsetTestStarted = false;
 
   int get bpm => _bpm;
+  @override
   MetronomePattern get pattern => _pattern;
   bool get isPlaying => _playing;
 
@@ -121,7 +133,7 @@ class MetronomeController extends ChangeNotifier {
   /// (Stop returns there); otherwise [bpm]. What a song's changes and
   /// saves compare against.
   int get startBpm =>
-      _runFrom != null && _onStart.speedUp && _parts == null ? _runFrom! : _bpm;
+      _runFrom != null && _onStart.speedUp && !playsParts ? _runFrom! : _bpm;
 
   /// Whether a run (speed up or stop after) is playing.
   bool get inRun => _playing && _runFrom != null && _onStart.runs;
@@ -186,7 +198,7 @@ class MetronomeController extends ChangeNotifier {
   /// change of [shift] moves both its ends; [pattern] replaces its own.
   void _editPart({int shift = 0, MetronomePattern? pattern}) {
     final parts = _parts;
-    if (parts == null) return;
+    if (parts == null || _applying) return;
     final i = partPosition!.part;
     final part = parts[i];
     final edited = [...parts]
@@ -312,6 +324,7 @@ class MetronomeController extends ChangeNotifier {
   /// Polyrhythm pulses per bar (0 = off; not the beat count). While
   /// playing, a new number starts at the next beat (with the rest of the
   /// bar's pulses); Off stops at once.
+  @override
   void setPolyrhythm(int n) {
     if (n == _pattern.polyrhythm) return;
     _applyPolyrhythm(_pattern.withPolyrhythm(n));
@@ -345,6 +358,7 @@ class MetronomeController extends ChangeNotifier {
   }
 
   /// Clicks per beat; while playing, from the next beat, bar kept.
+  @override
   void setSubdivision(int stepsPerBeat) {
     if (stepsPerBeat == _pattern.stepsPerBeat) return;
     _switchAtNextBeat(
@@ -355,6 +369,7 @@ class MetronomeController extends ChangeNotifier {
 
   /// Time signature, keeping existing beat states (new beats regular);
   /// while playing, the next beat starts a bar in the new meter.
+  @override
   void setMeter(int beatsPerBar, int beatUnit) {
     if (beatsPerBar == _pattern.beatsPerBar && beatUnit == _pattern.beatUnit) {
       return;
@@ -397,14 +412,59 @@ class MetronomeController extends ChangeNotifier {
   /// Back to a song's stored [parts] and [end] while it may be playing:
   /// the current part's tempo and pattern apply as [applyEdit] does.
   void applyParts(List<SongPart> parts, SongEnd end, {OnStart? onStart}) {
-    final part = parts[partPosition!.part.clamp(0, parts.length - 1)];
-    applyEdit(bpm: part.tempoStart, pattern: part.pattern, onStart: onStart);
-    // After the edit, which would otherwise shift the restored part.
-    _parts = parts;
-    _end = end;
-    _plan
-      ?..parts = parts
-      ..end = end;
+    if (onStart != null) setOnStart(onStart);
+    setParts(parts, end: end);
+  }
+
+  /// The parts page's edits: [parts] (and [end]) become the loaded song's,
+  /// an unsaved change. Stopped, Start begins at the same part (or the
+  /// last). Playing, nothing restarts: the part playing takes its new
+  /// tempo and pattern as an edit on the main screen would, the others
+  /// play as they now are when they come; a song that gains parts goes on
+  /// in its first part, and one left with a single open part plays on as
+  /// a plain song.
+  void setParts(List<SongPart> parts, {SongEnd? end}) {
+    final wasPlaying = playsParts;
+    final at = (_parts == null ? 0 : partPosition!.part).clamp(
+      0,
+      parts.length - 1,
+    );
+    _parts = partsPlain(parts) ? null : parts;
+    if (end != null) _end = end;
+    if (!_playing) _startPart = at;
+    if (_playing && playsParts) {
+      if (_plan case final plan?) {
+        plan
+          ..parts = parts
+          ..end = _end;
+      } else {
+        final plan = _plan = SongPlan(
+          parts: parts,
+          end: _end,
+          onStart: _onStart,
+        );
+        // The bar playing now becomes the first part's first bar.
+        _scheduler.replan((bar) => plan.jump(max(0, bar - 1), 0), run: plan);
+      }
+    } else if (_playing && wasPlaying) {
+      _plan = null;
+      _scheduler.run = _onStart.runs ? _onStart : null;
+    }
+    final part = parts[at];
+    _applying = true;
+    // A Gradual part playing keeps its ramp: the plan sets each beat.
+    final bpm = _playing && part.gradual ? _bpm : part.tempoStart;
+    applyEdit(bpm: bpm, pattern: part.pattern);
+    _applying = false;
+    notifyListeners();
+  }
+
+  /// Plays from part [index] (the page's "Play from here"; 0: the song's
+  /// "Play"), restarting if it's playing.
+  Future<void> playFrom(int index) {
+    stop();
+    jumpToPart(index);
+    return play();
   }
 
   /// Settings' visual offset test: uses the click if it's already
@@ -482,11 +542,10 @@ class MetronomeController extends ChangeNotifier {
     SongEnd end = SongEnd.stop,
   }) {
     if (onStart != null) _onStart = onStart;
-    final multi = parts != null && parts.length > 1;
-    _parts = multi ? parts : null;
+    _parts = parts == null || partsPlain(parts) ? null : parts;
     _end = end;
     _startPart = 0;
-    if (multi) {
+    if (_parts case final parts?) {
       bpm = parts.first.tempoStart;
       pattern = parts.first.pattern;
     }
@@ -498,9 +557,9 @@ class MetronomeController extends ChangeNotifier {
   RunPlan? _runPlan(bool run) {
     _plan = null;
     if (!run) return null;
-    if (_parts case final parts?) {
+    if (playsParts) {
       return _plan = SongPlan(
-        parts: parts,
+        parts: _parts!,
         end: _end,
         onStart: _onStart,
         startPart: _startPart,
@@ -553,10 +612,10 @@ class MetronomeController extends ChangeNotifier {
     final from = _runFrom;
     _runFrom = null;
     _plan = null;
-    if (_parts case final parts?) {
+    if (playsParts) {
       // Back to where Start begins, ready to play it again.
-      _bpm = parts[_startPart].tempoStart;
-      _pattern = parts[_startPart].pattern;
+      _bpm = _parts![_startPart].tempoStart;
+      _pattern = _parts![_startPart].pattern;
     } else if (from != null && _onStart.speedUp) {
       _bpm = from;
     }

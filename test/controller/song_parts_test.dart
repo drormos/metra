@@ -66,15 +66,26 @@ void main() {
         onStart: controller.onStart,
       );
 
-  test('one part: nothing changes (no parts held, the song\'s own tempo)', () {
-    controller.loadSong(
+  test('one part: nothing changes (no parts held, the song\'s own tempo); '
+      'a renamed one is kept but plays as before', () {
+    final plain = SongPart.steady(
+      id: SongPart.firstId,
+      name: SongPart.firstName,
+      bars: null,
       bpm: 90,
       pattern: _three,
-      parts: [_part('a', null, 90, null, _three)],
     );
+    controller.loadSong(bpm: 90, pattern: _three, parts: [plain]);
     expect(controller.parts, isNull);
     expect(controller.partPosition, isNull);
     expect(controller.bpm, 90);
+    controller.loadSong(
+      bpm: 90,
+      pattern: _three,
+      parts: [_part('a', null, 90)],
+    );
+    expect(controller.parts, hasLength(1));
+    expect(controller.playsParts, isFalse);
   });
 
   test('each part starts on a bar line in its own time signature and '
@@ -244,6 +255,64 @@ void main() {
       (3120, true), (4120, false), (5120, true), // b: 2/4 at 60
     ]);
     expect(controller.parts![1], _part('b', 2, 60, null, _two));
+  });
+
+  group('the parts page\'s edits while playing (no restart)', () {
+    test('a plain song that gains a part goes on in its first part, the bar '
+        'playing now its first bar', () async {
+      controller.loadSong(bpm: 120, pattern: _four);
+      await controller.play(); // beat 1 at 1120
+      runTo(1700); // in bar 0
+      controller.setParts([
+        _part('a', 2, 120),
+        _part('b', null, 60, null, _two),
+      ]);
+      expect(controller.playsParts, isTrue);
+      runTo(6300);
+      // Bars 0 and 1 of a, then b (2/4 at 60) at 5120.
+      expect(clicks(6200).where((c) => c.$2).map((c) => c.$1), [
+        1120,
+        3120,
+        5120,
+      ]);
+      expect(controller.pattern, _two);
+      controller.stop();
+    });
+
+    test(
+      'a new tempo for the part playing applies from the next beat',
+      () async {
+        load([_part('a', 4, 120), _part('b', null, 120)]);
+        await controller.play();
+        runTo(1300);
+        controller.setParts([_part('a', 4, 60), _part('b', null, 120)]);
+        runTo(4000);
+        expect(controller.bpm, 60);
+        final times = clicks(4000).map((c) => c.$1).toList();
+        expect(times.first, 1120, reason: 'no restart on beat 1');
+        expect(times[2] - times[1], 1000);
+        controller.stop();
+      },
+    );
+
+    test('left with one open part, it plays on as a plain song', () async {
+      load([_part('a', 1, 120), _part('b', 1, 120)]);
+      await controller.play();
+      runTo(1300);
+      controller.setParts([
+        SongPart.steady(
+          id: SongPart.firstId,
+          name: SongPart.firstName,
+          bars: null,
+          bpm: 120,
+          pattern: _four,
+        ),
+      ]);
+      expect(controller.parts, isNull);
+      runTo(9000);
+      expect(controller.isPlaying, isTrue, reason: 'no song end any more');
+      controller.stop();
+    });
   });
 
   group('with the library', () {

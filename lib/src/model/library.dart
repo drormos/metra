@@ -52,17 +52,13 @@ class Song {
       _parts ??
       [
         SongPart.steady(
-          id: firstPartId,
-          name: firstPartName,
+          id: SongPart.firstId,
+          name: SongPart.firstName,
           bars: null,
           bpm: _bpm,
           pattern: _pattern!,
         ),
       ];
-
-  /// What a one-part song's (or a migrated song's) part is called.
-  static const firstPartId = 'part-1';
-  static const firstPartName = 'Part 1';
 
   /// "When the song ends": stop or loop to the first part.
   final SongEnd end;

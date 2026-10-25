@@ -13,7 +13,7 @@ import 'package:metra/src/ui/play_marker.dart';
 import 'package:metra/src/ui/quick_pick.dart';
 import 'package:metra/src/ui/save_as_new_dialog.dart';
 import 'package:metra/src/ui/setlist_group.dart';
-import 'package:metra/src/ui/song_editor.dart';
+import 'package:metra/src/ui/parts_page.dart';
 import 'package:metra/src/ui/tabular_text.dart';
 import 'package:metra/src/ui/tempo_ruler.dart';
 
@@ -381,12 +381,12 @@ void main() {
       },
     );
 
-    testWidgets('the title block is one long-press target: the song '
-        'editor; with no song, nothing', (tester) async {
+    testWidgets('the title block is one long-press target: the parts '
+        'page; with no song, nothing', (tester) async {
       await withSet(tester); // a set, no song yet
       await tester.longPress(find.byKey(MetronomeScreen.titleBlockKey));
       await tester.pumpAndSettle();
-      expect(find.byType(SongEditor), findsNothing);
+      expect(find.byType(PartsPage), findsNothing);
       await tester.tap(find.byKey(SetlistGroup.nextKey));
       await tester.pump();
       expect(
@@ -395,7 +395,7 @@ void main() {
       );
       await tester.longPress(find.byKey(MetronomeScreen.subtitleKey));
       await tester.pumpAndSettle();
-      expect(find.byType(SongEditor), findsOneWidget);
+      expect(find.byType(PartsPage), findsOneWidget);
     });
 
     testWidgets('Single song: previous | next through the library A–Z', (
