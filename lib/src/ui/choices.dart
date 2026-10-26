@@ -23,8 +23,8 @@ class Choices<T> extends StatelessWidget {
   final T selected;
   final ValueChanged<T> onSelected;
 
-  /// The chips on their own line under the label (more than fit beside
-  /// it on a phone).
+  /// The chips under the label, centered (more than fit beside it on a
+  /// phone; those that don't fit one line wrap to a centered second).
   final bool below;
 
   @override
@@ -32,6 +32,9 @@ class Choices<T> extends StatelessWidget {
     final colors = context.colors;
     final chips = Wrap(
       spacing: 8,
+      // Under the label, the lines are centered: the last chip that
+      // doesn't fit makes a second, shorter line (a pyramid).
+      alignment: below ? WrapAlignment.center : WrapAlignment.start,
       children: [
         for (final MapEntry(key: value, value: text) in options.entries)
           _chip(colors, value, text, selected: value == selected),
@@ -39,7 +42,7 @@ class Choices<T> extends StatelessWidget {
     );
     if (below) {
       return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
             padding: const EdgeInsets.only(top: 8),
