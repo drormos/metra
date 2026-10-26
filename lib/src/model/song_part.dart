@@ -155,18 +155,17 @@ String durationLabel(Duration d) {
   return '≈ ${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
 }
 
-/// The parts page's summary: "6 parts · 45 bars · ≈ 1:38", or with the
-/// last part looping "6 parts · 45 bars, then loops Outro" (ui-spec.md
-/// "The parts page").
+/// The parts page's summary: "6 parts · 45 bars · ≈ 1:38", and with the
+/// last part looping ", then loops Outro" (ui-spec.md "The parts page").
 String partsSummary(List<SongPart> parts, SongEnd end) {
   final count = parts.length == 1 ? '1 part' : '${parts.length} parts';
   final total = parts.fold(0, (sum, p) => sum + p.bars);
   final bars = total == 1 ? '1 bar' : '$total bars';
-  if (end == SongEnd.loopLastPart) {
-    return '$count · $bars, then loops ${parts.last.name}';
-  }
   final time = parts.fold(Duration.zero, (sum, p) => sum + partDuration(p));
-  return '$count · $bars · ${durationLabel(time)}';
+  final summary = '$count · $bars · ${durationLabel(time)}';
+  return end == SongEnd.loopLastPart
+      ? '$summary, then loops ${parts.last.name}'
+      : summary;
 }
 
 /// A card's line: "8 bars · 7/8 · ≈ 0:26".

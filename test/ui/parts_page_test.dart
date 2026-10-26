@@ -111,7 +111,7 @@ void main() {
       expect(find.byType(PartsPage), findsOneWidget);
       expect(find.byType(TimeSignatureSheet), findsNothing);
       expect(find.text('Dead Weight'), findsWidgets);
-      expect(summary(tester), '1 part · 1 bar, then loops Part 1');
+      expect(summary(tester), '1 part · 1 bar · ≈ 0:02, then loops Part 1');
       await tester.pageBack();
       await tester.pumpAndSettle();
       await openPage(tester);
@@ -154,7 +154,7 @@ void main() {
     expect(names(), ['Part 1', 'Part 2']);
     // The first add on a plain song: both parts 8 bars.
     expect(parts().map((p) => p.bars), [8, 8]);
-    expect(summary(tester), '2 parts · 16 bars, then loops Part 2');
+    expect(summary(tester), '2 parts · 16 bars · ≈ 0:32, then loops Part 2');
     expect(library.songChanged(metronome), isTrue);
     expect(shown(PartsPage.saveKey), isTrue);
     expect(shown(PartsPage.discardKey), isTrue);
@@ -193,6 +193,31 @@ void main() {
     expect(library.editingParts, isFalse);
   });
 
+  testWidgets('top: the name shrinks to fit (down to 22px) before "…"; the '
+      'summary has its own full-width line under the bar', (tester) async {
+    await pump(tester);
+    await openPage(tester);
+    final summaryBox = tester.getRect(find.byKey(PartsPage.summaryKey));
+    final name = tester.getRect(find.byKey(PartsPage.nameKey));
+    expect(summaryBox.top, greaterThanOrEqualTo(name.bottom));
+    // With Save / Discard showing, the summary still isn't cut.
+    await tapIn(tester, find.byKey(PartsPage.addKey));
+    expect(
+      tester.getSize(find.byKey(PartsPage.summaryKey)).width,
+      greaterThan(300),
+    );
+    expect(summary(tester), endsWith('then loops Part 2'));
+    double size() =>
+        tester.widget<Text>(find.byKey(PartsPage.titleKey)).style!.fontSize!;
+    library.renameSong(library.currentSong!.id, 'Go');
+    await tester.pump();
+    expect(size(), 28);
+    library.renameSong(library.currentSong!.id, 'Dead Weight');
+    await tester.pump();
+    expect(size(), lessThan(28));
+    expect(size(), greaterThanOrEqualTo(22));
+  });
+
   testWidgets('Back with unsaved changes: no question; they stay the '
       'song\'s unsaved changes on the main screen', (tester) async {
     await pump(tester);
@@ -205,7 +230,7 @@ void main() {
     expect(find.byKey(MetronomeScreen.revertKey), findsOneWidget);
   });
 
-  testWidgets('"When the song ends": a dropdown on the label\'s line, '
+  testWidgets('"At the end": a dropdown on the label\'s line, '
       'the current choice ticked; adding or removing parts never changes '
       'it; Loop last part marks the last block', (tester) async {
     await pump(tester);
@@ -213,7 +238,7 @@ void main() {
     // A plain song loops its bar: the choice is there with one part too.
     expect(metronome.songEnd, SongEnd.loopLastPart);
     expect(find.byKey(PartsPage.loopIconKey), findsOneWidget);
-    final label = tester.getRect(find.text('When the song ends'));
+    final label = tester.getRect(find.text('At the end'));
     final menu = tester.getRect(find.byKey(PartsPage.endKey));
     expect(menu.center.dy, closeTo(label.center.dy, 2), reason: 'one row');
     expect(menu.left, greaterThanOrEqualTo(label.right));
@@ -626,6 +651,17 @@ void main() {
       return painter == null ? -1 : (painter as dynamic).progress.value;
     }
 
+    bool stripWhite(WidgetTester tester, int i) {
+      final box = tester.widget<AnimatedContainer>(
+        find.descendant(
+          of: find.byKey(PartsPage.stripKey(i)),
+          matching: find.byType(AnimatedContainer),
+        ),
+      );
+      return (box.decoration! as BoxDecoration).color ==
+          MetraColors.stageBlack.text;
+    }
+
     // a: 1 bar, b: 2 bars, both 4/4 at 120 (a bar is 2 s); b loops.
     List<SongPart> two() => [
       for (final (id, bars) in [('a', 1), ('b', 2)])
@@ -661,6 +697,8 @@ void main() {
       // b from 3120 (2 bars, 4 s): half its first bar, then half of all.
       await runTo(tester, 4120);
       expect(fill(tester, 0), -1);
+      // The strip follows the music: b's block is the white one.
+      expect([stripWhite(tester, 0), stripWhite(tester, 1)], [false, true]);
       expect(fill(tester, 1), closeTo(0.25, 0.05));
       await runTo(tester, 5120);
       expect(fill(tester, 1), closeTo(0.5, 0.05));
@@ -669,6 +707,63 @@ void main() {
       metronome.stop();
       await tester.pump();
       expect(fill(tester, 1), -1);
+      // Stopped, no card open: no block is white.
+      expect([stripWhite(tester, 0), stripWhite(tester, 1)], [false, false]);
+    });
+
+    // Every frame from Start until [ms]: the fill on [card] starts at 0
+    // with the first audible beat and grows in small steps, never jumping.
+    Future<void> growsFromZero(WidgetTester tester, int card, int ms) async {
+      var last = 0.0;
+      var moved = false;
+      while (output.time < Duration(milliseconds: ms)) {
+        output.time += const Duration(milliseconds: 20);
+        await tester.pump(const Duration(milliseconds: 20));
+        final f = fill(tester, card);
+        if (f < 0) continue; // not this card's part yet (count-in)
+        if (!moved && f > 0) {
+          expect(f, lessThan(0.02), reason: 'first frames: from 0');
+          moved = true;
+        }
+        expect(f - last, lessThan(0.02), reason: 'no jump at $output.time');
+        expect(f, greaterThanOrEqualTo(last));
+        last = f;
+      }
+      expect(moved, isTrue);
+    }
+
+    testWidgets('from the first audible beat, never jumping: Start, with a '
+        'count-in, Play from here, Stop then Start', (tester) async {
+      await pump(tester);
+      metronome.setParts(two(), end: SongEnd.loopLastPart);
+      await openPage(tester);
+      await tester.tap(find.byKey(PartsPage.playKey));
+      await tester.pump();
+      await growsFromZero(tester, 0, 2600);
+      // Stop, then Start again.
+      await tester.tap(find.byKey(PartsPage.playKey));
+      await tester.pump();
+      await tester.tap(find.byKey(PartsPage.playKey));
+      await tester.pump();
+      await growsFromZero(tester, 0, 4600);
+      metronome.stop();
+      await tester.pump();
+      // With a count-in.
+      metronome.setCountIn(1);
+      await tester.tap(find.byKey(PartsPage.playKey));
+      await tester.pump();
+      await growsFromZero(tester, 0, 9000);
+      metronome.stop();
+      metronome.setCountIn(0);
+      await tester.pump();
+      // Play from here (part b's card).
+      await tester.tap(find.byKey(PartsPage.cardKey(1)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(PartsPage.playFromKey));
+      await tester.pump();
+      await growsFromZero(tester, 1, 12000);
+      metronome.stop();
+      await tester.pump();
     });
 
     testWidgets('Remove animations: whole bars only', (tester) async {

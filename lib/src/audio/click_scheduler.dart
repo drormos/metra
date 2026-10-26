@@ -244,13 +244,15 @@ class ClickScheduler {
   }
 
   /// The time from [step] to the next step (or from the one before, when
-  /// the next isn't scheduled yet), or null with nothing to compare.
+  /// the next isn't scheduled yet; for the first step of a run, alone for
+  /// up to a step minus the lookahead, the grid's step), or null with
+  /// nothing to compare.
   Duration? stepInterval(ScheduledStep step) {
     final i = _steps.indexWhere((s) => s.index == step.index);
     if (i < 0) return null;
     if (i + 1 < _steps.length) return _steps[i + 1].time - step.time;
     if (i > 0) return step.time - _steps[i - 1].time;
-    return null;
+    return _grid?.stepInterval;
   }
 
   /// The latest polyrhythm pulse at or before engine time [time] that is

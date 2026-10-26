@@ -13,6 +13,7 @@ import '../model/on_start.dart';
 import 'beat_indicator.dart' show MutedLine;
 import 'dashed_outline.dart';
 import 'editor_scaffold.dart' show confirmDelete;
+import 'fit_text.dart';
 import 'haptics.dart';
 import 'motion.dart';
 import 'save_as_new_dialog.dart';
@@ -54,6 +55,7 @@ class PartsPage extends StatefulWidget {
   static const addKey = Key('parts-add');
   static const endKey = Key('parts-end');
   static const gradualKey = Key('parts-gradual');
+  static const titleKey = Key('parts-title');
   static Key fillKey(int i) => ValueKey('parts-fill-$i');
 
   /// The first "+ Add part" on a plain song gives both parts this many.
@@ -395,6 +397,24 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _topBar(context, song, parts, changed: changed),
+                  // The summary on its own line: beside the name, Save /
+                  // Discard cut it short.
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                    child: BrightenSwap(
+                      value: partsSummary(parts, _metronome.songEnd),
+                      child: Text(
+                        partsSummary(parts, _metronome.songEnd),
+                        key: PartsPage.summaryKey,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: context.colors.muted,
+                        ),
+                      ),
+                    ),
+                  ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                     child: _strip(context, parts),
@@ -438,30 +458,20 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
                   onTap: () => _rename(context, song),
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(minHeight: 48),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          song.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                          ),
+                    // Shrinks to fit like the main-screen title, down to
+                    // 22px, before "…".
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: FitText(
+                        song.name,
+                        textKey: PartsPage.titleKey,
+                        minFontSize: 22,
+                        style: const TextStyle(
+                          fontFamily: MetraFonts.condensed,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w700,
                         ),
-                        BrightenSwap(
-                          value: partsSummary(parts, _metronome.songEnd),
-                          child: Text(
-                            partsSummary(parts, _metronome.songEnd),
-                            key: PartsPage.summaryKey,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 12, color: colors.muted),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -553,7 +563,8 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
   }
 
   /// The whole song to scale: blocks proportional to bars, a loop icon on
-  /// the last when it loops; the open card's block is filled. Tap a block:
+  /// the last when it loops; the playing part's block is filled (stopped,
+  /// the open card's). Tap a block:
   /// its card opens and scrolls into view.
   Widget _strip(BuildContext context, List<SongPart> parts) {
     final colors = context.colors;
@@ -599,7 +610,11 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
                               context,
                               colors,
                               part,
-                              selected: part.id == _openId,
+                              // Playing: the part playing; stopped: the
+                              // open card's.
+                              selected: _playing != null
+                                  ? _playing == i
+                                  : part.id == _openId,
                               loops:
                                   i == parts.length - 1 &&
                                   _metronome.songEnd == SongEnd.loopLastPart,
@@ -1257,7 +1272,7 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
     SongEnd.loopLastPart: 'Loop last part',
   };
 
-  /// "+ Add part" (dashed) and "When the song ends".
+  /// "+ Add part" (dashed) and "At the end" (when the song ends).
   Widget _footer(BuildContext context, Song song, List<SongPart> parts) {
     final colors = context.colors;
     return Column(
@@ -1287,14 +1302,11 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
           child: Row(
             children: [
               const Expanded(
-                child: Text(
-                  'When the song ends',
-                  style: TextStyle(fontSize: 15),
-                ),
+                child: Text('At the end', style: TextStyle(fontSize: 15)),
               ),
               PopupMenuButton<SongEnd>(
                 key: PartsPage.endKey,
-                tooltip: 'When the song ends',
+                tooltip: 'At the end',
                 onSelected: (end) => _set(parts, end: end),
                 itemBuilder: (_) => [
                   for (final MapEntry(key: end, value: name)

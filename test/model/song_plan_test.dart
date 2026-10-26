@@ -125,7 +125,7 @@ void main() {
     final parts = [_part('Verse', 16, 120), _part('Outro', 8, 120)];
     expect(
       partsSummary(parts, SongEnd.loopLastPart),
-      '2 parts · 24 bars, then loops Outro',
+      '2 parts · 24 bars · ≈ 0:48, then loops Outro',
     );
     expect(partsSummary(parts, SongEnd.stop), '2 parts · 24 bars · ≈ 0:48');
     expect(

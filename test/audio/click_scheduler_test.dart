@@ -53,6 +53,14 @@ void main() {
     expect(output.liveTimes.last, lessThanOrEqualTo(output.time + _ms * 150));
   });
 
+  test('the first step alone still has an interval: the grid\'s step '
+      '(a playhead moves from the first audible beat)', () async {
+    await start();
+    final first = scheduler.stepAt(_ms * 1120)!;
+    expect(output.liveTimes, [_ms * 1120], reason: 'the next not yet');
+    expect(scheduler.stepInterval(first), _ms * 500);
+  });
+
   test('uses pattern levels and skips silent steps', () async {
     await start(
       pattern: MetronomePattern(
