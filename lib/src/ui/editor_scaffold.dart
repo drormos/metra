@@ -152,11 +152,14 @@ Future<bool> confirm(
 /// "Delete …?" before a swipe deletes your own work (ui-spec.md "Delete
 /// asks, remove undoes", `delete-confirm.reference.html`): the title, an
 /// optional muted line, Cancel (outlined) and Delete (red, filled). True
-/// when Delete was chosen.
+/// when Delete was chosen. Also "Discard changes …?" ([cancelLabel],
+/// [confirmLabel]).
 Future<bool> confirmDelete(
   BuildContext context, {
   required String title,
   String? body,
+  String cancelLabel = 'Cancel',
+  String confirmLabel = 'Delete',
 }) async =>
     await showDialog<bool>(
       context: context,
@@ -195,16 +198,19 @@ Future<bool> confirmDelete(
                   ),
                 ],
                 const SizedBox(height: 18),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                // Wraps rather than overflowing (long labels, large text).
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     SizedBox(
                       height: 48,
                       child: OutlinedButton(
                         key: deleteCancelKey,
                         onPressed: () => Navigator.pop(context, false),
-                        child: const Text(
-                          'Cancel',
+                        child: Text(
+                          cancelLabel,
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -212,7 +218,6 @@ Future<bool> confirmDelete(
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
                     SizedBox(
                       height: 48,
                       child: FilledButton(
@@ -223,8 +228,8 @@ Future<bool> confirmDelete(
                           padding: const EdgeInsets.symmetric(horizontal: 22),
                         ),
                         onPressed: () => Navigator.pop(context, true),
-                        child: const Text(
-                          'Delete',
+                        child: Text(
+                          confirmLabel,
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,

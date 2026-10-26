@@ -8,6 +8,7 @@ import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/library.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/storage/library_store.dart';
+import 'package:metra/src/ui/editor_scaffold.dart' show deleteConfirmKey;
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/on_start_sheet.dart';
 import 'package:metra/src/ui/parts_page.dart';
@@ -117,10 +118,18 @@ void main() {
 
   testWidgets('"+ Add part" adds a copy of the last part with the next name, '
       'opened; the open part before it gets a length; it\'s an unsaved '
-      'change: Revert takes it back, Save stores it', (tester) async {
+      'change: Discard (asked first) takes it back, Save stores it', (
+    tester,
+  ) async {
     await pump(tester);
     await openPage(tester);
-    expect(find.byKey(PartsPage.revertKey), findsNothing);
+    bool shown(Key key) => tester
+        .widget<Visibility>(
+          find.ancestor(of: find.byKey(key), matching: find.byType(Visibility)),
+        )
+        .visible;
+    expect(shown(PartsPage.saveKey), isFalse, reason: 'nothing unsaved');
+    final title = tester.getTopLeft(find.byKey(PartsPage.nameKey));
     await tapIn(tester, find.byKey(PartsPage.addKey));
     expect(names(), ['Part 1', 'Part 2']);
     expect(parts()[0].bars, PartsPage.defaultBars);
@@ -128,14 +137,43 @@ void main() {
     expect(summary(tester), '2 parts · 8 bars, then until you stop');
     expect(find.byKey(PartsPage.lengthKindKey), findsOneWidget, reason: 'open');
     expect(library.songChanged(metronome), isTrue);
-    await tapIn(tester, find.byKey(PartsPage.revertKey));
+    expect(shown(PartsPage.saveKey), isTrue);
+    expect(shown(PartsPage.discardKey), isTrue);
+    expect(tester.getTopLeft(find.byKey(PartsPage.nameKey)), title);
+    expect(find.text('Save as new'), findsNothing);
+    // Discard asks; Keep editing keeps the changes.
+    await tapIn(tester, find.byKey(PartsPage.discardKey));
+    expect(find.text('Discard changes to Dead Weight?'), findsOneWidget);
+    expect(
+      find.text('The song goes back to how it was last saved.'),
+      findsOneWidget,
+    );
+    await tapIn(tester, find.text('Keep editing'));
+    expect(names(), ['Part 1', 'Part 2']);
+    await tapIn(tester, find.byKey(PartsPage.discardKey));
+    expect(find.byKey(deleteConfirmKey), findsOneWidget);
+    await tester.tap(find.byKey(deleteConfirmKey));
+    await tester.pumpAndSettle();
+    expect(find.byKey(deleteConfirmKey), findsNothing);
     expect(names(), ['Part 1']);
     expect(metronome.parts, isNull, reason: 'a plain song again');
     await tapIn(tester, find.byKey(PartsPage.addKey));
     await tapIn(tester, find.byKey(PartsPage.saveKey));
     expect(library.currentSong!.parts, hasLength(2));
     expect(library.songChanged(metronome), isFalse);
-    expect(find.byKey(PartsPage.saveKey), findsNothing);
+    expect(shown(PartsPage.saveKey), isFalse);
+  });
+
+  testWidgets('Back with unsaved changes: no question; they stay the '
+      'song\'s unsaved changes on the main screen', (tester) async {
+    await pump(tester);
+    await openPage(tester);
+    await tapIn(tester, find.byKey(PartsPage.addKey));
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(PartsPage), findsNothing);
+    expect(library.songChanged(metronome), isTrue);
+    expect(find.byKey(MetronomeScreen.revertKey), findsOneWidget);
   });
 
   testWidgets('the last part only: Bars / Until you stop; open, no Gradual '

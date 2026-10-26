@@ -11,6 +11,7 @@ import '../model/on_start.dart';
 import 'beat_indicator.dart' show MutedLine;
 import 'choices.dart';
 import 'dashed_outline.dart';
+import 'editor_scaffold.dart' show confirmDelete;
 import 'haptics.dart';
 import 'save_as_new_dialog.dart';
 import 'subdivision_icon.dart';
@@ -57,9 +58,8 @@ class PartsPage extends StatefulWidget {
   static const duplicateKey = Key('parts-duplicate');
   static const partNameKey = Key('parts-part-name');
   static const undoKey = Key('parts-undo');
-  static const revertKey = Key('parts-revert');
+  static const discardKey = Key('parts-discard');
   static const saveKey = Key('parts-save');
-  static const saveAsNewKey = Key('parts-save-as-new');
 
   static Key cardKey(int i) => ValueKey('parts-card-$i');
   static Key stripKey(int i) => ValueKey('parts-strip-$i');
@@ -291,7 +291,7 @@ class _PartsPageState extends State<PartsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _topBar(context, song, parts),
+                  _topBar(context, song, parts, changed: changed),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                     child: _strip(context, parts),
@@ -299,7 +299,7 @@ class _PartsPageState extends State<PartsPage> {
                   Expanded(child: _list(context, song, parts)),
                   if (_removed case final removed?)
                     _undoBar(context, song, removed.part),
-                  if (changed) _saveLine(context),
+                  _playButton(context),
                 ],
               ),
             ),
@@ -309,98 +309,133 @@ class _PartsPageState extends State<PartsPage> {
     },
   );
 
-  Widget _topBar(BuildContext context, Song song, List<SongPart> parts) {
+  Widget _topBar(
+    BuildContext context,
+    Song song,
+    List<SongPart> parts, {
+    required bool changed,
+  }) {
     final colors = context.colors;
-    final playing = _metronome.isPlaying;
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 6, 16, 6),
-      child: Row(
-        children: [
-          IconButton(
-            tooltip: 'Back',
-            onPressed: () => Navigator.maybePop(context),
-            icon: const Icon(Icons.chevron_left, size: 28),
-          ),
-          Expanded(
-            child: Semantics(
-              button: true,
-              onTapHint: 'rename',
-              child: InkWell(
-                key: PartsPage.nameKey,
-                onTap: () => _rename(context, song),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 48),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        song.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
+      child: LayoutBuilder(
+        builder: (context, bar) => Row(
+          children: [
+            IconButton(
+              tooltip: 'Back',
+              onPressed: () => Navigator.maybePop(context),
+              icon: const Icon(Icons.chevron_left, size: 28),
+            ),
+            Expanded(
+              child: Semantics(
+                button: true,
+                onTapHint: 'rename',
+                child: InkWell(
+                  key: PartsPage.nameKey,
+                  onTap: () => _rename(context, song),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 48),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          song.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                      Text(
-                        partsSummary(parts),
-                        key: PartsPage.summaryKey,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, color: colors.muted),
-                      ),
-                    ],
+                        Text(
+                          partsSummary(parts),
+                          key: PartsPage.summaryKey,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12, color: colors.muted),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          // One width in both states; Stop is filled like the main
-          // Start/Stop, so it's unmistakable while playing.
-          SizedBox(
-            width: 104,
-            height: 48,
-            child: playing
-                ? FilledButton.icon(
-                    key: PartsPage.playKey,
-                    style: FilledButton.styleFrom(padding: EdgeInsets.zero),
-                    onPressed: () {
-                      Haptics.medium();
-                      _metronome.stop();
-                    },
-                    icon: const Icon(Icons.stop, size: 20),
-                    label: const Text(
-                      'Stop',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  )
-                : OutlinedButton.icon(
-                    key: PartsPage.playKey,
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      foregroundColor: colors.text,
-                      side: BorderSide(color: colors.text, width: 2),
-                    ),
-                    onPressed: () {
-                      Haptics.medium();
-                      _metronome.playFrom(0);
-                    },
-                    icon: const Icon(Icons.play_arrow, size: 20),
-                    label: const Text(
-                      'Play',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
+            const SizedBox(width: 8),
+            // Save / Discard with unsaved changes; their room is kept
+            // either way, so the title never moves.
+            Visibility(
+              visible: changed,
+              maintainSize: true,
+              maintainAnimation: true,
+              maintainState: true,
+              // Large text: the title keeps room (as the main screen's
+              // fixed controls, at most 1.3×).
+              child: MediaQuery.withClampedTextScaling(
+                maxScaleFactor: 1.3,
+                // Narrow phones: shrinks rather than squeezing out the title.
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: bar.maxWidth * 0.6),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextButton(
+                          key: PartsPage.discardKey,
+                          style: TextButton.styleFrom(
+                            foregroundColor: colors.muted,
+                            minimumSize: const Size(48, 48),
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                          ),
+                          onPressed: changed
+                              ? () => _discard(context, song)
+                              : null,
+                          child: const Text(
+                            'Discard',
+                            style: TextStyle(fontSize: 15),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        SizedBox(
+                          height: 48,
+                          child: Center(
+                            child: FilledButton(
+                              key: PartsPage.saveKey,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: colors.text,
+                                foregroundColor: colors.background,
+                                minimumSize: const Size(64, 38),
+                                fixedSize: const Size.fromHeight(38),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                              ),
+                              onPressed: changed
+                                  ? () {
+                                      Haptics.tick();
+                                      _library.saveToSong(_metronome);
+                                    }
+                                  : null,
+                              child: const Text(
+                                'Save',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-          ),
-        ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1023,66 +1058,52 @@ class _PartsPageState extends State<PartsPage> {
     );
   }
 
-  /// "Revert · Save · Save as new", as under the BPM on the main screen.
-  Widget _saveLine(BuildContext context) {
+  /// Discard asks first: it throws away work (and isn't Undo).
+  Future<void> _discard(BuildContext context, Song song) async {
+    final sure = await confirmDelete(
+      context,
+      title: 'Discard changes to ${song.name}?',
+      body: 'The song goes back to how it was last saved.',
+      cancelLabel: 'Keep editing',
+      confirmLabel: 'Discard',
+    );
+    if (!sure) return;
+    _gradual.clear();
+    _library.revertSong(_metronome);
+  }
+
+  /// Play / Stop, full width at the bottom, one size in both states: Play
+  /// outlined, Stop filled like the main Start/Stop.
+  Widget _playButton(BuildContext context) {
     final colors = context.colors;
-    Widget action(
-      Key key,
-      String text,
-      VoidCallback onTap, {
-      bool main = false,
-    }) => TextButton(
-      key: key,
-      style: TextButton.styleFrom(
-        foregroundColor: main ? colors.text : colors.muted,
-        minimumSize: const Size(48, 48),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-      ),
-      onPressed: () {
-        Haptics.tick();
-        onTap();
-      },
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 15,
-          fontWeight: main ? FontWeight.w600 : FontWeight.w400,
-        ),
-      ),
-    );
-    final dot = ExcludeSemantics(
-      child: Text('·', style: TextStyle(color: colors.beatResting)),
-    );
-    return Container(
-      height: 56,
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: colors.divider)),
-      ),
-      // Large text: the line shrinks rather than overflowing.
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            action(PartsPage.revertKey, 'Revert', () {
-              _gradual.clear();
-              _library.revertSong(_metronome);
-            }),
-            dot,
-            action(
-              PartsPage.saveKey,
-              'Save',
-              () => _library.saveToSong(_metronome),
-              main: true,
-            ),
-            dot,
-            action(
-              PartsPage.saveAsNewKey,
-              'Save as new',
-              () => showSaveAsNewSong(context, _library, _metronome),
-            ),
-          ],
-        ),
+    final playing = _metronome.isPlaying;
+    const label = TextStyle(fontSize: 18, fontWeight: FontWeight.w600);
+    void tap() {
+      Haptics.medium();
+      playing ? _metronome.stop() : _metronome.playFrom(0);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: SizedBox(
+        height: 56,
+        child: playing
+            ? FilledButton.icon(
+                key: PartsPage.playKey,
+                onPressed: tap,
+                icon: const Icon(Icons.stop, size: 24),
+                label: const Text('Stop', style: label),
+              )
+            : OutlinedButton.icon(
+                key: PartsPage.playKey,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: colors.text,
+                  side: BorderSide(color: colors.text, width: 2),
+                ),
+                onPressed: tap,
+                icon: const Icon(Icons.play_arrow, size: 24),
+                label: const Text('Play', style: label),
+              ),
       ),
     );
   }
