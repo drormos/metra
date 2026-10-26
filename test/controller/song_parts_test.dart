@@ -372,7 +372,7 @@ void main() {
       'shown; a Gradual part counts its own beats; Loop song warns',
       () async {
         load([
-          _part('a', 4, 120), // 4/4, a bar is 2 s
+          _part('a', 5, 120), // 4/4, a bar is 2 s: a long part
           _part('b', 1, 90, null, _two), // a beat is 666.7 ms
           _part('c', 3, 60, 120), // Gradual
         ], end: SongEnd.loopSong);
@@ -381,19 +381,20 @@ void main() {
         // a, then b: on each beat, from what you hear.
         expect(changes.take(9).toList(), [
           (1005, null),
-          (5120, 'b in 2 bars · 2/4 · 90'),
-          (7120, 'b in 4 · 2/4 · 90'),
-          (7620, 'b in 3 · 2/4 · 90'),
-          (8120, 'b in 2 · 2/4 · 90'),
-          (8620, 'b in 1 · 2/4 · 90'),
+          (7120, 'b in 2 bars · 2/4 · 90'),
+          (9120, 'b in 4 · 2/4 · 90'),
+          (9620, 'b in 3 · 2/4 · 90'),
+          (10120, 'b in 2 · 2/4 · 90'),
+          (10620, 'b in 1 · 2/4 · 90'),
           // b: one bar of 2/4, counting down at once; c starts at 60.
-          (9120, 'c in 2 · 4/4 · 60'),
-          (9790, 'c in 1 · 4/4 · 60'),
-          (10455, null),
+          (11120, 'c in 2 · 4/4 · 60'),
+          (11790, 'c in 1 · 4/4 · 60'),
+          // c (3 bars): short, so it counts bars from its first.
+          (12455, 'a in 3 bars'),
         ]);
-        // c (3 bars, 60 → 120, its beats getting shorter): 2 bars out, then
-        // its last bar's four beats; Loop song back to a, at 120 where c
-        // ends (no tempo).
+        // c (60 → 120, its beats getting shorter): then 2 bars, then its
+        // last bar's four beats; Loop song back to a, at 120 where c ends
+        // (no tempo); a is long: the normal line.
         final c = changes.skip(9).take(6).toList();
         expect(
           [for (final x in c) x.$2],
@@ -416,7 +417,7 @@ void main() {
         (3620, 'b in 3'),
         (4120, 'b in 2'),
         (4620, 'b in 1'),
-        (5120, null), // b: a 2-bar part warns nothing; the song stops
+        (5120, null), // the song stops after b: nothing
       ]);
       controller.stop();
       controller.setCountIn(0);

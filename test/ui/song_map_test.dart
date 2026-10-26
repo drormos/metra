@@ -183,7 +183,7 @@ void main() {
   });
 
   testWidgets('heads-up: the last bar\'s name a white tag counting the '
-      'beats; 2 bars out, bold; the new part, the normal line', (tester) async {
+      'beats; bars out, bold; a long part, the normal line', (tester) async {
     await pump(tester, parts: threeParts);
     await tester.tap(find.byKey(MetronomeScreen.playKey));
     await tester.pump();
@@ -197,7 +197,11 @@ void main() {
       of: find.byKey(MetronomeScreen.headsUpKey),
       matching: find.text(data),
     );
-    // Intro (2 bars at 100, from 1120): its last bar counts down at once.
+    // Intro (2 bars at 100, from 1120): a short part counts bars from its
+    // first, then its last bar's beats.
+    await runTo(tester, 1700);
+    expect(text('Verse in 2 bars'), findsOneWidget);
+    expect(find.byKey(MetronomeScreen.headsUpTagKey), findsNothing);
     await runTo(tester, 3700);
     expect(tag().data, 'Verse in 4');
     expect(text(' · 3/4 · 120'), findsOneWidget);
@@ -212,16 +216,19 @@ void main() {
     expect(tag().style!.color, MetraColors.stageBlack.background);
     await runTo(tester, 4300); // beat 2 at 4120
     expect(tag().data, 'Verse in 3');
-    // Verse (4 bars of 3/4 at 120, from 5920): the normal line.
+    // Verse (4 bars of 3/4 at 120, from 5920): short too, from bar 1.
     await runTo(tester, 6000);
-    expect(find.byKey(MetronomeScreen.headsUpKey), findsNothing);
-    expect(line(tester), 'Verse · bar 1 of 4 · next: Outro');
+    expect(text('Outro in 4 bars'), findsOneWidget);
     // Its bar 3 (from 8920): 2 bars out, bold.
     await runTo(tester, 9000);
     final bold = tester.widget<Text>(text('Outro in 2 bars'));
     expect(bold.style!.fontWeight, FontWeight.w700);
     expect(text(' · 4/4 · 90'), findsOneWidget);
     expect(find.byKey(MetronomeScreen.headsUpTagKey), findsNothing);
+    // The Outro (8 bars, from 11920, looping): the normal line.
+    await runTo(tester, 12000);
+    expect(find.byKey(MetronomeScreen.headsUpKey), findsNothing);
+    expect(line(tester), 'Outro · bar 1 of 8 · looping');
     metronome.stop();
     await tester.pump(const Duration(seconds: 1));
   });
@@ -233,15 +240,17 @@ void main() {
     metronome.setOnStart(
       const OnStart(stopOn: true, stopBy: StopBy.bars, stopBars: 12),
     );
+    // From the Outro (8 bars): the short parts count down instead.
+    await tapMap(tester, 100);
     await tester.tap(find.byKey(MetronomeScreen.playKey));
     await tester.pump();
     await runTo(tester, 1700);
-    expect(line(tester), 'Intro · bar 1 of 2 · 12 bars left');
+    expect(line(tester), 'Outro · bar 1 of 8 · 12 bars left');
     metronome.setOnStart(
       const OnStart(stopOn: true, stopTime: Duration(minutes: 4, seconds: 13)),
     );
     await runTo(tester, 2200);
-    expect(line(tester), 'Intro · bar 1 of 2 · 4:12 left');
+    expect(line(tester), 'Outro · bar 1 of 8 · 4:12 left');
     metronome.stop();
     await tester.pump(const Duration(seconds: 1));
   });

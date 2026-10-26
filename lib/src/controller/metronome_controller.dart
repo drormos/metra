@@ -218,10 +218,14 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
 
   /// The heads-up before a part changes (ui-spec.md "Heads-up before a
   /// part changes") at engine time [time] (the visual clock, as the beat
-  /// lights): [next] is coming in 2 [bars], or in the last bar in [beats]
-  /// beats of [current]'s time signature. Null otherwise: no change coming
-  /// (the song stops, or the last part loops), a 1- or 2-bar part before
-  /// its last bar, or a count-in.
+  /// lights): [next] is coming in [bars] bars (2, or in a part of up to
+  /// [shortPartBars] bars every bar from its first), or in the last bar in
+  /// [beats] beats of [current]'s time signature. Null otherwise: no
+  /// change coming (the song stops, or the last part loops), earlier in a
+  /// longer part, or a count-in.
+  /// Parts this short count down in bars from their first bar.
+  static const shortPartBars = 4;
+
   ({SongPart current, SongPart next, int? bars, int? beats})? headsUpAt(
     Duration time,
   ) {
@@ -235,11 +239,21 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
     if (at == null) return null;
     final current = parts[at.part];
     final barsLeft = current.bars - at.bar;
-    if (barsLeft > 2 || (barsLeft == 2 && current.bars <= 2)) return null;
+    // A short part counts its bars from its first one (the normal line
+    // would show for a bar or two and then give way); a longer one warns
+    // 2 bars out.
+    if (barsLeft > (current.bars <= shortPartBars ? shortPartBars : 2)) {
+      return null;
+    }
     final next = plan.locate(bar + barsLeft);
     if (next == null || next.part == at.part) return null;
-    if (barsLeft == 2) {
-      return (current: current, next: parts[next.part], bars: 2, beats: null);
+    if (barsLeft > 1) {
+      return (
+        current: current,
+        next: parts[next.part],
+        bars: barsLeft,
+        beats: null,
+      );
     }
     final beat = step.barPosition ~/ step.pattern.stepsPerBeat;
     return (
