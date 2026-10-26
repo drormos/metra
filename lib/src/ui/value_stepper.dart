@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import 'haptics.dart';
 import 'meter_control.dart';
+import 'motion.dart';
 import 'theme.dart';
 
 /// The app's one −/+ stepper (ui-spec.md "Editing the values", "Song
@@ -28,7 +29,11 @@ class ValueStepper extends StatefulWidget {
     this.fieldWidth = 92,
     this.buttonSize = 48,
     this.fontSize = 24,
+    this.leading,
   });
+
+  /// Before − with a small gap (the parts page's ✕ on "Ends at").
+  final Widget? leading;
 
   final String label;
   final bool showLabel;
@@ -163,7 +168,17 @@ class _ValueStepperState extends State<ValueStepper> {
     return Row(
       children: [
         if (widget.showLabel)
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 15))),
+          // A new label swaps in (snap in, soft brighten).
+          Expanded(
+            child: BrightenSwap(
+              value: label,
+              child: Text(label, style: const TextStyle(fontSize: 15)),
+            ),
+          ),
+        if (widget.leading case final leading?) ...[
+          leading,
+          const SizedBox(width: 10),
+        ],
         Semantics(
           label: 'Less $label',
           button: true,

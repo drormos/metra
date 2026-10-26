@@ -251,19 +251,64 @@ void main() {
     await tester.pump(const Duration(seconds: 7));
   });
 
-  testWidgets('Gradual: From the previous part\'s tempo, To this one\'s; the '
-      'card reads 120 to 130', (tester) async {
+  testWidgets('"Gradual tempo change": Starts at keeps the tempo, Ends at '
+      '+10; ✕ goes back to one tempo; the card never changes shape', (
+    tester,
+  ) async {
+    await pump(tester);
+    await openPage(tester);
+    await tapIn(tester, find.byKey(PartsPage.addKey)); // Part 2, at 120
+    // From the card's header: the list may scroll, the card mustn't change.
+    double top(Key key) =>
+        tester.getTopLeft(find.byKey(key)).dy -
+        tester.getTopLeft(find.byKey(PartsPage.cardKey(1))).dy;
+    final steadyRows = (
+      top(ValueStepper.plusKey('BPM')),
+      top(PartsPage.gradualKey),
+      top(PartsPage.rhythmKey),
+    );
+    expect(find.text('Gradual tempo change'), findsOneWidget);
+    expect(find.byIcon(Icons.trending_up), findsOneWidget);
+    await tapIn(tester, find.byKey(PartsPage.gradualKey));
+    expect((parts()[1].tempoStart, parts()[1].tempoEnd), (120, 130));
+    expect(find.text('Starts at'), findsOneWidget);
+    expect(find.text('Ends at'), findsOneWidget);
+    expect(find.text('BPM'), findsNothing);
+    expect(top(ValueStepper.plusKey('Starts at')), steadyRows.$1);
+    expect(top(PartsPage.rhythmKey), steadyRows.$3, reason: 'same height');
+    // ✕ is the size of − / +, before −.
+    final clear = tester.getRect(find.byKey(PartsPage.steadyKey));
+    final minus = tester.getRect(find.byKey(ValueStepper.minusKey('Ends at')));
+    expect(clear.size, minus.size);
+    expect(clear.right, lessThan(minus.left));
+    // "120 → 130" on the card.
+    expect(find.byIcon(Icons.arrow_forward), findsOneWidget);
+    await tapIn(tester, find.byKey(ValueStepper.plusKey('Ends at')));
+    expect(parts()[1].tempoEnd, 131);
+    await tapIn(tester, find.byKey(ValueStepper.plusKey('Starts at')));
+    expect((parts()[1].tempoStart, parts()[1].tempoEnd), (121, 131));
+    await tapIn(tester, find.byKey(PartsPage.steadyKey));
+    expect((parts()[1].tempoStart, parts()[1].tempoEnd), (121, 121));
+    expect(find.text('BPM'), findsOneWidget);
+    expect(top(PartsPage.gradualKey), steadyRows.$2);
+    expect(top(PartsPage.rhythmKey), steadyRows.$3);
+  });
+
+  testWidgets('Ends at brought back to Starts at stays while the card is '
+      'open; reopened, it\'s steady with the button again', (tester) async {
     await pump(tester);
     await openPage(tester);
     await tapIn(tester, find.byKey(PartsPage.addKey));
-    await tapIn(tester, chip(PartsPage.tempoKindKey, 'Gradual'));
-    expect((parts()[1].tempoStart, parts()[1].tempoEnd), (120, 130));
-    // "120 → 130" on the card (the To field shows 130 too).
-    expect(find.byIcon(Icons.arrow_forward), findsOneWidget);
-    await tapIn(tester, find.byKey(ValueStepper.plusKey('To')));
-    expect(parts()[1].tempoEnd, 131);
-    await tapIn(tester, chip(PartsPage.tempoKindKey, 'Steady'));
-    expect(parts()[1].gradual, isFalse);
+    await tapIn(tester, find.byKey(PartsPage.gradualKey));
+    for (var i = 0; i < 10; i++) {
+      await tapIn(tester, find.byKey(ValueStepper.minusKey('Ends at')));
+    }
+    expect(parts()[1].gradual, isFalse, reason: 'stored as steady');
+    expect(find.text('Ends at'), findsOneWidget);
+    await tapIn(tester, find.byKey(PartsPage.cardKey(1))); // close
+    await tapIn(tester, find.byKey(PartsPage.cardKey(1))); // reopen
+    expect(find.text('Ends at'), findsNothing);
+    expect(find.byKey(PartsPage.gradualKey), findsOneWidget);
   });
 
   testWidgets('swipe removes a part, with Undo; the last one can\'t go', (
@@ -401,8 +446,10 @@ void main() {
       await tapIn(tester, find.byKey(PartsPage.addKey));
       double y(Key key) => tester.getTopLeft(find.byKey(key)).dy;
       final length = ValueStepper.plusKey('Length');
-      expect(y(PartsPage.partNameKey), lessThan(y(PartsPage.tempoKindKey)));
-      expect(y(PartsPage.tempoKindKey), lessThan(y(length)));
+      final bpm = ValueStepper.plusKey('BPM');
+      expect(y(PartsPage.partNameKey), lessThan(y(bpm)));
+      expect(y(bpm), lessThan(y(PartsPage.gradualKey)));
+      expect(y(PartsPage.gradualKey), lessThan(y(length)));
       expect(y(length), lessThan(y(PartsPage.rhythmKey)));
     });
 
@@ -478,9 +525,8 @@ void main() {
       );
     });
 
-    testWidgets('Gradual starts From the tempo the previous part ends on', (
-      tester,
-    ) async {
+    testWidgets('a gradual change keeps the start the user set (it never '
+        'moves to the previous part\'s end)', (tester) async {
       await pump(tester);
       metronome.setParts([
         part('Intro', 4, 100, 140),
@@ -488,8 +534,8 @@ void main() {
       ]);
       await openPage(tester);
       await tapIn(tester, find.byKey(PartsPage.cardKey(1)));
-      await tapIn(tester, chip(PartsPage.tempoKindKey, 'Gradual'));
-      expect((parts()[1].tempoStart, parts()[1].tempoEnd), (140, 120));
+      await tapIn(tester, find.byKey(PartsPage.gradualKey));
+      expect((parts()[1].tempoStart, parts()[1].tempoEnd), (120, 130));
     });
   });
 

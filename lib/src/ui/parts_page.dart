@@ -52,7 +52,8 @@ class PartsPage extends StatefulWidget {
   static const summaryKey = Key('parts-summary');
   static const addKey = Key('parts-add');
   static const endKey = Key('parts-end');
-  static const tempoKindKey = Key('parts-tempo-kind');
+  static const gradualKey = Key('parts-gradual');
+  static const steadyKey = Key('parts-steady');
   static const loopIconKey = Key('parts-loop-icon');
   static const rhythmKey = Key('parts-rhythm');
   static const playFromKey = Key('parts-play-from');
@@ -78,8 +79,8 @@ class _PartsPageState extends State<PartsPage>
   MetronomeController get _metronome => widget.metronome;
 
   String? _openId;
-  // Parts the user set to Gradual whose ends are (still) equal: the chips
-  // stay on Gradual while From and To pass each other.
+  // The open part when its end tempo was turned on: "Ends at" stays while
+  // Starts at and Ends at pass each other.
   final _gradual = <String>{};
   final _cardKeys = <String, GlobalKey>{};
   // Each open card's body, measured when another card's opening closes it.
@@ -207,7 +208,12 @@ class _PartsPageState extends State<PartsPage>
     final above = opening && previous != null && !scroll
         ? _bodyAbove(previous, id)
         : 0.0;
-    setState(() => _openId = opening ? id : null);
+    setState(() {
+      _openId = opening ? id : null;
+      // An end equal to its start is a steady part: reopened, it shows
+      // the button again.
+      _gradual.retainWhere((g) => g == _openId);
+    });
     // Started now, its clock counts from the coming frame, as the closing
     // card's size animation (started in that frame's layout) does.
     if (above > 0) _keepStill(above);
@@ -808,6 +814,67 @@ class _PartsPageState extends State<PartsPage>
     },
   );
 
+  /// Steady: a full-width 40px dashed "Gradual tempo change" that gives
+  /// the part an end tempo.
+  Widget _gradualButton(MetraColors colors, VoidCallback onTap) => SizedBox(
+    height: 48,
+    child: Center(
+      child: SizedBox(
+        height: 40,
+        child: CustomPaint(
+          painter: DashedOutline(colors.beatResting, radius: 4, width: 2),
+          child: InkWell(
+            key: PartsPage.gradualKey,
+            borderRadius: BorderRadius.circular(4),
+            onTap: () {
+              Haptics.tick();
+              onTap();
+            },
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.trending_up, size: 18),
+                SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    'Gradual tempo change',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  /// "Ends at"'s ✕: back to one tempo. The size of − / +, outlined white.
+  Widget _steadyButton(MetraColors colors, VoidCallback onTap) => Semantics(
+    label: 'One tempo',
+    button: true,
+    excludeSemantics: true,
+    child: SizedBox.square(
+      dimension: 48,
+      child: OutlinedButton(
+        key: PartsPage.steadyKey,
+        style: OutlinedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          minimumSize: Size.zero,
+          foregroundColor: colors.text,
+          side: BorderSide(color: colors.text, width: 2),
+        ),
+        onPressed: () {
+          Haptics.tick();
+          onTap();
+        },
+        child: const Icon(Icons.close, size: 20),
+      ),
+    ),
+  );
+
   Widget _openCard(
     BuildContext context,
     Song song,
@@ -820,22 +887,27 @@ class _PartsPageState extends State<PartsPage>
     void edit(SongPart Function(SongPart) change) => _edit(song, i, change);
     int bpm(int v) =>
         v.clamp(MetronomeController.minBpm, MetronomeController.maxBpm);
-    Widget tempo(String label, int value, SongPart Function(int) set) =>
-        ValueStepper(
-          label: label,
-          display: '$value',
-          editText: '$value',
-          onMinus: value > MetronomeController.minBpm
-              ? () => edit((_) => set(value - 1))
-              : null,
-          onPlus: value < MetronomeController.maxBpm
-              ? () => edit((_) => set(value + 1))
-              : null,
-          onTyped: (text) {
-            final v = int.tryParse(text);
-            if (v != null) edit((_) => set(bpm(v)));
-          },
-        );
+    Widget tempo(
+      String label,
+      int value,
+      SongPart Function(int) set, {
+      Widget? leading,
+    }) => ValueStepper(
+      label: label,
+      leading: leading,
+      display: '$value',
+      editText: '$value',
+      onMinus: value > MetronomeController.minBpm
+          ? () => edit((_) => set(value - 1))
+          : null,
+      onPlus: value < MetronomeController.maxBpm
+          ? () => edit((_) => set(value + 1))
+          : null,
+      onTyped: (text) {
+        final v = int.tryParse(text);
+        if (v != null) edit((_) => set(bpm(v)));
+      },
+    );
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
       decoration: BoxDecoration(
@@ -856,38 +928,51 @@ class _PartsPageState extends State<PartsPage>
               ),
             ],
           ),
-          Choices<bool>(
-            key: PartsPage.tempoKindKey,
-            label: 'Tempo',
-            options: const {false: 'Steady', true: 'Gradual'},
-            selected: gradual,
-            onSelected: (on) {
-              setState(
-                () => on ? _gradual.add(part.id) : _gradual.remove(part.id),
-              );
-              edit((p) {
-                if (!on) return p.copyWith(tempoEnd: p.tempoStart);
-                // From the previous part's tempo, to this one's.
-                final from = i > 0 ? parts[i - 1].tempoEnd : p.tempoStart;
-                var to = p.tempoStart;
-                if (to == from) {
-                  to = from + 10 > MetronomeController.maxBpm
-                      ? from - 10
-                      : from + 10;
-                }
-                return p.copyWith(tempoStart: from, tempoEnd: to);
-              });
-            },
-          ),
-          if (gradual) ...[
-            tempo('From', part.tempoStart, (v) => part.copyWith(tempoStart: v)),
-            tempo('To', part.tempoEnd, (v) => part.copyWith(tempoEnd: v)),
-          ] else
+          // Two rows, one height in both states: only their words swap.
+          if (gradual)
+            tempo(
+              'Starts at',
+              part.tempoStart,
+              (v) => part.copyWith(tempoStart: v),
+            )
+          else
             tempo(
               'BPM',
               part.tempoStart,
               (v) => part.copyWith(tempoStart: v, tempoEnd: v),
             ),
+          BrightenSwap(
+            value: gradual,
+            // The taller of the two sets the height, so nothing moves.
+            child: IndexedStack(
+              index: gradual ? 1 : 0,
+              alignment: Alignment.center,
+              children: [
+                _gradualButton(colors, () {
+                  setState(() => _gradual.add(part.id));
+                  // The end 10 above the start (below it near the top),
+                  // so the change shows at once; the start stays.
+                  edit((p) {
+                    final up = p.tempoStart + 10;
+                    return p.copyWith(
+                      tempoEnd: up > MetronomeController.maxBpm
+                          ? p.tempoStart - 10
+                          : up,
+                    );
+                  });
+                }),
+                tempo(
+                  'Ends at',
+                  part.tempoEnd,
+                  (v) => part.copyWith(tempoEnd: v),
+                  leading: _steadyButton(colors, () {
+                    setState(() => _gradual.remove(part.id));
+                    edit((p) => p.copyWith(tempoEnd: p.tempoStart));
+                  }),
+                ),
+              ],
+            ),
+          ),
           _barsStepper(part.bars, label: 'Length', edit: edit),
           Row(
             children: [
