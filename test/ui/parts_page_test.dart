@@ -204,6 +204,14 @@ void main() {
     final stop = chip(PartsPage.endKey, 'Stop');
     expect(tester.getTopLeft(stop).dy, greaterThan(label.dy), reason: 'below');
     expect(chip(PartsPage.endKey, 'Loop song'), findsOneWidget);
+    // Side by side, as wide as their text, from the left (the test font
+    // is wider than the app's, so the third may wrap here; on a phone all
+    // three fit on one row).
+    final stopChip = tester.getRect(chip(PartsPage.endKey, 'Stop'));
+    final loopChip = tester.getRect(chip(PartsPage.endKey, 'Loop song'));
+    expect(loopChip.top, stopChip.top);
+    expect(stopChip.right, lessThan(loopChip.left));
+    expect(stopChip.left, lessThan(label.dx + 40));
     expect(chip(PartsPage.endKey, 'Loop last part'), findsOneWidget);
     await tapIn(tester, find.byKey(PartsPage.addKey));
     expect(metronome.songEnd, SongEnd.loopLastPart);

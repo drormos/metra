@@ -79,11 +79,12 @@ class Choices<T> extends StatelessWidget {
         },
         child: SizedBox(
           height: 48,
+          // As wide as its text: a full-width chip would take a line.
           child: Center(
+            widthFactor: 1,
             child: Container(
               height: 36,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              alignment: Alignment.center,
               decoration: ShapeDecoration(
                 color: selected ? colors.tickResting : null,
                 shape: StadiumBorder(
@@ -93,12 +94,15 @@ class Choices<T> extends StatelessWidget {
                   ),
                 ),
               ),
-              child: Text(
-                text,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                  color: selected ? colors.text : colors.muted,
+              child: Center(
+                widthFactor: 1,
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    color: selected ? colors.text : colors.muted,
+                  ),
                 ),
               ),
             ),
