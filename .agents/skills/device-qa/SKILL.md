@@ -5,6 +5,8 @@ description: Use when a Metra build needs checking on a real phone (before a rel
 
 # On-device checks
 
+Driving the phone over adb: the user may be using it. Check the foreground app before every tap, swipe or text input (phone skill, "The user uses the phone while you test"); if it isn't Metra, stop and tell the user.
+
 Pick the sections the change touches; a release runs all of them. Install with `adb install -r` (never `flutter install`).
 
 **Timing**
