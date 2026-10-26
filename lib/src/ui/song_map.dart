@@ -27,20 +27,13 @@ class SongMap extends StatefulWidget {
   static const minWidth = 24.0;
   static const gap = 3.0;
 
-  /// An open last part: drawn this many bars wide, fading out; the needle
-  /// rests [openRest] bars into it.
-  static const openBars = 6;
-  static const openRest = 3;
-
   /// Where each part starts and how wide it is, in map pixels.
   static List<({double x, double width})> layout(List<SongPart> parts) {
     var x = 0.0;
     return [
       for (final part in parts)
         () {
-          final width = part.bars == null
-              ? openBars * pxPerBar
-              : (part.bars! * pxPerBar).clamp(minWidth, double.infinity);
+          final width = (part.bars * pxPerBar).clamp(minWidth, double.infinity);
           final block = (x: x, width: width);
           x += width + gap;
           return block;
@@ -59,10 +52,7 @@ class SongMap extends StatefulWidget {
     final p = parts[part];
     final b = blocks[part];
     final into = bar + fraction;
-    if (p.bars == null) {
-      return b.x + into.clamp(0, openRest.toDouble()) * pxPerBar;
-    }
-    return b.x + (into / p.bars!).clamp(0.0, 1.0) * b.width;
+    return b.x + (into / p.bars).clamp(0.0, 1.0) * b.width;
   }
 
   /// The part at map position [x] (the nearest one in a gap or past the
@@ -238,6 +228,7 @@ class _SongMapState extends State<SongMap> with TickerProviderStateMixin {
                       parts: parts,
                       at: _drag ?? _x,
                       current: current,
+                      loops: widget.controller.songEnd == SongEnd.loopLastPart,
                       colors: context.colors,
                     ),
                   ),
@@ -256,12 +247,16 @@ class _MapPainter extends CustomPainter {
     required this.parts,
     required this.at,
     required this.current,
+    required this.loops,
     required this.colors,
   });
 
   final List<SongPart> parts;
   final double at;
   final int current;
+
+  /// The last part loops until Stop: a loop icon after its name.
+  final bool loops;
   final MetraColors colors;
 
   static const _blockTop = 8.0;
@@ -285,20 +280,18 @@ class _MapPainter extends CustomPainter {
       final selected = i == current;
       final color = selected ? colors.text : colors.tickResting;
       final rect = Rect.fromLTWH(left, _blockTop, b.width, height);
-      fill
-        ..color = color
-        ..shader = part.open
-            ? LinearGradient(
-                colors: [color, color, color.withAlpha(0)],
-                stops: const [0, 0.55, 1],
-              ).createShader(rect)
-            : null;
+      fill.color = color;
       canvas.drawRRect(
         RRect.fromRectAndRadius(rect, const Radius.circular(4)),
         fill,
       );
-      fill.shader = null;
-      _label(canvas, part, rect, selected);
+      _label(
+        canvas,
+        part,
+        rect,
+        selected,
+        loop: loops && i == parts.length - 1,
+      );
     }
 
     // The edges fade into the background.
@@ -323,8 +316,14 @@ class _MapPainter extends CustomPainter {
     canvas.drawRect(Rect.fromLTWH(centre - 2, 0, 4, size.height), fill);
   }
 
-  /// The name inside when it fits; an open part adds the ∞ icon.
-  void _label(Canvas canvas, SongPart part, Rect rect, bool selected) {
+  /// The name inside when it fits; a looping last part adds the loop icon.
+  void _label(
+    Canvas canvas,
+    SongPart part,
+    Rect rect,
+    bool selected, {
+    required bool loop,
+  }) {
     final color = selected ? colors.background : colors.muted;
     final name = TextPainter(
       text: TextSpan(
@@ -338,8 +337,8 @@ class _MapPainter extends CustomPainter {
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    const icon = Icons.all_inclusive;
-    final infinity = part.open
+    const icon = Icons.repeat;
+    final loopIcon = loop
         ? (TextPainter(
             text: TextSpan(
               text: String.fromCharCode(icon.codePoint),
@@ -353,26 +352,27 @@ class _MapPainter extends CustomPainter {
             textDirection: TextDirection.ltr,
           )..layout())
         : null;
-    final width = name.width + (infinity == null ? 0 : infinity.width + 3);
+    final width = name.width + (loopIcon == null ? 0 : loopIcon.width + 3);
     if (width <= rect.width - 6) {
       var left = rect.center.dx - width / 2;
       name.paint(canvas, Offset(left, rect.center.dy - name.height / 2));
-      if (infinity != null) {
+      if (loopIcon != null) {
         left += name.width + 3;
-        infinity.paint(
+        loopIcon.paint(
           canvas,
-          Offset(left, rect.center.dy - infinity.height / 2),
+          Offset(left, rect.center.dy - loopIcon.height / 2),
         );
       }
     }
     name.dispose();
-    infinity?.dispose();
+    loopIcon?.dispose();
   }
 
   @override
   bool shouldRepaint(_MapPainter old) =>
       old.at != at ||
       old.current != current ||
+      old.loops != loops ||
       old.colors != colors ||
       !identical(old.parts, parts);
 }

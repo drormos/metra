@@ -152,16 +152,15 @@ void main() {
   });
 
   test('song parts: a part change on a bar line, a one-bar 2/4 part, a '
-      'gradual ramp, then an open part', () async {
-    SongPart part(String id, int? bars, int from, int to, int beats) =>
-        SongPart(
-          id: id,
-          name: id,
-          bars: bars,
-          tempoStart: from,
-          tempoEnd: to,
-          pattern: MetronomePattern.simple(beatsPerBar: beats, stepsPerBeat: 1),
-        );
+      'gradual ramp, then the last part looping', () async {
+    SongPart part(String id, int bars, int from, int to, int beats) => SongPart(
+      id: id,
+      name: id,
+      bars: bars,
+      tempoStart: from,
+      tempoEnd: to,
+      pattern: MetronomePattern.simple(beatsPerBar: beats, stepsPerBeat: 1),
+    );
     final recorder = _OnsetRecorder()..start();
     controller.loadSong(
       bpm: 120,
@@ -170,8 +169,9 @@ void main() {
         part('a', 1, 120, 120, 4),
         part('b', 1, 120, 120, 2), // the odd bar
         part('c', 1, 60, 120, 4), // 60, 80, 100, 120 a beat
-        part('d', null, 90, 90, 4),
+        part('d', 1, 90, 90, 4), // loops
       ],
+      end: SongEnd.loopLastPart,
     );
     await controller.play();
     await _wait(const Duration(seconds: 7));

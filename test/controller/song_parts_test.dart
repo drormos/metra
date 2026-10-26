@@ -16,20 +16,15 @@ const _four = MetronomePattern.standard();
 final _three = MetronomePattern.simple(beatsPerBar: 3, stepsPerBeat: 1);
 final _two = MetronomePattern.simple(beatsPerBar: 2, stepsPerBeat: 1);
 
-SongPart _part(
-  String id,
-  int? bars,
-  int from, [
-  int? to,
-  MetronomePattern? p,
-]) => SongPart(
-  id: id,
-  name: id,
-  bars: bars,
-  tempoStart: from,
-  tempoEnd: to ?? from,
-  pattern: p ?? _four,
-);
+SongPart _part(String id, int bars, int from, [int? to, MetronomePattern? p]) =>
+    SongPart(
+      id: id,
+      name: id,
+      bars: bars,
+      tempoStart: from,
+      tempoEnd: to ?? from,
+      pattern: p ?? _four,
+    );
 
 /// Songs with parts (ui-spec.md "Song parts"), on the fake engine clock.
 void main() {
@@ -71,7 +66,7 @@ void main() {
     final plain = SongPart.steady(
       id: SongPart.firstId,
       name: SongPart.firstName,
-      bars: null,
+      bars: 1,
       bpm: 90,
       pattern: _three,
     );
@@ -79,22 +74,18 @@ void main() {
     expect(controller.parts, isNull);
     expect(controller.partPosition, isNull);
     expect(controller.bpm, 90);
-    controller.loadSong(
-      bpm: 90,
-      pattern: _three,
-      parts: [_part('a', null, 90)],
-    );
+    controller.loadSong(bpm: 90, pattern: _three, parts: [_part('a', 1, 90)]);
     expect(controller.parts, hasLength(1));
     expect(controller.playsParts, isFalse);
   });
 
   test('each part starts on a bar line in its own time signature and '
-      'tempo; an odd one-bar part; the open last part runs on', () async {
+      'tempo; an odd one-bar part; Loop last part runs on', () async {
     load([
       _part('a', 1, 120),
       _part('b', 1, 120, null, _two),
-      _part('c', null, 60, null, _three),
-    ]);
+      _part('c', 1, 60, null, _three),
+    ], end: SongEnd.loopLastPart);
     expect(controller.bpm, 120);
     await controller.play(); // beat 1 at 1120
     runTo(7300);
@@ -106,7 +97,7 @@ void main() {
     ]);
     expect(controller.bpm, 60);
     expect(controller.pattern, _three);
-    expect(controller.partPosition, (part: 2, bar: 1));
+    expect(controller.partPosition, (part: 2, bar: 0), reason: 'again');
     runTo(30000);
     expect(controller.isPlaying, isTrue);
     controller.stop();
@@ -116,7 +107,10 @@ void main() {
 
   test('Gradual changes tempo on every beat, reaching To on the last beat; '
       'the next part starts at its own tempo', () async {
-    load([_part('a', 1, 60, 120), _part('b', null, 90)]);
+    load([
+      _part('a', 1, 60, 120),
+      _part('b', 1, 90),
+    ], end: SongEnd.loopLastPart);
     await controller.play();
     runTo(4500);
     // 60, 80, 100, 120 bpm: 1000, 750, 600, 500 ms; then 90 bpm.
@@ -126,7 +120,10 @@ void main() {
   });
 
   test('the BPM follows the live tempo beat by beat', () async {
-    load([_part('a', 1, 60, 120), _part('b', null, 90)]);
+    load([
+      _part('a', 1, 60, 120),
+      _part('b', 1, 90),
+    ], end: SongEnd.loopLastPart);
     await controller.play();
     runTo(2200);
     expect(controller.bpm, 80);
@@ -136,13 +133,13 @@ void main() {
     expect(controller.bpm, 90);
   });
 
-  test('loop: back to part 1 on the bar line; the count-in plays once, in '
+  test('loop song: back to part 1 on the bar line; the count-in plays once, in '
       'the first part\'s meter', () async {
     controller.setCountIn(1);
     load([
       _part('a', 1, 120, null, _two),
       _part('b', 1, 120, null, _three),
-    ], end: SongEnd.loop);
+    ], end: SongEnd.loopSong);
     await controller.play();
     runTo(6200);
     expect(clicks(6000), [
@@ -154,6 +151,30 @@ void main() {
     ]);
     expect(controller.countingIn, isFalse);
     expect(controller.isPlaying, isTrue);
+  });
+
+  test('loop last part: the last part again and again until Stop; a '
+      'Gradual one restarts its ramp; the song never ends', () async {
+    var ended = 0;
+    controller.onSongEnd = () => ended++;
+    load([
+      _part('a', 1, 120, null, _two),
+      _part('b', 1, 60, 120),
+    ], end: SongEnd.loopLastPart);
+    await controller.play(); // beat 1 at 1120
+    runTo(9000);
+    // a: 2 beats at 120; b: 60, 80, 100, 120 bpm (1000, 750, 600, 500),
+    // then b again from 60.
+    expect(clicks(8000).map((c) => c.$1), [
+      1120, 1620, // a
+      2120, 3120, 3870, 4470, // b
+      4970, 5970, 6720, 7320, 7820, // b again
+    ]);
+    expect(controller.partPosition?.part, 1);
+    runTo(60000);
+    expect(controller.isPlaying, isTrue);
+    expect(ended, 0);
+    controller.stop();
   });
 
   test('End: Stop stops at the end of the last part and says the song '
@@ -178,7 +199,7 @@ void main() {
 
   test('speed up is ignored for a song with parts', () async {
     controller.setOnStart(const OnStart(speedUp: true, changeBy: 10, every: 1));
-    load([_part('a', 4, 120), _part('b', null, 120)]);
+    load([_part('a', 4, 120), _part('b', 1, 120)], end: SongEnd.loopLastPart);
     await controller.play();
     runTo(9000);
     expect(controller.bpm, 120);
@@ -219,7 +240,11 @@ void main() {
 
   test('a tempo change moves the current part, both ends of a Gradual one; '
       'the change holds until the part ends', () async {
-    load([_part('a', 2, 100), _part('b', 2, 60, 120), _part('c', null, 80)]);
+    load([
+      _part('a', 2, 100),
+      _part('b', 2, 60, 120),
+      _part('c', 1, 80),
+    ], end: SongEnd.loopLastPart);
     controller.setBpm(110);
     expect(controller.parts![0].tempoStart, 110);
     controller.jumpToPart(1);
@@ -263,10 +288,7 @@ void main() {
       controller.loadSong(bpm: 120, pattern: _four);
       await controller.play(); // beat 1 at 1120
       runTo(1700); // in bar 0
-      controller.setParts([
-        _part('a', 2, 120),
-        _part('b', null, 60, null, _two),
-      ]);
+      controller.setParts([_part('a', 2, 120), _part('b', 1, 60, null, _two)]);
       expect(controller.playsParts, isTrue);
       runTo(6300);
       // Bars 0 and 1 of a, then b (2/4 at 60) at 5120.
@@ -282,10 +304,13 @@ void main() {
     test(
       'a new tempo for the part playing applies from the next beat',
       () async {
-        load([_part('a', 4, 120), _part('b', null, 120)]);
+        load([
+          _part('a', 4, 120),
+          _part('b', 1, 120),
+        ], end: SongEnd.loopLastPart);
         await controller.play();
         runTo(1300);
-        controller.setParts([_part('a', 4, 60), _part('b', null, 120)]);
+        controller.setParts([_part('a', 4, 60), _part('b', 1, 120)]);
         runTo(4000);
         expect(controller.bpm, 60);
         final times = clicks(4000).map((c) => c.$1).toList();
@@ -295,7 +320,7 @@ void main() {
       },
     );
 
-    test('left with one open part, it plays on as a plain song', () async {
+    test('left with one looping bar, it plays on as a plain song', () async {
       load([_part('a', 1, 120), _part('b', 1, 120)]);
       await controller.play();
       runTo(1300);
@@ -303,11 +328,11 @@ void main() {
         SongPart.steady(
           id: SongPart.firstId,
           name: SongPart.firstName,
-          bars: null,
+          bars: 1,
           bpm: 120,
           pattern: _four,
         ),
-      ]);
+      ], end: SongEnd.loopLastPart);
       expect(controller.parts, isNull);
       runTo(9000);
       expect(controller.isPlaying, isTrue, reason: 'no song end any more');
@@ -331,8 +356,13 @@ void main() {
       dir.deleteSync(recursive: true);
     });
 
-    Song addParts(String name, List<SongPart> parts) =>
-        library.addSong(name: name, bpm: 0, pattern: _four, parts: parts);
+    Song addParts(String name, List<SongPart> parts) => library.addSong(
+      name: name,
+      bpm: 0,
+      pattern: _four,
+      parts: parts,
+      end: SongEnd.stop,
+    );
 
     test('in a set, a song whose parts end leaves the next song ready; it '
         'never starts by itself', () async {

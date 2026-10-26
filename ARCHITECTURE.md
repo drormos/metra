@@ -53,7 +53,7 @@ Timing never comes from Dart timers: the scheduler hands every click to the engi
 | Mode tabs, context row, center button | `SetlistGroup` |
 | Set panel, sets view, Songs list, song picker | `QuickPick` (`QuickPickKind.set` / `sets` / `songs`, `_pickerPanel`) |
 | Top panel, Rhythm panel, When I press Start | `TopPanel.toggle`, `TimeSignatureSheet`, `OnStartSheet` |
-| Song parts, part, when the song ends | `SongPart`, `Song.parts` / `Song.end` (`SongEnd`), `SongPlan` (a `PatternPlan`), `MetronomeController.parts` / `partPosition` / `jumpToPart` |
+| Song parts, part, when the song ends | `SongPart`, `Song.parts` / `Song.end` (`SongEnd`: stop, loopSong, loopLastPart; saved as `endBehavior`), `SongPlan` (a `PatternPlan`), `MetronomeController.parts` / `partPosition` / `jumpToPart` |
 | Count-in, speed up, stop after ("a run") | `OnStart` (`countIn`, `speedUp`, `stopAfter`; `runs`), scheduler `RunPlan` |
 | Up to / Down to | `OnStart.upTo`, `limitLabel` |
 | Step, beat, bar, pulse | `ScheduledStep` (index, `barPosition`, `bar`), `ScheduledPulse` |

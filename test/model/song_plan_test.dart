@@ -7,20 +7,15 @@ import 'package:metra/src/model/song_plan.dart';
 const _four = MetronomePattern.standard();
 final _three = MetronomePattern.simple(beatsPerBar: 3, stepsPerBeat: 1);
 
-SongPart _part(
-  String id,
-  int? bars,
-  int from, [
-  int? to,
-  MetronomePattern? p,
-]) => SongPart(
-  id: id,
-  name: id,
-  bars: bars,
-  tempoStart: from,
-  tempoEnd: to ?? from,
-  pattern: p ?? _four,
-);
+SongPart _part(String id, int bars, int from, [int? to, MetronomePattern? p]) =>
+    SongPart(
+      id: id,
+      name: id,
+      bars: bars,
+      tempoStart: from,
+      tempoEnd: to ?? from,
+      pattern: p ?? _four,
+    );
 
 void main() {
   SongPlan plan(
@@ -52,17 +47,31 @@ void main() {
     expect(p.endsAt(5, Duration.zero), isFalse);
   });
 
-  test('loop goes back to part 1, however long it runs', () {
-    final p = plan([_part('a', 2, 100), _part('b', 1, 100)], end: SongEnd.loop);
+  test('Loop song goes back to part 1, however long it runs', () {
+    final p = plan([
+      _part('a', 2, 100),
+      _part('b', 1, 100),
+    ], end: SongEnd.loopSong);
     expect(p.locate(3), (part: 0, bar: 0));
     expect(p.locate(3000 * 3 + 2), (part: 1, bar: 0));
     expect(p.endsAt(3000, Duration.zero), isFalse);
   });
 
-  test('an open last part runs until Stop', () {
-    final p = plan([_part('a', 1, 100), _part('b', null, 100)]);
-    expect(p.locate(10000), (part: 1, bar: 9999));
+  test('Loop last part plays it again and again until Stop; a Gradual one '
+      'restarts its ramp each time', () {
+    final p = plan([
+      _part('a', 1, 100),
+      _part('b', 2, 100, 120),
+    ], end: SongEnd.loopLastPart);
+    expect(p.locate(1), (part: 1, bar: 0));
+    expect(p.locate(3), (part: 1, bar: 0));
+    expect(p.locate(10000), (part: 1, bar: 1));
     expect(p.endsAt(10000, Duration.zero), isFalse);
+    // Its first beat at From on every pass, its last at To.
+    for (final bar in [1, 3, 9999]) {
+      expect(p.tempoAt(bar, 0, 999), 100);
+      expect(p.tempoAt(bar + 1, 3, 999), 120);
+    }
   });
 
   test('a start part and jumps replace what follows', () {
@@ -101,7 +110,7 @@ void main() {
     expect(p.tempoAt(2, 1, 0), isNull, reason: 'a hand-set tempo holds');
   });
 
-  test('a one-beat Gradual part plays To; an open part is steady', () {
+  test('a one-beat Gradual part plays To', () {
     final one = _part(
       'a',
       1,
@@ -110,12 +119,42 @@ void main() {
       MetronomePattern.simple(beatsPerBar: 1, stepsPerBeat: 1),
     );
     expect(one.tempoAtBeat(0), 120);
-    expect(_part('b', null, 60, 120).gradual, isFalse);
+  });
+
+  test('the words: summary, position line, and when it plays as parts', () {
+    final parts = [_part('Verse', 16, 120), _part('Outro', 8, 120)];
+    expect(
+      partsSummary(parts, SongEnd.loopLastPart),
+      '2 parts · 24 bars, then loops Outro',
+    );
+    expect(partsSummary(parts, SongEnd.stop), '2 parts · 24 bars · ≈ 0:48');
+    expect(
+      partPositionLabel(parts, 1, 2, end: SongEnd.loopLastPart),
+      'Outro · bar 3 of 8 · looping',
+    );
+    expect(partPositionLabel(parts, 1, 2), 'Outro · bar 3 of 8');
+    expect(
+      partPositionLabel(parts, 0, 0, end: SongEnd.loopLastPart),
+      'Verse · bar 1 of 16 · next: Outro',
+    );
+    // One steady part looping plays as a plain song; a Gradual one, an
+    // end, or a second part needs the parts engine.
+    final one = [_part(SongPart.firstName, 1, 120)];
+    expect(partsPlay(one, SongEnd.loopLastPart), isFalse);
+    expect(partsPlain(one, SongEnd.loopLastPart), isTrue);
+    expect(partsPlay(one, SongEnd.stop), isTrue);
+    expect(partsPlay([_part('a', 4, 100, 120)], SongEnd.loopLastPart), isTrue);
+    expect(partsPlay(parts, SongEnd.loopLastPart), isTrue);
+    // 8 looping bars play the same, but the length is kept.
+    final eight = [_part(SongPart.firstName, 8, 120)];
+    expect(partsPlay(eight, SongEnd.loopLastPart), isFalse);
+    expect(partsPlain(eight, SongEnd.loopLastPart), isFalse);
   });
 
   test('speed up is ignored; Stop after still ends it', () {
     final p = plan(
-      [_part('a', 8, 100), _part('b', null, 100)],
+      [_part('a', 8, 100), _part('b', 4, 100)],
+      end: SongEnd.loopLastPart,
       onStart: const OnStart(
         speedUp: true,
         every: 1,

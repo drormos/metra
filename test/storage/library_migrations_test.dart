@@ -177,7 +177,7 @@ void main() {
   }
 
   test(
-    'version 3: each song becomes one open part, ending with Stop',
+    'version 3: each song becomes one part, one bar looping (as it played)',
     () async {
       for (final f in ['library.json', 'settings.json']) {
         File('test/fixtures/library_v3/$f').copySync('${dir.path}/$f');
@@ -189,15 +189,58 @@ void main() {
         expect(song.parts, hasLength(1));
         final part = song.parts.single;
         expect(part.name, 'Part 1');
-        expect(part.open, isTrue);
+        expect(part.bars, 1);
         expect(part.tempoStart, old['bpm']);
         expect(part.tempoEnd, old['bpm']);
         expect(part.pattern.toJson(), old['pattern']);
-        expect(song.end, SongEnd.stop);
+        expect(song.end, SongEnd.loopLastPart);
       }
       expect(l.songs, isNotEmpty);
     },
   );
+
+  test('version 4: an open last part becomes 1 bar with "Loop last part"; '
+      'otherwise "end" keeps its meaning as "endBehavior"', () async {
+    for (final f in ['library.json', 'settings.json']) {
+      File('test/fixtures/library_v4/$f').copySync('${dir.path}/$f');
+    }
+    final raw = decode(File('test/fixtures/library_v4/library.json'));
+    final l = await store.load();
+    final oldSongs = [for (final s in raw['songs']! as List) s as Map];
+    expect(oldSongs.map((s) => s['end']), ['loop', 'stop']);
+    final [dead, blues] = l.songs;
+    // Closed parts: lengths kept, "loop" is the whole song.
+    expect(dead.parts.map((p) => p.bars), [4, 16]);
+    expect(dead.parts.first.gradual, isTrue);
+    expect(dead.end, SongEnd.loopSong);
+    // One open part (every song before parts): one bar, looping, as plain
+    // as before.
+    expect(blues.parts.single.bars, 1);
+    expect(blues.parts.single.tempoStart, 64);
+    expect(blues.end, SongEnd.loopLastPart);
+    expect(partsPlain(blues.parts, blues.end), isTrue);
+    expect(dead.toJson().keys, isNot(contains('end')));
+  });
+
+  test('version 4: a song ending with Stop keeps Stop', () {
+    final v5 = migrate({
+      'version': 4,
+      'setlists': [],
+      'songs': [
+        {
+          'id': 's',
+          'parts': [
+            {'bars': 8},
+          ],
+          'end': 'stop',
+        },
+      ],
+    });
+    final song = (v5['songs']! as List).single as Map;
+    expect(song['endBehavior'], 'stop');
+    expect(song.containsKey('end'), isFalse);
+    expect((song['parts'] as List).single, {'bars': 8});
+  });
 
   test('every step runs in order up to the latest; unknown versions throw', () {
     final latest = migrate({'version': 1, 'songs': [], 'setlists': []});

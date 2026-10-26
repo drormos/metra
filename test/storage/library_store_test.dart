@@ -140,7 +140,7 @@ void main() {
     v1['songs'] = [
       for (final song in v1['songs']! as List<Map<String, Object?>>)
         {
-          ...song..remove('end'),
+          ...song..remove('endBehavior'),
           'bpm': (song.remove('parts')! as List).first['tempoStart'],
           'pattern': withSong().songs.first.pattern.toJson(),
         },

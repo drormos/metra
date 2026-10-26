@@ -38,17 +38,12 @@ void main() {
     }
   });
 
-  // Intro (2 bars, 100), Verse (4 bars, 3/4, 120), Outro (open, 90).
+  // Intro (2 bars, 100), Verse (4 bars, 3/4, 120), Outro (8 bars, 90,
+  // looping: the default end).
   final threeParts = [
     SongPart.steady(id: 'i', name: 'Intro', bars: 2, bpm: 100, pattern: _four),
     SongPart.steady(id: 'v', name: 'Verse', bars: 4, bpm: 120, pattern: _three),
-    SongPart.steady(
-      id: 'o',
-      name: 'Outro',
-      bars: null,
-      bpm: 90,
-      pattern: _four,
-    ),
+    SongPart.steady(id: 'o', name: 'Outro', bars: 8, bpm: 90, pattern: _four),
   ];
 
   /// "Dead Weight" with [parts] (or one plain part) as a single song;
@@ -160,7 +155,7 @@ void main() {
     // Past the touch slop, ~70 px of map: from the Verse into the Outro.
     await slide(tester, -90);
     expect(metronome.partPosition?.part, 2);
-    expect(line(tester), 'Outro · bar 1');
+    expect(line(tester), 'Outro · bar 1 of 8 · looping');
     await slide(tester, 200);
     expect(metronome.partPosition?.part, 0);
   });
@@ -178,7 +173,7 @@ void main() {
     expect(metronome.partPosition?.part, 0, reason: 'until the bar line');
     await runTo(tester, 3700); // bar 2 at 3520
     expect(metronome.partPosition, (part: 2, bar: 0));
-    expect(line(tester), 'Outro · bar 1');
+    expect(line(tester), 'Outro · bar 1 of 8 · looping');
     expect(metronome.bpm, 90);
     metronome.stop();
     await tester.pump(const Duration(seconds: 1));
@@ -263,12 +258,11 @@ void main() {
     expect(metronome.pattern, _three);
   });
 
-  test('map positions: to scale, a short part never thinner than 24 px, an '
-      'open part held a few bars in', () {
+  test('map positions: to scale, a short part never thinner than 24 px', () {
     final blocks = SongMap.layout(threeParts);
     expect([for (final b in blocks) b.x], [0, 31, 90]);
     expect(SongMap.position(threeParts, blocks, 1, 2, 0.5), 31 + 2.5 / 4 * 56);
-    expect(SongMap.position(threeParts, blocks, 2, 40, 0), 90 + 3 * 14);
+    expect(SongMap.position(threeParts, blocks, 2, 4, 0), 90 + 4 * 14);
     final short = SongMap.layout([
       SongPart.steady(id: 'a', name: 'a', bars: 1, bpm: 90, pattern: _four),
     ]);

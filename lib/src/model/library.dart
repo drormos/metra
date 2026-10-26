@@ -14,7 +14,8 @@ export 'song_part.dart';
 /// part, and then [bpm] and [pattern] are simply that part's.
 @immutable
 class Song {
-  /// A one-part song: one open part of [bpm] and [pattern].
+  /// A one-part song: one bar of [bpm] and [pattern], looping until Stop
+  /// (how every song played before parts).
   const Song({
     required this.id,
     required this.name,
@@ -24,14 +25,14 @@ class Song {
     this.editedAt,
     this.playedAt,
   }) : _parts = null,
-       end = SongEnd.stop;
+       end = SongEnd.loopLastPart;
 
   /// A song of [parts] (at least one).
   const Song.withParts({
     required this.id,
     required this.name,
     required List<SongPart> this._parts,
-    this.end = SongEnd.stop,
+    this.end = SongEnd.loopLastPart,
     this.onStart = OnStart.off,
     this.editedAt,
     this.playedAt,
@@ -47,20 +48,20 @@ class Song {
   final MetronomePattern? _pattern;
   final List<SongPart>? _parts;
 
-  /// The parts in order; one open part for a one-part song.
+  /// The parts in order; one bar for a one-part song.
   List<SongPart> get parts =>
       _parts ??
       [
         SongPart.steady(
           id: SongPart.firstId,
           name: SongPart.firstName,
-          bars: null,
+          bars: 1,
           bpm: _bpm,
           pattern: _pattern!,
         ),
       ];
 
-  /// "When the song ends": stop or loop to the first part.
+  /// "When the song ends": stop, loop the song, or loop its last part.
   final SongEnd end;
 
   /// The first part's tempo and pattern: a one-part song's own.
@@ -119,7 +120,7 @@ class Song {
     'id': id,
     'name': name,
     'parts': [for (final part in parts) part.toJson()],
-    'end': end.name,
+    'endBehavior': end.name,
     'onStart': onStart.toJson(),
     'editedAt': editedAt?.millisecondsSinceEpoch,
     'playedAt': playedAt?.millisecondsSinceEpoch,
@@ -137,7 +138,9 @@ class Song {
       id: json['id'] as String,
       name: json['name'] as String,
       parts: parts,
-      end: SongEnd.values.asNameMap()[json['end']] ?? SongEnd.stop,
+      end:
+          SongEnd.values.asNameMap()[json['endBehavior']] ??
+          SongEnd.loopLastPart,
       onStart: OnStart.fromJson(json['onStart'] as Map<String, Object?>),
       editedAt: switch (json['editedAt']) {
         final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
@@ -466,21 +469,15 @@ class Library {
     );
   }
 
-  /// Tempos and patterns in range, 1–999 bars, only the last part open
-  /// (an earlier open one plays 1 bar), and an open part steady.
+  /// Tempos and patterns in range, and 1–999 bars.
   static List<SongPart> _fixParts(List<SongPart> parts) => [
-    for (final (i, part) in parts.indexed)
-      () {
-        final last = i == parts.length - 1;
-        final bars = part.bars == null && !last ? 1 : part.bars?.clamp(1, 999);
-        final start = part.tempoStart.clamp(30, 300);
-        return part.copyWith(
-          bars: bars,
-          tempoStart: start,
-          tempoEnd: bars == null ? start : part.tempoEnd.clamp(30, 300),
-          pattern: _fixPattern(part.pattern),
-        );
-      }(),
+    for (final part in parts)
+      part.copyWith(
+        bars: part.bars.clamp(1, 999),
+        tempoStart: part.tempoStart.clamp(30, 300),
+        tempoEnd: part.tempoEnd.clamp(30, 300),
+        pattern: _fixPattern(part.pattern),
+      ),
   ];
 
   /// 1–16 beats, 1–4 clicks per beat, a 4 or 8 unit.

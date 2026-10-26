@@ -98,7 +98,7 @@ void main() {
       expect(find.byType(PartsPage), findsOneWidget);
       expect(find.byType(TimeSignatureSheet), findsNothing);
       expect(find.text('Dead Weight'), findsWidgets);
-      expect(summary(tester), '1 part · until you stop');
+      expect(summary(tester), '1 part · 1 bar, then loops Part 1');
       await tester.pageBack();
       await tester.pumpAndSettle();
       await openPage(tester);
@@ -139,10 +139,8 @@ void main() {
     final title = tester.getTopLeft(find.byKey(PartsPage.nameKey));
     await tapIn(tester, find.byKey(PartsPage.addKey));
     expect(names(), ['Part 1', 'Part 2']);
-    expect(parts()[0].bars, PartsPage.defaultBars);
-    expect(parts()[1].open, isTrue);
-    expect(summary(tester), '2 parts · 8 bars, then until you stop');
-    expect(find.byKey(PartsPage.lengthKindKey), findsOneWidget, reason: 'open');
+    expect(parts().map((p) => p.bars), [1, 1]);
+    expect(summary(tester), '2 parts · 2 bars, then loops Part 2');
     expect(library.songChanged(metronome), isTrue);
     expect(shown(PartsPage.saveKey), isTrue);
     expect(shown(PartsPage.discardKey), isTrue);
@@ -193,41 +191,52 @@ void main() {
     expect(find.byKey(MetronomeScreen.revertKey), findsOneWidget);
   });
 
-  testWidgets('the last part only: Bars / Until you stop; the switch '
-      'keeps the card\'s shape; open, no "When the song ends"', (tester) async {
+  testWidgets('"When the song ends": three chips under the label, always '
+      'shown; adding or removing parts never changes the choice; Loop last '
+      'part marks the last block', (tester) async {
     await pump(tester);
     await openPage(tester);
-    await tapIn(tester, find.byKey(PartsPage.addKey)); // Part 2, open
-    expect(find.byKey(PartsPage.endKey), findsNothing);
-    expect(find.text('Plays until you press Stop'), findsOneWidget);
-    // From the card's header: the list may scroll, the card mustn't change.
-    double top(Key key) =>
-        tester.getTopLeft(find.byKey(key)).dy -
-        tester.getTopLeft(find.byKey(PartsPage.cardKey(1))).dy;
-    final tempoTop = top(PartsPage.tempoKindKey);
-    final rhythmTop = top(PartsPage.rhythmKey);
-    await tapIn(tester, chip(PartsPage.lengthKindKey, 'Bars'));
-    expect(parts()[1].bars, PartsPage.defaultBars);
-    expect(find.text('Plays until you press Stop'), findsNothing);
-    expect(top(PartsPage.tempoKindKey), tempoTop);
-    expect(top(PartsPage.rhythmKey), rhythmTop, reason: 'same height');
+    // A plain song loops its bar: the choice is there with one part too.
+    expect(metronome.songEnd, SongEnd.loopLastPart);
+    expect(find.byKey(PartsPage.loopIconKey), findsOneWidget);
+    expect(find.text('Until you stop'), findsNothing);
+    final label = tester.getTopLeft(find.text('When the song ends'));
+    final stop = chip(PartsPage.endKey, 'Stop');
+    expect(tester.getTopLeft(stop).dy, greaterThan(label.dy), reason: 'below');
+    expect(chip(PartsPage.endKey, 'Loop song'), findsOneWidget);
+    expect(chip(PartsPage.endKey, 'Loop last part'), findsOneWidget);
+    await tapIn(tester, find.byKey(PartsPage.addKey));
+    expect(metronome.songEnd, SongEnd.loopLastPart);
     await tester.dragUntilVisible(
       find.byKey(PartsPage.endKey),
       find.byType(ReorderableListView),
       const Offset(0, -100),
     );
-    expect(find.byKey(PartsPage.endKey), findsOneWidget);
-    await tapIn(tester, chip(PartsPage.endKey, 'Repeat song'));
-    expect(metronome.songEnd, SongEnd.loop);
-    expect(summary(tester), '2 parts · 16 bars · ≈ 0:32');
-    // Part 1 isn't the last: no length chips on its card.
-    await tester.dragUntilVisible(
-      find.byKey(PartsPage.cardKey(0)),
-      find.byType(ReorderableListView),
-      const Offset(0, 100),
-    );
-    await tapIn(tester, find.byKey(PartsPage.cardKey(0)));
-    expect(find.byKey(PartsPage.lengthKindKey), findsNothing);
+    await tapIn(tester, chip(PartsPage.endKey, 'Loop song'));
+    expect(metronome.songEnd, SongEnd.loopSong);
+    expect(find.byKey(PartsPage.loopIconKey), findsNothing);
+    expect(summary(tester), '2 parts · 2 bars · ≈ 0:04');
+    await tapIn(tester, chip(PartsPage.endKey, 'Stop'));
+    expect(metronome.songEnd, SongEnd.stop);
+    await tapIn(tester, find.byKey(PartsPage.addKey));
+    expect(metronome.songEnd, SongEnd.stop);
+    tester
+        .state<ScrollableState>(
+          find
+              .descendant(
+                of: find.byType(ReorderableListView),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        )
+        .position
+        .jumpTo(0);
+    await tester.pumpAndSettle();
+    await tester.drag(find.byKey(PartsPage.cardKey(0)), const Offset(-300, 0));
+    await tester.pumpAndSettle();
+    expect(parts(), hasLength(2));
+    expect(metronome.songEnd, SongEnd.stop);
+    await tester.pump(const Duration(seconds: 7));
   });
 
   testWidgets('Gradual: From the previous part\'s tempo, To this one\'s; the '
@@ -235,7 +244,6 @@ void main() {
     await pump(tester);
     await openPage(tester);
     await tapIn(tester, find.byKey(PartsPage.addKey));
-    await tapIn(tester, chip(PartsPage.lengthKindKey, 'Bars'));
     await tapIn(tester, chip(PartsPage.tempoKindKey, 'Gradual'));
     expect((parts()[1].tempoStart, parts()[1].tempoEnd), (120, 130));
     // "120 → 130" on the card (the To field shows 130 too).
@@ -244,21 +252,6 @@ void main() {
     expect(parts()[1].tempoEnd, 131);
     await tapIn(tester, chip(PartsPage.tempoKindKey, 'Steady'));
     expect(parts()[1].gradual, isFalse);
-  });
-
-  testWidgets('a Gradual last part can\'t run until you stop: the chip '
-      'only hints; Gradual on an open part gives it a length', (tester) async {
-    await pump(tester);
-    await openPage(tester);
-    await tapIn(tester, find.byKey(PartsPage.addKey)); // Part 2, open
-    await tapIn(tester, chip(PartsPage.tempoKindKey, 'Gradual'));
-    expect(parts()[1].bars, PartsPage.defaultBars);
-    expect(parts()[1].gradual, isTrue);
-    await tapIn(tester, chip(PartsPage.lengthKindKey, 'Until you stop'));
-    expect(parts()[1].open, isFalse);
-    expect(find.text('Gradual parts need a length'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 3));
-    await tester.pumpAndSettle();
   });
 
   testWidgets('swipe removes a part, with Undo; the last one can\'t go', (
@@ -306,9 +299,6 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
     expect(names(), ['Chorus', 'Part 2', 'Chorus']);
-    // The open part, no longer last, gets a length.
-    expect(parts()[1].bars, PartsPage.defaultBars);
-    expect(parts().any((p) => p.open), isFalse);
   });
 
   testWidgets('the strip opens the tapped part\'s card', (tester) async {
@@ -317,7 +307,7 @@ void main() {
     await tapIn(tester, find.byKey(PartsPage.addKey));
     await tapIn(tester, find.byKey(PartsPage.stripKey(0)));
     expect(find.byKey(PartsPage.duplicateKey), findsOneWidget);
-    expect(find.byKey(PartsPage.lengthKindKey), findsNothing, reason: 'part 1');
+    expect(find.byKey(PartsPage.partNameKey), findsOneWidget);
   });
 
   testWidgets('Rhythm › edits the part\'s time signature', (tester) async {
@@ -397,11 +387,11 @@ void main() {
       await pump(tester);
       await openPage(tester);
       await tapIn(tester, find.byKey(PartsPage.addKey));
-      await tapIn(tester, chip(PartsPage.lengthKindKey, 'Bars'));
       double y(Key key) => tester.getTopLeft(find.byKey(key)).dy;
+      final length = ValueStepper.plusKey('Length');
       expect(y(PartsPage.partNameKey), lessThan(y(PartsPage.tempoKindKey)));
-      expect(y(PartsPage.tempoKindKey), lessThan(y(PartsPage.lengthKindKey)));
-      expect(y(PartsPage.lengthKindKey), lessThan(y(PartsPage.rhythmKey)));
+      expect(y(PartsPage.tempoKindKey), lessThan(y(length)));
+      expect(y(length), lessThan(y(PartsPage.rhythmKey)));
     });
 
     testWidgets('a stepper held repeats and speeds up', (tester) async {
@@ -442,7 +432,7 @@ void main() {
   });
 
   group('polish', () {
-    SongPart part(String id, int? bars, int from, int to, [int beats = 4]) =>
+    SongPart part(String id, int bars, int from, int to, [int beats = 4]) =>
         SongPart(
           id: id,
           name: id,

@@ -35,7 +35,7 @@ final sampleLibrary = Library(
           ).cycleBeat(2).toggleCell(3, 1).withPolyrhythm(3).cyclePulse(1),
         ),
       ],
-      end: SongEnd.loop,
+      end: SongEnd.loopSong,
       onStart: const OnStart(
         countInOn: true,
         countInBars: 2,

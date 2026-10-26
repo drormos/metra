@@ -63,7 +63,7 @@ void main() {
         SongPart(
           id: 'p$i',
           name: 'Part $i',
-          bars: i == count - 1 && r.nextInt(3) == 0 ? null : 1 + r.nextInt(3),
+          bars: 1 + r.nextInt(3),
           tempoStart: 30 + r.nextInt(271),
           tempoEnd: 30 + r.nextInt(271),
           pattern: randomPattern(r),
@@ -71,7 +71,7 @@ void main() {
     ];
     return SongPlan(
       parts: parts,
-      end: r.nextBool() ? SongEnd.stop : SongEnd.loop,
+      end: SongEnd.values[r.nextInt(SongEnd.values.length)],
       onStart: r.nextInt(4) == 0
           ? OnStart(
               stopOn: true,

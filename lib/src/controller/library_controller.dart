@@ -440,7 +440,7 @@ class LibraryController extends ChangeNotifier {
   /// applies as on the main screen (no restart on beat 1).
   void revertSong(MetronomeController metronome) {
     if (currentSong case final song?) {
-      if (!partsPlain(song.parts) || metronome.parts != null) {
+      if (!partsPlain(song.parts, song.end) || metronome.parts != null) {
         metronome.applyParts(song.parts, song.end, onStart: song.onStart);
       } else {
         metronome.applyEdit(
@@ -509,9 +509,18 @@ class LibraryController extends ChangeNotifier {
                 end: metronome.songEnd,
                 onStart: metronome.onStart,
               )
+            // A plain one: one looping bar.
             : song.copyWith(
-                bpm: metronome.startBpm,
-                pattern: metronome.pattern,
+                parts: [
+                  SongPart.steady(
+                    id: SongPart.firstId,
+                    name: SongPart.firstName,
+                    bars: 1,
+                    bpm: metronome.startBpm,
+                    pattern: metronome.pattern,
+                  ),
+                ],
+                end: SongEnd.loopLastPart,
                 onStart: metronome.onStart,
               ),
       );
@@ -833,7 +842,7 @@ class LibraryController extends ChangeNotifier {
     required MetronomePattern pattern,
     OnStart onStart = OnStart.off,
     List<SongPart>? parts,
-    SongEnd end = SongEnd.stop,
+    SongEnd end = SongEnd.loopLastPart,
   }) {
     final song = parts != null
         ? Song.withParts(

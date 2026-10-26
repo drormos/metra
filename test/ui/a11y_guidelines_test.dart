@@ -287,7 +287,7 @@ void main() {
       SongPart.steady(
         id: 'o',
         name: 'Outro',
-        bars: null,
+        bars: 8,
         bpm: 120,
         pattern: const MetronomePattern.standard(),
       ),

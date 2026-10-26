@@ -73,23 +73,25 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
   // or Free play), what happens at its end, the part Start begins with,
   // and the plan while it plays parts.
   List<SongPart>? _parts;
-  SongEnd _end = SongEnd.stop;
+  SongEnd _end = SongEnd.loopLastPart;
   int _startPart = 0;
   SongPlan? _plan;
 
   /// The loaded song's parts with the changes made here (unsaved until
-  /// saved to the song); null for a plain one-part song (one open "Part
-  /// 1": its tempo and pattern are [bpm] and [pattern]) and in Free play.
+  /// saved to the song); null for a plain one-part song (one looping bar
+  /// of "Part 1": its tempo and pattern are [bpm] and [pattern]) and in
+  /// Free play.
   List<SongPart>? get parts => _parts;
 
-  /// Whether the song plays as parts (2 or more, or a length), not as one
-  /// open part with "When I press Start" as before.
-  bool get playsParts => _parts != null && partsPlay(_parts!);
+  /// Whether the song plays as parts (2 or more, a Gradual one, or an end
+  /// other than looping it), not as one looping part with "When I press
+  /// Start" as before.
+  bool get playsParts => _parts != null && partsPlay(_parts!, _end);
 
   // While the page's parts apply, the edits they make don't edit them.
   bool _applying = false;
 
-  /// "When the song ends" of the loaded song with parts.
+  /// "When the song ends" of the loaded song (a plain one loops its bar).
   SongEnd get songEnd => _end;
 
   /// A song with parts ended by itself (not Stop after, not by hand).
@@ -454,16 +456,16 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
   /// last). Playing, nothing restarts: the part playing takes its new
   /// tempo and pattern as an edit on the main screen would, the others
   /// play as they now are when they come; a song that gains parts goes on
-  /// in its first part, and one left with a single open part plays on as
-  /// a plain song.
+  /// in its first part, and one left with a single steady looping part
+  /// plays on as a plain song.
   void setParts(List<SongPart> parts, {SongEnd? end}) {
     final wasPlaying = playsParts;
     final at = (_parts == null ? 0 : partPosition!.part).clamp(
       0,
       parts.length - 1,
     );
-    _parts = partsPlain(parts) ? null : parts;
     if (end != null) _end = end;
+    _parts = partsPlain(parts, _end) ? null : parts;
     if (!_playing) _startPart = at;
     if (_playing && playsParts) {
       if (_plan case final plan?) {
@@ -498,6 +500,7 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
     if (_parts == null) return;
     final plays = playsParts;
     _parts = null;
+    _end = SongEnd.loopLastPart;
     _startPart = 0;
     if (_playing && plays) {
       _plan = null;
@@ -586,11 +589,11 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
     required MetronomePattern pattern,
     OnStart? onStart,
     List<SongPart>? parts,
-    SongEnd end = SongEnd.stop,
+    SongEnd end = SongEnd.loopLastPart,
   }) {
     if (onStart != null) _onStart = onStart;
-    _parts = parts == null || partsPlain(parts) ? null : parts;
     _end = end;
+    _parts = parts == null || partsPlain(parts, end) ? null : parts;
     _startPart = 0;
     if (_parts case final parts?) {
       bpm = parts.first.tempoStart;

@@ -5,8 +5,9 @@ import 'song_part.dart';
 
 /// A song's parts as the scheduler plays them (ui-spec.md "Song parts"):
 /// each part starts on a bar line in its own pattern; a Gradual part
-/// changes tempo on every beat; the song stops or loops at its end; an
-/// open last part repeats until Stop. Stop after still applies; speed up
+/// changes tempo on every beat; at its end the song stops, loops, or
+/// loops its last part (a Gradual one restarts its ramp each time), until
+/// Stop. Stop after still applies; speed up
 /// doesn't (the parts decide the tempo).
 class SongPlan implements PatternPlan {
   SongPlan({
@@ -42,18 +43,22 @@ class SongPlan implements PatternPlan {
     );
     var part = from.part.clamp(0, parts.length - 1);
     var into = bar - from.bar;
-    // Looping, whole passes of the song are skipped at once.
-    final total = parts.every((p) => !p.open)
-        ? parts.fold(0, (sum, p) => sum + p.bars!)
-        : null;
     while (true) {
       final bars = parts[part].bars;
-      if (bars == null || into < bars) return (part: part, bar: into);
+      if (into < bars) return (part: part, bar: into);
       into -= bars;
       if (++part < parts.length) continue;
-      if (end == SongEnd.stop) return null;
-      part = 0;
-      into %= total!;
+      // Looping, whole passes are skipped at once.
+      switch (end) {
+        case SongEnd.stop:
+          return null;
+        case SongEnd.loopLastPart:
+          part = parts.length - 1;
+          into %= parts[part].bars;
+        case SongEnd.loopSong:
+          part = 0;
+          into %= parts.fold(0, (sum, p) => sum + p.bars);
+      }
     }
   }
 

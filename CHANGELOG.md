@@ -4,8 +4,10 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Changed
+- Song parts: every part has a length in bars. "Until you stop" is replaced by "When the song ends": Stop, Loop song or Loop last part (a Gradual last part restarts its ramp each time). Existing songs loop their bar as before. The strip marks a looping last part with a loop icon; the summary reads "45 bars, then loops Outro" and the line under the BPM "Outro · bar 3 of 8 · looping".
+
 ### Fixed
-- Parts page: switching the last part between Bars and Until you stop no longer reshapes the card; Gradual parts explain why they need a length.
 - Parts page: an open card can be held and reordered however tall it is.
 - Parts page: a song that ends while you edit it stays loaded (in a set, it no longer moves on to the next song).
 

@@ -15,10 +15,13 @@
 /// - 3 (build 56 on): settings gain `keepScreenOn` and `stageMode`.
 /// - 4 (build 58 on): a song is a list of parts and an `end`; its `bpm`
 ///   and `pattern` became one open part.
+/// - 5 (build 68 on): every part has a length; `end` became
+///   `endBehavior` (`stop` | `loopSong` | `loopLastPart`), and an open
+///   last part became 1 bar with `loopLastPart`.
 library;
 
 /// The latest format, and the two files' shapes in it.
-const latestVersion = 4;
+const latestVersion = 5;
 
 typedef Json = Map<String, Object?>;
 
@@ -41,7 +44,7 @@ Json migrate(Json json) {
   return current;
 }
 
-final List<Json Function(Json)> _steps = [_v1ToV2, _v2ToV3, _v3ToV4];
+final List<Json Function(Json)> _steps = [_v1ToV2, _v2ToV3, _v3ToV4, _v4ToV5];
 
 /// Version 1, in all the shapes it shipped in, to version 2:
 /// - fields added after build 2 get their defaults (time signature unit,
@@ -167,6 +170,42 @@ Json _v3ToV4(Json v3) => {
           ],
           'end': 'stop',
         }
+      else
+        raw,
+  ],
+};
+
+/// Version 4 to 5: a song with an open part (only ever the last; one
+/// open part is how every song before parts played) gets 1 bar there and
+/// "Loop last part", which plays the same; otherwise `end` keeps its
+/// meaning: `stop`, or `loop` (the whole song) as `loopSong`.
+Json _v4ToV5(Json v4) => {
+  ...v4,
+  'version': 5,
+  'songs': [
+    for (final raw in v4['songs']! as List)
+      if (raw is Json && raw['parts'] is List)
+        () {
+          final parts = [
+            for (final part in raw['parts'] as List)
+              part is Json && part['bars'] == null
+                  ? {...part, 'bars': 1}
+                  : part,
+          ];
+          final open = (raw['parts'] as List).any(
+            (p) => p is Json && p['bars'] == null,
+          );
+          return {
+            for (final MapEntry(:key, :value) in raw.entries)
+              if (key != 'end') key: value,
+            'parts': parts,
+            'endBehavior': open
+                ? 'loopLastPart'
+                : raw['end'] == 'loop'
+                ? 'loopSong'
+                : 'stop',
+          };
+        }()
       else
         raw,
   ],

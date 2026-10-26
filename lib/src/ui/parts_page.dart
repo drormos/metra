@@ -52,9 +52,8 @@ class PartsPage extends StatefulWidget {
   static const summaryKey = Key('parts-summary');
   static const addKey = Key('parts-add');
   static const endKey = Key('parts-end');
-  static const lengthKindKey = Key('parts-length-kind');
   static const tempoKindKey = Key('parts-tempo-kind');
-  static const untilStopKey = Key('parts-until-stop');
+  static const loopIconKey = Key('parts-loop-icon');
   static const rhythmKey = Key('parts-rhythm');
   static const playFromKey = Key('parts-play-from');
   static const duplicateKey = Key('parts-duplicate');
@@ -66,9 +65,6 @@ class PartsPage extends StatefulWidget {
   static Key cardKey(int i) => ValueKey('parts-card-$i');
   static Key stripKey(int i) => ValueKey('parts-strip-$i');
   static Key accentKey(int beat) => ValueKey('parts-accent-$beat');
-
-  /// What an open part that stops being the last one gets.
-  static const defaultBars = 8;
 
   static const customName = 'Custom name…';
 
@@ -151,27 +147,14 @@ class _PartsPageState extends State<PartsPage>
         SongPart.steady(
           id: song.parts.first.id,
           name: song.parts.first.name,
-          bars: null,
+          bars: song.parts.first.bars,
           bpm: _metronome.startBpm,
           pattern: _metronome.pattern,
         ),
       ];
 
-  SongEnd get _end =>
-      _metronome.parts == null ? SongEnd.stop : _metronome.songEnd;
-
-  /// Applies [parts]: only the last part may run until you stop (an earlier
-  /// open one gets [PartsPage.defaultBars]), and an open part is steady.
-  void _set(List<SongPart> parts, {SongEnd? end}) {
-    _metronome.setParts([
-      for (final (i, p) in parts.indexed)
-        p.open && i < parts.length - 1
-            ? p.copyWith(bars: PartsPage.defaultBars)
-            : p.open
-            ? p.copyWith(tempoEnd: p.tempoStart)
-            : p,
-    ], end: end);
-  }
+  void _set(List<SongPart> parts, {SongEnd? end}) =>
+      _metronome.setParts(parts, end: end);
 
   void _edit(Song song, int i, SongPart Function(SongPart) change) {
     final parts = [..._parts(song)];
@@ -437,9 +420,9 @@ class _PartsPageState extends State<PartsPage>
                           ),
                         ),
                         BrightenSwap(
-                          value: partsSummary(parts),
+                          value: partsSummary(parts, _metronome.songEnd),
                           child: Text(
-                            partsSummary(parts),
+                            partsSummary(parts, _metronome.songEnd),
                             key: PartsPage.summaryKey,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -537,16 +520,12 @@ class _PartsPageState extends State<PartsPage>
     );
   }
 
-  /// The whole song to scale: blocks proportional to bars (an open part a
-  /// fading block with "∞"); the open card's block is filled. Tap a block:
+  /// The whole song to scale: blocks proportional to bars, a loop icon on
+  /// the last when it loops; the open card's block is filled. Tap a block:
   /// its card opens and scrolls into view.
   Widget _strip(BuildContext context, List<SongPart> parts) {
     final colors = context.colors;
-    final closed = [for (final p in parts) ?p.bars];
-    final average = closed.isEmpty
-        ? 8
-        : (closed.reduce((a, b) => a + b) / closed.length).ceil();
-    final flexes = [for (final p in parts) p.bars ?? average];
+    final flexes = [for (final p in parts) p.bars];
     final sum = flexes.fold(0, (a, b) => a + b);
     final resize = MetraMotion.of(context, MetraMotion.cardExpand);
     return LayoutBuilder(
@@ -589,6 +568,9 @@ class _PartsPageState extends State<PartsPage>
                               colors,
                               part,
                               selected: part.id == _openId,
+                              loops:
+                                  i == parts.length - 1 &&
+                                  _metronome.songEnd == SongEnd.loopLastPart,
                             ),
                           ),
                         ),
@@ -609,6 +591,7 @@ class _PartsPageState extends State<PartsPage>
     MetraColors colors,
     SongPart part, {
     required bool selected,
+    required bool loops,
   }) {
     final fill = selected ? colors.text : colors.tickResting;
     // The highlight cross-fades.
@@ -618,13 +601,7 @@ class _PartsPageState extends State<PartsPage>
       alignment: Alignment.center,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(4),
-        color: part.open ? null : fill,
-        gradient: part.open
-            ? LinearGradient(
-                colors: [fill, fill, fill.withAlpha(0)],
-                stops: const [0, 0.55, 1],
-              )
-            : null,
+        color: fill,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -643,11 +620,12 @@ class _PartsPageState extends State<PartsPage>
               ),
             ),
           ),
-          // An open part runs until you stop.
-          if (part.open) ...[
+          // The last part loops until you stop.
+          if (loops) ...[
             const SizedBox(width: 3),
             Icon(
-              Icons.all_inclusive,
+              Icons.repeat,
+              key: PartsPage.loopIconKey,
               size: 12,
               color: selected ? colors.background : colors.muted,
             ),
@@ -838,7 +816,6 @@ class _PartsPageState extends State<PartsPage>
   ) {
     final colors = context.colors;
     final part = parts[i];
-    final last = i == parts.length - 1;
     final gradual = part.gradual || _gradual.contains(part.id);
     void edit(SongPart Function(SongPart) change) => _edit(song, i, change);
     int bpm(int v) =>
@@ -890,8 +867,6 @@ class _PartsPageState extends State<PartsPage>
               );
               edit((p) {
                 if (!on) return p.copyWith(tempoEnd: p.tempoStart);
-                // A Gradual part needs a length to reach To in.
-                p = p.copyWith(bars: p.bars ?? PartsPage.defaultBars);
                 // From the previous part's tempo, to this one's.
                 final from = i > 0 ? parts[i - 1].tempoEnd : p.tempoStart;
                 var to = p.tempoStart;
@@ -913,42 +888,7 @@ class _PartsPageState extends State<PartsPage>
               part.tempoStart,
               (v) => part.copyWith(tempoStart: v, tempoEnd: v),
             ),
-          if (last)
-            Choices<bool>(
-              key: PartsPage.lengthKindKey,
-              label: 'Length',
-              options: const {false: 'Bars', true: 'Until you stop'},
-              selected: part.open,
-              hints: gradual
-                  ? const {true: 'Gradual parts need a length'}
-                  : const {},
-              onSelected: (open) => edit(
-                (p) => open
-                    ? p.copyWith(bars: null, tempoEnd: p.tempoStart)
-                    : p.copyWith(bars: PartsPage.defaultBars),
-              ),
-            ),
-          // The slot keeps the stepper's height either way: switching to
-          // Until you stop never reshapes the card.
-          BrightenSwap(
-            value: part.open,
-            child: IndexedStack(
-              alignment: Alignment.centerLeft,
-              index: part.open ? 1 : 0,
-              children: [
-                _barsStepper(
-                  part.bars ?? PartsPage.defaultBars,
-                  label: last ? 'Bars' : 'Length',
-                  edit: edit,
-                ),
-                Text(
-                  'Plays until you press Stop',
-                  key: PartsPage.untilStopKey,
-                  style: TextStyle(fontSize: 15, color: colors.muted),
-                ),
-              ],
-            ),
-          ),
+          _barsStepper(part.bars, label: 'Length', edit: edit),
           Row(
             children: [
               const Expanded(
@@ -1184,8 +1124,7 @@ class _PartsPageState extends State<PartsPage>
     );
   }
 
-  /// "+ Add part" (dashed) and "When the song ends" (not when the last part
-  /// runs until you stop).
+  /// "+ Add part" (dashed) and "When the song ends".
   Widget _footer(BuildContext context, Song song, List<SongPart> parts) {
     final colors = context.colors;
     return Column(
@@ -1208,20 +1147,21 @@ class _PartsPageState extends State<PartsPage>
             ),
           ),
         ),
-        if (!parts.last.open)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Choices<SongEnd>(
-              key: PartsPage.endKey,
-              label: 'When the song ends',
-              options: const {
-                SongEnd.stop: 'Stop',
-                SongEnd.loop: 'Repeat song',
-              },
-              selected: _end,
-              onSelected: (end) => _set(parts, end: end),
-            ),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Choices<SongEnd>(
+            key: PartsPage.endKey,
+            label: 'When the song ends',
+            below: true,
+            options: const {
+              SongEnd.stop: 'Stop',
+              SongEnd.loopSong: 'Loop song',
+              SongEnd.loopLastPart: 'Loop last part',
+            },
+            selected: _metronome.songEnd,
+            onSelected: (end) => _set(parts, end: end),
           ),
+        ),
       ],
     );
   }

@@ -912,7 +912,12 @@ class _TempoLineState extends State<_TempoLine> {
     if (parts == null || parts.length < 2 || at == null) {
       return tempoName(widget.bpm);
     }
-    return partPositionLabel(parts, at.part, at.bar);
+    return partPositionLabel(
+      parts,
+      at.part,
+      at.bar,
+      end: widget.controller.songEnd,
+    );
   }
 
   /// Revert · Save · Save as new; B's line floats below the first time.
@@ -1058,7 +1063,12 @@ class RunLine extends StatefulWidget {
         // left" (no "next", to keep it one short line).
         final on = controller.onStart;
         if (on.stopAfter == StopAfter.off) {
-          return partPositionLabel(parts, at.part, at.bar);
+          return partPositionLabel(
+            parts,
+            at.part,
+            at.bar,
+            end: controller.songEnd,
+          );
         }
         final start = controller.runStart;
         final left = on
