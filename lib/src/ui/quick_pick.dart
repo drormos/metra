@@ -830,7 +830,7 @@ class _QuickPickState extends State<QuickPick>
             height: 44,
             child: Row(
               children: [
-                TextButton(
+                TextButton.icon(
                   key: QuickPick.pickBackKey,
                   style: TextButton.styleFrom(
                     foregroundColor: colors.muted,
@@ -838,7 +838,8 @@ class _QuickPickState extends State<QuickPick>
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                   ),
                   onPressed: _back,
-                  child: const Text('‹ Back', style: TextStyle(fontSize: 14)),
+                  icon: const Icon(Icons.chevron_left, size: 20),
+                  label: const Text('Back', style: TextStyle(fontSize: 14)),
                 ),
                 const Spacer(),
                 Flexible(
@@ -1026,7 +1027,7 @@ class _QuickPickState extends State<QuickPick>
         ? null
         : Align(
             alignment: Alignment.centerLeft,
-            child: TextButton(
+            child: TextButton.icon(
               key: QuickPick.backKey,
               style: TextButton.styleFrom(
                 foregroundColor: colors.muted,
@@ -1034,7 +1035,8 @@ class _QuickPickState extends State<QuickPick>
                 padding: const EdgeInsets.symmetric(horizontal: 12),
               ),
               onPressed: _back,
-              child: const Text('‹ Back', style: TextStyle(fontSize: 14)),
+              icon: const Icon(Icons.chevron_left, size: 20),
+              label: const Text('Back', style: TextStyle(fontSize: 14)),
             ),
           );
     final search = all.length > QuickPick.searchAbove

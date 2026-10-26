@@ -342,10 +342,12 @@ void main() {
           final panel = tester.getRect(find.byKey(TopPanel.surfaceKey));
           final scroll = tester
               .state<ScrollableState>(
-                find.descendant(
-                  of: find.byKey(TopPanel.surfaceKey),
-                  matching: find.byType(Scrollable),
-                ),
+                find
+                    .descendant(
+                      of: find.byKey(TopPanel.surfaceKey),
+                      matching: find.byType(Scrollable),
+                    )
+                    .first,
               )
               .position;
           expect(panel.bottom, lessThanOrEqualTo(size.height - 24 - 16));
@@ -628,7 +630,7 @@ void main() {
       await tester.tap(find.byKey(MetronomeScreen.meterKey));
       await tester.pumpAndSettle();
       final sheet = find.byType(TimeSignatureSheet);
-      await tester.tap(find.descendant(of: sheet, matching: find.text('+')));
+      await tester.tap(find.byKey(ValueStepper.plusKey('Beats')));
       await tester.pump();
       expect(controller.pattern.timeSignature, '5/4');
       await tester.tap(find.byKey(const ValueKey('segment-8')));
@@ -1148,7 +1150,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 20));
       }
       expect(
-        find.text('↗ +5 every 2 bars · next in 1 · 7 bars left'),
+        find.text('+5 every 2 bars · next in 1 · 7 bars left'),
         findsOneWidget,
       );
       await tester.tap(find.byKey(MetronomeScreen.playKey));

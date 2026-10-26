@@ -359,7 +359,7 @@ void main() {
       }
       expect(
         tester.widget<Text>(find.byKey(MetronomeScreen.countInLineKey)).data,
-        startsWith('↗ +5 every 2 bars'),
+        startsWith('+5 every 2 bars'),
       );
       expect(metronome.bpm, 105);
       expect(tester.widget<BpmReadout>(find.byType(BpmReadout)).bpm, 105);

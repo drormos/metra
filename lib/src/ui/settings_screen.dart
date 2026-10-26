@@ -11,9 +11,9 @@ import '../model/metronome_pattern.dart';
 import '../model/whats_new.dart';
 import 'about.dart';
 import 'editor_scaffold.dart';
-import 'meter_control.dart';
 import 'segmented.dart';
 import 'theme.dart';
+import 'value_stepper.dart';
 
 /// Opens Settings (ui-spec.md "Settings", `settings.reference.html`),
 /// from the gear button. Changes apply at once. Opening clears the gear's
@@ -45,6 +45,7 @@ class SettingsScreen extends StatelessWidget {
   static const keepScreenOnKey = Key('settings-keep-screen-on');
   static const resetKey = Key('settings-volume-reset');
   static const offsetKey = Key('settings-offset');
+  static const offsetLabel = 'Visual offset';
   static const testKey = Key('settings-offset-test');
   static const whatsNewKey = Key('settings-whats-new');
   static const allUpdatesKey = Key('settings-all-updates');
@@ -170,11 +171,13 @@ class SettingsScreen extends StatelessWidget {
           Wrap(
             alignment: WrapAlignment.spaceBetween,
             children: [
-              TextButton(
+              TextButton.icon(
                 key: allUpdatesKey,
                 style: quiet(colors.muted),
                 onPressed: () => openAllUpdates(context),
-                child: const Text('All updates ›'),
+                iconAlignment: IconAlignment.end,
+                icon: const Icon(Icons.chevron_right, size: 20),
+                label: const Text('All updates'),
               ),
               TextButton(
                 key: gotItKey,
@@ -431,52 +434,27 @@ class SettingsScreen extends StatelessWidget {
       children: [
         _OffsetFlash(metronome: metronome),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Tooltip(
-              message: 'Flash earlier',
-              child: StepButton(
-                '−',
-                size: 52,
-                fontSize: 28,
-                accelerate: false,
-                onPressed:
-                    metronome.visualOffset > MetronomeController.minVisualOffset
-                    ? () => metronome.setVisualOffset(
-                        metronome.visualOffset - step,
-                      )
-                    : null,
-              ),
-            ),
-            Expanded(
-              child: Text(
-                '${ms > 0 ? '+' : ''}$ms ms',
-                key: offsetKey,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontFamily: MetraFonts.condensed,
-                  fontSize: 34,
-                  fontWeight: FontWeight.w700,
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-              ),
-            ),
-            Tooltip(
-              message: 'Flash later',
-              child: StepButton(
-                '+',
-                size: 52,
-                fontSize: 28,
-                accelerate: false,
-                onPressed:
-                    metronome.visualOffset < MetronomeController.maxVisualOffset
-                    ? () => metronome.setVisualOffset(
-                        metronome.visualOffset + step,
-                      )
-                    : null,
-              ),
-            ),
-          ],
+        // − earlier, + later; tap the number to type it.
+        ValueStepper(
+          key: offsetKey,
+          label: offsetLabel,
+          showLabel: false,
+          signed: true,
+          display: '${ms > 0 ? '+' : ''}$ms ms',
+          editText: '$ms',
+          fieldWidth: null,
+          buttonSize: 52,
+          fontSize: 34,
+          onMinus: metronome.visualOffset > MetronomeController.minVisualOffset
+              ? () => metronome.setVisualOffset(metronome.visualOffset - step)
+              : null,
+          onPlus: metronome.visualOffset < MetronomeController.maxVisualOffset
+              ? () => metronome.setVisualOffset(metronome.visualOffset + step)
+              : null,
+          onTyped: (text) {
+            final v = int.tryParse(text.replaceAll('−', '-'));
+            if (v != null) metronome.setVisualOffset(Duration(milliseconds: v));
+          },
         ),
         const SizedBox(height: 12),
         SizedBox(

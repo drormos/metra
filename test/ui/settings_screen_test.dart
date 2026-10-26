@@ -14,6 +14,7 @@ import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/about.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/settings_screen.dart';
+import 'package:metra/src/ui/value_stepper.dart';
 
 import '../audio/fake_click_output.dart';
 import 'test_theme.dart';
@@ -94,10 +95,13 @@ void main() {
     await tester.scrollUntilVisible(
       finder,
       150,
-      scrollable: find.descendant(
-        of: find.byType(SettingsScreen),
-        matching: find.byType(Scrollable),
-      ),
+      // The page's list (fields have their own scrollables inside).
+      scrollable: find
+          .descendant(
+            of: find.byType(SettingsScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
     // Not pumpAndSettle: while playing, the flash animates every frame.
     await tester.pump(const Duration(milliseconds: 300));
@@ -273,17 +277,28 @@ void main() {
 
   testWidgets('visual offset −/+ in 10 ms steps', (tester) async {
     await openSettingsScreen(tester);
-    await tapVisible(tester, find.byTooltip('Flash later'));
-    await tester.tap(find.byTooltip('Flash later'));
+    const label = SettingsScreen.offsetLabel;
+    await tapVisible(tester, find.byKey(ValueStepper.plusKey(label)));
+    await tester.tap(find.byKey(ValueStepper.plusKey(label)));
     await tester.pump();
     expect(metronome.visualOffset, const Duration(milliseconds: 20));
     expect(
-      tester.widget<Text>(find.byKey(SettingsScreen.offsetKey)).data,
+      tester
+          .widget<TextField>(find.byKey(ValueStepper.fieldKey(label)))
+          .controller!
+          .text,
       '+20 ms',
     );
-    await tester.tap(find.byTooltip('Flash earlier'));
+    await tester.tap(find.byKey(ValueStepper.minusKey(label)));
     await tester.pump();
     expect(metronome.visualOffset, const Duration(milliseconds: 10));
+    // Typed: snapped into range.
+    await tester.tap(find.byKey(ValueStepper.fieldKey(label)));
+    await tester.pump();
+    await tester.enterText(find.byKey(ValueStepper.fieldKey(label)), '900');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    expect(metronome.visualOffset, MetronomeController.maxVisualOffset);
   });
 
   testWidgets('the test starts the click; leaving stops what it started', (

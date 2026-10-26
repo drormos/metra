@@ -981,6 +981,35 @@ class _TempoLineState extends State<_TempoLine> {
 /// 4" ("Count-in · 2 · 3 of 4" in bar 2 of 2); during a run, its progress
 /// ("↗ +5 every 8 bars · next in 3 · 4:12 left"); otherwise it is [child].
 /// Read per frame from the engine clock, like the beat blocks.
+/// A run's line with its speed-up arrow ("↗ +5 every 8 bars") drawn as
+/// a vector icon: Android shows some arrow glyphs as colored emoji.
+Widget _iconLine(BuildContext context, String label) {
+  final color = context.colors.text;
+  final arrow = switch (label) {
+    _ when label.startsWith('↗ ') => Icons.trending_up,
+    _ when label.startsWith('↘ ') => Icons.trending_down,
+    _ => null,
+  };
+  return Semantics(
+    label: label,
+    excludeSemantics: true,
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (arrow != null) ...[
+          Icon(arrow, size: 20, color: color),
+          const SizedBox(width: 6),
+        ],
+        Text(
+          arrow == null ? label : label.substring(2),
+          key: MetronomeScreen.countInLineKey,
+          style: TextStyle(fontSize: 16, color: color),
+        ),
+      ],
+    ),
+  );
+}
+
 class RunLine extends StatefulWidget {
   const RunLine({super.key, required this.controller, required this.child});
 
@@ -1072,11 +1101,7 @@ class _RunLineState extends State<RunLine> with SingleTickerProviderStateMixin {
             // Shrinks rather than overflowing on narrow phones.
             child: FittedBox(
               fit: BoxFit.scaleDown,
-              child: Text(
-                label,
-                key: MetronomeScreen.countInLineKey,
-                style: TextStyle(fontSize: 16, color: context.colors.text),
-              ),
+              child: _iconLine(context, label),
             ),
           ),
       ],

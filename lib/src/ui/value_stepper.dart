@@ -5,12 +5,14 @@ import 'haptics.dart';
 import 'meter_control.dart';
 import 'theme.dart';
 
-/// One value in the "When I press Start" sheet (ui-spec.md "Editing the
-/// values"): a label, then − / the value / +. − and + step and repeat
-/// while held, accelerating (a medium bump at a limit). The value sits in
-/// an outlined field: tapping it opens the number keyboard with the value
-/// selected; Done or tapping outside hands the text to [onTyped], which
-/// snaps it into range. No drag-to-scrub.
+/// The app's one −/+ stepper (ui-spec.md "Editing the values", "Song
+/// parts" fixes): a label, then − / the value / +. − and + step on a tap
+/// and repeat while held, accelerating (a medium bump at a limit). The
+/// value sits in an outlined field: tapping it opens the number keyboard
+/// with the value selected; Done or tapping outside hands the text to
+/// [onTyped], which snaps it into range. No drag-to-scrub. Without
+/// [showLabel] the label only names it for TalkBack; [fieldWidth] null
+/// stretches the field between the buttons.
 class ValueStepper extends StatefulWidget {
   const ValueStepper({
     super.key,
@@ -22,9 +24,17 @@ class ValueStepper extends StatefulWidget {
     required this.onTyped,
     this.time = false,
     this.signed = false,
+    this.showLabel = true,
+    this.fieldWidth = 92,
+    this.buttonSize = 48,
+    this.fontSize = 24,
   });
 
   final String label;
+  final bool showLabel;
+  final double? fieldWidth;
+  final double buttonSize;
+  final double fontSize;
 
   /// Shown at rest ("+5", "8 bars", "No limit", "10:00").
   final String display;
@@ -103,78 +113,79 @@ class _ValueStepperState extends State<ValueStepper> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final label = widget.label;
+    final field = SizedBox(
+      width: widget.fieldWidth,
+      height: widget.buttonSize,
+      // The 40px outline is drawn inside; the field takes the whole
+      // box, so it's a full-size touch target.
+      child: DecoratedBox(
+        decoration: _OutlineInside(colors.controlOutline),
+        child: Center(
+          child: Semantics(
+            label: label,
+            textField: true,
+            child: TextField(
+              key: ValueStepper.fieldKey(label),
+              controller: _text,
+              focusNode: _focus,
+              textAlign: TextAlign.center,
+              keyboardType: TextInputType.numberWithOptions(
+                signed: widget.signed,
+              ),
+              textInputAction: TextInputAction.done,
+              inputFormatters: [
+                if (widget.time)
+                  _MicrowaveTime()
+                else
+                  FilteringTextInputFormatter.allow(
+                    RegExp(widget.signed ? r'[-−0-9]' : r'[0-9]'),
+                  ),
+              ],
+              // Fills the box; the number is display text already.
+              expands: true,
+              maxLines: null,
+              textAlignVertical: TextAlignVertical.center,
+              style: TextStyle(
+                fontFamily: MetraFonts.condensed,
+                fontSize: widget.fontSize,
+                fontWeight: FontWeight.w700,
+                height: 1,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+              decoration: const InputDecoration.collapsed(hintText: null),
+              onSubmitted: (_) => _focus.unfocus(),
+              onTapOutside: (_) => _focus.unfocus(),
+            ),
+          ),
+        ),
+      ),
+    );
     return Row(
       children: [
-        Expanded(child: Text(label, style: const TextStyle(fontSize: 15))),
+        if (widget.showLabel)
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 15))),
         Semantics(
           label: 'Less $label',
           button: true,
           excludeSemantics: true,
           child: StepButton(
-            '−',
+            Icons.remove,
             key: ValueStepper.minusKey(label),
-            size: 48,
-            fontSize: 24,
+            size: widget.buttonSize,
             onPressed: _step(widget.onMinus),
           ),
         ),
         const SizedBox(width: 6),
-        SizedBox(
-          width: 92,
-          height: 48,
-          // The 40px outline is drawn inside; the field takes the whole
-          // 48px box, so it's a full-size touch target.
-          child: DecoratedBox(
-            decoration: _OutlineInside(colors.controlOutline),
-            child: Center(
-              child: Semantics(
-                label: label,
-                textField: true,
-                child: TextField(
-                  key: ValueStepper.fieldKey(label),
-                  controller: _text,
-                  focusNode: _focus,
-                  textAlign: TextAlign.center,
-                  keyboardType: TextInputType.numberWithOptions(
-                    signed: widget.signed,
-                  ),
-                  textInputAction: TextInputAction.done,
-                  inputFormatters: [
-                    if (widget.time)
-                      _MicrowaveTime()
-                    else
-                      FilteringTextInputFormatter.allow(
-                        RegExp(widget.signed ? r'[-−0-9]' : r'[0-9]'),
-                      ),
-                  ],
-                  // Fills the box; the number is display text already.
-                  expands: true,
-                  maxLines: null,
-                  textAlignVertical: TextAlignVertical.center,
-                  style: const TextStyle(
-                    fontFamily: MetraFonts.condensed,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    height: 1,
-                  ),
-                  decoration: const InputDecoration.collapsed(hintText: null),
-                  onSubmitted: (_) => _focus.unfocus(),
-                  onTapOutside: (_) => _focus.unfocus(),
-                ),
-              ),
-            ),
-          ),
-        ),
+        if (widget.fieldWidth == null) Expanded(child: field) else field,
         const SizedBox(width: 6),
         Semantics(
           label: 'More $label',
           button: true,
           excludeSemantics: true,
           child: StepButton(
-            '+',
+            Icons.add,
             key: ValueStepper.plusKey(label),
-            size: 48,
-            fontSize: 24,
+            size: widget.buttonSize,
             onPressed: _step(widget.onPlus),
           ),
         ),

@@ -3,53 +3,43 @@ import 'package:flutter/material.dart';
 import 'repeat_button.dart';
 import 'segmented.dart';
 import 'theme.dart';
+import 'value_stepper.dart';
 
-/// A filled square −/+ that repeats while held (song editor, time
-/// signature sheet).
+/// A filled square −/+ (a vector icon) that steps on a tap and repeats
+/// while held, accelerating like the tempo buttons: the buttons of
+/// [ValueStepper], the app's one stepper.
 class StepButton extends StatelessWidget {
   const StepButton(
-    this.label, {
+    this.icon, {
     super.key,
     required this.size,
-    required this.fontSize,
     required this.onPressed,
-    this.accelerate = true,
   });
 
-  final String label;
+  final IconData icon;
   final double size;
-  final double fontSize;
 
   /// Null disables it (at the end of the range).
   final VoidCallback? onPressed;
-  final bool accelerate;
 
   @override
   Widget build(BuildContext context) => SizedBox.square(
     dimension: size,
     child: RepeatButton(
-      accelerate: accelerate,
       style: FilledButton.styleFrom(
         backgroundColor: context.colors.surface,
         foregroundColor: context.colors.text,
         padding: EdgeInsets.zero,
       ),
       onPressed: onPressed,
-      child: Text(
-        label,
-        style: TextStyle(
-          fontFamily: MetraFonts.condensed,
-          fontSize: fontSize,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+      child: Icon(icon, size: size * 0.5),
     ),
   );
 }
 
-/// Beats −/+ (1–[maxBeats], held: ~6 per second, no acceleration), "/",
-/// and a 4 | 8 segmented control. Shared by the song editor and the time
-/// signature sheet; [onChanged] gets every step.
+/// Beats −/+ (1–[maxBeats], the app's stepper: tap the number to type),
+/// "/", and a 4 | 8 segmented control: the Rhythm panel's Custom row.
+/// [onChanged] gets every step.
 class MeterControl extends StatelessWidget {
   const MeterControl({
     super.key,
@@ -60,7 +50,6 @@ class MeterControl extends StatelessWidget {
   });
 
   static const maxBeats = 16;
-  static const beatsKey = Key('meter-beats');
 
   final int beats;
   final int unit;
@@ -79,33 +68,27 @@ class MeterControl extends StatelessWidget {
     );
     return Row(
       children: [
-        StepButton(
-          '−',
-          size: size,
-          fontSize: size * 0.55,
-          accelerate: false,
-          onPressed: beats > 1 ? () => onChanged(beats - 1, unit) : null,
-        ),
-        SizedBox(
-          width: size * 0.85,
-          child: Text(
-            '$beats',
-            key: beatsKey,
-            textAlign: TextAlign.center,
-            style: big,
-          ),
-        ),
-        StepButton(
-          '+',
-          size: size,
-          fontSize: size * 0.55,
-          accelerate: false,
-          onPressed: beats < maxBeats ? () => onChanged(beats + 1, unit) : null,
+        ValueStepper(
+          label: 'Beats',
+          showLabel: false,
+          display: '$beats',
+          editText: '$beats',
+          fieldWidth: size * 1.1,
+          buttonSize: size,
+          fontSize: size * 0.6,
+          onMinus: beats > 1 ? () => onChanged(beats - 1, unit) : null,
+          onPlus: beats < maxBeats ? () => onChanged(beats + 1, unit) : null,
+          onTyped: (text) {
+            final v = int.tryParse(text);
+            if (v != null) onChanged(v.clamp(1, maxBeats), unit);
+          },
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Text(
             '/',
+            // Sized with the number, not the system text size.
+            textScaler: TextScaler.noScaling,
             style: big.copyWith(
               fontWeight: FontWeight.w600,
               color: colors.muted,

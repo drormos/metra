@@ -103,6 +103,7 @@ class _PartsPageState extends State<PartsPage> {
     _metronome.removeListener(_onMetronome);
     _undoTimer?.cancel();
     _follow?.cancel();
+    _closing?.cancel();
     super.dispose();
   }
 
@@ -166,7 +167,30 @@ class _PartsPageState extends State<PartsPage> {
       'part-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
       '-${_idCounter++}';
 
+  // Closes a held open card a frame before the reorder lift.
+  Timer? _closing;
+  // That press closed it: its tap mustn't open it again.
+  bool _heldClosed = false;
+
+  void _closeBeforeLift(String id) {
+    _heldClosed = false;
+    _closing?.cancel();
+    _closing = Timer(
+      RowGestures.liftPress - const Duration(milliseconds: 40),
+      () {
+        if (mounted && _openId == id) {
+          _heldClosed = true;
+          setState(() => _openId = null);
+        }
+      },
+    );
+  }
+
   void _open(String id, {bool scroll = false}) {
+    if (_heldClosed) {
+      _heldClosed = false;
+      return;
+    }
     setState(() => _openId = _openId == id ? null : id);
     if (scroll && _openId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -333,21 +357,48 @@ class _PartsPageState extends State<PartsPage> {
             ),
           ),
           const SizedBox(width: 8),
-          OutlinedButton(
-            key: PartsPage.playKey,
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(0, 48),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              side: BorderSide(color: colors.border, width: 2),
-            ),
-            onPressed: () {
-              Haptics.medium();
-              playing ? _metronome.stop() : _metronome.playFrom(0);
-            },
-            child: Text(
-              playing ? '■ Stop' : '▶ Play',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-            ),
+          // One width in both states; Stop is filled like the main
+          // Start/Stop, so it's unmistakable while playing.
+          SizedBox(
+            width: 104,
+            height: 48,
+            child: playing
+                ? FilledButton.icon(
+                    key: PartsPage.playKey,
+                    style: FilledButton.styleFrom(padding: EdgeInsets.zero),
+                    onPressed: () {
+                      Haptics.medium();
+                      _metronome.stop();
+                    },
+                    icon: const Icon(Icons.stop, size: 20),
+                    label: const Text(
+                      'Stop',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  )
+                : OutlinedButton.icon(
+                    key: PartsPage.playKey,
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      foregroundColor: colors.text,
+                      side: BorderSide(color: colors.text, width: 2),
+                    ),
+                    onPressed: () {
+                      Haptics.medium();
+                      _metronome.playFrom(0);
+                    },
+                    icon: const Icon(Icons.play_arrow, size: 20),
+                    label: const Text(
+                      'Play',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -406,17 +457,33 @@ class _PartsPageState extends State<PartsPage> {
               )
             : null,
       ),
-      child: Text(
-        part.open ? '${part.name} ∞' : part.name,
-        maxLines: 1,
-        overflow: TextOverflow.clip,
-        softWrap: false,
-        textScaler: TextScaler.noScaling,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: selected ? colors.background : colors.muted,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              part.name,
+              maxLines: 1,
+              overflow: TextOverflow.clip,
+              softWrap: false,
+              textScaler: TextScaler.noScaling,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: selected ? colors.background : colors.muted,
+              ),
+            ),
+          ),
+          // An open part runs until you stop.
+          if (part.open) ...[
+            const SizedBox(width: 3),
+            Icon(
+              Icons.all_inclusive,
+              size: 12,
+              color: selected ? colors.background : colors.muted,
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -434,9 +501,8 @@ class _PartsPageState extends State<PartsPage> {
           footer: _footer(context, song, parts),
           itemBuilder: (context, i) {
             final part = parts[i];
-            return HoldToReorder(
+            return KeyedSubtree(
               key: ValueKey(part.id),
-              index: i,
               child: ExitShift(
                 index: i,
                 child: Padding(
@@ -479,62 +545,65 @@ class _PartsPageState extends State<PartsPage> {
           Semantics(
             button: true,
             expanded: open,
-            child: InkWell(
-              key: PartsPage.cardKey(i),
-              onTap: () => _open(part.id),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 60),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 22,
-                        child: Text(
-                          '${i + 1}',
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: colors.disabledText,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              part.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              partLine(part),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+            // Only the header lifts the card to reorder; held on an open
+            // card, it closes just before the lift (one gesture).
+            child: HoldToReorder(
+              index: i,
+              child: Listener(
+                onPointerDown: open ? (_) => _closeBeforeLift(part.id) : null,
+                onPointerUp: (_) => _closing?.cancel(),
+                onPointerCancel: (_) => _closing?.cancel(),
+                child: InkWell(
+                  key: PartsPage.cardKey(i),
+                  onTap: () => _open(part.id),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 60),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 22,
+                            child: Text(
+                              '${i + 1}',
+                              textAlign: TextAlign.right,
                               style: TextStyle(
                                 fontSize: 13,
-                                color: colors.muted,
+                                color: colors.disabledText,
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  part.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  partLine(part),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: colors.muted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          _tempo(colors, part),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Text(
-                        partTempo(part),
-                        style: const TextStyle(
-                          fontFamily: MetraFonts.condensed,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -595,6 +664,39 @@ class _PartsPageState extends State<PartsPage> {
               ),
             ],
           ),
+          if (!part.open)
+            Choices<bool>(
+              key: PartsPage.tempoKindKey,
+              label: 'Tempo',
+              options: const {false: 'Steady', true: 'Gradual'},
+              selected: gradual,
+              onSelected: (on) {
+                setState(
+                  () => on ? _gradual.add(part.id) : _gradual.remove(part.id),
+                );
+                edit((p) {
+                  if (!on) return p.copyWith(tempoEnd: p.tempoStart);
+                  // From the previous part's tempo, to this one's.
+                  final from = i > 0 ? parts[i - 1].tempoEnd : p.tempoStart;
+                  var to = p.tempoStart;
+                  if (to == from) {
+                    to = from + 10 > MetronomeController.maxBpm
+                        ? from - 10
+                        : from + 10;
+                  }
+                  return p.copyWith(tempoStart: from, tempoEnd: to);
+                });
+              },
+            ),
+          if (gradual && !part.open) ...[
+            tempo('From', part.tempoStart, (v) => part.copyWith(tempoStart: v)),
+            tempo('To', part.tempoEnd, (v) => part.copyWith(tempoEnd: v)),
+          ] else
+            tempo(
+              'BPM',
+              part.tempoStart,
+              (v) => part.copyWith(tempoStart: v, tempoEnd: v),
+            ),
           if (last)
             Choices<bool>(
               key: PartsPage.lengthKindKey,
@@ -648,39 +750,6 @@ class _PartsPageState extends State<PartsPage> {
                 );
               },
             ),
-          if (!part.open)
-            Choices<bool>(
-              key: PartsPage.tempoKindKey,
-              label: 'Tempo',
-              options: const {false: 'Steady', true: 'Gradual'},
-              selected: gradual,
-              onSelected: (on) {
-                setState(
-                  () => on ? _gradual.add(part.id) : _gradual.remove(part.id),
-                );
-                edit((p) {
-                  if (!on) return p.copyWith(tempoEnd: p.tempoStart);
-                  // From the previous part's tempo, to this one's.
-                  final from = i > 0 ? parts[i - 1].tempoEnd : p.tempoStart;
-                  var to = p.tempoStart;
-                  if (to == from) {
-                    to = from + 10 > MetronomeController.maxBpm
-                        ? from - 10
-                        : from + 10;
-                  }
-                  return p.copyWith(tempoStart: from, tempoEnd: to);
-                });
-              },
-            ),
-          if (gradual && !part.open) ...[
-            tempo('From', part.tempoStart, (v) => part.copyWith(tempoStart: v)),
-            tempo('To', part.tempoEnd, (v) => part.copyWith(tempoEnd: v)),
-          ] else
-            tempo(
-              'BPM',
-              part.tempoStart,
-              (v) => part.copyWith(tempoStart: v, tempoEnd: v),
-            ),
           Row(
             children: [
               const Expanded(
@@ -708,12 +777,10 @@ class _PartsPageState extends State<PartsPage> {
                     const SizedBox(width: 8),
                     SubdivisionIcon(part.pattern.stepsPerBeat, size: 20),
                     const SizedBox(width: 6),
-                    Text(
-                      '›',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: colors.disabledText,
-                      ),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 20,
+                      color: colors.disabledText,
                     ),
                   ],
                 ),
@@ -728,15 +795,16 @@ class _PartsPageState extends State<PartsPage> {
           Wrap(
             alignment: WrapAlignment.spaceBetween,
             children: [
-              TextButton(
+              TextButton.icon(
                 key: PartsPage.playFromKey,
                 style: TextButton.styleFrom(foregroundColor: colors.text),
                 onPressed: () {
                   Haptics.medium();
                   _metronome.playFrom(i);
                 },
-                child: const Text(
-                  '▶ Play from here',
+                icon: const Icon(Icons.play_arrow, size: 20),
+                label: const Text(
+                  'Play from here',
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -751,6 +819,28 @@ class _PartsPageState extends State<PartsPage> {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  /// "128", or "128 → 140" with a vector arrow.
+  Widget _tempo(MetraColors colors, SongPart part) {
+    const style = TextStyle(
+      fontFamily: MetraFonts.condensed,
+      fontSize: 24,
+      fontWeight: FontWeight.w700,
+    );
+    if (!part.gradual) return Text('${part.tempoStart}', style: style);
+    return Semantics(
+      label: '${part.tempoStart} to ${part.tempoEnd}',
+      excludeSemantics: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('${part.tempoStart}', style: style),
+          Icon(Icons.arrow_forward, size: 18, color: colors.muted),
+          Text('${part.tempoEnd}', style: style),
         ],
       ),
     );
@@ -849,7 +939,7 @@ class _PartsPageState extends State<PartsPage> {
                 ),
               ),
               const SizedBox(width: 10),
-              Text('⌄', style: TextStyle(fontSize: 14, color: colors.muted)),
+              Icon(Icons.expand_more, size: 20, color: colors.muted),
             ],
           ),
         ),
@@ -1183,7 +1273,7 @@ class SongPartsRow extends StatelessWidget {
                 style: TextStyle(fontSize: 14, color: colors.muted),
               ),
             const SizedBox(width: 8),
-            Text('›', style: TextStyle(fontSize: 18, color: colors.muted)),
+            Icon(Icons.chevron_right, size: 22, color: colors.muted),
           ],
         ),
       ),

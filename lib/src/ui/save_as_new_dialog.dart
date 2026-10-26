@@ -238,16 +238,18 @@ class _SaveAsNewDialogState extends State<_SaveAsNewDialog> {
             if (!_more && sets.length > 3)
               Align(
                 alignment: Alignment.centerLeft,
-                child: TextButton(
+                child: TextButton.icon(
                   key: SaveAsNewKeys.moreSets,
+                  iconAlignment: IconAlignment.end,
+                  icon: const Icon(Icons.expand_more, size: 20),
                   style: TextButton.styleFrom(
                     foregroundColor: colors.muted,
                     padding: const EdgeInsets.only(left: 32, right: 12),
                     minimumSize: const Size(0, 48),
                   ),
                   onPressed: () => setState(() => _more = true),
-                  child: const Text(
-                    'More setlists ⌄',
+                  label: const Text(
+                    'More setlists',
                     style: TextStyle(fontSize: 14),
                   ),
                 ),

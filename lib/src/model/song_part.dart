@@ -178,11 +178,6 @@ String partLine(SongPart part) {
       '${durationLabel(partDuration(part)!)}';
 }
 
-/// A card's tempo: "128" or "128 → 140".
-String partTempo(SongPart part) => part.gradual
-    ? '${part.tempoStart} → ${part.tempoEnd}'
-    : '${part.tempoStart}';
-
 /// The common part names, in song order (the name dropdown).
 const partNames = [
   'Intro',

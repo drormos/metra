@@ -168,14 +168,15 @@ void main() {
   });
 
   testWidgets('Gradual: From the previous part\'s tempo, To this one\'s; the '
-      'card reads "120 → 130"', (tester) async {
+      'card reads 120 to 130', (tester) async {
     await pump(tester);
     await openPage(tester);
     await tapIn(tester, find.byKey(PartsPage.addKey));
     await tapIn(tester, chip(PartsPage.lengthKindKey, 'Bars'));
     await tapIn(tester, chip(PartsPage.tempoKindKey, 'Gradual'));
     expect((parts()[1].tempoStart, parts()[1].tempoEnd), (120, 130));
-    expect(find.text('120 → 130'), findsOneWidget);
+    // "120 → 130" on the card (the To field shows 130 too).
+    expect(find.byIcon(Icons.arrow_forward), findsOneWidget);
     await tapIn(tester, find.byKey(ValueStepper.plusKey('To')));
     expect(parts()[1].tempoEnd, 131);
     await tapIn(tester, chip(PartsPage.tempoKindKey, 'Steady'));
@@ -264,5 +265,82 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(OnStartSheet.notForParts), findsOneWidget);
     expect(find.byType(SetlistGroup), findsOneWidget);
+  });
+
+  group('fixes after the first phone check', () {
+    Future<void> drag(WidgetTester tester, Finder from, double dy) async {
+      final gesture = await tester.startGesture(tester.getCenter(from));
+      await tester.pump(kLongPressTimeout + const Duration(milliseconds: 100));
+      for (var i = 0; i < 6; i++) {
+        await gesture.moveBy(Offset(0, dy / 6));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await gesture.up();
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('only the header lifts a card: held on an open card it '
+        'closes and lifts in one gesture; held in the body, nothing', (
+      tester,
+    ) async {
+      await pump(tester);
+      await openPage(tester);
+      await tapIn(tester, find.byKey(PartsPage.addKey)); // Part 2, open
+      // Held inside the open body (the accents): no lift, still open.
+      await drag(tester, find.byKey(PartsPage.accentKey(0)), -80);
+      expect(names(), ['Part 1', 'Part 2']);
+      expect(find.byKey(PartsPage.duplicateKey), findsOneWidget);
+      // Held on its header: closes, lifts, moves up one.
+      await drag(tester, find.byKey(PartsPage.cardKey(1)), -68);
+      expect(names(), ['Part 2', 'Part 1']);
+      expect(find.byKey(PartsPage.duplicateKey), findsNothing);
+    });
+
+    testWidgets('open card: Name, then Tempo, then Length', (tester) async {
+      await pump(tester);
+      await openPage(tester);
+      await tapIn(tester, find.byKey(PartsPage.addKey));
+      await tapIn(tester, chip(PartsPage.lengthKindKey, 'Bars'));
+      double y(Key key) => tester.getTopLeft(find.byKey(key)).dy;
+      expect(y(PartsPage.partNameKey), lessThan(y(PartsPage.tempoKindKey)));
+      expect(y(PartsPage.tempoKindKey), lessThan(y(PartsPage.lengthKindKey)));
+      expect(y(PartsPage.lengthKindKey), lessThan(y(PartsPage.rhythmKey)));
+    });
+
+    testWidgets('a stepper held repeats and speeds up', (tester) async {
+      await pump(tester);
+      await openPage(tester);
+      await tapIn(tester, find.byKey(PartsPage.cardKey(0)));
+      final plus = find.byKey(ValueStepper.plusKey('BPM'));
+      await tester.ensureVisible(plus);
+      final gesture = await tester.startGesture(tester.getCenter(plus));
+      for (var i = 0; i < 100; i++) {
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+      await gesture.up();
+      await tester.pump();
+      // 2 s held: well past one step a tap.
+      expect(metronome.bpm, greaterThan(135));
+    });
+
+    testWidgets('Play / Stop keeps its size; Stop is filled', (tester) async {
+      await pump(tester);
+      await openPage(tester);
+      final play = tester.getSize(find.byKey(PartsPage.playKey));
+      expect(find.byIcon(Icons.play_arrow), findsOneWidget);
+      await tester.tap(find.byKey(PartsPage.playKey));
+      await tester.pump();
+      expect(tester.getSize(find.byKey(PartsPage.playKey)), play);
+      expect(
+        find.descendant(
+          of: find.byKey(PartsPage.playKey),
+          matching: find.byIcon(Icons.stop),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.widget(find.byKey(PartsPage.playKey)), isA<FilledButton>());
+      metronome.stop();
+      await tester.pump(const Duration(seconds: 1));
+    });
   });
 }

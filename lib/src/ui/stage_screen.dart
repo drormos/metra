@@ -357,7 +357,7 @@ class _StageScreenState extends State<StageScreen>
                 child: _stepButton(
                   colors,
                   key: StageScreen.previousKey,
-                  label: '‹ Previous',
+                  label: 'Previous',
                   song: before,
                   end: 'Start of set',
                   alignment: CrossAxisAlignment.start,
@@ -369,7 +369,7 @@ class _StageScreenState extends State<StageScreen>
                 child: _stepButton(
                   colors,
                   key: StageScreen.nextKey,
-                  label: 'Next ›',
+                  label: 'Next',
                   song: index < 0 && songs.isNotEmpty ? songs.first : after,
                   end: 'End of set',
                   alignment: CrossAxisAlignment.end,
@@ -524,7 +524,20 @@ class _StageScreenState extends State<StageScreen>
                 if (song == null)
                   Text(end, maxLines: 1, style: muted)
                 else ...[
-                  Text(label, maxLines: 1, style: muted),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (alignment == CrossAxisAlignment.start)
+                        Icon(Icons.chevron_left, size: 16, color: colors.muted),
+                      Flexible(child: Text(label, maxLines: 1, style: muted)),
+                      if (alignment == CrossAxisAlignment.end)
+                        Icon(
+                          Icons.chevron_right,
+                          size: 16,
+                          color: colors.muted,
+                        ),
+                    ],
+                  ),
                   Text(
                     song.name,
                     maxLines: 1,
