@@ -4,11 +4,18 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-26
+
 ### Added
 - Stage mode: a full-screen, play-only view of the set for gigs (from the set panel's "Stage mode" button). Big Previous / Next / Start, hold to exit, remembered across a restart.
 - Settings → Keep screen on: while Metra is open (new default) or only while playing.
 - Song parts: a song can be a list of parts, each with its own length, tempo (steady or gradual) and rhythm, for tempo changes, odd bars and song structure. Edited on the new parts page ("Song parts ›" in the Rhythm panel, or long-press the title), which replaces the song editor.
 - For a song with parts, the main screen shows the song map in place of the tempo ruler (slide or tap to go to a part) and "Chorus · bar 3 of 8 · next: Break" under the BPM; stage mode shows the map too (tap only).
+
+### Changed
+- The song editor is replaced by the parts page.
+- Every −/+ stepper repeats while held, speeding up, and its value can be typed (also the Rhythm panel's beats and Settings' visual offset).
+- Vector icons everywhere instead of text symbols (some showed as colored emoji on Android).
 
 ## [1.5.3] - 2026-10-23
 

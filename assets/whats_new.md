@@ -2,6 +2,13 @@
 
 Newest first. The top version's lines are also the Play Store release notes.
 
+## 1.6.0 · Oct 2026
+- Song parts: tempo changes, odd bars and sections in one song
+- Stage mode: your set full screen, for gigs
+- The screen stays on while Metra is open (Settings)
+- The song map: slide or tap to jump to a part
+- Every stepper repeats when held and takes typed numbers
+
 ## 1.5.3 · Oct 2026
 - Count-in, speed up and stop after, from the stopwatch
 - Subdivision now lives in the Rhythm panel ("4/4")

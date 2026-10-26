@@ -59,7 +59,10 @@ class SongPart {
     if (!gradual) return tempoStart.toDouble();
     final last = bars! * pattern.beatsPerBar - 1;
     if (last <= 0) return tempoEnd.toDouble();
-    return tempoStart + (tempoEnd - tempoStart) * beat / last;
+    // Held at its ends: a beat past the last (a longer bar in force than
+    // the part's own) plays To, never a tempo beyond it.
+    final t = (beat / last).clamp(0.0, 1.0);
+    return tempoStart + (tempoEnd - tempoStart) * t;
   }
 
   static const _keep = Object();

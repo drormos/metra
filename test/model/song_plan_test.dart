@@ -127,4 +127,12 @@ void main() {
     expect(p.tempoAt(2, 0, 100), isNull);
     expect(p.endsAt(3, Duration.zero), isTrue);
   });
+
+  test('a ramp holds at its ends: a beat past the last plays To (found by '
+      'parts_fuzz_test session 831 at 2000 sessions)', () {
+    final down = _part('a', 1, 140, 40);
+    expect(down.tempoAtBeat(3), 40);
+    expect(down.tempoAtBeat(11), 40);
+    expect(down.tempoAtBeat(-1), 140);
+  });
 }
