@@ -13,6 +13,7 @@ import 'choices.dart';
 import 'dashed_outline.dart';
 import 'editor_scaffold.dart' show confirmDelete;
 import 'haptics.dart';
+import 'motion.dart';
 import 'save_as_new_dialog.dart';
 import 'subdivision_icon.dart';
 import 'swipe_row.dart';
@@ -74,7 +75,8 @@ class PartsPage extends StatefulWidget {
   State<PartsPage> createState() => _PartsPageState();
 }
 
-class _PartsPageState extends State<PartsPage> {
+class _PartsPageState extends State<PartsPage>
+    with SingleTickerProviderStateMixin {
   LibraryController get _library => widget.library;
   MetronomeController get _metronome => widget.metronome;
 
@@ -83,6 +85,14 @@ class _PartsPageState extends State<PartsPage> {
   // stay on Gradual while From and To pass each other.
   final _gradual = <String>{};
   final _cardKeys = <String, GlobalKey>{};
+  // Each open card's body, measured when another card's opening closes it.
+  final _bodyKeys = <String, GlobalKey>{};
+  final _scroll = ScrollController();
+  // Cards that grow in as they're built (added, duplicated, undone).
+  final _arriving = <String>{};
+  // Keeps a tapped header still while a card above it closes.
+  late final AnimationController _anchor = AnimationController(vsync: this);
+  Timer? _reveal;
   ({SongPart part, int index})? _removed;
   Timer? _undoTimer;
   int _idCounter = 0;
@@ -104,6 +114,9 @@ class _PartsPageState extends State<PartsPage> {
     _undoTimer?.cancel();
     _follow?.cancel();
     _closing?.cancel();
+    _reveal?.cancel();
+    _anchor.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -186,25 +199,85 @@ class _PartsPageState extends State<PartsPage> {
     );
   }
 
+  /// Opens card [id] (or closes it, open already), in one ~180ms height
+  /// change. Its header stays under the finger: when a card above it
+  /// closes at the same time, the list scrolls by that card's body on the
+  /// same curve. From the strip ([scroll]): scrolls to the card. Never
+  /// waits: a tap mid-animation retargets it.
   void _open(String id, {bool scroll = false}) {
     if (_heldClosed) {
       _heldClosed = false;
       return;
     }
-    setState(() => _openId = _openId == id ? null : id);
-    if (scroll && _openId != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final context = _cardKeys[id]?.currentContext;
-        if (context != null && context.mounted) {
-          Scrollable.ensureVisible(
-            context,
-            duration: MetraMotion.reduced(context)
-                ? Duration.zero
-                : const Duration(milliseconds: 250),
-          );
-        }
+    final previous = _openId;
+    final opening = previous != id;
+    final above = opening && previous != null && !scroll
+        ? _bodyAbove(previous, id)
+        : 0.0;
+    setState(() => _openId = opening ? id : null);
+    // Started now, its clock counts from the coming frame, as the closing
+    // card's size animation (started in that frame's layout) does.
+    if (above > 0) _keepStill(above);
+    if (!opening) return;
+    _reveal?.cancel();
+    if (scroll) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollTo(id));
+    } else {
+      // Once open, only if it ends below the screen, only as far as needed.
+      _reveal = Timer(MetraMotion.of(context, MetraMotion.cardExpand), () {
+        _scrollTo(id, end: true);
       });
     }
+  }
+
+  /// The height of [previous]'s open body when that card sits above [id].
+  double _bodyAbove(String previous, String id) {
+    final before = _cardKeys[previous]?.currentContext?.findRenderObject();
+    final card = _cardKeys[id]?.currentContext?.findRenderObject();
+    final body = _bodyKeys[previous]?.currentContext?.size?.height;
+    if (before is! RenderBox || card is! RenderBox || body == null) return 0;
+    final above =
+        before.localToGlobal(Offset.zero).dy <
+        card.localToGlobal(Offset.zero).dy;
+    return above ? body : 0;
+  }
+
+  // shortcut: at the top of the list there's nothing to scroll back, so
+  // the header moves up by what's left; keeping it still there would need
+  // an empty gap above the cards.
+  void _keepStill(double height) {
+    if (!mounted || !_scroll.hasClients) return;
+    final start = _scroll.position.pixels;
+    void follow() {
+      if (!_scroll.hasClients) return;
+      final t = MetraMotion.cardCurve.transform(_anchor.value);
+      _scroll.position.jumpTo((start - height * t).clamp(0, double.infinity));
+    }
+
+    _anchor
+      ..stop()
+      ..duration = MetraMotion.of(context, MetraMotion.cardExpand)
+      ..removeListener(follow)
+      ..addListener(follow)
+      ..forward(from: 0).whenComplete(() => _anchor.removeListener(follow));
+  }
+
+  /// Scrolls card [id] into view: to it (~250ms ease-in-out), or with
+  /// [end] only if it ends below the screen (~200ms).
+  void _scrollTo(String id, {bool end = false}) {
+    final context = _cardKeys[id]?.currentContext;
+    if (context == null || !context.mounted) return;
+    Scrollable.ensureVisible(
+      context,
+      duration: MetraMotion.of(
+        context,
+        end ? MetraMotion.reveal : MetraMotion.jump,
+      ),
+      curve: end ? MetraMotion.cardCurve : Curves.easeInOut,
+      alignmentPolicy: end
+          ? ScrollPositionAlignmentPolicy.keepVisibleAtEnd
+          : ScrollPositionAlignmentPolicy.explicit,
+    );
   }
 
   void _add(Song song) {
@@ -221,8 +294,9 @@ class _PartsPageState extends State<PartsPage> {
       pattern: last.pattern,
     );
     Haptics.tick();
+    _arriving.add(added.id);
     _set([...parts, added]);
-    _open(added.id, scroll: true);
+    _open(added.id);
   }
 
   void _duplicate(Song song, int i) {
@@ -237,8 +311,9 @@ class _PartsPageState extends State<PartsPage> {
       pattern: p.pattern,
     );
     Haptics.tick();
+    _arriving.add(copy.id);
     _set([...parts]..insert(i + 1, copy));
-    _open(copy.id, scroll: true);
+    _open(copy.id);
   }
 
   void _remove(Song song, int i) {
@@ -259,6 +334,7 @@ class _PartsPageState extends State<PartsPage> {
     _undoTimer?.cancel();
     final parts = [..._parts(song)];
     parts.insert(removed.index.clamp(0, parts.length), removed.part);
+    _arriving.add(removed.part.id);
     _set(parts);
     setState(() => _removed = null);
   }
@@ -350,12 +426,15 @@ class _PartsPageState extends State<PartsPage> {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        Text(
-                          partsSummary(parts),
-                          key: PartsPage.summaryKey,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 12, color: colors.muted),
+                        BrightenSwap(
+                          value: partsSummary(parts),
+                          child: Text(
+                            partsSummary(parts),
+                            key: PartsPage.summaryKey,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12, color: colors.muted),
+                          ),
                         ),
                       ],
                     ),
@@ -366,71 +445,77 @@ class _PartsPageState extends State<PartsPage> {
             const SizedBox(width: 8),
             // Save / Discard with unsaved changes; their room is kept
             // either way, so the title never moves.
-            Visibility(
-              visible: changed,
-              maintainSize: true,
-              maintainAnimation: true,
-              maintainState: true,
-              // Large text: the title keeps room (as the main screen's
-              // fixed controls, at most 1.3×).
-              child: MediaQuery.withClampedTextScaling(
-                maxScaleFactor: 1.3,
-                // Narrow phones: shrinks rather than squeezing out the title.
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: bar.maxWidth * 0.6),
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerRight,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TextButton(
-                          key: PartsPage.discardKey,
-                          style: TextButton.styleFrom(
-                            foregroundColor: colors.muted,
-                            minimumSize: const Size(48, 48),
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                          ),
-                          onPressed: changed
-                              ? () => _discard(context, song)
-                              : null,
-                          child: const Text(
-                            'Discard',
-                            style: TextStyle(fontSize: 15),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        SizedBox(
-                          height: 48,
-                          child: Center(
-                            child: FilledButton(
-                              key: PartsPage.saveKey,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: colors.text,
-                                foregroundColor: colors.background,
-                                minimumSize: const Size(64, 38),
-                                fixedSize: const Size.fromHeight(38),
+            AnimatedOpacity(
+              opacity: changed ? 1 : 0,
+              duration: MetraMotion.of(context, MetraMotion.controlsFade),
+              child: IgnorePointer(
+                ignoring: !changed,
+                child: ExcludeSemantics(
+                  excluding: !changed,
+                  // Large text: the title keeps room (as the main screen's
+                  // fixed controls, at most 1.3×).
+                  child: MediaQuery.withClampedTextScaling(
+                    maxScaleFactor: 1.3,
+                    // Narrow phones: shrinks rather than squeezing out the title.
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: bar.maxWidth * 0.6),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextButton(
+                              key: PartsPage.discardKey,
+                              style: TextButton.styleFrom(
+                                foregroundColor: colors.muted,
+                                minimumSize: const Size(48, 48),
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
+                                  horizontal: 10,
                                 ),
                               ),
                               onPressed: changed
-                                  ? () {
-                                      Haptics.tick();
-                                      _library.saveToSong(_metronome);
-                                    }
+                                  ? () => _discard(context, song)
                                   : null,
                               child: const Text(
-                                'Save',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
+                                'Discard',
+                                style: TextStyle(fontSize: 15),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            SizedBox(
+                              height: 48,
+                              child: Center(
+                                child: FilledButton(
+                                  key: PartsPage.saveKey,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: colors.text,
+                                    foregroundColor: colors.background,
+                                    minimumSize: const Size(64, 38),
+                                    fixedSize: const Size.fromHeight(38),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                  ),
+                                  onPressed: changed
+                                      ? () {
+                                          Haptics.tick();
+                                          _library.saveToSong(_metronome);
+                                        }
+                                      : null,
+                                  child: const Text(
+                                    'Save',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
@@ -451,37 +536,74 @@ class _PartsPageState extends State<PartsPage> {
     final average = closed.isEmpty
         ? 8
         : (closed.reduce((a, b) => a + b) / closed.length).ceil();
-    return Row(
-      children: [
-        for (final (i, part) in parts.indexed) ...[
-          if (i > 0) const SizedBox(width: 3),
-          Expanded(
-            flex: part.bars ?? average,
-            child: Semantics(
-              button: true,
-              label: '${part.name}, ${partLine(part)}',
-              excludeSemantics: true,
-              child: GestureDetector(
-                key: PartsPage.stripKey(i),
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  if (_openId != part.id) _open(part.id, scroll: true);
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: _block(colors, part, selected: part.id == _openId),
-                ),
+    final flexes = [for (final p in parts) p.bars ?? average];
+    final sum = flexes.fold(0, (a, b) => a + b);
+    final resize = MetraMotion.of(context, MetraMotion.cardExpand);
+    return LayoutBuilder(
+      builder: (context, box) {
+        final room = box.maxWidth - 3 * (parts.length - 1);
+        // While blocks resize, their sum can pass the width for a moment:
+        // clipped, not an overflow.
+        return SizedBox(
+          height: 48, // a 28px block in its 48dp touch row
+          child: ClipRect(
+            child: OverflowBox(
+              alignment: Alignment.centerLeft,
+              maxWidth: double.infinity,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final (i, part) in parts.indexed) ...[
+                    if (i > 0) const SizedBox(width: 3),
+                    // Lengths change smoothly (~180ms).
+                    AnimatedContainer(
+                      duration: resize,
+                      curve: MetraMotion.cardCurve,
+                      width: room * flexes[i] / sum,
+                      child: Semantics(
+                        button: true,
+                        label: '${part.name}, ${partLine(part)}',
+                        excludeSemantics: true,
+                        child: GestureDetector(
+                          key: PartsPage.stripKey(i),
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            if (_openId != part.id) {
+                              _open(part.id, scroll: true);
+                            }
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            child: _block(
+                              context,
+                              colors,
+                              part,
+                              selected: part.id == _openId,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
-        ],
-      ],
+        );
+      },
     );
   }
 
-  Widget _block(MetraColors colors, SongPart part, {required bool selected}) {
+  Widget _block(
+    BuildContext context,
+    MetraColors colors,
+    SongPart part, {
+    required bool selected,
+  }) {
     final fill = selected ? colors.text : colors.tickResting;
-    return Container(
+    // The highlight cross-fades.
+    return AnimatedContainer(
+      duration: MetraMotion.of(context, MetraMotion.cardExpand),
       height: 28,
       alignment: Alignment.center,
       decoration: BoxDecoration(
@@ -528,34 +650,37 @@ class _PartsPageState extends State<PartsPage> {
   Widget _list(BuildContext context, Song song, List<SongPart> parts) =>
       RowExitHost(
         child: ReorderableListView.builder(
+          scrollController: _scroll,
           buildDefaultDragHandles: false,
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           itemCount: parts.length,
           onReorderStart: (_) => Haptics.medium(),
           onReorderItem: (from, to) => _reorder(song, from, to),
-          proxyDecorator: (child, _, _) =>
-              Material(type: MaterialType.transparency, child: child),
+          proxyDecorator: (child, _, animation) => _lifted(animation, child),
           footer: _footer(context, song, parts),
           itemBuilder: (context, i) {
             final part = parts[i];
             return KeyedSubtree(
               key: ValueKey(part.id),
-              child: ExitShift(
-                index: i,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: SwipeRow(
-                    index: i,
-                    enabled: parts.length > 1,
-                    label: 'Remove',
-                    actionLabel: 'Remove part',
-                    moreActions: {
-                      if (i > 0) 'Move up': () => _reorder(song, i, i - 1),
-                      if (i < parts.length - 1)
-                        'Move down': () => _reorder(song, i, i + 1),
-                    },
-                    onSwiped: () => _remove(song, i),
-                    child: _card(context, song, parts, i),
+              child: _Arrive(
+                arriving: _arriving.remove(part.id),
+                child: ExitShift(
+                  index: i,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: SwipeRow(
+                      index: i,
+                      enabled: parts.length > 1,
+                      label: 'Remove',
+                      actionLabel: 'Remove part',
+                      moreActions: {
+                        if (i > 0) 'Move up': () => _reorder(song, i, i - 1),
+                        if (i < parts.length - 1)
+                          'Move down': () => _reorder(song, i, i + 1),
+                      },
+                      onSwiped: () => _remove(song, i),
+                      child: _card(context, song, parts, i),
+                    ),
                   ),
                 ),
               ),
@@ -646,7 +771,16 @@ class _PartsPageState extends State<PartsPage> {
               ),
             ),
           ),
-          if (open) _openCard(context, song, parts, i),
+          // One height change (~180ms, ease-out); the body fades in, and
+          // goes at once on closing.
+          _Expand(
+            child: open
+                ? KeyedSubtree(
+                    key: _bodyKeys.putIfAbsent(part.id, GlobalKey.new),
+                    child: _FadeIn(child: _openCard(context, song, parts, i)),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
         ],
       ),
     );
@@ -860,6 +994,44 @@ class _PartsPageState extends State<PartsPage> {
       ),
     );
   }
+
+  /// A lifted card: scaled to 1.02 with a shadow over ~100ms.
+  Widget _lifted(Animation<double> animation, Widget child) => AnimatedBuilder(
+    animation: animation,
+    builder: (context, child) {
+      final colors = context.colors;
+      final reduced = MetraMotion.reduced(context);
+      final t = reduced
+          ? 1.0
+          : Curves.easeOut.transform(
+              (animation.value * 250 / MetraMotion.lift.inMilliseconds).clamp(
+                0.0,
+                1.0,
+              ),
+            );
+      return Transform.scale(
+        scale: 1 + 0.02 * t,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: Color.lerp(
+                  colors.shadow.withAlpha(0),
+                  colors.shadow,
+                  t,
+                )!,
+                blurRadius: 16 * t,
+                offset: Offset(0, 4 * t),
+              ),
+            ],
+          ),
+          child: child,
+        ),
+      );
+    },
+    child: Material(type: MaterialType.transparency, child: child),
+  );
 
   /// "128", or "128 → 140" with a vector arrow.
   Widget _tempo(MetraColors colors, SongPart part) {
@@ -1305,4 +1477,70 @@ class SongPartsRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A new card grows in (height and fade, ~200ms, "arrive").
+class _Arrive extends StatelessWidget {
+  const _Arrive({required this.arriving, required this.child});
+
+  final bool arriving;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+    tween: Tween(begin: arriving ? 0 : 1, end: 1),
+    duration: MetraMotion.of(context, MetraMotion.arrive),
+    curve: MetraMotion.arriveCurve,
+    builder: (context, t, child) => t == 1
+        ? child!
+        : ClipRect(
+            child: Align(
+              alignment: Alignment.topCenter,
+              heightFactor: t,
+              child: Opacity(opacity: t, child: child),
+            ),
+          ),
+    child: child,
+  );
+}
+
+/// An opened card's body fades in, from ~40ms over 120ms.
+class _FadeIn extends StatelessWidget {
+  const _FadeIn({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = MetraMotion.cardFadeDelay + MetraMotion.cardFade;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: MetraMotion.of(context, total),
+      curve: Interval(
+        MetraMotion.cardFadeDelay.inMicroseconds / total.inMicroseconds,
+        1,
+        curve: Curves.easeOut,
+      ),
+      builder: (context, t, child) => Opacity(opacity: t, child: child),
+      child: child,
+    );
+  }
+}
+
+/// A card's body opening or closing in one height change; with Remove
+/// animations, at once.
+class _Expand extends StatelessWidget {
+  const _Expand({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => MetraMotion.reduced(context)
+      ? child
+      : AnimatedSize(
+          duration: MetraMotion.cardExpand,
+          curve: MetraMotion.cardCurve,
+          alignment: Alignment.topCenter,
+          child: child,
+        );
 }

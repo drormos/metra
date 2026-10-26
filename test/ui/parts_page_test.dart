@@ -13,6 +13,7 @@ import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/on_start_sheet.dart';
 import 'package:metra/src/ui/parts_page.dart';
 import 'package:metra/src/ui/save_as_new_dialog.dart';
+import 'package:metra/src/ui/swipe_row.dart';
 import 'package:metra/src/ui/setlist_group.dart';
 import 'package:metra/src/ui/time_signature_sheet.dart';
 import 'package:metra/src/ui/value_stepper.dart';
@@ -123,11 +124,17 @@ void main() {
   ) async {
     await pump(tester);
     await openPage(tester);
-    bool shown(Key key) => tester
-        .widget<Visibility>(
-          find.ancestor(of: find.byKey(key), matching: find.byType(Visibility)),
-        )
-        .visible;
+    // Save / Discard fade in their reserved room.
+    bool shown(Key key) =>
+        tester
+            .widget<AnimatedOpacity>(
+              find.ancestor(
+                of: find.byKey(key),
+                matching: find.byType(AnimatedOpacity),
+              ),
+            )
+            .opacity ==
+        1;
     expect(shown(PartsPage.saveKey), isFalse, reason: 'nothing unsaved');
     final title = tester.getTopLeft(find.byKey(PartsPage.nameKey));
     await tapIn(tester, find.byKey(PartsPage.addKey));
@@ -429,6 +436,117 @@ void main() {
       await tapIn(tester, find.byKey(PartsPage.cardKey(1)));
       await tapIn(tester, chip(PartsPage.tempoKindKey, 'Gradual'));
       expect((parts()[1].tempoStart, parts()[1].tempoEnd), (140, 120));
+    });
+  });
+
+  group('motion', () {
+    List<SongPart> four() => [
+      for (final name in ['Intro', 'Verse', 'Chorus', 'Outro'])
+        SongPart.steady(
+          id: name,
+          name: name,
+          bars: 4,
+          bpm: 120,
+          pattern: const MetronomePattern.standard(),
+        ),
+    ];
+
+    testWidgets('opening a card while one above it closes keeps the tapped '
+        'header still, every frame', (tester) async {
+      await pump(tester);
+      metronome.setParts([
+        for (var n = 0; n < 16; n++)
+          SongPart.steady(
+            id: 'p$n',
+            name: 'Part ${n + 1}',
+            bars: 4,
+            bpm: 120,
+            pattern: const MetronomePattern.standard(),
+          ),
+      ]);
+      await openPage(tester);
+      await tapIn(tester, find.byKey(PartsPage.cardKey(1)));
+      // Scrolled down far enough to take the closing body back.
+      await tester.drag(
+        find.byType(ReorderableListView),
+        const Offset(0, -600),
+      );
+      await tester.pumpAndSettle();
+      final header = find.byKey(PartsPage.cardKey(8));
+      final y = tester.getTopLeft(header).dy;
+      await tester.tap(header);
+      for (var i = 0; i < 15; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(tester.getTopLeft(header).dy, closeTo(y, 1), reason: 'frame $i');
+      }
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(header).dy, closeTo(y, 1));
+      expect(find.byKey(PartsPage.duplicateKey), findsOneWidget);
+    });
+
+    testWidgets('a tap mid-animation acts at once', (tester) async {
+      await pump(tester);
+      metronome.setParts(four());
+      await openPage(tester);
+      await tester.tap(find.byKey(PartsPage.cardKey(0)));
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.tap(find.byKey(PartsPage.cardKey(1)));
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pumpAndSettle();
+      // Card 1 is the open one: its body sits right under its header.
+      final body = find.byKey(PartsPage.duplicateKey);
+      expect(body, findsOneWidget);
+      expect(
+        tester.getTopLeft(body).dy,
+        greaterThan(tester.getTopLeft(find.byKey(PartsPage.cardKey(1))).dy),
+      );
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a new part grows in', (tester) async {
+      await pump(tester);
+      await openPage(tester);
+      await tester.tap(find.byKey(PartsPage.addKey));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      final card = find.byKey(PartsPage.cardKey(1));
+      final early = tester
+          .getSize(
+            find.ancestor(of: card, matching: find.byType(ClipRect)).first,
+          )
+          .height;
+      await tester.pumpAndSettle();
+      final full = tester
+          .getSize(
+            find.ancestor(of: card, matching: find.byType(SwipeRow)).first,
+          )
+          .height;
+      expect(early, lessThan(full));
+    });
+
+    testWidgets('Remove animations: a card opens at once', (tester) async {
+      await pump(tester);
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      metronome.setParts(four());
+      await openPage(tester);
+      await tester.tap(find.byKey(PartsPage.cardKey(0)));
+      await tester.pump();
+      await tester.pump();
+      final body = tester.getSize(find.byKey(PartsPage.duplicateKey));
+      expect(body.height, greaterThan(0));
+      final opacity = tester.widget<Opacity>(
+        find
+            .ancestor(
+              of: find.byKey(PartsPage.duplicateKey),
+              matching: find.byType(Opacity),
+            )
+            .first,
+      );
+      expect(opacity.opacity, 1);
     });
   });
 }

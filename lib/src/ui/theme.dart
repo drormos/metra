@@ -214,6 +214,22 @@ abstract final class MetraMotion {
   static const arriveCurve = Curves.easeOut;
   static const arriveRise = 6.0;
 
+  /// The parts page (ui-spec.md "Motion on the parts page"): a card opens
+  /// or closes in one height change; its body fades in from
+  /// [cardFadeDelay] over [cardFade]; the list scrolls a card into view
+  /// over [reveal], to a tapped strip block over [jump]; strip blocks
+  /// resize over [cardExpand]; Save / Discard fade over [controlsFade]; a
+  /// lifted card scales up over [lift]; the song map snaps over [mapSnap].
+  static const cardExpand = Duration(milliseconds: 180);
+  static const cardCurve = Curves.easeOut;
+  static const cardFadeDelay = Duration(milliseconds: 40);
+  static const cardFade = Duration(milliseconds: 120);
+  static const reveal = Duration(milliseconds: 200);
+  static const jump = Duration(milliseconds: 250);
+  static const controlsFade = Duration(milliseconds: 120);
+  static const lift = Duration(milliseconds: 100);
+  static const mapSnap = Duration(milliseconds: 220);
+
   /// A beat light's pulse (ui-spec.md "Beat lights: a short pulse"),
   /// against the time to its own next click: up over [lightRise] (ease-
   /// out) starting [lightLead] before the click, lit for [lightShare] of

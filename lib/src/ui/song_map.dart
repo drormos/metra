@@ -88,7 +88,13 @@ class _SongMapState extends State<SongMap> with TickerProviderStateMixin {
   // While dragging or snapping: the position under the finger.
   double? _drag;
   late final AnimationController _snap = AnimationController(vsync: this)
-    ..addListener(() => setState(() => _drag = _snapTween.evaluate(_snap)));
+    ..addListener(
+      () => setState(
+        () => _drag = _snapTween.transform(
+          Curves.decelerate.transform(_snap.value),
+        ),
+      ),
+    );
   Tween<double> _snapTween = Tween(begin: 0, end: 0);
   // A part gone to while playing: held at its start until it plays.
   int? _going;
@@ -155,9 +161,7 @@ class _SongMapState extends State<SongMap> with TickerProviderStateMixin {
     final blocks = SongMap.layout(parts);
     if (_controller.isPlaying) _going = part;
     _snapTween = Tween(begin: _drag ?? _x, end: blocks[part].x);
-    _snap.duration = MetraMotion.reduced(context)
-        ? Duration.zero
-        : const Duration(milliseconds: 150);
+    _snap.duration = MetraMotion.of(context, MetraMotion.mapSnap);
     _snap.forward(from: 0).whenComplete(() {
       if (mounted) setState(() => _drag = null);
     });
