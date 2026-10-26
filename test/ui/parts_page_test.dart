@@ -204,8 +204,8 @@ void main() {
     final stop = chip(PartsPage.endKey, 'Stop');
     expect(tester.getTopLeft(stop).dy, greaterThan(label.dy), reason: 'below');
     expect(chip(PartsPage.endKey, 'Loop song'), findsOneWidget);
-    // Stop and Loop song side by side, Loop last part under them, each
-    // line centered (a pyramid).
+    // Stop and Loop song each centered in their half, Loop last part
+    // centered under them.
     final group = tester.getRect(find.byKey(PartsPage.endKey));
     final stopChip = tester.getRect(chip(PartsPage.endKey, 'Stop'));
     final loopChip = tester.getRect(chip(PartsPage.endKey, 'Loop song'));
@@ -213,7 +213,8 @@ void main() {
     expect(loopChip.top, stopChip.top);
     expect(stopChip.right, lessThan(loopChip.left));
     expect(lastChip.top, greaterThan(stopChip.top));
-    expect((stopChip.left + loopChip.right) / 2, closeTo(group.center.dx, 20));
+    expect(stopChip.center.dx, closeTo(group.left + group.width / 4, 1));
+    expect(loopChip.center.dx, closeTo(group.left + group.width * 3 / 4, 1));
     expect(lastChip.center.dx, closeTo(group.center.dx, 1));
     expect(chip(PartsPage.endKey, 'Loop last part'), findsOneWidget);
     await tapIn(tester, find.byKey(PartsPage.addKey));
