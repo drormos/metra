@@ -350,6 +350,23 @@ void main() {
       expect(controller.bpm, 90);
     });
 
+    test('in a set, with the parts page open, a song that ends stays '
+        'loaded, back at part 1, wherever it started', () async {
+      final first = addParts('First', [_part('a', 1, 120), _part('b', 1, 120)]);
+      final next = library.addSong(name: 'Next', bpm: 90, pattern: _three);
+      final set = library.saveSetlist(
+        name: 'Set',
+        songIds: [first.id, next.id],
+      );
+      library.loadSetlist(set.id, controller);
+      library.editingParts = true;
+      await controller.playFrom(1);
+      runTo(5300);
+      expect(controller.isPlaying, isFalse);
+      expect(library.currentSong!.name, 'First');
+      expect(controller.partPosition, (part: 0, bar: 0));
+    });
+
     test('changes are unsaved changes: Revert brings the parts back, Save '
         'stores them', () {
       final song = addParts('Song', [_part('a', 2, 100), _part('b', 2, 140)]);

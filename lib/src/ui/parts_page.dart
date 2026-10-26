@@ -54,6 +54,7 @@ class PartsPage extends StatefulWidget {
   static const endKey = Key('parts-end');
   static const lengthKindKey = Key('parts-length-kind');
   static const tempoKindKey = Key('parts-tempo-kind');
+  static const untilStopKey = Key('parts-until-stop');
   static const rhythmKey = Key('parts-rhythm');
   static const playFromKey = Key('parts-play-from');
   static const duplicateKey = Key('parts-duplicate');
@@ -104,12 +105,14 @@ class _PartsPageState extends State<PartsPage>
   @override
   void initState() {
     super.initState();
+    _library.editingParts = true;
     _metronome.addListener(_onMetronome);
     _onMetronome();
   }
 
   @override
   void dispose() {
+    _library.editingParts = false;
     _metronome.removeListener(_onMetronome);
     _undoTimer?.cancel();
     _follow?.cancel();
@@ -184,6 +187,9 @@ class _PartsPageState extends State<PartsPage>
   Timer? _closing;
   // That press closed it: its tap mustn't open it again.
   bool _heldClosed = false;
+  // Closed by a hold, at once: the list takes the lifted card's size at
+  // the lift, and a card still collapsing would make it auto-scroll.
+  String? _snapClosed;
 
   void _closeBeforeLift(String id) {
     _heldClosed = false;
@@ -193,7 +199,10 @@ class _PartsPageState extends State<PartsPage>
       () {
         if (mounted && _openId == id) {
           _heldClosed = true;
-          setState(() => _openId = null);
+          setState(() {
+            _openId = null;
+            _snapClosed = id;
+          });
         }
       },
     );
@@ -205,6 +214,7 @@ class _PartsPageState extends State<PartsPage>
   /// same curve. From the strip ([scroll]): scrolls to the card. Never
   /// waits: a tap mid-animation retargets it.
   void _open(String id, {bool scroll = false}) {
+    _snapClosed = null;
     if (_heldClosed) {
       _heldClosed = false;
       return;
@@ -774,6 +784,7 @@ class _PartsPageState extends State<PartsPage>
           // One height change (~180ms, ease-out); the body fades in, and
           // goes at once on closing.
           _Expand(
+            instant: _snapClosed == part.id,
             child: open
                 ? KeyedSubtree(
                     key: _bodyKeys.putIfAbsent(part.id, GlobalKey.new),
@@ -785,6 +796,39 @@ class _PartsPageState extends State<PartsPage>
       ),
     );
   }
+
+  Widget _barsStepper(
+    int bars, {
+    required String label,
+    required void Function(SongPart Function(SongPart)) edit,
+  }) => ValueStepper(
+    label: label,
+    display: bars == 1 ? '1 bar' : '$bars bars',
+    editText: '$bars',
+    onMinus: bars > SongPart.minBars
+        ? () => edit(
+            (p) => p.copyWith(
+              bars: OnStart.stepDown(bars, OnStart.barsGrid, SongPart.minBars),
+            ),
+          )
+        : null,
+    onPlus: bars < SongPart.maxBars
+        ? () => edit(
+            (p) => p.copyWith(
+              bars: OnStart.stepUp(bars, OnStart.barsGrid, SongPart.maxBars),
+            ),
+          )
+        : null,
+    onTyped: (text) {
+      final v = int.tryParse(text);
+      if (v == null) return;
+      edit(
+        (p) => p.copyWith(
+          bars: OnStart.clampInt(v, SongPart.minBars, SongPart.maxBars),
+        ),
+      );
+    },
+  );
 
   Widget _openCard(
     BuildContext context,
@@ -835,31 +879,32 @@ class _PartsPageState extends State<PartsPage>
               ),
             ],
           ),
-          if (!part.open)
-            Choices<bool>(
-              key: PartsPage.tempoKindKey,
-              label: 'Tempo',
-              options: const {false: 'Steady', true: 'Gradual'},
-              selected: gradual,
-              onSelected: (on) {
-                setState(
-                  () => on ? _gradual.add(part.id) : _gradual.remove(part.id),
-                );
-                edit((p) {
-                  if (!on) return p.copyWith(tempoEnd: p.tempoStart);
-                  // From the previous part's tempo, to this one's.
-                  final from = i > 0 ? parts[i - 1].tempoEnd : p.tempoStart;
-                  var to = p.tempoStart;
-                  if (to == from) {
-                    to = from + 10 > MetronomeController.maxBpm
-                        ? from - 10
-                        : from + 10;
-                  }
-                  return p.copyWith(tempoStart: from, tempoEnd: to);
-                });
-              },
-            ),
-          if (gradual && !part.open) ...[
+          Choices<bool>(
+            key: PartsPage.tempoKindKey,
+            label: 'Tempo',
+            options: const {false: 'Steady', true: 'Gradual'},
+            selected: gradual,
+            onSelected: (on) {
+              setState(
+                () => on ? _gradual.add(part.id) : _gradual.remove(part.id),
+              );
+              edit((p) {
+                if (!on) return p.copyWith(tempoEnd: p.tempoStart);
+                // A Gradual part needs a length to reach To in.
+                p = p.copyWith(bars: p.bars ?? PartsPage.defaultBars);
+                // From the previous part's tempo, to this one's.
+                final from = i > 0 ? parts[i - 1].tempoEnd : p.tempoStart;
+                var to = p.tempoStart;
+                if (to == from) {
+                  to = from + 10 > MetronomeController.maxBpm
+                      ? from - 10
+                      : from + 10;
+                }
+                return p.copyWith(tempoStart: from, tempoEnd: to);
+              });
+            },
+          ),
+          if (gradual) ...[
             tempo('From', part.tempoStart, (v) => part.copyWith(tempoStart: v)),
             tempo('To', part.tempoEnd, (v) => part.copyWith(tempoEnd: v)),
           ] else
@@ -874,53 +919,36 @@ class _PartsPageState extends State<PartsPage>
               label: 'Length',
               options: const {false: 'Bars', true: 'Until you stop'},
               selected: part.open,
+              hints: gradual
+                  ? const {true: 'Gradual parts need a length'}
+                  : const {},
               onSelected: (open) => edit(
                 (p) => open
                     ? p.copyWith(bars: null, tempoEnd: p.tempoStart)
                     : p.copyWith(bars: PartsPage.defaultBars),
               ),
             ),
-          if (part.bars case final bars?)
-            ValueStepper(
-              label: last ? 'Bars' : 'Length',
-              display: bars == 1 ? '1 bar' : '$bars bars',
-              editText: '$bars',
-              onMinus: bars > SongPart.minBars
-                  ? () => edit(
-                      (p) => p.copyWith(
-                        bars: OnStart.stepDown(
-                          bars,
-                          OnStart.barsGrid,
-                          SongPart.minBars,
-                        ),
-                      ),
-                    )
-                  : null,
-              onPlus: bars < SongPart.maxBars
-                  ? () => edit(
-                      (p) => p.copyWith(
-                        bars: OnStart.stepUp(
-                          bars,
-                          OnStart.barsGrid,
-                          SongPart.maxBars,
-                        ),
-                      ),
-                    )
-                  : null,
-              onTyped: (text) {
-                final v = int.tryParse(text);
-                if (v == null) return;
-                edit(
-                  (p) => p.copyWith(
-                    bars: OnStart.clampInt(
-                      v,
-                      SongPart.minBars,
-                      SongPart.maxBars,
-                    ),
-                  ),
-                );
-              },
+          // The slot keeps the stepper's height either way: switching to
+          // Until you stop never reshapes the card.
+          BrightenSwap(
+            value: part.open,
+            child: IndexedStack(
+              alignment: Alignment.centerLeft,
+              index: part.open ? 1 : 0,
+              children: [
+                _barsStepper(
+                  part.bars ?? PartsPage.defaultBars,
+                  label: last ? 'Bars' : 'Length',
+                  edit: edit,
+                ),
+                Text(
+                  'Plays until you press Stop',
+                  key: PartsPage.untilStopKey,
+                  style: TextStyle(fontSize: 15, color: colors.muted),
+                ),
+              ],
             ),
+          ),
           Row(
             children: [
               const Expanded(
@@ -1530,12 +1558,13 @@ class _FadeIn extends StatelessWidget {
 /// A card's body opening or closing in one height change; with Remove
 /// animations, at once.
 class _Expand extends StatelessWidget {
-  const _Expand({required this.child});
+  const _Expand({required this.child, this.instant = false});
 
   final Widget child;
+  final bool instant;
 
   @override
-  Widget build(BuildContext context) => MetraMotion.reduced(context)
+  Widget build(BuildContext context) => instant || MetraMotion.reduced(context)
       ? child
       : AnimatedSize(
           duration: MetraMotion.cardExpand,

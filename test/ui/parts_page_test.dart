@@ -171,6 +171,16 @@ void main() {
     expect(shown(PartsPage.saveKey), isFalse);
   });
 
+  testWidgets('while the page is open, a song that ends stays loaded '
+      '(the library knows); after Back, a set moves on again', (tester) async {
+    await pump(tester);
+    await openPage(tester);
+    expect(library.editingParts, isTrue);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(library.editingParts, isFalse);
+  });
+
   testWidgets('Back with unsaved changes: no question; they stay the '
       'song\'s unsaved changes on the main screen', (tester) async {
     await pump(tester);
@@ -183,16 +193,24 @@ void main() {
     expect(find.byKey(MetronomeScreen.revertKey), findsOneWidget);
   });
 
-  testWidgets('the last part only: Bars / Until you stop; open, no Gradual '
-      'and no "When the song ends"', (tester) async {
+  testWidgets('the last part only: Bars / Until you stop; the switch '
+      'keeps the card\'s shape; open, no "When the song ends"', (tester) async {
     await pump(tester);
     await openPage(tester);
     await tapIn(tester, find.byKey(PartsPage.addKey)); // Part 2, open
-    expect(find.byKey(PartsPage.tempoKindKey), findsNothing);
     expect(find.byKey(PartsPage.endKey), findsNothing);
+    expect(find.text('Plays until you press Stop'), findsOneWidget);
+    // From the card's header: the list may scroll, the card mustn't change.
+    double top(Key key) =>
+        tester.getTopLeft(find.byKey(key)).dy -
+        tester.getTopLeft(find.byKey(PartsPage.cardKey(1))).dy;
+    final tempoTop = top(PartsPage.tempoKindKey);
+    final rhythmTop = top(PartsPage.rhythmKey);
     await tapIn(tester, chip(PartsPage.lengthKindKey, 'Bars'));
     expect(parts()[1].bars, PartsPage.defaultBars);
-    expect(find.byKey(PartsPage.tempoKindKey), findsOneWidget);
+    expect(find.text('Plays until you press Stop'), findsNothing);
+    expect(top(PartsPage.tempoKindKey), tempoTop);
+    expect(top(PartsPage.rhythmKey), rhythmTop, reason: 'same height');
     await tester.dragUntilVisible(
       find.byKey(PartsPage.endKey),
       find.byType(ReorderableListView),
@@ -226,6 +244,21 @@ void main() {
     expect(parts()[1].tempoEnd, 131);
     await tapIn(tester, chip(PartsPage.tempoKindKey, 'Steady'));
     expect(parts()[1].gradual, isFalse);
+  });
+
+  testWidgets('a Gradual last part can\'t run until you stop: the chip '
+      'only hints; Gradual on an open part gives it a length', (tester) async {
+    await pump(tester);
+    await openPage(tester);
+    await tapIn(tester, find.byKey(PartsPage.addKey)); // Part 2, open
+    await tapIn(tester, chip(PartsPage.tempoKindKey, 'Gradual'));
+    expect(parts()[1].bars, PartsPage.defaultBars);
+    expect(parts()[1].gradual, isTrue);
+    await tapIn(tester, chip(PartsPage.lengthKindKey, 'Until you stop'));
+    expect(parts()[1].open, isFalse);
+    expect(find.text('Gradual parts need a length'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('swipe removes a part, with Undo; the last one can\'t go', (
@@ -315,7 +348,11 @@ void main() {
   group('fixes after the first phone check', () {
     Future<void> drag(WidgetTester tester, Finder from, double dy) async {
       final gesture = await tester.startGesture(tester.getCenter(from));
-      await tester.pump(kLongPressTimeout + const Duration(milliseconds: 100));
+      // A frame between the close (just before the lift) and the lift.
+      await tester.pump(
+        RowGestures.liftPress - const Duration(milliseconds: 20),
+      );
+      await tester.pump(kLongPressTimeout);
       for (var i = 0; i < 6; i++) {
         await gesture.moveBy(Offset(0, dy / 6));
         await tester.pump(const Duration(milliseconds: 16));
@@ -332,10 +369,25 @@ void main() {
       await openPage(tester);
       await tapIn(tester, find.byKey(PartsPage.addKey)); // Part 2, open
       // Held inside the open body (the accents): no lift, still open.
+      // Scrolled without a drag: a held drag on the header would close it.
+      final list = tester
+          .state<ScrollableState>(
+            find
+                .descendant(
+                  of: find.byType(ReorderableListView),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          )
+          .position;
+      list.jumpTo(list.maxScrollExtent);
+      await tester.pumpAndSettle();
       await drag(tester, find.byKey(PartsPage.accentKey(0)), -80);
       expect(names(), ['Part 1', 'Part 2']);
       expect(find.byKey(PartsPage.duplicateKey), findsOneWidget);
       // Held on its header: closes, lifts, moves up one.
+      list.jumpTo(0);
+      await tester.pumpAndSettle();
       await drag(tester, find.byKey(PartsPage.cardKey(1)), -68);
       expect(names(), ['Part 2', 'Part 1']);
       expect(find.byKey(PartsPage.duplicateKey), findsNothing);

@@ -1026,12 +1026,21 @@ class LibraryController extends ChangeNotifier {
   // The click this library drives (see [attach]).
   MetronomeController? _metronome;
 
+  /// While the parts page is open: a song that ends stays loaded, back at
+  /// part 1, wherever playback started (ui-spec.md "Song end in a set").
+  bool editingParts = false;
+
   void attach(MetronomeController metronome) {
     _metronome = metronome;
     // In a set, a song whose parts ended leaves the next song ready
-    // (ui-spec.md "Song parts"); it never starts by itself.
+    // (ui-spec.md "Song parts"); it never starts by itself. Never while
+    // the song is being edited.
     metronome.onSongEnd = () {
-      if (activeSetlist != null && hasNext) nextSong(metronome);
+      if (editingParts) {
+        metronome.jumpToPart(0);
+      } else if (activeSetlist != null && hasNext) {
+        nextSong(metronome);
+      }
     };
     metronome
       ..setBpm(_library.lastBpm)

@@ -15,12 +15,17 @@ class Choices<T> extends StatelessWidget {
     required this.options,
     required this.selected,
     required this.onSelected,
+    this.hints = const {},
   });
 
   final String label;
   final Map<T, String> options;
   final T selected;
   final ValueChanged<T> onSelected;
+
+  /// Options that can't be chosen now, with why: shown dimmed, and a tap
+  /// shows the hint instead of choosing.
+  final Map<T, String> hints;
 
   @override
   Widget build(BuildContext context) {
@@ -49,16 +54,20 @@ class Choices<T> extends StatelessWidget {
     required bool selected,
   }) {
     const shape = StadiumBorder();
-    return Semantics(
+    final hint = hints[value];
+    final chip = Semantics(
       button: true,
       selected: selected,
       child: InkWell(
         key: ValueKey('chip-$value'),
         customBorder: shape,
-        onTap: () {
-          Haptics.tick();
-          onSelected(value);
-        },
+        // A hinted chip leaves the tap to its tooltip.
+        onTap: hint != null
+            ? null
+            : () {
+                Haptics.tick();
+                onSelected(value);
+              },
         child: SizedBox(
           height: 48,
           child: Center(
@@ -80,7 +89,11 @@ class Choices<T> extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                  color: selected ? colors.text : colors.muted,
+                  color: selected
+                      ? colors.text
+                      : hint != null
+                      ? colors.disabledText
+                      : colors.muted,
                 ),
               ),
             ),
@@ -88,5 +101,12 @@ class Choices<T> extends StatelessWidget {
         ),
       ),
     );
+    return hint == null
+        ? chip
+        : Tooltip(
+            message: hint,
+            triggerMode: TooltipTriggerMode.tap,
+            child: chip,
+          );
   }
 }

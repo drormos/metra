@@ -4,6 +4,11 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Fixed
+- Parts page: switching the last part between Bars and Until you stop no longer reshapes the card; Gradual parts explain why they need a length.
+- Parts page: an open card can be held and reordered however tall it is.
+- Parts page: a song that ends while you edit it stays loaded (in a set, it no longer moves on to the next song).
+
 ## [1.6.0] - 2026-10-26
 
 ### Added
