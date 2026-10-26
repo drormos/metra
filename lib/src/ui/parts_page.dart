@@ -1014,7 +1014,10 @@ class _PartsPageState extends State<PartsPage> {
             child: Choices<SongEnd>(
               key: PartsPage.endKey,
               label: 'When the song ends',
-              options: const {SongEnd.stop: 'Stop', SongEnd.loop: 'Loop'},
+              options: const {
+                SongEnd.stop: 'Stop',
+                SongEnd.loop: 'Repeat song',
+              },
               selected: _end,
               onSelected: (end) => _set(parts, end: end),
             ),

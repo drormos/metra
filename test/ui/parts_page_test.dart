@@ -192,7 +192,7 @@ void main() {
       const Offset(0, -100),
     );
     expect(find.byKey(PartsPage.endKey), findsOneWidget);
-    await tapIn(tester, chip(PartsPage.endKey, 'Loop'));
+    await tapIn(tester, chip(PartsPage.endKey, 'Repeat song'));
     expect(metronome.songEnd, SongEnd.loop);
     expect(summary(tester), '2 parts · 16 bars · ≈ 0:32');
     // Part 1 isn't the last: no length chips on its card.
