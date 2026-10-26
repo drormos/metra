@@ -15,17 +15,12 @@ class Choices<T> extends StatelessWidget {
     required this.options,
     required this.selected,
     required this.onSelected,
-    this.below = false,
   });
 
   final String label;
   final Map<T, String> options;
   final T selected;
   final ValueChanged<T> onSelected;
-
-  /// The chips under the label, two to a line, each centered in its half
-  /// (more than fit beside it on a phone).
-  final bool below;
 
   @override
   Widget build(BuildContext context) {
@@ -37,32 +32,6 @@ class Choices<T> extends StatelessWidget {
           _chip(colors, value, text, selected: value == selected),
       ],
     );
-    if (below) {
-      // Two to a line, each centered in its half; an odd last one centered
-      // on its own line.
-      final all = [
-        for (final MapEntry(key: value, value: text) in options.entries)
-          _chip(colors, value, text, selected: value == selected),
-      ];
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(label, style: const TextStyle(fontSize: 15)),
-          ),
-          for (var i = 0; i < all.length; i += 2)
-            i + 1 < all.length
-                ? Row(
-                    children: [
-                      Expanded(child: Center(child: all[i])),
-                      Expanded(child: Center(child: all[i + 1])),
-                    ],
-                  )
-                : Center(child: all[i]),
-        ],
-      );
-    }
     // With large text the chips go under the label rather than off screen.
     return Wrap(
       alignment: WrapAlignment.spaceBetween,

@@ -76,14 +76,22 @@ void main() {
       tester.widget<Text>(find.byKey(PartsPage.summaryKey)).data!;
   List<SongPart> parts() => metronome.parts ?? library.currentSong!.parts;
   List<String> names() => [for (final p in parts()) p.name];
-  Finder chip(Key group, String text) =>
-      find.descendant(of: find.byKey(group), matching: find.text(text));
-
   Future<void> tapIn(WidgetTester tester, Finder finder) async {
     await tester.ensureVisible(finder);
     await tester.pumpAndSettle();
     await tester.tap(finder);
     await tester.pumpAndSettle();
+  }
+
+  // "When the song ends" → [end].
+  Future<void> pick(SongEnd end, WidgetTester tester) async {
+    await tapIn(tester, find.byKey(PartsPage.endKey));
+    await tapIn(
+      tester,
+      find.byWidgetPredicate(
+        (w) => w is CheckedPopupMenuItem<SongEnd> && w.value == end,
+      ),
+    );
   }
 
   group('getting there', () {
@@ -139,8 +147,9 @@ void main() {
     final title = tester.getTopLeft(find.byKey(PartsPage.nameKey));
     await tapIn(tester, find.byKey(PartsPage.addKey));
     expect(names(), ['Part 1', 'Part 2']);
-    expect(parts().map((p) => p.bars), [1, 1]);
-    expect(summary(tester), '2 parts · 2 bars, then loops Part 2');
+    // The first add on a plain song: both parts 8 bars.
+    expect(parts().map((p) => p.bars), [8, 8]);
+    expect(summary(tester), '2 parts · 16 bars, then loops Part 2');
     expect(library.songChanged(metronome), isTrue);
     expect(shown(PartsPage.saveKey), isTrue);
     expect(shown(PartsPage.discardKey), isTrue);
@@ -191,32 +200,42 @@ void main() {
     expect(find.byKey(MetronomeScreen.revertKey), findsOneWidget);
   });
 
-  testWidgets('"When the song ends": three chips under the label, always '
-      'shown; adding or removing parts never changes the choice; Loop last '
-      'part marks the last block', (tester) async {
+  testWidgets('"When the song ends": a dropdown on the label\'s line, '
+      'the current choice ticked; adding or removing parts never changes '
+      'it; Loop last part marks the last block', (tester) async {
     await pump(tester);
     await openPage(tester);
     // A plain song loops its bar: the choice is there with one part too.
     expect(metronome.songEnd, SongEnd.loopLastPart);
     expect(find.byKey(PartsPage.loopIconKey), findsOneWidget);
-    expect(find.text('Until you stop'), findsNothing);
-    final label = tester.getTopLeft(find.text('When the song ends'));
-    final stop = chip(PartsPage.endKey, 'Stop');
-    expect(tester.getTopLeft(stop).dy, greaterThan(label.dy), reason: 'below');
-    expect(chip(PartsPage.endKey, 'Loop song'), findsOneWidget);
-    // Stop and Loop song each centered in their half, Loop last part
-    // centered under them.
-    final group = tester.getRect(find.byKey(PartsPage.endKey));
-    final stopChip = tester.getRect(chip(PartsPage.endKey, 'Stop'));
-    final loopChip = tester.getRect(chip(PartsPage.endKey, 'Loop song'));
-    final lastChip = tester.getRect(chip(PartsPage.endKey, 'Loop last part'));
-    expect(loopChip.top, stopChip.top);
-    expect(stopChip.right, lessThan(loopChip.left));
-    expect(lastChip.top, greaterThan(stopChip.top));
-    expect(stopChip.center.dx, closeTo(group.left + group.width / 4, 1));
-    expect(loopChip.center.dx, closeTo(group.left + group.width * 3 / 4, 1));
-    expect(lastChip.center.dx, closeTo(group.center.dx, 1));
-    expect(chip(PartsPage.endKey, 'Loop last part'), findsOneWidget);
+    final label = tester.getRect(find.text('When the song ends'));
+    final menu = tester.getRect(find.byKey(PartsPage.endKey));
+    expect(menu.center.dy, closeTo(label.center.dy, 2), reason: 'one row');
+    expect(menu.left, greaterThanOrEqualTo(label.right));
+    expect(
+      find.descendant(
+        of: find.byKey(PartsPage.endKey),
+        matching: find.text('Loop last part'),
+      ),
+      findsOneWidget,
+    );
+    // The menu: all three, the current one ticked; picking closes it.
+    await tapIn(tester, find.byKey(PartsPage.endKey));
+    final items = tester.widgetList<CheckedPopupMenuItem<SongEnd>>(
+      find.byType(CheckedPopupMenuItem<SongEnd>),
+    );
+    expect(
+      [for (final i in items) (i.value, i.checked)],
+      [
+        (SongEnd.stop, false),
+        (SongEnd.loopSong, false),
+        (SongEnd.loopLastPart, true),
+      ],
+    );
+    await tapIn(tester, find.text('Stop').last);
+    expect(metronome.songEnd, SongEnd.stop);
+    expect(find.byType(CheckedPopupMenuItem<SongEnd>), findsNothing);
+    await pick(SongEnd.loopLastPart, tester);
     await tapIn(tester, find.byKey(PartsPage.addKey));
     expect(metronome.songEnd, SongEnd.loopLastPart);
     await tester.dragUntilVisible(
@@ -224,11 +243,11 @@ void main() {
       find.byType(ReorderableListView),
       const Offset(0, -100),
     );
-    await tapIn(tester, chip(PartsPage.endKey, 'Loop song'));
+    await pick(SongEnd.loopSong, tester);
     expect(metronome.songEnd, SongEnd.loopSong);
     expect(find.byKey(PartsPage.loopIconKey), findsNothing);
-    expect(summary(tester), '2 parts · 2 bars · ≈ 0:04');
-    await tapIn(tester, chip(PartsPage.endKey, 'Stop'));
+    expect(summary(tester), '2 parts · 16 bars · ≈ 0:32');
+    await pick(SongEnd.stop, tester);
     expect(metronome.songEnd, SongEnd.stop);
     await tapIn(tester, find.byKey(PartsPage.addKey));
     expect(metronome.songEnd, SongEnd.stop);
@@ -523,6 +542,17 @@ void main() {
         findsOneWidget,
         reason: 'open',
       );
+    });
+
+    testWidgets('only a 1-bar single part gets the 8-bar first add; a '
+        'single part of another length is copied as it is', (tester) async {
+      await pump(tester);
+      metronome.setParts([part('Verse', 4, 120, 120)]);
+      await openPage(tester);
+      await tapIn(tester, find.byKey(PartsPage.addKey));
+      expect(parts().map((p) => p.bars), [4, 4]);
+      await tapIn(tester, find.byKey(PartsPage.addKey));
+      expect(parts().map((p) => p.bars), [4, 4, 4]);
     });
 
     testWidgets('a gradual change keeps the start the user set (it never '

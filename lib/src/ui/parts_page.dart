@@ -9,7 +9,6 @@ import '../model/library.dart';
 import '../model/metronome_pattern.dart';
 import '../model/on_start.dart';
 import 'beat_indicator.dart' show MutedLine;
-import 'choices.dart';
 import 'dashed_outline.dart';
 import 'editor_scaffold.dart' show confirmDelete;
 import 'haptics.dart';
@@ -53,6 +52,9 @@ class PartsPage extends StatefulWidget {
   static const addKey = Key('parts-add');
   static const endKey = Key('parts-end');
   static const gradualKey = Key('parts-gradual');
+
+  /// The first "+ Add part" on a plain song gives both parts this many.
+  static const firstAddBars = 8;
   static const steadyKey = Key('parts-steady');
   static const loopIconKey = Key('parts-loop-icon');
   static const rhythmKey = Key('parts-rhythm');
@@ -280,7 +282,12 @@ class _PartsPageState extends State<PartsPage>
   }
 
   void _add(Song song) {
-    final parts = _parts(song);
+    var parts = _parts(song);
+    // The first add on a plain song (one part of 1 bar, a length never
+    // really chosen): both parts get 8 bars, a real starting point.
+    if (parts.length == 1 && parts.single.bars == 1) {
+      parts = [parts.single.copyWith(bars: PartsPage.firstAddBars)];
+    }
     final last = parts.last;
     // The last part's rhythm and length, the next name, steady at the
     // tempo the song has reached (a Gradual part's To).
@@ -816,20 +823,21 @@ class _PartsPageState extends State<PartsPage>
 
   /// Steady: a full-width 40px dashed "Gradual tempo change" that gives
   /// the part an end tempo.
-  Widget _gradualButton(MetraColors colors, VoidCallback onTap) => SizedBox(
-    height: 48,
-    child: Center(
-      child: SizedBox(
-        height: 40,
-        child: CustomPaint(
-          painter: DashedOutline(colors.beatResting, radius: 4, width: 2),
-          child: InkWell(
-            key: PartsPage.gradualKey,
-            borderRadius: BorderRadius.circular(4),
-            onTap: () {
-              Haptics.tick();
-              onTap();
-            },
+  Widget _gradualButton(MetraColors colors, VoidCallback onTap) => InkWell(
+    key: PartsPage.gradualKey,
+    borderRadius: BorderRadius.circular(4),
+    onTap: () {
+      Haptics.tick();
+      onTap();
+    },
+    // A 48dp touch row around the 40px dashed outline.
+    child: SizedBox(
+      height: 48,
+      child: Center(
+        child: SizedBox(
+          height: 40,
+          child: CustomPaint(
+            painter: DashedOutline(colors.beatResting, radius: 4, width: 2),
             child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -1175,39 +1183,46 @@ class _PartsPageState extends State<PartsPage>
         for (final name in [...partNames, PartsPage.customName])
           PopupMenuItem(value: name, child: Text(name)),
       ],
-      child: Container(
-        constraints: const BoxConstraints(minWidth: 150, minHeight: 48),
-        alignment: Alignment.center,
-        child: Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            border: Border.all(color: colors.controlOutline, width: 2),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 100, maxWidth: 160),
-                child: Text(
-                  part.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Icon(Icons.expand_more, size: 20, color: colors.muted),
-            ],
-          ),
-        ),
-      ),
+      child: _menuBox(colors, part.name),
     );
   }
+
+  /// The look of a dropdown on this page (the part's Name, "When the song
+  /// ends"): [text] and ⌄ in a 40px outline, in a 48dp row.
+  Widget _menuBox(MetraColors colors, String text) => Container(
+    constraints: const BoxConstraints(minWidth: 150, minHeight: 48),
+    alignment: Alignment.center,
+    child: Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        border: Border.all(color: colors.controlOutline, width: 2),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 100, maxWidth: 160),
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Icon(Icons.expand_more, size: 20, color: colors.muted),
+        ],
+      ),
+    ),
+  );
+
+  static const _endNames = {
+    SongEnd.stop: 'Stop',
+    SongEnd.loopSong: 'Loop song',
+    SongEnd.loopLastPart: 'Loop last part',
+  };
 
   /// "+ Add part" (dashed) and "When the song ends".
   Widget _footer(BuildContext context, Song song, List<SongPart> parts) {
@@ -1234,17 +1249,32 @@ class _PartsPageState extends State<PartsPage>
         ),
         Padding(
           padding: const EdgeInsets.only(top: 4),
-          child: Choices<SongEnd>(
-            key: PartsPage.endKey,
-            label: 'When the song ends',
-            below: true,
-            options: const {
-              SongEnd.stop: 'Stop',
-              SongEnd.loopSong: 'Loop song',
-              SongEnd.loopLastPart: 'Loop last part',
-            },
-            selected: _metronome.songEnd,
-            onSelected: (end) => _set(parts, end: end),
+          // One line at any text size: the label, then the current choice
+          // as a dropdown like the part's Name.
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'When the song ends',
+                  style: TextStyle(fontSize: 15),
+                ),
+              ),
+              PopupMenuButton<SongEnd>(
+                key: PartsPage.endKey,
+                tooltip: 'When the song ends',
+                onSelected: (end) => _set(parts, end: end),
+                itemBuilder: (_) => [
+                  for (final MapEntry(key: end, value: name)
+                      in _endNames.entries)
+                    CheckedPopupMenuItem(
+                      value: end,
+                      checked: end == _metronome.songEnd,
+                      child: Text(name),
+                    ),
+                ],
+                child: _menuBox(colors, _endNames[_metronome.songEnd]!),
+              ),
+            ],
           ),
         ),
       ],
