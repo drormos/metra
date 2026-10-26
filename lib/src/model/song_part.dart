@@ -202,3 +202,16 @@ String nextPartName(List<SongPart> parts) {
   }
   return 'Part $n';
 }
+
+/// Where the song is, for the line under the BPM: "Chorus · bar 3 of 8 ·
+/// next: Break"; the last part has no "next"; an open part "Outro · bar
+/// 12". [bar] counts from 0.
+String partPositionLabel(List<SongPart> parts, int part, int bar) {
+  final p = parts[part];
+  if (p.bars == null) return '${p.name} · bar ${bar + 1}';
+  return [
+    p.name,
+    'bar ${bar + 1} of ${p.bars}',
+    if (part + 1 < parts.length) 'next: ${parts[part + 1].name}',
+  ].join(' · ');
+}

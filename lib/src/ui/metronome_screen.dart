@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/on_start.dart';
+import '../model/song_part.dart';
 import '../model/tempo_name.dart';
 import '../model/whats_new.dart';
 import 'beat_indicator.dart';
@@ -20,6 +21,7 @@ import 'on_start_sheet.dart';
 import 'parts_page.dart';
 import 'poly_lane.dart';
 import 'setlist_group.dart';
+import 'song_map.dart';
 import 'save_as_new_dialog.dart';
 import 'settings_screen.dart';
 import 'icons.dart';
@@ -185,6 +187,16 @@ class MetronomeScreen extends StatelessWidget {
     );
   }
 
+  /// A Gradual part playing: the BPM changes every beat, instantly.
+  bool get _ramping {
+    final parts = controller.parts;
+    final at = controller.partPosition;
+    return controller.isPlaying &&
+        parts != null &&
+        at != null &&
+        parts[at.part].gradual;
+  }
+
   Widget _content(BuildContext context) {
     final colors = context.colors;
     final bpm = controller.bpm;
@@ -232,6 +244,7 @@ class MetronomeScreen extends StatelessWidget {
                               ),
                               unitSize: 18,
                               numberKey: bpmKey,
+                              brightens: !_ramping,
                             ),
                           ),
                         ),
@@ -270,7 +283,11 @@ class MetronomeScreen extends StatelessWidget {
             },
           ),
         ),
-        TempoRuler(bpm: bpm, onChanged: controller.setBpm),
+        // A song with parts: the song map in the ruler's slot.
+        if ((controller.parts?.length ?? 0) > 1)
+          SongMap(controller: controller)
+        else
+          TempoRuler(bpm: bpm, onChanged: controller.setBpm),
         const SizedBox(height: 18), // 6px + the normal 12px gap
         TempoSteps(
           bpm: bpm,
@@ -850,7 +867,7 @@ class _TempoLineState extends State<_TempoLine> {
     if (library == null || !library.songChanged(controller)) {
       final saved = _saved;
       return BrightenSwap(
-        value: saved ?? (_firstLoad ? 'first-load' : tempoName(widget.bpm)),
+        value: saved ?? (_firstLoad ? 'first-load' : _restText),
         child: _quiet(colors),
       );
     }
@@ -880,11 +897,22 @@ class _TempoLineState extends State<_TempoLine> {
               style: TextStyle(fontSize: 15, color: colors.text),
             )
           : Text(
-              tempoName(widget.bpm),
+              _restText,
               key: MetronomeScreen.tempoNameKey,
               style: TextStyle(fontSize: 16, color: colors.muted),
             ),
     );
+  }
+
+  /// The tempo name; for a song with parts, where Start begins ("Verse ·
+  /// bar 1 of 16 · next: Chorus").
+  String get _restText {
+    final parts = widget.controller.parts;
+    final at = widget.controller.partPosition;
+    if (parts == null || parts.length < 2 || at == null) {
+      return tempoName(widget.bpm);
+    }
+    return partPositionLabel(parts, at.part, at.bar);
   }
 
   /// Revert · Save · Save as new; B's line floats below the first time.
@@ -1022,6 +1050,12 @@ class RunLine extends StatefulWidget {
     if (step == null || countIn == null) {
       // Before its first beat has sounded.
       if (step == null && controller.countingIn) return 'Count-in';
+      // A song with parts: where it is.
+      final parts = controller.parts;
+      final at = now == null ? null : controller.partAt(now);
+      if (parts != null && parts.length > 1 && at != null) {
+        return partPositionLabel(parts, at.part, at.bar);
+      }
       if (!controller.inRun) return null;
       final start = controller.runStart;
       final elapsed = now == null || start == null || now < start

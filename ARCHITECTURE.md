@@ -41,6 +41,7 @@ Timing never comes from Dart timers: the scheduler hands every click to the engi
 | Theme | `ui/theme.dart` (`MetraColors`, `MetraMotion`, `MetraFonts`) | Every color is a token; a test forbids hardcoded colors in widgets. |
 | Stage mode | `ui/stage_screen.dart`, `controller/keep_awake.dart` | Shown instead of the main screen while `LibraryController.stageMode`; taps settle into one restart. |
 | Parts page | `ui/parts_page.dart` (`PartsPage`, `SongPartsRow`) | The song editor: strip, cards, edits through `MetronomeController.setParts`; the Rhythm panel via `RhythmTarget`. |
+| Song map | `ui/song_map.dart` | The ruler's slot for a song with parts; follows `MetronomeController.playheadAt`, goes with `jumpToPart`. |
 | Settings, About | `ui/settings_screen.dart`, `ui/about.dart`, `model/whats_new.dart` (`assets/whats_new.md`) | |
 | Android | `android/app/src/main/kotlin/.../MainActivity.kt`, `PlaybackTile.kt`, `res/xml/` (backup rules) | |
 

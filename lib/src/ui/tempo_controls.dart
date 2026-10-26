@@ -17,7 +17,11 @@ class BpmReadout extends StatefulWidget {
     required this.fontSize,
     required this.unitSize,
     this.numberKey,
+    this.brightens = true,
   });
+
+  /// Off while a Gradual part ramps: every beat, instantly.
+  final bool brightens;
 
   final int bpm;
   final double fontSize;
@@ -96,7 +100,7 @@ class _BpmReadoutState extends State<BpmReadout> {
           '${widget.bpm}',
           key: widget.numberKey,
           style: BpmReadout.numberStyle(widget.fontSize),
-          brightens: true,
+          brightens: widget.brightens,
         ),
         SizedBox(width: gap),
         Text('bpm', style: unit),

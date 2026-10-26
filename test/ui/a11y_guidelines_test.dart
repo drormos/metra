@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/library_controller.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
+import 'package:metra/src/model/library.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/model/on_start.dart';
 import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/parts_page.dart';
+import 'package:metra/src/ui/song_map.dart';
 import 'package:metra/src/ui/top_panel.dart';
 import 'package:metra/src/ui/quick_pick.dart';
 import 'package:metra/src/ui/setlist_group.dart';
@@ -271,4 +273,49 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  // A song with parts: the song map in the ruler's slot.
+  void withParts() => library.saveToSong(
+    metronome..setParts([
+      SongPart.steady(
+        id: 'i',
+        name: 'Intro',
+        bars: 4,
+        bpm: 100,
+        pattern: const MetronomePattern.standard(),
+      ),
+      SongPart.steady(
+        id: 'o',
+        name: 'Outro',
+        bars: null,
+        bpm: 120,
+        pattern: const MetronomePattern.standard(),
+      ),
+    ]),
+  );
+
+  for (final (theme, colors) in [
+    ('dark', MetraColors.stageBlack),
+    ('daylight', MetraColors.daylight),
+  ]) {
+    testWidgets('$theme: main screen with parts', (tester) async {
+      final handle = tester.ensureSemantics();
+      failures.clear();
+      await pump(tester, colors: colors);
+      withParts();
+      await tester.pumpAndSettle();
+      expect(find.byType(SongMap), findsOneWidget);
+      await checkAll(tester, '$theme main screen with parts');
+      handle.dispose();
+      expect(failures, isEmpty);
+    });
+  }
+  testWidgets('main screen with parts, text at 200% on 320dp: nothing '
+      'breaks', (tester) async {
+    await pump(tester, colors: MetraColors.stageBlack, textScale: 2);
+    tester.view.physicalSize = const Size(320, 690);
+    withParts();
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
 }

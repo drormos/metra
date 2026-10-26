@@ -168,6 +168,39 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
     return _plan?.locate(bar) ?? (part: parts.length - 1, bar: 0);
   }
 
+  /// The part playing at engine time [time] and the bar within it (from
+  /// 0); null in a count-in, stopped, or without parts playing.
+  ({int part, int bar})? partAt(Duration time) {
+    final bar = _playing ? _scheduler.stepAt(time)?.bar : null;
+    return bar == null ? null : _plan?.locate(bar);
+  }
+
+  /// Where the song is at [frameTime] (as [visualTimeAt]): the part, the
+  /// bar within it and how far through that bar (0–1), so the song map can
+  /// move smoothly. Stopped (or in a count-in): the start of the part Start
+  /// begins with. Null for a song without parts.
+  ({int part, int bar, double fraction})? playheadAt(Duration frameTime) {
+    if (_parts == null) return null;
+    final start = (part: _startPart, bar: 0, fraction: 0.0);
+    final now = visualTimeAt(frameTime);
+    final step = now == null ? null : _scheduler.stepAt(now);
+    final bar = step?.bar;
+    final at = bar == null ? null : _plan?.locate(bar);
+    if (step == null || at == null) return start;
+    final interval = _scheduler.stepInterval(step);
+    final into = interval == null || interval == Duration.zero
+        ? 0.0
+        : ((now! - step.time).inMicroseconds / interval.inMicroseconds).clamp(
+            0.0,
+            1.0,
+          );
+    return (
+      part: at.part,
+      bar: at.bar,
+      fraction: (step.barPosition + into) / step.pattern.stepsPerBar,
+    );
+  }
+
   /// Goes to part [index]: stopped, Start begins there; playing, it starts
   /// on the next bar line.
   void jumpToPart(int index) {
@@ -456,6 +489,20 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
     final bpm = _playing && part.gradual ? _bpm : part.tempoStart;
     applyEdit(bpm: bpm, pattern: part.pattern);
     _applying = false;
+    notifyListeners();
+  }
+
+  /// The song is unloaded (Free play): the click keeps the part it's on,
+  /// as a plain click; the parts go.
+  void dropParts() {
+    if (_parts == null) return;
+    final plays = playsParts;
+    _parts = null;
+    _startPart = 0;
+    if (_playing && plays) {
+      _plan = null;
+      _scheduler.run = _onStart.runs ? _onStart : null;
+    }
     notifyListeners();
   }
 

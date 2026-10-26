@@ -12,6 +12,7 @@ import 'dashed_outline.dart';
 import 'fit_text.dart';
 import 'haptics.dart';
 import 'metronome_screen.dart';
+import 'song_map.dart';
 import 'tempo_controls.dart';
 import 'theme.dart';
 
@@ -334,6 +335,11 @@ class _StageScreenState extends State<StageScreen>
             ),
           ),
         ),
+        // A song with parts: the song map, taps only (no gestures here).
+        if ((_metronome.parts?.length ?? 0) > 1) ...[
+          SongMap(controller: _metronome, slide: false),
+          const SizedBox(height: 8),
+        ],
         SizedBox(
           height: 24,
           child: Center(

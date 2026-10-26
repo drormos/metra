@@ -1023,7 +1023,11 @@ class LibraryController extends ChangeNotifier {
   /// Restores the last session's tempo, pattern, count-in, flash offset, click
   /// sound and volumes into [metronome], then saves them whenever they
   /// change.
+  // The click this library drives (see [attach]).
+  MetronomeController? _metronome;
+
   void attach(MetronomeController metronome) {
+    _metronome = metronome;
     // In a set, a song whose parts ended leaves the next song ready
     // (ui-spec.md "Song parts"); it never starts by itself.
     metronome.onSongEnd = () {
@@ -1082,6 +1086,9 @@ class LibraryController extends ChangeNotifier {
         _sessionSongId = library.currentSongId;
       }
     }
+    // No song loaded any more (Free play, a deleted song or set): the click
+    // goes on as it sounds, without the song's parts.
+    if (moved && currentSong == null) _metronome?.dropParts();
     notifyListeners();
     _unsaved = library;
     _writing ??= _writeAll();
