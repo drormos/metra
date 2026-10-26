@@ -381,4 +381,54 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
     });
   });
+
+  group('polish', () {
+    SongPart part(String id, int? bars, int from, int to, [int beats = 4]) =>
+        SongPart(
+          id: id,
+          name: id,
+          bars: bars,
+          tempoStart: from,
+          tempoEnd: to,
+          pattern: MetronomePattern.simple(
+            beatsPerBar: beats,
+            stepsPerBeat: 2,
+          ).cycleBeat(1),
+        );
+
+    testWidgets('"+ Add part" keeps the last part\'s rhythm and length, '
+        'steady at the tempo it ends on', (tester) async {
+      await pump(tester);
+      metronome.setParts([
+        part('Intro', 4, 100, 100),
+        part('Verse', 8, 120, 140, 7),
+      ]);
+      await openPage(tester);
+      await tapIn(tester, find.byKey(PartsPage.addKey));
+      final added = parts().last;
+      expect(added.name, 'Pre-chorus');
+      expect(added.bars, 8);
+      expect(added.pattern, parts()[1].pattern);
+      expect((added.tempoStart, added.tempoEnd), (140, 140));
+      expect(
+        find.byKey(PartsPage.duplicateKey),
+        findsOneWidget,
+        reason: 'open',
+      );
+    });
+
+    testWidgets('Gradual starts From the tempo the previous part ends on', (
+      tester,
+    ) async {
+      await pump(tester);
+      metronome.setParts([
+        part('Intro', 4, 100, 140),
+        part('Verse', 8, 120, 120),
+      ]);
+      await openPage(tester);
+      await tapIn(tester, find.byKey(PartsPage.cardKey(1)));
+      await tapIn(tester, chip(PartsPage.tempoKindKey, 'Gradual'));
+      expect((parts()[1].tempoStart, parts()[1].tempoEnd), (140, 120));
+    });
+  });
 }

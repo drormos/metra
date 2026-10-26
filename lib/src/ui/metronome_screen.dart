@@ -1054,7 +1054,25 @@ class RunLine extends StatefulWidget {
       final parts = controller.parts;
       final at = now == null ? null : controller.partAt(now);
       if (parts != null && parts.length > 1 && at != null) {
-        return partPositionLabel(parts, at.part, at.bar);
+        // With Stop after, both, part first: "Chorus · bar 3 of 8 · 4:12
+        // left" (no "next", to keep it one short line).
+        final on = controller.onStart;
+        if (on.stopAfter == StopAfter.off) {
+          return partPositionLabel(parts, at.part, at.bar);
+        }
+        final start = controller.runStart;
+        final left = on
+            .copyWith(speedUp: false)
+            .progress(
+              bpm: controller.bpm,
+              from: controller.startBpm,
+              bar: step?.bar ?? -1,
+              elapsed: now == null || start == null || now < start
+                  ? Duration.zero
+                  : now - start,
+            );
+        return '${partPositionLabel(parts, at.part, at.bar, next: false)} · '
+            '$left';
       }
       if (!controller.inRun) return null;
       final start = controller.runStart;

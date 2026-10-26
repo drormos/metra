@@ -8,6 +8,7 @@ import 'package:metra/src/controller/library_controller.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/library.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
+import 'package:metra/src/model/on_start.dart';
 import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/song_map.dart';
@@ -179,6 +180,26 @@ void main() {
     expect(metronome.partPosition, (part: 2, bar: 0));
     expect(line(tester), 'Outro · bar 1');
     expect(metronome.bpm, 90);
+    metronome.stop();
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('with Stop after, the line shows both, part first', (
+    tester,
+  ) async {
+    await pump(tester, parts: threeParts);
+    metronome.setOnStart(
+      const OnStart(stopOn: true, stopBy: StopBy.bars, stopBars: 12),
+    );
+    await tester.tap(find.byKey(MetronomeScreen.playKey));
+    await tester.pump();
+    await runTo(tester, 1700);
+    expect(line(tester), 'Intro · bar 1 of 2 · 12 bars left');
+    metronome.setOnStart(
+      const OnStart(stopOn: true, stopTime: Duration(minutes: 4, seconds: 13)),
+    );
+    await runTo(tester, 2200);
+    expect(line(tester), 'Intro · bar 1 of 2 · 4:12 left');
     metronome.stop();
     await tester.pump(const Duration(seconds: 1));
   });

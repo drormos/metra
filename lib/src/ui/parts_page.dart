@@ -209,14 +209,16 @@ class _PartsPageState extends State<PartsPage> {
 
   void _add(Song song) {
     final parts = _parts(song);
-    final copy = parts.last.copyWith(name: nextPartName(parts));
+    final last = parts.last;
+    // The last part's rhythm and length, the next name, steady at the
+    // tempo the song has reached (a Gradual part's To).
     final added = SongPart(
       id: _newId(),
-      name: copy.name,
-      bars: copy.bars,
-      tempoStart: copy.tempoStart,
-      tempoEnd: copy.tempoEnd,
-      pattern: copy.pattern,
+      name: nextPartName(parts),
+      bars: last.bars,
+      tempoStart: last.tempoEnd,
+      tempoEnd: last.tempoEnd,
+      pattern: last.pattern,
     );
     Haptics.tick();
     _set([...parts, added]);
