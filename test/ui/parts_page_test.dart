@@ -27,6 +27,7 @@ import 'test_theme.dart';
 /// The parts page (ui-spec.md "Song parts" → "The parts page").
 void main() {
   late Directory dir;
+  late FakeClickOutput output;
   late MetronomeController metronome;
   late LibraryController library;
 
@@ -46,7 +47,8 @@ void main() {
       ..physicalSize = const Size(400, 900)
       ..devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    metronome = MetronomeController(FakeClickOutput());
+    output = FakeClickOutput()..time = const Duration(seconds: 1);
+    metronome = MetronomeController(output);
     addTearDown(metronome.dispose);
     library = (await tester.runAsync(
       () => LibraryController.load(
@@ -605,6 +607,87 @@ void main() {
       await tapIn(tester, find.byKey(PartsPage.cardKey(1)));
       await tapIn(tester, find.byKey(PartsPage.gradualKey));
       expect((parts()[1].tempoStart, parts()[1].tempoEnd), (120, 130));
+    });
+  });
+
+  group('the playing card fills like a progress bar', () {
+    // The engine clock and the frames together, to [ms].
+    Future<void> runTo(WidgetTester tester, int ms) async {
+      while (output.time < Duration(milliseconds: ms)) {
+        output.time += const Duration(milliseconds: 20);
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+    }
+
+    double fill(WidgetTester tester, int i) {
+      final painter = tester
+          .widget<CustomPaint>(find.byKey(PartsPage.fillKey(i)))
+          .painter;
+      return painter == null ? -1 : (painter as dynamic).progress.value;
+    }
+
+    // a: 1 bar, b: 2 bars, both 4/4 at 120 (a bar is 2 s); b loops.
+    List<SongPart> two() => [
+      for (final (id, bars) in [('a', 1), ('b', 2)])
+        SongPart.steady(
+          id: id,
+          name: id,
+          bars: bars,
+          bpm: 120,
+          pattern: const MetronomePattern.standard(),
+        ),
+    ];
+
+    testWidgets('across each part from empty, again on every loop; only '
+        'the header, and the card isn\'t rebuilt as it fills', (tester) async {
+      await pump(tester);
+      metronome.setParts(two(), end: SongEnd.loopLastPart);
+      await openPage(tester);
+      await tester.tap(find.byKey(PartsPage.playKey)); // beat 1 at ~1120
+      await tester.pump();
+      await runTo(tester, 2120); // half of a
+      expect(fill(tester, 0), closeTo(0.5, 0.05));
+      expect(fill(tester, 1), -1, reason: 'not playing');
+      final card = tester.widget(find.byKey(PartsPage.cardKey(0)));
+      await runTo(tester, 2600);
+      expect(fill(tester, 0), closeTo(0.74, 0.05));
+      expect(
+        identical(tester.widget(find.byKey(PartsPage.cardKey(0))), card),
+        isTrue,
+        reason: 'repaint only',
+      );
+      // Only the 60px header fills.
+      expect(tester.getSize(find.byKey(PartsPage.fillKey(0))).height, 60);
+      // b from 3120 (2 bars, 4 s): half its first bar, then half of all.
+      await runTo(tester, 4120);
+      expect(fill(tester, 0), -1);
+      expect(fill(tester, 1), closeTo(0.25, 0.05));
+      await runTo(tester, 5120);
+      expect(fill(tester, 1), closeTo(0.5, 0.05));
+      await runTo(tester, 8120); // b again from 7120: half its first bar
+      expect(fill(tester, 1), closeTo(0.25, 0.05));
+      metronome.stop();
+      await tester.pump();
+      expect(fill(tester, 1), -1);
+    });
+
+    testWidgets('Remove animations: whole bars only', (tester) async {
+      await pump(tester);
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      metronome.setParts(two().reversed.toList(), end: SongEnd.stop);
+      await openPage(tester);
+      await tester.tap(find.byKey(PartsPage.playKey));
+      await tester.pump();
+      await runTo(tester, 2120); // half of b's first bar
+      expect(fill(tester, 0), 0);
+      await runTo(tester, 4120); // half of its second
+      expect(fill(tester, 0), 0.5);
+      metronome.stop();
+      await tester.pump();
     });
   });
 

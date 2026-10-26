@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
@@ -52,6 +54,7 @@ class PartsPage extends StatefulWidget {
   static const addKey = Key('parts-add');
   static const endKey = Key('parts-end');
   static const gradualKey = Key('parts-gradual');
+  static Key fillKey(int i) => ValueKey('parts-fill-$i');
 
   /// The first "+ Add part" on a plain song gives both parts this many.
   static const firstAddBars = 8;
@@ -75,8 +78,7 @@ class PartsPage extends StatefulWidget {
   State<PartsPage> createState() => _PartsPageState();
 }
 
-class _PartsPageState extends State<PartsPage>
-    with SingleTickerProviderStateMixin {
+class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
   LibraryController get _library => widget.library;
   MetronomeController get _metronome => widget.metronome;
 
@@ -96,9 +98,12 @@ class _PartsPageState extends State<PartsPage>
   ({SongPart part, int index})? _removed;
   Timer? _undoTimer;
   int _idCounter = 0;
-  // The card of the part playing, checked while playing (a part change
-  // with the same tempo and pattern notifies nothing).
-  Timer? _follow;
+  // The card of the part playing and how far through it the music is
+  // (0–1), read from the engine every frame while playing. Only the
+  // header's fill repaints with [_progress]; the cards rebuild only when
+  // the part changes.
+  late final Ticker _follow = createTicker((_) => _checkPlaying());
+  final _progress = ValueNotifier(0.0);
   int? _playing;
 
   @override
@@ -114,7 +119,8 @@ class _PartsPageState extends State<PartsPage>
     _library.editingParts = false;
     _metronome.removeListener(_onMetronome);
     _undoTimer?.cancel();
-    _follow?.cancel();
+    _follow.dispose();
+    _progress.dispose();
     _closing?.cancel();
     _reveal?.cancel();
     _anchor.dispose();
@@ -124,22 +130,35 @@ class _PartsPageState extends State<PartsPage>
 
   void _onMetronome() {
     if (_metronome.isPlaying) {
-      _follow ??= Timer.periodic(
-        const Duration(milliseconds: 100),
-        (_) => _checkPlaying(),
-      );
+      if (!_follow.isActive) _follow.start();
     } else {
-      _follow?.cancel();
-      _follow = null;
+      _follow.stop();
     }
     _checkPlaying();
   }
 
+  /// The part playing and the fill across it: by the beat position the
+  /// visual clock is at, so it moves with a Gradual part's tempo and starts
+  /// empty on every part start (every pass of a looping part); with
+  /// "Remove animations", whole bars only.
   void _checkPlaying() {
-    final at = _metronome.isPlaying
-        ? (_metronome.partPosition?.part ?? 0)
+    if (!mounted) return;
+    final playing = _metronome.isPlaying;
+    final at = playing
+        ? _metronome.playheadAt(
+            SchedulerBinding.instance.currentSystemFrameTimeStamp,
+          )
         : null;
-    if (at != _playing && mounted) setState(() => _playing = at);
+    final part = playing ? (at?.part ?? 0) : null;
+    if (part != _playing) setState(() => _playing = part);
+    final parts = _metronome.parts;
+    if (at == null || parts == null || at.part >= parts.length) {
+      _progress.value = 0;
+      return;
+    }
+    final bars = parts[at.part].bars;
+    final into = MetraMotion.reduced(context) ? 0.0 : at.fraction;
+    _progress.value = ((at.bar + into) / bars).clamp(0.0, 1.0);
   }
 
   /// The loaded song's parts as they play now: a plain one-part song's
@@ -697,7 +716,7 @@ class _PartsPageState extends State<PartsPage>
     return Container(
       key: _cardKeys.putIfAbsent(part.id, GlobalKey.new),
       decoration: BoxDecoration(
-        color: _playing == i ? colors.selectedRow : colors.sheet,
+        color: colors.sheet,
         border: Border.all(color: colors.border),
         borderRadius: BorderRadius.circular(8),
       ),
@@ -716,55 +735,62 @@ class _PartsPageState extends State<PartsPage>
                 onPointerDown: open ? (_) => _closeBeforeLift(part.id) : null,
                 onPointerUp: (_) => _closing?.cancel(),
                 onPointerCancel: (_) => _closing?.cancel(),
-                child: InkWell(
-                  key: PartsPage.cardKey(i),
-                  onTap: () => _open(part.id),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 60),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: 22,
-                            child: Text(
-                              '${i + 1}',
-                              textAlign: TextAlign.right,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: colors.disabledText,
+                // Playing, the header fills from the left across the part.
+                child: CustomPaint(
+                  key: PartsPage.fillKey(i),
+                  painter: _playing == i
+                      ? _ProgressFill(_progress, colors.selectedRow)
+                      : null,
+                  child: InkWell(
+                    key: PartsPage.cardKey(i),
+                    onTap: () => _open(part.id),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 60),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 22,
+                              child: Text(
+                                '${i + 1}',
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: colors.disabledText,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  part.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w600,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    part.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
-                                ),
-                                Text(
-                                  partLine(part),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: colors.muted,
+                                  Text(
+                                    partLine(part),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: colors.muted,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          _tempo(colors, part),
-                        ],
+                            const SizedBox(width: 12),
+                            _tempo(colors, part),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -1634,4 +1660,25 @@ class _Expand extends StatelessWidget {
           alignment: Alignment.topCenter,
           child: child,
         );
+}
+
+/// The playing card's header filled from the left to [progress] (0–1).
+/// Repaints with it; nothing is rebuilt.
+class _ProgressFill extends CustomPainter {
+  _ProgressFill(this.progress, this.color) : super(repaint: progress);
+
+  final ValueListenable<double> progress;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width * progress.value, size.height),
+      Paint()..color = color,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ProgressFill old) =>
+      old.progress != progress || old.color != color;
 }
