@@ -42,6 +42,7 @@ class SettingsScreen extends StatelessWidget {
   final LibraryController? library;
 
   static const vibrateKey = Key('settings-vibrate');
+  static const partChangeSoundKey = Key('settings-part-change-sound');
   static const keepScreenOnKey = Key('settings-keep-screen-on');
   static const resetKey = Key('settings-volume-reset');
   static const offsetKey = Key('settings-offset');
@@ -100,7 +101,20 @@ class SettingsScreen extends StatelessWidget {
                         ),
                       ),
                     ],
-                    _section(context, 'Click sound', _clickSound(context)),
+                    _section(
+                      context,
+                      'Click sound',
+                      library == null
+                          ? _clickSound(context)
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _clickSound(context),
+                                const SizedBox(height: 12),
+                                _partChangeSound(context),
+                              ],
+                            ),
+                    ),
                     if (library != null) ...[
                       _section(context, 'Vibration', _vibration(context)),
                       _section(
@@ -334,6 +348,32 @@ class SettingsScreen extends StatelessWidget {
           style: TextStyle(fontSize: 13, color: colors.muted),
         ),
       ],
+    );
+  }
+
+  Widget _partChangeSound(BuildContext context) {
+    final colors = context.colors;
+    final library = this.library!;
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: colors.divider, width: 2),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: SwitchListTile(
+        key: partChangeSoundKey,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+        title: const Text(
+          'Sound on part changes',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          'For songs with parts: a higher click on the first beat of each '
+          'new part',
+          style: TextStyle(fontSize: 13, color: colors.muted),
+        ),
+        value: library.partChangeSound,
+        onChanged: library.setPartChangeSound,
+      ),
     );
   }
 

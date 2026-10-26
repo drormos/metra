@@ -85,6 +85,8 @@ class MetronomeScreen extends StatelessWidget {
     leadingDistribution: TextLeadingDistribution.even,
   );
   static const countInLineKey = Key('count-in-line');
+  static const headsUpKey = Key('heads-up');
+  static const headsUpTagKey = Key('heads-up-tag');
   static const revertKey = Key('revert');
   static const firstChangeKey = Key('first-change-line');
   static const settingsKey = Key('settings-button');
@@ -1109,6 +1111,8 @@ class RunLine extends StatefulWidget {
 class _RunLineState extends State<RunLine> with SingleTickerProviderStateMixin {
   late final Ticker _ticker = createTicker(_onTick);
   String? _label;
+  // Before a part changes: what's coming and when (it replaces the label).
+  ({String name, String details, int? bars, int? beats})? _headsUp;
 
   @override
   void initState() {
@@ -1130,40 +1134,106 @@ class _RunLineState extends State<RunLine> with SingleTickerProviderStateMixin {
       if (!_ticker.isActive) _ticker.start();
     } else {
       _ticker.stop();
-      if (_label != null) setState(() => _label = null);
+      if (_label != null || _headsUp != null) {
+        setState(() {
+          _label = null;
+          _headsUp = null;
+        });
+      }
     }
   }
 
   void _onTick(Duration _) {
-    final label = RunLine.labelFor(
-      widget.controller,
-      widget.controller.visualTimeAt(
-        SchedulerBinding.instance.currentFrameTimeStamp,
+    final controller = widget.controller;
+    final now = controller.visualTimeAt(
+      SchedulerBinding.instance.currentFrameTimeStamp,
+    );
+    final label = RunLine.labelFor(controller, now);
+    final up = now == null ? null : controller.headsUpAt(now);
+    final headsUp = up == null
+        ? null
+        : (
+            name: up.next.name,
+            details: headsUpDetails(up.current, up.next),
+            bars: up.bars,
+            beats: up.beats,
+          );
+    if (label != _label || headsUp != _headsUp) {
+      setState(() {
+        _label = label;
+        _headsUp = headsUp;
+      });
+    }
+  }
+
+  /// "**Break in 2 bars** · 2/4 · 128", then in the last bar the name as a
+  /// white tag counting the beats left ("Break in 3"), swapping each beat.
+  Widget _headsUpLine(
+    BuildContext context,
+    ({String name, String details, int? bars, int? beats}) up,
+  ) {
+    final colors = context.colors;
+    final beats = up.beats;
+    final lead = beats == null
+        ? '${up.name} in ${up.bars} bars'
+        : '${up.name} in $beats';
+    final details = up.details.isEmpty ? '' : ' · ${up.details}';
+    const bold = TextStyle(fontSize: 16, fontWeight: FontWeight.w700);
+    return Semantics(
+      label: beats == null ? '$lead$details' : '$lead beats$details',
+      excludeSemantics: true,
+      child: Row(
+        key: MetronomeScreen.headsUpKey,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (beats == null)
+            Text(lead, style: bold.copyWith(color: colors.text))
+          else
+            BrightenSwap(
+              value: beats,
+              child: Container(
+                key: MetronomeScreen.headsUpTagKey,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: colors.text,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  lead,
+                  style: bold.copyWith(color: colors.background),
+                ),
+              ),
+            ),
+          if (details.isNotEmpty)
+            Text(details, style: TextStyle(fontSize: 16, color: colors.text)),
+        ],
       ),
     );
-    if (label != _label) setState(() => _label = label);
   }
 
   @override
   Widget build(BuildContext context) {
     final label = _label;
+    final headsUp = _headsUp;
     // The tempo line stays underneath, keeping its state (its tips).
     return Stack(
       fit: StackFit.expand,
       children: [
         Visibility(
-          visible: label == null,
+          visible: label == null && headsUp == null,
           maintainState: true,
           maintainAnimation: true,
           maintainSize: true,
           child: widget.child,
         ),
-        if (label != null)
+        if (headsUp != null || label != null)
           Center(
             // Shrinks rather than overflowing on narrow phones.
             child: FittedBox(
               fit: BoxFit.scaleDown,
-              child: _iconLine(context, label),
+              child: headsUp != null
+                  ? _headsUpLine(context, headsUp)
+                  : _iconLine(context, label!),
             ),
           ),
       ],

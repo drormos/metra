@@ -340,6 +340,142 @@ void main() {
     });
   });
 
+  group('heads-up before a part changes', () {
+    // At engine time [ms]: "next in N bars [details]" / "next in N beats
+    // [details]", or null.
+    String? up(int ms) {
+      final h = controller.headsUpAt(_ms * ms);
+      if (h == null) return null;
+      final when = h.bars != null ? '${h.bars} bars' : '${h.beats}';
+      final details = headsUpDetails(h.current, h.next);
+      return '${h.next.name} in $when${details.isEmpty ? '' : ' · $details'}';
+    }
+
+    // Runs to [ms] in 5 ms steps, noting each change of the heads-up as
+    // (time, text).
+    List<(int, String?)> trace(int ms) {
+      final changes = <(int, String?)>[];
+      String? last = '-';
+      while (output.time < _ms * ms) {
+        output.time += _ms * 5;
+        controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+        final now = output.time.inMilliseconds;
+        final u = up(now);
+        if (u != last) changes.add((now, last = u));
+      }
+      return changes;
+    }
+
+    test(
+      '2 bars before, then the beats of the last bar, on the beat; a '
+      '1-bar part counts down at once; time signature and tempo changes '
+      'shown; a Gradual part counts its own beats; Loop song warns',
+      () async {
+        load([
+          _part('a', 4, 120), // 4/4, a bar is 2 s
+          _part('b', 1, 90, null, _two), // a beat is 666.7 ms
+          _part('c', 3, 60, 120), // Gradual
+        ], end: SongEnd.loopSong);
+        await controller.play(); // a from 1120
+        final changes = trace(30000);
+        // a, then b: on each beat, from what you hear.
+        expect(changes.take(9).toList(), [
+          (1005, null),
+          (5120, 'b in 2 bars · 2/4 · 90'),
+          (7120, 'b in 4 · 2/4 · 90'),
+          (7620, 'b in 3 · 2/4 · 90'),
+          (8120, 'b in 2 · 2/4 · 90'),
+          (8620, 'b in 1 · 2/4 · 90'),
+          // b: one bar of 2/4, counting down at once; c starts at 60.
+          (9120, 'c in 2 · 4/4 · 60'),
+          (9790, 'c in 1 · 4/4 · 60'),
+          (10455, null),
+        ]);
+        // c (3 bars, 60 → 120, its beats getting shorter): 2 bars out, then
+        // its last bar's four beats; Loop song back to a, at 120 where c
+        // ends (no tempo).
+        final c = changes.skip(9).take(6).toList();
+        expect(
+          [for (final x in c) x.$2],
+          ['a in 2 bars', 'a in 4', 'a in 3', 'a in 2', 'a in 1', null],
+        );
+        final beats = [for (var i = 2; i < 6; i++) c[i].$1 - c[i - 1].$1];
+        expect(beats.first, greaterThan(beats.last), reason: 'speeding up');
+        controller.stop();
+      },
+    );
+
+    test('nothing before the song stops, while the last part loops, or '
+        'during a count-in', () async {
+      controller.setCountIn(1);
+      load([_part('a', 1, 120), _part('b', 2, 120)]);
+      await controller.play(); // count-in from 1120, a from 3120
+      expect(trace(12000), [
+        (1005, null), // the count-in included
+        (3120, 'b in 4'),
+        (3620, 'b in 3'),
+        (4120, 'b in 2'),
+        (4620, 'b in 1'),
+        (5120, null), // b: a 2-bar part warns nothing; the song stops
+      ]);
+      controller.stop();
+      controller.setCountIn(0);
+      load([_part('a', 1, 120), _part('b', 1, 120)], end: SongEnd.loopLastPart);
+      await controller.play();
+      expect(
+        [for (final c in trace(30000)) c.$2],
+        [
+          null,
+          'b in 4',
+          'b in 3',
+          'b in 2',
+          'b in 1',
+          null, // then b loops: no more
+        ],
+      );
+      controller.stop();
+    });
+
+    test('Sound on part changes: a new part\'s first beat raised, in the '
+        'engine; not the start, not another pass of a looping part', () async {
+      controller.setPartChangeSound(true);
+      load([
+        _part('a', 1, 120, null, _two),
+        _part('b', 1, 120),
+      ], end: SongEnd.loopSong);
+      await controller.play(); // a 1120, 1620; b 2120…3620; a 4120
+      runTo(4500);
+      expect(
+        [
+          for (final c in output.live)
+            if (c.at <= _ms * 4500) (c.at.inMilliseconds, c.raised),
+        ],
+        [
+          (1120, false), (1620, false), // a: the start isn't a change
+          (2120, true), (2620, false), (3120, false), (3620, false), // b
+          (4120, true), // a again
+        ],
+      );
+      controller.stop();
+      // Off: nothing raised.
+      controller.setPartChangeSound(false);
+      output.clicks.clear();
+      await controller.play();
+      runTo(9000);
+      expect(output.live.where((c) => c.raised), isEmpty);
+      controller.stop();
+      // Loop last part: its passes aren't changes.
+      controller.setPartChangeSound(true);
+      output.clicks.clear();
+      load([_part('a', 1, 120), _part('b', 1, 120)], end: SongEnd.loopLastPart);
+      await controller.play();
+      final start = output.time.inMilliseconds;
+      runTo(start + 9000);
+      expect(output.live.where((c) => c.raised), hasLength(1), reason: 'a → b');
+      controller.stop();
+    });
+  });
+
   group('with the library', () {
     late Directory dir;
     late LibraryController library;

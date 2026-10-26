@@ -73,6 +73,7 @@ final sampleLibrary = Library(
   clickSound: ClickSound.bell,
   themeMode: ThemeMode.light,
   vibrate: false,
+  partChangeSound: true,
   keepScreenOn: KeepScreenOn.whilePlaying,
   volumes: const ClickVolumes(
     accent: 0.9,

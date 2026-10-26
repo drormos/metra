@@ -247,6 +247,7 @@ void main() {
     expect(latest['version'], Library.version);
     expect(latest['keepScreenOn'], 'whileOpen');
     expect(latest['stageMode'], false);
+    expect(latest['partChangeSound'], false, reason: 'version 6: off');
     expect(() => migrate({'version': 0}), throwsFormatException);
     expect(latestVersion, Library.version);
   });

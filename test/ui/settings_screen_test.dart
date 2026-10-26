@@ -120,6 +120,23 @@ void main() {
     await reveal(tester, find.byKey(SettingsScreen.testKey));
   });
 
+  testWidgets('"Sound on part changes": off by default, under the click '
+      'sound; the switch reaches the click', (tester) async {
+    await openSettingsScreen(tester);
+    expect(library.partChangeSound, isFalse);
+    expect(
+      find.text(
+        'For songs with parts: a higher click on the first beat of each '
+        'new part',
+      ),
+      findsOneWidget,
+    );
+    await tapVisible(tester, find.byKey(SettingsScreen.partChangeSoundKey));
+    await tester.pump();
+    expect(library.partChangeSound, isTrue);
+    expect(metronome.partChangeSound, isTrue);
+  });
+
   testWidgets('the gear opens Settings directly; About is its last section; '
       'Back returns to the main screen; the click keeps playing', (
     tester,
@@ -260,6 +277,8 @@ void main() {
     tester,
   ) async {
     await openSettingsScreen(tester);
+    // Built once the list reaches it (the page grew below the fold).
+    await reveal(tester, find.text('Polyrhythm'));
     final accent = find.byType(Slider).first;
     await reveal(tester, accent);
     await tester.drag(accent, const Offset(-120, 0));

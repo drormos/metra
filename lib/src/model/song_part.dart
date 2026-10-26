@@ -220,3 +220,12 @@ String partPositionLabel(
       'next: ${parts[part + 1].name}',
   ].join(' · ');
 }
+
+/// What a heads-up adds after "Break in 2 bars": only what changes from
+/// [current], the time signature and/or the tempo ([next]'s start: a
+/// Gradual part's From), e.g. "2/4 · 128"; empty when nothing does.
+String headsUpDetails(SongPart current, SongPart next) => [
+  if (next.pattern.timeSignature != current.pattern.timeSignature)
+    next.pattern.timeSignature,
+  if (next.tempoStart != current.tempoEnd) '${next.tempoStart}',
+].join(' · ');

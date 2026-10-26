@@ -18,10 +18,11 @@
 /// - 5 (build 68 on): every part has a length; `end` became
 ///   `endBehavior` (`stop` | `loopSong` | `loopLastPart`), and an open
 ///   last part became 1 bar with `loopLastPart`.
+/// - 6 (build 79 on): settings gain `partChangeSound` (off).
 library;
 
 /// The latest format, and the two files' shapes in it.
-const latestVersion = 5;
+const latestVersion = 6;
 
 typedef Json = Map<String, Object?>;
 
@@ -44,7 +45,13 @@ Json migrate(Json json) {
   return current;
 }
 
-final List<Json Function(Json)> _steps = [_v1ToV2, _v2ToV3, _v3ToV4, _v4ToV5];
+final List<Json Function(Json)> _steps = [
+  _v1ToV2,
+  _v2ToV3,
+  _v3ToV4,
+  _v4ToV5,
+  _v5ToV6,
+];
 
 /// Version 1, in all the shapes it shipped in, to version 2:
 /// - fields added after build 2 get their defaults (time signature unit,
@@ -210,6 +217,9 @@ Json _v4ToV5(Json v4) => {
         raw,
   ],
 };
+
+/// Version 5 to 6: "Sound on part changes", off.
+Json _v5ToV6(Json v5) => {...v5, 'version': 6, 'partChangeSound': false};
 
 /// The one-time hints' names in `tipsSeen` (version 1 had a flag each).
 const swipeHintTip = 'set-swipe-hint';

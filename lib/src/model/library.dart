@@ -211,6 +211,7 @@ class Library {
     this.clickSound = ClickSound.woodblock,
     this.themeMode = ThemeMode.system,
     this.vibrate = true,
+    this.partChangeSound = false,
     this.keepScreenOn = KeepScreenOn.whileOpen,
     this.volumes = ClickVolumes.defaults,
     this.activeSetlistId,
@@ -250,6 +251,10 @@ class Library {
   /// vibration setting still applies.
   final bool vibrate;
 
+  /// "Sound on part changes": the first beat of each new part a higher
+  /// click.
+  final bool partChangeSound;
+
   /// "Keep screen on": while Metra is open, or only while playing.
   final KeepScreenOn keepScreenOn;
 
@@ -281,6 +286,7 @@ class Library {
     ClickSound? clickSound,
     ThemeMode? themeMode,
     bool? vibrate,
+    bool? partChangeSound,
     KeepScreenOn? keepScreenOn,
     ClickVolumes? volumes,
     Set<String>? tipsSeen,
@@ -295,6 +301,7 @@ class Library {
     clickSound: clickSound ?? this.clickSound,
     themeMode: themeMode ?? this.themeMode,
     vibrate: vibrate ?? this.vibrate,
+    partChangeSound: partChangeSound ?? this.partChangeSound,
     keepScreenOn: keepScreenOn ?? this.keepScreenOn,
     volumes: volumes ?? this.volumes,
     activeSetlistId: activeSetlistId,
@@ -320,6 +327,7 @@ class Library {
     clickSound: clickSound,
     themeMode: themeMode,
     vibrate: vibrate,
+    partChangeSound: partChangeSound,
     keepScreenOn: keepScreenOn,
     volumes: volumes,
     activeSetlistId: setlistId,
@@ -338,6 +346,7 @@ class Library {
     'clickSound': clickSound.name,
     'themeMode': themeMode.name,
     'vibrate': vibrate,
+    'partChangeSound': partChangeSound,
     'keepScreenOn': keepScreenOn.name,
     'volumes': volumes.toJson(),
     'activeSetlistId': activeSetlistId,
@@ -384,6 +393,7 @@ class Library {
       themeMode:
           ThemeMode.values.asNameMap()[latest['themeMode']] ?? ThemeMode.system,
       vibrate: read('vibrate', true),
+      partChangeSound: read('partChangeSound', false),
       keepScreenOn:
           KeepScreenOn.values.asNameMap()[latest['keepScreenOn']] ??
           KeepScreenOn.whileOpen,
@@ -458,6 +468,7 @@ class Library {
       clickSound: clickSound,
       themeMode: themeMode,
       vibrate: vibrate,
+      partChangeSound: partChangeSound,
       keepScreenOn: keepScreenOn,
       volumes: volumes,
       activeSetlistId: active?.id,

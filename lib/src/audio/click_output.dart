@@ -20,8 +20,9 @@ abstract interface class ClickOutput {
   void release();
 
   /// Play a click of [level] at engine time [at]. [level] is never
-  /// [StepLevel.silent].
-  ClickHandle schedule(StepLevel level, Duration at);
+  /// [StepLevel.silent]. [raised]: the accent sound a little higher, for
+  /// the first beat of a new part ("Sound on part changes").
+  ClickHandle schedule(StepLevel level, Duration at, {bool raised = false});
 
   /// Play a polyrhythm pulse of [level] (accent or normal) at engine time
   /// [at]: the current click sound, higher, so it's a separate voice.

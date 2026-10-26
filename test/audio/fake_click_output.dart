@@ -6,10 +6,11 @@ import 'package:metra/src/model/click_volumes.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 
 class FakeClick {
-  FakeClick(this.id, this.level, this.at);
+  FakeClick(this.id, this.level, this.at, {this.raised = false});
   final int id;
   final StepLevel level;
   final Duration at;
+  final bool raised;
   bool cancelled = false;
 }
 
@@ -50,8 +51,8 @@ class FakeClickOutput implements ClickOutput {
   }
 
   @override
-  ClickHandle schedule(StepLevel level, Duration at) {
-    final click = FakeClick(clicks.length, level, at);
+  ClickHandle schedule(StepLevel level, Duration at, {bool raised = false}) {
+    final click = FakeClick(clicks.length, level, at, raised: raised);
     clicks.add(click);
     return click;
   }

@@ -67,15 +67,28 @@ class SoloudClickOutput implements ClickOutput {
       SoLoud.instance.setAudioDeviceIdleTimeout(_defaultIdleTimeout);
 
   @override
-  ClickHandle schedule(StepLevel level, Duration at) => _Click(
-    SoLoud.instance.playScheduled(
-      level == StepLevel.accent
-          ? _sources[_sound]!.accent
-          : _sources[_sound]!.normal,
-      at,
-      volume: _gain(level),
-    ),
-  );
+  ClickHandle schedule(StepLevel level, Duration at, {bool raised = false}) =>
+      _Click(
+        raised
+            // The accent, two semitones up: heard as "something changed",
+            // not mistaken for a polyrhythm pulse (a fifth up).
+            ? SoLoud.instance.playScheduled(
+                _sources[_sound]!.accent,
+                at,
+                volume: _gain(StepLevel.accent),
+                scale: partChangeSpeed,
+              )
+            : SoLoud.instance.playScheduled(
+                level == StepLevel.accent
+                    ? _sources[_sound]!.accent
+                    : _sources[_sound]!.normal,
+                at,
+                volume: _gain(level),
+              ),
+      );
+
+  /// The first beat of a new part: two semitones up (2^(2/12)).
+  static const partChangeSpeed = 1.1225;
 
   /// Polyrhythm pulses: the same samples ~a fifth up (1.5× speed, by ear).
   static const pulseSpeed = 1.5;

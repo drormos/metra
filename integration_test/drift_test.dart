@@ -162,6 +162,8 @@ void main() {
       pattern: MetronomePattern.simple(beatsPerBar: beats, stepsPerBeat: 1),
     );
     final recorder = _OnsetRecorder()..start();
+    // New parts' first beats raised: still on the grid.
+    controller.setPartChangeSound(true);
     controller.loadSong(
       bpm: 120,
       pattern: const MetronomePattern.standard(),

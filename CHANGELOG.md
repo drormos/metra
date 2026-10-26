@@ -4,6 +4,10 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+- Song parts: a heads-up before a part changes, on the main screen and in stage mode ("Break in 2 bars · 2/4 · 128", then the beats counting down in the last bar).
+- Settings › "Sound on part changes": a higher click on the first beat of each new part (off by default).
+
 ### Changed
 - Song parts: every part has a length in bars. "Until you stop" is replaced by "When the song ends": Stop, Loop song or Loop last part (a Gradual last part restarts its ramp each time). Existing songs loop their bar as before. The strip marks a looping last part with a loop icon; the summary reads "45 bars, then loops Outro" and the line under the BPM "Outro · bar 3 of 8 · looping".
 

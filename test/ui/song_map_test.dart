@@ -16,6 +16,9 @@ import 'package:metra/src/ui/stage_screen.dart';
 import 'package:metra/src/ui/tempo_ruler.dart';
 
 import '../audio/fake_click_output.dart';
+
+import 'package:metra/src/ui/theme.dart';
+
 import 'test_theme.dart';
 
 const _four = MetronomePattern.standard();
@@ -175,6 +178,50 @@ void main() {
     expect(metronome.partPosition, (part: 2, bar: 0));
     expect(line(tester), 'Outro · bar 1 of 8 · looping');
     expect(metronome.bpm, 90);
+    metronome.stop();
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('heads-up: the last bar\'s name a white tag counting the '
+      'beats; 2 bars out, bold; the new part, the normal line', (tester) async {
+    await pump(tester, parts: threeParts);
+    await tester.tap(find.byKey(MetronomeScreen.playKey));
+    await tester.pump();
+    Text tag() => tester.widget<Text>(
+      find.descendant(
+        of: find.byKey(MetronomeScreen.headsUpTagKey),
+        matching: find.byType(Text),
+      ),
+    );
+    Finder text(String data) => find.descendant(
+      of: find.byKey(MetronomeScreen.headsUpKey),
+      matching: find.text(data),
+    );
+    // Intro (2 bars at 100, from 1120): its last bar counts down at once.
+    await runTo(tester, 3700);
+    expect(tag().data, 'Verse in 4');
+    expect(text(' · 3/4 · 120'), findsOneWidget);
+    final box = tester.widget<Container>(
+      find.byKey(MetronomeScreen.headsUpTagKey),
+    );
+    expect(
+      (box.decoration! as BoxDecoration).color,
+      MetraColors.stageBlack.text,
+      reason: 'white tag',
+    );
+    expect(tag().style!.color, MetraColors.stageBlack.background);
+    await runTo(tester, 4300); // beat 2 at 4120
+    expect(tag().data, 'Verse in 3');
+    // Verse (4 bars of 3/4 at 120, from 5920): the normal line.
+    await runTo(tester, 6000);
+    expect(find.byKey(MetronomeScreen.headsUpKey), findsNothing);
+    expect(line(tester), 'Verse · bar 1 of 4 · next: Outro');
+    // Its bar 3 (from 8920): 2 bars out, bold.
+    await runTo(tester, 9000);
+    final bold = tester.widget<Text>(text('Outro in 2 bars'));
+    expect(bold.style!.fontWeight, FontWeight.w700);
+    expect(text(' · 4/4 · 90'), findsOneWidget);
+    expect(find.byKey(MetronomeScreen.headsUpTagKey), findsNothing);
     metronome.stop();
     await tester.pump(const Duration(seconds: 1));
   });

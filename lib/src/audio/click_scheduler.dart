@@ -62,6 +62,10 @@ abstract interface class RunPlan {
 abstract interface class PatternPlan implements RunPlan {
   /// The pattern from song bar [bar] (from 0) on, or null to keep it.
   MetronomePattern? patternAt(int bar);
+
+  /// Whether song bar [bar]'s first beat sounds raised (a new part, with
+  /// "Sound on part changes" on).
+  bool raisesAt(int bar);
 }
 
 /// One polyrhythm pulse that has been handed to the engine.
@@ -707,9 +711,13 @@ class ClickScheduler {
       final time = _grid!.stepTime(_nextStep);
       if (song && bar == 0 && barPosition == 0) _runStart = time;
       final level = _pattern.steps[barPosition];
+      // In the engine, sample-accurate like every click: a new part's
+      // first beat raised (a muted one stays muted).
+      final raised =
+          song && barPosition == 0 && run is PatternPlan && run.raisesAt(bar);
       final handle = level == StepLevel.silent
           ? null
-          : _output.schedule(level, time);
+          : _output.schedule(level, time, raised: raised);
       _steps.add(
         ScheduledStep(
           _nextStep,

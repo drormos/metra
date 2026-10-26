@@ -22,9 +22,9 @@ class _Recording extends FakeClickOutput {
   }
 
   @override
-  ClickHandle schedule(StepLevel level, Duration at) {
+  ClickHandle schedule(StepLevel level, Duration at, {bool raised = false}) {
     _check('click', at);
-    return super.schedule(level, at);
+    return super.schedule(level, at, raised: raised);
   }
 
   @override

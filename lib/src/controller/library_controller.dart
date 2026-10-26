@@ -101,6 +101,16 @@ class LibraryController extends ChangeNotifier {
     if (on != vibrate) _update(_library.copyWith(vibrate: on));
   }
 
+  /// "Sound on part changes" (default off).
+  bool get partChangeSound => _library.partChangeSound;
+
+  void setPartChangeSound(bool on) {
+    _metronome?.setPartChangeSound(on);
+    if (on != partChangeSound) {
+      _update(_library.copyWith(partChangeSound: on));
+    }
+  }
+
   /// Settings → "Keep screen on".
   KeepScreenOn get keepScreenOn => _library.keepScreenOn;
 
@@ -1056,6 +1066,7 @@ class LibraryController extends ChangeNotifier {
       ..setPattern(_library.lastPattern)
       ..setOnStart(_library.lastOnStart)
       ..setVisualOffset(_library.visualOffset)
+      ..setPartChangeSound(_library.partChangeSound)
       ..setClickSound(_library.clickSound, preview: false)
       ..setVolumes(_library.volumes);
     metronome.addListener(() {

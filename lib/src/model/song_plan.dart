@@ -22,6 +22,9 @@ class SongPlan implements PatternPlan {
   SongEnd end;
   OnStart onStart;
 
+  /// "Sound on part changes": a new part's first beat raised.
+  bool raisesPartChanges = false;
+
   // Where the song plays from: from song bar `bar` on, part `part`'s first
   // bar (the start, then each jump), oldest first.
   final List<({int bar, int part})> _jumps;
@@ -60,6 +63,16 @@ class SongPlan implements PatternPlan {
           into %= parts.fold(0, (sum, p) => sum + p.bars);
       }
     }
+  }
+
+  /// A part starts at song bar [bar] that isn't the one before it (not the
+  /// run's start, nor another pass of a looping last part).
+  @override
+  bool raisesAt(int bar) {
+    if (!raisesPartChanges || bar < 1) return false;
+    final at = locate(bar);
+    if (at == null || at.bar != 0) return false;
+    return locate(bar - 1)?.part != at.part;
   }
 
   @override

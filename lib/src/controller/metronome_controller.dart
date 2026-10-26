@@ -97,6 +97,19 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
   /// A song with parts ended by itself (not Stop after, not by hand).
   VoidCallback? onSongEnd;
 
+  /// Settings → "Sound on part changes": the first beat of each new part
+  /// plays the accent a little higher, in the engine.
+  bool get partChangeSound => _partChangeSound;
+  bool _partChangeSound = false;
+
+  void setPartChangeSound(bool on) {
+    if (on == _partChangeSound) return;
+    _partChangeSound = on;
+    // Steps already handed to the engine keep their sound.
+    _plan?.raisesPartChanges = on;
+    notifyListeners();
+  }
+
   bool _offsetTestStarted = false;
 
   int get bpm => _bpm;
@@ -200,6 +213,40 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
       part: at.part,
       bar: at.bar,
       fraction: (step.barPosition + into) / step.pattern.stepsPerBar,
+    );
+  }
+
+  /// The heads-up before a part changes (ui-spec.md "Heads-up before a
+  /// part changes") at engine time [time] (the visual clock, as the beat
+  /// lights): [next] is coming in 2 [bars], or in the last bar in [beats]
+  /// beats of [current]'s time signature. Null otherwise: no change coming
+  /// (the song stops, or the last part loops), a 1- or 2-bar part before
+  /// its last bar, or a count-in.
+  ({SongPart current, SongPart next, int? bars, int? beats})? headsUpAt(
+    Duration time,
+  ) {
+    final parts = _parts;
+    final plan = _plan;
+    if (parts == null || plan == null) return null;
+    final step = _scheduler.stepAt(time);
+    final bar = step?.bar;
+    if (step == null || bar == null || step.countIn != null) return null;
+    final at = plan.locate(bar);
+    if (at == null) return null;
+    final current = parts[at.part];
+    final barsLeft = current.bars - at.bar;
+    if (barsLeft > 2 || (barsLeft == 2 && current.bars <= 2)) return null;
+    final next = plan.locate(bar + barsLeft);
+    if (next == null || next.part == at.part) return null;
+    if (barsLeft == 2) {
+      return (current: current, next: parts[next.part], bars: 2, beats: null);
+    }
+    final beat = step.barPosition ~/ step.pattern.stepsPerBeat;
+    return (
+      current: current,
+      next: parts[next.part],
+      bars: null,
+      beats: step.pattern.beatsPerBar - beat,
     );
   }
 
@@ -477,7 +524,7 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
           parts: parts,
           end: _end,
           onStart: _onStart,
-        );
+        )..raisesPartChanges = _partChangeSound;
         // The bar playing now becomes the first part's first bar.
         _scheduler.replan((bar) => plan.jump(max(0, bar - 1), 0), run: plan);
       }
@@ -613,7 +660,7 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
         end: _end,
         onStart: _onStart,
         startPart: _startPart,
-      );
+      )..raisesPartChanges = _partChangeSound;
     }
     return _onStart.runs ? _onStart : null;
   }
