@@ -30,9 +30,19 @@ class ValueStepper extends StatefulWidget {
     this.buttonSize = 48,
     this.fontSize = 24,
     this.leading,
+    this.compact = false,
+    this.onSheet = false,
   });
 
-  /// Before − with a small gap (the parts page's ✕ on "Ends at").
+  /// − / + drawn 40px in 48dp touch cells that sit edge to edge (no gaps),
+  /// so a label and a [leading] button fit beside them (the parts page).
+  final bool compact;
+
+  /// On a sheet or a part card: − / + in the theme's surfaceOnSheet.
+  final bool onSheet;
+
+  /// Right before − (the parts page's ✕ on "Ends at"; it brings its own
+  /// gap).
   final Widget? leading;
 
   final String label;
@@ -118,6 +128,8 @@ class _ValueStepperState extends State<ValueStepper> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final label = widget.label;
+    final drawn = widget.compact ? 40.0 : null;
+    final color = widget.onSheet ? colors.surfaceOnSheet : null;
     final field = SizedBox(
       width: widget.fieldWidth,
       height: widget.buttonSize,
@@ -172,13 +184,22 @@ class _ValueStepperState extends State<ValueStepper> {
           Expanded(
             child: BrightenSwap(
               value: label,
-              child: Text(label, style: const TextStyle(fontSize: 15)),
+              // Beside a leading button the label keeps one line, shrinking
+              // a little if it must ("Ends at" beside its ✕).
+              child: widget.leading == null
+                  ? Text(label, style: const TextStyle(fontSize: 15))
+                  : FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        style: const TextStyle(fontSize: 15),
+                      ),
+                    ),
             ),
           ),
-        if (widget.leading case final leading?) ...[
-          leading,
-          const SizedBox(width: 10),
-        ],
+        ?widget.leading,
         Semantics(
           label: 'Less $label',
           button: true,
@@ -187,12 +208,14 @@ class _ValueStepperState extends State<ValueStepper> {
             Icons.remove,
             key: ValueStepper.minusKey(label),
             size: widget.buttonSize,
+            drawn: drawn,
+            color: color,
             onPressed: _step(widget.onMinus),
           ),
         ),
-        const SizedBox(width: 6),
+        if (!widget.compact) const SizedBox(width: 6),
         if (widget.fieldWidth == null) Expanded(child: field) else field,
-        const SizedBox(width: 6),
+        if (!widget.compact) const SizedBox(width: 6),
         Semantics(
           label: 'More $label',
           button: true,
@@ -201,6 +224,8 @@ class _ValueStepperState extends State<ValueStepper> {
             Icons.add,
             key: ValueStepper.plusKey(label),
             size: widget.buttonSize,
+            drawn: drawn,
+            color: color,
             onPressed: _step(widget.onPlus),
           ),
         ),

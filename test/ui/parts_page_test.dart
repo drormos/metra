@@ -19,6 +19,9 @@ import 'package:metra/src/ui/time_signature_sheet.dart';
 import 'package:metra/src/ui/value_stepper.dart';
 
 import '../audio/fake_click_output.dart';
+
+import 'package:metra/src/ui/theme.dart';
+
 import 'test_theme.dart';
 
 /// The parts page (ui-spec.md "Song parts" → "The parts page").
@@ -295,11 +298,47 @@ void main() {
     expect(find.text('BPM'), findsNothing);
     expect(top(ValueStepper.plusKey('Starts at')), steadyRows.$1);
     expect(top(PartsPage.rhythmKey), steadyRows.$3, reason: 'same height');
-    // ✕ is the size of − / +, before −.
+    // ✕: 40px wide, before −.
     final clear = tester.getRect(find.byKey(PartsPage.steadyKey));
     final minus = tester.getRect(find.byKey(ValueStepper.minusKey('Ends at')));
-    expect(clear.size, minus.size);
-    expect(clear.right, lessThan(minus.left));
+    final drawn = tester.getRect(
+      find.descendant(
+        of: find.byKey(PartsPage.steadyKey),
+        matching: find.byType(Material),
+      ),
+    );
+    expect(drawn.size, const Size(40, 40));
+    expect(clear.size, const Size(48, 48), reason: 'touch target');
+    expect(minus.width, 48);
+    // Cells edge to edge: ✕ | − | value (92) | +, each button drawn 40px
+    // in the sheet's button color.
+    final plus = tester.getRect(find.byKey(ValueStepper.plusKey('Ends at')));
+    expect(minus.left, clear.right);
+    expect(plus.left - minus.right, 92);
+    final minusDrawn = tester.getRect(
+      find.descendant(
+        of: find.byKey(ValueStepper.minusKey('Ends at')),
+        matching: find.byType(Material),
+      ),
+    );
+    expect(minusDrawn.size, const Size(40, 40));
+    expect(
+      tester
+          .widget<Material>(
+            find.descendant(
+              of: find.byKey(ValueStepper.minusKey('Ends at')),
+              matching: find.byType(Material),
+            ),
+          )
+          .color,
+      MetraColors.stageBlack.surfaceOnSheet,
+    );
+    expect(drawn.right, lessThan(minus.left));
+    // Its label stays one line beside the ✕.
+    expect(
+      tester.getSize(find.text('Ends at')).height,
+      tester.getSize(find.text('Starts at')).height,
+    );
     // "120 → 130" on the card.
     expect(find.byIcon(Icons.arrow_forward), findsOneWidget);
     await tapIn(tester, find.byKey(ValueStepper.plusKey('Ends at')));

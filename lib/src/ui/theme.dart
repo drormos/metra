@@ -15,6 +15,7 @@ class MetraColors extends ThemeExtension<MetraColors> {
     required this.slot,
     required this.shadow,
     required this.surface,
+    required this.surfaceOnSheet,
     required this.divider,
     required this.selectedRow,
     required this.border,
@@ -47,6 +48,7 @@ class MetraColors extends ThemeExtension<MetraColors> {
     slot: Color(0xFF4A4A4A),
     shadow: Color(0xD9000000),
     surface: Color(0xFF1A1A1A),
+    surfaceOnSheet: Color(0xFF2A2A2A),
     divider: Color(0xFF1F1F1F),
     selectedRow: Color(0xFF242424),
     border: Color(0xFF2E2E2E),
@@ -79,6 +81,7 @@ class MetraColors extends ThemeExtension<MetraColors> {
     slot: Color(0xFFA8A39A),
     shadow: Color(0x40000000),
     surface: Color(0xFFE3DFD6),
+    surfaceOnSheet: Color(0xFFD8D3C9),
     divider: Color(0xFFDCD8CF),
     selectedRow: Color(0xFFDAD5CB),
     border: Color(0xFFCFCAC0),
@@ -118,6 +121,10 @@ class MetraColors extends ThemeExtension<MetraColors> {
 
   /// Filled buttons.
   final Color surface;
+
+  /// Filled buttons on a sheet or a part card (#111), where [surface]
+  /// almost disappears.
+  final Color surfaceOnSheet;
 
   /// Lines between list rows; the ruler's rules.
   final Color divider;

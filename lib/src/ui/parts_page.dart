@@ -793,6 +793,8 @@ class _PartsPageState extends State<PartsPage>
     required String label,
     required void Function(SongPart Function(SongPart)) edit,
   }) => ValueStepper(
+    compact: true,
+    onSheet: true,
     label: label,
     display: bars == 1 ? '1 bar' : '$bars bars',
     editText: '$bars',
@@ -859,18 +861,21 @@ class _PartsPageState extends State<PartsPage>
     ),
   );
 
-  /// "Ends at"'s ✕: back to one tempo. The size of − / +, outlined white.
+  /// "Ends at"'s ✕: back to one tempo. A 40px square outlined white.
   Widget _steadyButton(MetraColors colors, VoidCallback onTap) => Semantics(
     label: 'One tempo',
     button: true,
     excludeSemantics: true,
-    child: SizedBox.square(
-      dimension: 48,
+    // 40px drawn (the spec) in its 48dp touch target, which takes in the
+    // small gap before −.
+    child: Center(
       child: OutlinedButton(
         key: PartsPage.steadyKey,
         style: OutlinedButton.styleFrom(
           padding: EdgeInsets.zero,
-          minimumSize: Size.zero,
+          minimumSize: const Size(40, 40),
+          fixedSize: const Size(40, 40),
+          tapTargetSize: MaterialTapTargetSize.padded,
           foregroundColor: colors.text,
           side: BorderSide(color: colors.text, width: 2),
         ),
@@ -901,6 +906,8 @@ class _PartsPageState extends State<PartsPage>
       SongPart Function(int) set, {
       Widget? leading,
     }) => ValueStepper(
+      compact: true,
+      onSheet: true,
       label: label,
       leading: leading,
       display: '$value',

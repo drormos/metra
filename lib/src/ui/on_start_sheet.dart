@@ -288,6 +288,7 @@ class OnStartSheet extends StatelessWidget {
     final label = on.limitLabel;
     return [
       ValueStepper(
+        onSheet: true,
         label: changeLabel,
         signed: true,
         display: OnStart.changeLabel(on.changeBy),
@@ -312,6 +313,7 @@ class OnStartSheet extends StatelessWidget {
         },
       ),
       ValueStepper(
+        onSheet: true,
         label: everyLabel,
         display: OnStart.barsLabel(on.every),
         editText: '${on.every}',
@@ -348,6 +350,7 @@ class OnStartSheet extends StatelessWidget {
         },
       ),
       ValueStepper(
+        onSheet: true,
         label: label,
         display: upTo == null ? 'No limit' : '$upTo',
         editText: upTo == null ? '' : '$upTo',
@@ -396,6 +399,7 @@ class OnStartSheet extends StatelessWidget {
     if (on.stopBy == StopBy.bars) {
       final bars = on.stopBars;
       return ValueStepper(
+        onSheet: true,
         label: lengthLabel,
         display: '$bars',
         editText: '$bars',
@@ -435,6 +439,7 @@ class OnStartSheet extends StatelessWidget {
     final s = on.stopTime.inSeconds;
     Duration secs(int v) => Duration(seconds: v);
     return ValueStepper(
+      onSheet: true,
       label: lengthLabel,
       time: true,
       display: OnStart.timeLabel(on.stopTime),

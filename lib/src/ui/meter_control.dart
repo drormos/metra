@@ -14,27 +14,43 @@ class StepButton extends StatelessWidget {
     super.key,
     required this.size,
     required this.onPressed,
+    this.drawn,
+    this.color,
   });
 
   final IconData icon;
   final double size;
 
+  /// Drawn this size, centered in its [size] touch cell (null: fills it).
+  final double? drawn;
+
+  /// The fill (null: the theme's surface).
+  final Color? color;
+
   /// Null disables it (at the end of the range).
   final VoidCallback? onPressed;
 
   @override
-  Widget build(BuildContext context) => SizedBox.square(
-    dimension: size,
-    child: RepeatButton(
+  Widget build(BuildContext context) {
+    final drawn = this.drawn;
+    final button = RepeatButton(
       style: FilledButton.styleFrom(
-        backgroundColor: context.colors.surface,
+        backgroundColor: color ?? context.colors.surface,
         foregroundColor: context.colors.text,
         padding: EdgeInsets.zero,
+        // Smaller than its cell: the cell is still the touch target.
+        minimumSize: drawn == null ? null : Size.square(drawn),
+        fixedSize: drawn == null ? null : Size.square(drawn),
+        tapTargetSize: MaterialTapTargetSize.padded,
       ),
       onPressed: onPressed,
-      child: Icon(icon, size: size * 0.5),
-    ),
-  );
+      child: Icon(icon, size: (drawn ?? size) * 0.5),
+    );
+    return SizedBox.square(
+      dimension: size,
+      child: drawn == null ? button : Center(child: button),
+    );
+  }
 }
 
 /// Beats −/+ (1–[maxBeats], the app's stepper: tap the number to type),
