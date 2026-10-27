@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import '../audio/call_pause.dart';
@@ -75,10 +76,19 @@ abstract final class AndroidBridge {
   }
 
   /// Calls ring and end (`CallMonitor.kt`): the click pauses for them.
+  /// Each return to the front asks for a frame ("redraw", `MainActivity`),
+  /// even if Flutter thinks it's hidden: a screen rebuilt over the running
+  /// engine waits for one before it draws.
   static void attachCalls(CallPause calls) =>
       android.setMethodCallHandler((call) async {
-        if (call.method != 'callActive') throw MissingPluginException();
-        await calls.callChanged(active: call.arguments as bool);
+        switch (call.method) {
+          case 'callActive':
+            await calls.callChanged(active: call.arguments as bool);
+          case 'redraw':
+            SchedulerBinding.instance.scheduleForcedFrame();
+          default:
+            throw MissingPluginException();
+        }
       });
 
   /// How long an Undo bar should stay: [base], or longer if Android's

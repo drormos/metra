@@ -12,7 +12,12 @@ import '../controller/metronome_controller.dart';
 /// Setlist mode adds previous/next; Free play and Single song add the
 /// main screen's −5 −1 +1 +5 tempo steps. No duration, so no seek bar.
 class MetronomeAudioHandler extends BaseAudioHandler {
-  MetronomeAudioHandler(this._controller, {this._library, this._cover}) {
+  MetronomeAudioHandler(
+    this._controller, {
+    this._library,
+    this._cover,
+    this._onClosed,
+  }) {
     Listenable.merge([_controller, ?_library]).addListener(_publish);
     _publish();
   }
@@ -22,6 +27,9 @@ class MetronomeAudioHandler extends BaseAudioHandler {
 
   /// The cover image for a tempo, as a file URI; null: no artwork.
   final Future<Uri> Function(int bpm)? _cover;
+
+  /// Ends the app (swiped away from recents, once saved).
+  final void Function()? _onClosed;
   int? _coverBpm;
   Uri? _coverUri;
 
@@ -91,9 +99,15 @@ class MetronomeAudioHandler extends BaseAudioHandler {
   }
 
   /// Swiping the app away from recents stops the click and removes the
-  /// card.
+  /// card, then ends the app once the library is saved: otherwise Android
+  /// keeps the process, and with it the engine, so a reopen would reuse a
+  /// screen that once got stuck after a display-settings change.
   @override
-  Future<void> onTaskRemoved() => onNotificationDeleted();
+  Future<void> onTaskRemoved() async {
+    await onNotificationDeleted();
+    await _library?.flush();
+    _onClosed?.call();
+  }
 
   // Playing = ready + playing: audio_service then starts the foreground
   // service. Stopped and ready keeps the card (no longer foreground);

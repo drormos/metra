@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart'
-    show ChangeNotifier, ThemeMode, debugPrint, visibleForTesting;
+    show ChangeNotifier, ThemeMode, debugPrint;
 
 import '../model/library.dart';
 import '../model/library_migrations.dart';
@@ -1092,7 +1092,6 @@ class LibraryController extends ChangeNotifier {
   }
 
   /// Completes when every save so far has been written.
-  @visibleForTesting
   Future<void> flush() => _writing ?? Future.value();
 
   void _update(Library library) {

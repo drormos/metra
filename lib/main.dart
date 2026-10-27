@@ -149,6 +149,7 @@ Future<MetronomeAudioHandler?> _initAndroidBackground(
         library: library,
         cover: (bpm) async =>
             mediaCoverFile(await getTemporaryDirectory(), bpm),
+        onClosed: () => exit(0),
       ),
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.dror.metra.playback',

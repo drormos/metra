@@ -27,6 +27,7 @@ class MainActivity : AudioServiceActivity() {
         super.configureFlutterEngine(flutterEngine)
         TileBridge.attach(this, flutterEngine)
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "metra/android")
+        this.channel = channel
         CallMonitor.attach(this, channel)
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
@@ -54,6 +55,17 @@ class MainActivity : AudioServiceActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    private var channel: MethodChannel? = null
+
+    // Every return to the front asks Flutter for a frame. A screen rebuilt
+    // over the running engine (a system display setting changed while the
+    // app was alive) waits to draw until Flutter shows a frame, and with
+    // nothing asking for one it waited forever.
+    override fun onPostResume() {
+        super.onPostResume()
+        channel?.invokeMethod("redraw", null)
     }
 
     // Already running (warm): the tile asked to start.

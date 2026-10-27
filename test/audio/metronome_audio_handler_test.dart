@@ -96,11 +96,29 @@ void main() {
 
   AudioProcessingState card() => handler.playbackState.value.processingState;
 
-  test('removing the task stops playback and the card', () async {
+  test('removing the task stops playback and the card, then ends the app '
+      'once the library is saved (a reopen starts clean)', () async {
+    final dir = Directory.systemTemp.createTempSync('metra_task_');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final library = await LibraryController.load(
+      LibraryStore(File('${dir.path}/library.json')),
+    );
+    final closed = <bool>[];
+    handler = MetronomeAudioHandler(
+      controller,
+      library: library,
+      onClosed: () => closed.add(File('${dir.path}/library.json').existsSync()),
+    );
+    library.addSong(
+      name: 'Saved first',
+      bpm: 90,
+      pattern: const MetronomePattern.standard(),
+    );
     await controller.play();
     await handler.onTaskRemoved();
     expect(controller.isPlaying, isFalse);
     expect(card(), AudioProcessingState.idle);
+    expect(closed, [true], reason: 'ended after the save was written');
   });
 
   test('tempo steps are main-screen steps; pause stops', () async {

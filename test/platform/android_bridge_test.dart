@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart' show AppLifecycleState;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/audio/call_pause.dart';
@@ -100,6 +101,24 @@ void main() {
     await call(false);
     expect(controller.isPlaying, isTrue);
     controller.stop();
+    AndroidBridge.android.setMethodCallHandler(null);
+  });
+
+  test('"redraw" (each return to the front) asks for a frame, even while '
+      'Flutter thinks it is hidden', () async {
+    AndroidBridge.attachCalls(CallPause(controller));
+    final binding = TestWidgetsFlutterBinding.instance;
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    addTearDown(
+      () => binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed),
+    );
+    expect(binding.hasScheduledFrame, isFalse);
+    await messenger.handlePlatformMessage(
+      AndroidBridge.android.name,
+      codec.encodeMethodCall(const MethodCall('redraw')),
+      (_) {},
+    );
+    expect(binding.hasScheduledFrame, isTrue);
     AndroidBridge.android.setMethodCallHandler(null);
   });
 }
