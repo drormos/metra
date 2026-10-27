@@ -11,11 +11,11 @@ import '../model/library.dart';
 import '../model/metronome_pattern.dart';
 import '../model/on_start.dart';
 import 'beat_indicator.dart' show MutedLine;
+import 'count_in.dart';
 import 'dashed_outline.dart';
 import 'editor_scaffold.dart' show confirmDelete;
 import 'fit_text.dart';
 import 'haptics.dart';
-import 'metronome_screen.dart' show RunLine;
 import 'motion.dart';
 import 'save_as_new_dialog.dart';
 import 'subdivision_icon.dart';
@@ -107,8 +107,6 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
   // the part changes.
   late final Ticker _follow = createTicker((_) => _checkPlaying());
   final _progress = ValueNotifier(0.0);
-  // In a count-in: its line, in place of the playing card's subtitle.
-  final _countIn = ValueNotifier<String?>(null);
   int? _playing;
 
   @override
@@ -128,7 +126,6 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
     _undoTimer?.cancel();
     _follow.dispose();
     _progress.dispose();
-    _countIn.dispose();
     _closing?.cancel();
     _reveal?.cancel();
     _anchor.dispose();
@@ -152,10 +149,10 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
   void _checkPlaying() {
     if (!mounted) return;
     final playing = _metronome.isPlaying;
-    final frame = SchedulerBinding.instance.currentSystemFrameTimeStamp;
-    final at = playing ? _metronome.playheadAt(frame) : null;
-    _countIn.value = playing
-        ? RunLine.countInLabel(_metronome, _metronome.visualTimeAt(frame))
+    final at = playing
+        ? _metronome.playheadAt(
+            SchedulerBinding.instance.currentSystemFrameTimeStamp,
+          )
         : null;
     final part = playing ? (at?.part ?? 0) : null;
     if (part != _playing) setState(() => _playing = part);
@@ -407,18 +404,37 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
                   // Discard cut it short.
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-                    child: BrightenSwap(
-                      value: partsSummary(parts, _metronome.songEnd),
-                      child: Text(
-                        partsSummary(parts, _metronome.songEnd),
-                        key: PartsPage.summaryKey,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: context.colors.muted,
-                        ),
-                      ),
+                    // In a count-in, the count in its place, bold white;
+                    // one fixed line height, so nothing moves.
+                    child: CountInBuilder(
+                      controller: _metronome,
+                      builder: (context, countIn) {
+                        final text = countIn == null
+                            ? partsSummary(parts, _metronome.songEnd)
+                            : countInLine(countIn);
+                        return BrightenSwap(
+                          value: text,
+                          child: Text(
+                            text,
+                            key: PartsPage.summaryKey,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            strutStyle: const StrutStyle(
+                              fontSize: 13,
+                              forceStrutHeight: true,
+                            ),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: countIn == null
+                                  ? null
+                                  : FontWeight.w700,
+                              color: countIn == null
+                                  ? context.colors.muted
+                                  : context.colors.text,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                   Padding(
@@ -796,24 +812,14 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                  ValueListenableBuilder(
-                                    valueListenable: _countIn,
-                                    builder: (context, countIn, _) {
-                                      final shown = _playing == i
-                                          ? countIn
-                                          : null;
-                                      return Text(
-                                        shown ?? partLine(part),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: shown == null
-                                              ? colors.muted
-                                              : colors.text,
-                                        ),
-                                      );
-                                    },
+                                  Text(
+                                    partLine(part),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: colors.muted,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -1409,11 +1415,14 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
       child: SizedBox(
         height: 56,
         child: playing
-            ? FilledButton.icon(
+            ? FilledButton(
                 key: PartsPage.playKey,
                 onPressed: tap,
-                icon: const Icon(Icons.stop, size: 24),
-                label: const Text('Stop', style: label),
+                child: StopLabel(
+                  controller: _metronome,
+                  fontSize: label.fontSize!,
+                  iconSize: 24,
+                ),
               )
             : OutlinedButton.icon(
                 key: PartsPage.playKey,

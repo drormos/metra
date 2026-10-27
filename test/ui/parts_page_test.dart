@@ -19,6 +19,7 @@ import 'package:metra/src/ui/time_signature_sheet.dart';
 import 'package:metra/src/ui/value_stepper.dart';
 
 import '../audio/fake_click_output.dart';
+import 'button_text.dart';
 
 import 'package:metra/src/ui/theme.dart';
 
@@ -736,32 +737,48 @@ void main() {
       expect([stripWhite(tester, 0), stripWhite(tester, 1)], [false, false]);
     });
 
-    testWidgets('a count-in shows on the card about to play, in place of '
-        'its subtitle, from Start; the fill stays empty until the part', (
-      tester,
-    ) async {
+    testWidgets('a count-in: the summary line and the Stop button show it '
+        'from Start, in place (nothing moves); the cards and the fill wait '
+        'for the song', (tester) async {
       await pump(tester);
       metronome
         ..setCountIn(1)
         ..setParts(two(), end: SongEnd.loopLastPart);
       await openPage(tester);
-      Finder onCard(String text) => find.descendant(
-        of: find.byKey(PartsPage.cardKey(0)),
-        matching: find.text(text),
-      );
       final subtitle = partLine(two().first);
-      expect(onCard(subtitle), findsOneWidget);
+      final summary = tester.widget<Text>(find.byKey(PartsPage.summaryKey));
+      final summaryRect = tester.getRect(find.byKey(PartsPage.summaryKey));
+      final cardRect = tester.getRect(find.byKey(PartsPage.cardKey(0)));
       await tester.tap(find.byKey(PartsPage.playKey));
       await tester.pump();
-      expect(onCard('Count-in · 1 of 4'), findsOneWidget, reason: 'at once');
-      expect(onCard(subtitle), findsNothing);
+      Text line() => tester.widget<Text>(find.byKey(PartsPage.summaryKey));
+      expect(line().data, 'Count-in · 1 of 4', reason: 'at once');
+      expect(line().style!.fontWeight, FontWeight.w700);
+      expect(
+        tester.getRect(find.byKey(PartsPage.summaryKey)).height,
+        summaryRect.height,
+      );
+      expect(tester.getRect(find.byKey(PartsPage.cardKey(0))), cardRect);
+      expect(
+        buttonText(tester, PartsPage.playKey),
+        contains('Count-in 1 of 4'),
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(PartsPage.cardKey(0)),
+          matching: find.text(subtitle),
+        ),
+        findsOneWidget,
+        reason: 'the card stays as it is',
+      );
       // Count-in beats every 500 ms from 1120; a from 3120.
       await runTo(tester, 1700);
-      expect(onCard('Count-in · 2 of 4'), findsOneWidget);
+      expect(line().data, 'Count-in · 2 of 4');
       expect(fill(tester, 0), 0);
       await runTo(tester, 3200);
-      expect(onCard(subtitle), findsOneWidget);
+      expect(line().data, summary.data);
       expect(fill(tester, 0), greaterThan(0));
+      expect(buttonText(tester, PartsPage.playKey), 'Stop');
       metronome.stop();
       await tester.pump();
     });

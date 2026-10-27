@@ -20,6 +20,7 @@ import 'package:metra/src/ui/time_signature_sheet.dart';
 import 'package:metra/src/ui/top_panel.dart';
 
 import '../audio/fake_click_output.dart';
+import 'button_text.dart';
 import 'test_theme.dart';
 
 const _frame = Duration(milliseconds: 16);
@@ -1180,6 +1181,11 @@ void main() {
 
       // Before the first click sounds: already the count, beat 1 unlit.
       expect(find.text('Count-in · 1 · 1 of 4'), findsOneWidget);
+      // The button pressed shows it too (the beat, not the bar).
+      expect(
+        buttonText(tester, MetronomeScreen.playKey),
+        contains('Count-in 1 of 4'),
+      );
       expect(find.byKey(const ValueKey('beat-0-on')), findsNothing);
       // 120 bpm: count-in beats every 500 ms from 120 ms, 2 bars.
       await to(140);
@@ -1189,6 +1195,10 @@ void main() {
       expect(find.text('Count-in · 1 · 1 of 4'), findsOneWidget);
       await to(1140);
       expect(find.text('Count-in · 1 · 3 of 4'), findsOneWidget);
+      expect(
+        buttonText(tester, MetronomeScreen.playKey),
+        contains('Count-in 3 of 4'),
+      );
       expect(find.byKey(const ValueKey('beat-2-on')), findsOneWidget);
       expect(find.byKey(const ValueKey('tick-2-0-off')), findsOneWidget);
       expect(find.byKey(const ValueKey('tick-2-1-off')), findsOneWidget);
@@ -1201,6 +1211,7 @@ void main() {
       expect(find.byKey(const ValueKey('count-in-1')), findsNothing);
       expect(find.byKey(MetronomeScreen.countInLineKey), findsNothing);
       expect(find.byKey(const ValueKey('beat-0-on')), findsOneWidget);
+      expect(buttonText(tester, MetronomeScreen.playKey), 'Stop');
       expect(find.byKey(const ValueKey('tick-0-0-on')), findsOneWidget);
       expect(find.byKey(MetronomeScreen.tempoNameKey), findsOneWidget);
       await tester.tap(find.byKey(MetronomeScreen.playKey));

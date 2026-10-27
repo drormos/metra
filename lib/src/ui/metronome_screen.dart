@@ -14,6 +14,7 @@ import '../model/song_part.dart';
 import '../model/tempo_name.dart';
 import '../model/whats_new.dart';
 import 'beat_indicator.dart';
+import 'count_in.dart';
 import 'fit_text.dart';
 import 'haptics.dart';
 import 'motion.dart';
@@ -318,14 +319,16 @@ class MetronomeScreen extends StatelessWidget {
                     Haptics.medium();
                     controller.toggle();
                   },
-                  icon: Icon(
-                    controller.isPlaying ? Icons.stop : Icons.play_arrow,
-                    size: 24,
-                  ),
-                  label: Text(
-                    controller.isPlaying ? 'Stop' : 'Start',
-                    style: const TextStyle(fontSize: 22),
-                  ),
+                  icon: controller.isPlaying
+                      ? null
+                      : const Icon(Icons.play_arrow, size: 24),
+                  label: controller.isPlaying
+                      ? StopLabel(
+                          controller: controller,
+                          fontSize: 22,
+                          iconSize: 24,
+                        )
+                      : const Text('Start', style: TextStyle(fontSize: 22)),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1051,36 +1054,8 @@ class RunLine extends StatefulWidget {
   final MetronomeController controller;
   final Widget child;
 
-  /// "Count-in · 3 of 4" ("Count-in · 2 · 3 of 4" in bar 2 of 2) at
-  /// [now], or null outside a count-in. Before the first click sounds it
-  /// already reads beat 1 of bar 1, so it never jumps from a bare
-  /// "Count-in" to the count.
-  static String? countInLabel(MetronomeController controller, Duration? now) {
-    final step = now == null ? null : controller.stepAt(now);
-    final countIn = step?.countIn;
-    final (bar, bars, beat, of) = switch (countIn) {
-      final c? => (
-        c.bar,
-        c.bars,
-        step!.barPosition + 1,
-        step.pattern.beatsPerBar,
-      ),
-      null when step == null && controller.countingIn => (
-        1,
-        controller.onStart.countIn,
-        1,
-        controller.pattern.beatsPerBar,
-      ),
-      null => (0, 0, 0, 0),
-    };
-    if (bars == 0) return null;
-    return bars > 1
-        ? 'Count-in · $bar · $beat of $of'
-        : 'Count-in · $beat of $of';
-  }
-
   static String? labelFor(MetronomeController controller, Duration? now) {
-    if (countInLabel(controller, now) case final label?) return label;
+    if (countInAt(controller, now) case final c?) return countInLine(c);
     final step = now == null ? null : controller.stepAt(now);
     // A song with parts: where it is.
     final parts = controller.parts;

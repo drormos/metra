@@ -17,6 +17,7 @@ import 'package:metra/src/ui/tempo_controls.dart';
 import 'package:metra/src/ui/theme.dart';
 
 import '../audio/fake_click_output.dart';
+import 'button_text.dart';
 
 /// Stage mode (ui-spec.md "Stage mode").
 void main() {
@@ -363,6 +364,25 @@ void main() {
       );
       expect(metronome.bpm, 105);
       expect(tester.widget<BpmReadout>(find.byType(BpmReadout)).bpm, 105);
+      metronome.stop();
+      await tester.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('the Stop button shows the count-in from Start, then just '
+        '"Stop"', (tester) async {
+      await pump(tester);
+      await tester.tap(find.byKey(StageScreen.playKey));
+      await tester.pump();
+      expect(
+        buttonText(tester, StageScreen.playKey),
+        contains('Count-in 1 of 4'),
+      );
+      // 100 bpm: count-in beats every 600 ms; the song from 2.4 s on.
+      while (output.time < const Duration(milliseconds: 2700)) {
+        output.time += const Duration(milliseconds: 20);
+        await tester.pump(const Duration(milliseconds: 20));
+      }
+      expect(buttonText(tester, StageScreen.playKey), 'Stop');
       metronome.stop();
       await tester.pump(const Duration(seconds: 1));
     });

@@ -5,6 +5,7 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 ## [Unreleased]
 
 ### Added
+- During a count-in, the Stop button shows the count ("Stop · Count-in 3 of 4") on every page, and the parts page's summary line shows it too.
 - Song parts: a heads-up before a part changes, on the main screen and in stage mode ("Break in 2 bars · 2/4 · 128", then the beats counting down in the last bar).
 - Settings › "Sound on part changes": a higher click on the first beat of each new part (off by default).
 
@@ -13,7 +14,7 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 - Song parts: every part has a length in bars. "Until you stop" is replaced by "When the song ends": Stop, Loop song or Loop last part (a Gradual last part restarts its ramp each time). Existing songs loop their bar as before. The strip marks a looping last part with a loop icon; the summary reads "45 bars, then loops Outro" and the line under the BPM "Outro · bar 3 of 8 · looping".
 
 ### Fixed
-- The count-in line shows "Count-in · 1 of 4" as soon as you press Start (it showed a bare "Count-in", or briefly the next part's heads-up, first); on the parts page the card about to play shows the count-in too.
+- The count-in line shows "Count-in · 1 of 4" as soon as you press Start (it showed a bare "Count-in", or briefly the next part's heads-up, first).
 - Parts page: an open card can be held and reordered however tall it is.
 - Parts page: a song that ends while you edit it stays loaded (in a set, it no longer moves on to the next song).
 

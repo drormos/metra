@@ -8,6 +8,7 @@ import '../controller/metronome_controller.dart';
 import '../model/library.dart';
 import '../model/on_start.dart';
 import 'beat_indicator.dart';
+import 'count_in.dart';
 import 'dashed_outline.dart';
 import 'fit_text.dart';
 import 'haptics.dart';
@@ -391,14 +392,12 @@ class _StageScreenState extends State<StageScreen>
           child: FilledButton.icon(
             key: StageScreen.playKey,
             onPressed: _startStop,
-            icon: Icon(
-              _metronome.isPlaying ? Icons.stop : Icons.play_arrow,
-              size: 28,
-            ),
-            label: Text(
-              _metronome.isPlaying ? 'Stop' : 'Start',
-              style: const TextStyle(fontSize: 26),
-            ),
+            icon: _metronome.isPlaying
+                ? null
+                : const Icon(Icons.play_arrow, size: 28),
+            label: _metronome.isPlaying
+                ? StopLabel(controller: _metronome, fontSize: 26, iconSize: 28)
+                : const Text('Start', style: TextStyle(fontSize: 26)),
           ),
         ),
       ],
