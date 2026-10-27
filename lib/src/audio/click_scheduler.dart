@@ -174,8 +174,10 @@ class ClickScheduler {
   bool get isRunning => _timer != null;
 
   /// Whether a count-in is playing, or about to (the song hasn't been
-  /// handed to the engine yet).
-  bool get countingIn => _countInEnd != null;
+  /// handed to the engine yet), from [start] on: also while the device
+  /// starts, so nothing shows the song first.
+  bool get countingIn => _countInEnd != null || _countInStarting;
+  bool _countInStarting = false;
 
   /// Called when the engine clock reaches a step where the run changed the
   /// tempo (so the shown tempo changes on the bar line, not when the bar
@@ -281,7 +283,12 @@ class ClickScheduler {
     final session = ++_session;
     _pattern = pattern;
     _prepared = true;
-    await _output.prepare();
+    _countInStarting = countInBars > 0;
+    try {
+      await _output.prepare();
+    } finally {
+      if (session == _session) _countInStarting = false;
+    }
     if (session != _session) return;
 
     _timer = Timer.periodic(refillInterval, (_) => refill());
@@ -344,6 +351,7 @@ class ClickScheduler {
     _timer = null;
     _grid = null;
     _countInEnd = null;
+    _countInStarting = false;
     _run = null;
     _endAt = null;
     _undo.clear();

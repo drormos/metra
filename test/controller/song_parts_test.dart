@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
@@ -375,6 +376,20 @@ void main() {
       final details = headsUpDetails(h.current, h.next);
       return '${h.next.name} in $when${details.isEmpty ? '' : ' · $details'}';
     }
+
+    test('with a count-in, none while the audio device starts: it counts '
+        'in from Start', () async {
+      controller.setCountIn(1);
+      load([_part('a', 2, 120), _part('b', 2, 120)]);
+      output.prepareGate = Completer();
+      final playing = controller.play();
+      expect(controller.countingIn, isTrue);
+      expect(up(1000), isNull);
+      output.prepareGate!.complete();
+      await playing;
+      expect(up(1000), isNull);
+      controller.stop();
+    });
 
     // Runs to [ms] in 5 ms steps, noting each change of the heads-up as
     // (time, text).
