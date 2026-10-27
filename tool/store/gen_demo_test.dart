@@ -96,6 +96,32 @@ void main() {
       simple(4, 4),
       onStart: const OnStart(stopOn: true, stopTime: Duration(minutes: 5)),
     );
+    // A song with parts for the store shots (heads-up, parts page, stage
+    // mode): a 1-bar 2/4 break and a Gradual chorus.
+    SongPart part(String name, int bars, int from, [int? to, int beats = 4]) =>
+        SongPart(
+          id: 'demo-part-${n++}',
+          name: name,
+          bars: bars,
+          tempoStart: from,
+          tempoEnd: to ?? from,
+          pattern: simple(beats, 2),
+        );
+    final harbor = Song.withParts(
+      id: 'demo-${n++}',
+      name: 'Glass Harbor',
+      parts: [
+        part('Intro', 4, 120),
+        part('Verse', 8, 120),
+        part('Break', 1, 128, null, 2),
+        part('Chorus', 8, 128, 140),
+        part('Bridge', 4, 132),
+        part('Outro', 4, 120),
+      ],
+      end: SongEnd.stop,
+      onStart: const OnStart(countInOn: true),
+      editedAt: edited,
+    );
     final threeFour = song(
       'Three Over Four',
       90,
@@ -104,6 +130,7 @@ void main() {
 
     final gig = [
       midnight,
+      harbor,
       copper,
       staticBloom,
       northbound,
@@ -114,10 +141,9 @@ void main() {
       hollow,
       redLine,
       lastDance,
-      breakdown,
     ];
     final library = Library(
-      songs: [...gig, ladder, strokes, threeFour],
+      songs: [...gig, breakdown, ladder, strokes, threeFour],
       setlists: [
         Setlist(
           id: 'set-blue-room',
@@ -165,6 +191,9 @@ void main() {
         'examples-added',
         'whats-new-dot:1.5.2',
         'whats-new:1.5.2',
+        'whats-new-dot:1.6.0',
+        'whats-new:1.6.0',
+        'stage-dnd-tip',
       },
     ).repaired();
     const enc = JsonEncoder.withIndent('  ');

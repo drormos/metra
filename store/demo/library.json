@@ -1,27 +1,36 @@
 {
-  "version": 2,
+  "version": 6,
   "songs": [
     {
       "id": "demo-0",
       "name": "Midnight Engine",
-      "bpm": 148,
-      "pattern": {
-        "beatsPerBar": 4,
-        "stepsPerBeat": 2,
-        "beatUnit": 4,
-        "steps": [
-          "accent",
-          "soft",
-          "normal",
-          "soft",
-          "normal",
-          "soft",
-          "normal",
-          "soft"
-        ],
-        "polyrhythm": 0,
-        "polyStates": []
-      },
+      "parts": [
+        {
+          "id": "part-1",
+          "name": "Part 1",
+          "bars": 1,
+          "tempoStart": 148,
+          "tempoEnd": 148,
+          "pattern": {
+            "beatsPerBar": 4,
+            "stepsPerBeat": 2,
+            "beatUnit": 4,
+            "steps": [
+              "accent",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        }
+      ],
+      "endBehavior": "loopLastPart",
       "onStart": {
         "countInOn": false,
         "countInBars": 1,
@@ -38,26 +47,196 @@
       "playedAt": null
     },
     {
+      "id": "demo-14",
+      "name": "Glass Harbor",
+      "parts": [
+        {
+          "id": "demo-part-15",
+          "name": "Intro",
+          "bars": 4,
+          "tempoStart": 120,
+          "tempoEnd": 120,
+          "pattern": {
+            "beatsPerBar": 4,
+            "stepsPerBeat": 2,
+            "beatUnit": 4,
+            "steps": [
+              "accent",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        },
+        {
+          "id": "demo-part-16",
+          "name": "Verse",
+          "bars": 8,
+          "tempoStart": 120,
+          "tempoEnd": 120,
+          "pattern": {
+            "beatsPerBar": 4,
+            "stepsPerBeat": 2,
+            "beatUnit": 4,
+            "steps": [
+              "accent",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        },
+        {
+          "id": "demo-part-17",
+          "name": "Break",
+          "bars": 1,
+          "tempoStart": 128,
+          "tempoEnd": 128,
+          "pattern": {
+            "beatsPerBar": 2,
+            "stepsPerBeat": 2,
+            "beatUnit": 4,
+            "steps": [
+              "accent",
+              "soft",
+              "normal",
+              "soft"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        },
+        {
+          "id": "demo-part-18",
+          "name": "Chorus",
+          "bars": 8,
+          "tempoStart": 128,
+          "tempoEnd": 140,
+          "pattern": {
+            "beatsPerBar": 4,
+            "stepsPerBeat": 2,
+            "beatUnit": 4,
+            "steps": [
+              "accent",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        },
+        {
+          "id": "demo-part-19",
+          "name": "Bridge",
+          "bars": 4,
+          "tempoStart": 132,
+          "tempoEnd": 132,
+          "pattern": {
+            "beatsPerBar": 4,
+            "stepsPerBeat": 2,
+            "beatUnit": 4,
+            "steps": [
+              "accent",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        },
+        {
+          "id": "demo-part-20",
+          "name": "Outro",
+          "bars": 4,
+          "tempoStart": 120,
+          "tempoEnd": 120,
+          "pattern": {
+            "beatsPerBar": 4,
+            "stepsPerBeat": 2,
+            "beatUnit": 4,
+            "steps": [
+              "accent",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        }
+      ],
+      "endBehavior": "stop",
+      "onStart": {
+        "countInOn": true,
+        "countInBars": 1,
+        "speedUp": false,
+        "changeBy": 5,
+        "every": 8,
+        "upTo": null,
+        "stopOn": false,
+        "stopBy": "time",
+        "stopBars": 32,
+        "stopTimeS": 300
+      },
+      "editedAt": 1792486800000,
+      "playedAt": null
+    },
+    {
       "id": "demo-1",
       "name": "Copper Sky",
-      "bpm": 98,
-      "pattern": {
-        "beatsPerBar": 4,
-        "stepsPerBeat": 2,
-        "beatUnit": 4,
-        "steps": [
-          "accent",
-          "soft",
-          "normal",
-          "soft",
-          "normal",
-          "soft",
-          "normal",
-          "soft"
-        ],
-        "polyrhythm": 0,
-        "polyStates": []
-      },
+      "parts": [
+        {
+          "id": "part-1",
+          "name": "Part 1",
+          "bars": 1,
+          "tempoStart": 98,
+          "tempoEnd": 98,
+          "pattern": {
+            "beatsPerBar": 4,
+            "stepsPerBeat": 2,
+            "beatUnit": 4,
+            "steps": [
+              "accent",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        }
+      ],
+      "endBehavior": "loopLastPart",
       "onStart": {
         "countInOn": false,
         "countInBars": 1,
@@ -76,24 +255,33 @@
     {
       "id": "demo-2",
       "name": "Static Bloom",
-      "bpm": 132,
-      "pattern": {
-        "beatsPerBar": 4,
-        "stepsPerBeat": 2,
-        "beatUnit": 4,
-        "steps": [
-          "accent",
-          "soft",
-          "normal",
-          "soft",
-          "normal",
-          "soft",
-          "normal",
-          "soft"
-        ],
-        "polyrhythm": 0,
-        "polyStates": []
-      },
+      "parts": [
+        {
+          "id": "part-1",
+          "name": "Part 1",
+          "bars": 1,
+          "tempoStart": 132,
+          "tempoEnd": 132,
+          "pattern": {
+            "beatsPerBar": 4,
+            "stepsPerBeat": 2,
+            "beatUnit": 4,
+            "steps": [
+              "accent",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        }
+      ],
+      "endBehavior": "loopLastPart",
       "onStart": {
         "countInOn": false,
         "countInBars": 1,
@@ -112,24 +300,33 @@
     {
       "id": "demo-3",
       "name": "Northbound",
-      "bpm": 120,
-      "pattern": {
-        "beatsPerBar": 4,
-        "stepsPerBeat": 2,
-        "beatUnit": 4,
-        "steps": [
-          "accent",
-          "soft",
-          "normal",
-          "soft",
-          "normal",
-          "soft",
-          "normal",
-          "soft"
-        ],
-        "polyrhythm": 0,
-        "polyStates": []
-      },
+      "parts": [
+        {
+          "id": "part-1",
+          "name": "Part 1",
+          "bars": 1,
+          "tempoStart": 120,
+          "tempoEnd": 120,
+          "pattern": {
+            "beatsPerBar": 4,
+            "stepsPerBeat": 2,
+            "beatUnit": 4,
+            "steps": [
+              "accent",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        }
+      ],
+      "endBehavior": "loopLastPart",
       "onStart": {
         "countInOn": false,
         "countInBars": 1,
@@ -148,28 +345,37 @@
     {
       "id": "demo-4",
       "name": "Paper Crowns",
-      "bpm": 92,
-      "pattern": {
-        "beatsPerBar": 4,
-        "stepsPerBeat": 3,
-        "beatUnit": 4,
-        "steps": [
-          "accent",
-          "soft",
-          "soft",
-          "normal",
-          "soft",
-          "soft",
-          "normal",
-          "soft",
-          "soft",
-          "normal",
-          "soft",
-          "soft"
-        ],
-        "polyrhythm": 0,
-        "polyStates": []
-      },
+      "parts": [
+        {
+          "id": "part-1",
+          "name": "Part 1",
+          "bars": 1,
+          "tempoStart": 92,
+          "tempoEnd": 92,
+          "pattern": {
+            "beatsPerBar": 4,
+            "stepsPerBeat": 3,
+            "beatUnit": 4,
+            "steps": [
+              "accent",
+              "soft",
+              "soft",
+              "normal",
+              "soft",
+              "soft",
+              "normal",
+              "soft",
+              "soft",
+              "normal",
+              "soft",
+              "soft"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        }
+      ],
+      "endBehavior": "loopLastPart",
       "onStart": {
         "countInOn": false,
         "countInBars": 1,
@@ -188,34 +394,43 @@
     {
       "id": "demo-5",
       "name": "Seven Lanterns",
-      "bpm": 140,
-      "pattern": {
-        "beatsPerBar": 7,
-        "stepsPerBeat": 2,
-        "beatUnit": 8,
-        "steps": [
-          "accent",
-          "soft",
-          "normal",
-          "soft",
-          "accent",
-          "soft",
-          "normal",
-          "soft",
-          "accent",
-          "soft",
-          "normal",
-          "soft",
-          "normal",
-          "soft"
-        ],
-        "polyrhythm": 3,
-        "polyStates": [
-          "normal",
-          "normal",
-          "normal"
-        ]
-      },
+      "parts": [
+        {
+          "id": "part-1",
+          "name": "Part 1",
+          "bars": 1,
+          "tempoStart": 140,
+          "tempoEnd": 140,
+          "pattern": {
+            "beatsPerBar": 7,
+            "stepsPerBeat": 2,
+            "beatUnit": 8,
+            "steps": [
+              "accent",
+              "soft",
+              "normal",
+              "soft",
+              "accent",
+              "soft",
+              "normal",
+              "soft",
+              "accent",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft"
+            ],
+            "polyrhythm": 3,
+            "polyStates": [
+              "normal",
+              "normal",
+              "normal"
+            ]
+          }
+        }
+      ],
+      "endBehavior": "loopLastPart",
       "onStart": {
         "countInOn": false,
         "countInBars": 1,
@@ -234,28 +449,37 @@
     {
       "id": "demo-6",
       "name": "Slow Burn",
-      "bpm": 68,
-      "pattern": {
-        "beatsPerBar": 12,
-        "stepsPerBeat": 1,
-        "beatUnit": 8,
-        "steps": [
-          "accent",
-          "normal",
-          "normal",
-          "accent",
-          "normal",
-          "normal",
-          "accent",
-          "normal",
-          "normal",
-          "accent",
-          "normal",
-          "normal"
-        ],
-        "polyrhythm": 0,
-        "polyStates": []
-      },
+      "parts": [
+        {
+          "id": "part-1",
+          "name": "Part 1",
+          "bars": 1,
+          "tempoStart": 68,
+          "tempoEnd": 68,
+          "pattern": {
+            "beatsPerBar": 12,
+            "stepsPerBeat": 1,
+            "beatUnit": 8,
+            "steps": [
+              "accent",
+              "normal",
+              "normal",
+              "accent",
+              "normal",
+              "normal",
+              "accent",
+              "normal",
+              "normal",
+              "accent",
+              "normal",
+              "normal"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        }
+      ],
+      "endBehavior": "loopLastPart",
       "onStart": {
         "countInOn": false,
         "countInBars": 1,
@@ -274,22 +498,31 @@
     {
       "id": "demo-7",
       "name": "Ghost Lights",
-      "bpm": 116,
-      "pattern": {
-        "beatsPerBar": 6,
-        "stepsPerBeat": 1,
-        "beatUnit": 8,
-        "steps": [
-          "accent",
-          "normal",
-          "normal",
-          "accent",
-          "normal",
-          "normal"
-        ],
-        "polyrhythm": 0,
-        "polyStates": []
-      },
+      "parts": [
+        {
+          "id": "part-1",
+          "name": "Part 1",
+          "bars": 1,
+          "tempoStart": 116,
+          "tempoEnd": 116,
+          "pattern": {
+            "beatsPerBar": 6,
+            "stepsPerBeat": 1,
+            "beatUnit": 8,
+            "steps": [
+              "accent",
+              "normal",
+              "normal",
+              "accent",
+              "normal",
+              "normal"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        }
+      ],
+      "endBehavior": "loopLastPart",
       "onStart": {
         "countInOn": false,
         "countInBars": 1,
@@ -308,22 +541,31 @@
     {
       "id": "demo-8",
       "name": "Hollow Pines",
-      "bpm": 84,
-      "pattern": {
-        "beatsPerBar": 6,
-        "stepsPerBeat": 1,
-        "beatUnit": 8,
-        "steps": [
-          "accent",
-          "normal",
-          "normal",
-          "accent",
-          "normal",
-          "normal"
-        ],
-        "polyrhythm": 0,
-        "polyStates": []
-      },
+      "parts": [
+        {
+          "id": "part-1",
+          "name": "Part 1",
+          "bars": 1,
+          "tempoStart": 84,
+          "tempoEnd": 84,
+          "pattern": {
+            "beatsPerBar": 6,
+            "stepsPerBeat": 1,
+            "beatUnit": 8,
+            "steps": [
+              "accent",
+              "normal",
+              "normal",
+              "accent",
+              "normal",
+              "normal"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        }
+      ],
+      "endBehavior": "loopLastPart",
       "onStart": {
         "countInOn": false,
         "countInBars": 1,
@@ -342,24 +584,33 @@
     {
       "id": "demo-9",
       "name": "Red Line",
-      "bpm": 160,
-      "pattern": {
-        "beatsPerBar": 4,
-        "stepsPerBeat": 2,
-        "beatUnit": 4,
-        "steps": [
-          "accent",
-          "soft",
-          "normal",
-          "soft",
-          "normal",
-          "soft",
-          "normal",
-          "soft"
-        ],
-        "polyrhythm": 0,
-        "polyStates": []
-      },
+      "parts": [
+        {
+          "id": "part-1",
+          "name": "Part 1",
+          "bars": 1,
+          "tempoStart": 160,
+          "tempoEnd": 160,
+          "pattern": {
+            "beatsPerBar": 4,
+            "stepsPerBeat": 2,
+            "beatUnit": 4,
+            "steps": [
+              "accent",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft",
+              "normal",
+              "soft"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        }
+      ],
+      "endBehavior": "loopLastPart",
       "onStart": {
         "countInOn": false,
         "countInBars": 1,
@@ -378,19 +629,28 @@
     {
       "id": "demo-10",
       "name": "Last Dance",
-      "bpm": 104,
-      "pattern": {
-        "beatsPerBar": 3,
-        "stepsPerBeat": 1,
-        "beatUnit": 4,
-        "steps": [
-          "accent",
-          "normal",
-          "normal"
-        ],
-        "polyrhythm": 0,
-        "polyStates": []
-      },
+      "parts": [
+        {
+          "id": "part-1",
+          "name": "Part 1",
+          "bars": 1,
+          "tempoStart": 104,
+          "tempoEnd": 104,
+          "pattern": {
+            "beatsPerBar": 3,
+            "stepsPerBeat": 1,
+            "beatUnit": 4,
+            "steps": [
+              "accent",
+              "normal",
+              "normal"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        }
+      ],
+      "endBehavior": "loopLastPart",
       "onStart": {
         "countInOn": false,
         "countInBars": 1,
@@ -409,32 +669,41 @@
     {
       "id": "demo-11",
       "name": "Breakdown",
-      "bpm": 174,
-      "pattern": {
-        "beatsPerBar": 4,
-        "stepsPerBeat": 4,
-        "beatUnit": 4,
-        "steps": [
-          "accent",
-          "soft",
-          "soft",
-          "soft",
-          "normal",
-          "soft",
-          "soft",
-          "soft",
-          "normal",
-          "soft",
-          "soft",
-          "soft",
-          "normal",
-          "soft",
-          "soft",
-          "soft"
-        ],
-        "polyrhythm": 0,
-        "polyStates": []
-      },
+      "parts": [
+        {
+          "id": "part-1",
+          "name": "Part 1",
+          "bars": 1,
+          "tempoStart": 174,
+          "tempoEnd": 174,
+          "pattern": {
+            "beatsPerBar": 4,
+            "stepsPerBeat": 4,
+            "beatUnit": 4,
+            "steps": [
+              "accent",
+              "soft",
+              "soft",
+              "soft",
+              "normal",
+              "soft",
+              "soft",
+              "soft",
+              "normal",
+              "soft",
+              "soft",
+              "soft",
+              "normal",
+              "soft",
+              "soft",
+              "soft"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        }
+      ],
+      "endBehavior": "loopLastPart",
       "onStart": {
         "countInOn": false,
         "countInBars": 1,
@@ -453,32 +722,41 @@
     {
       "id": "demo-12",
       "name": "Paradiddle Ladder",
-      "bpm": 80,
-      "pattern": {
-        "beatsPerBar": 4,
-        "stepsPerBeat": 4,
-        "beatUnit": 4,
-        "steps": [
-          "accent",
-          "soft",
-          "soft",
-          "soft",
-          "normal",
-          "soft",
-          "soft",
-          "soft",
-          "normal",
-          "soft",
-          "soft",
-          "soft",
-          "normal",
-          "soft",
-          "soft",
-          "soft"
-        ],
-        "polyrhythm": 0,
-        "polyStates": []
-      },
+      "parts": [
+        {
+          "id": "part-1",
+          "name": "Part 1",
+          "bars": 1,
+          "tempoStart": 80,
+          "tempoEnd": 80,
+          "pattern": {
+            "beatsPerBar": 4,
+            "stepsPerBeat": 4,
+            "beatUnit": 4,
+            "steps": [
+              "accent",
+              "soft",
+              "soft",
+              "soft",
+              "normal",
+              "soft",
+              "soft",
+              "soft",
+              "normal",
+              "soft",
+              "soft",
+              "soft",
+              "normal",
+              "soft",
+              "soft",
+              "soft"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        }
+      ],
+      "endBehavior": "loopLastPart",
       "onStart": {
         "countInOn": true,
         "countInBars": 1,
@@ -497,32 +775,41 @@
     {
       "id": "demo-13",
       "name": "Single Strokes",
-      "bpm": 100,
-      "pattern": {
-        "beatsPerBar": 4,
-        "stepsPerBeat": 4,
-        "beatUnit": 4,
-        "steps": [
-          "accent",
-          "soft",
-          "soft",
-          "soft",
-          "normal",
-          "soft",
-          "soft",
-          "soft",
-          "normal",
-          "soft",
-          "soft",
-          "soft",
-          "normal",
-          "soft",
-          "soft",
-          "soft"
-        ],
-        "polyrhythm": 0,
-        "polyStates": []
-      },
+      "parts": [
+        {
+          "id": "part-1",
+          "name": "Part 1",
+          "bars": 1,
+          "tempoStart": 100,
+          "tempoEnd": 100,
+          "pattern": {
+            "beatsPerBar": 4,
+            "stepsPerBeat": 4,
+            "beatUnit": 4,
+            "steps": [
+              "accent",
+              "soft",
+              "soft",
+              "soft",
+              "normal",
+              "soft",
+              "soft",
+              "soft",
+              "normal",
+              "soft",
+              "soft",
+              "soft",
+              "normal",
+              "soft",
+              "soft",
+              "soft"
+            ],
+            "polyrhythm": 0,
+            "polyStates": []
+          }
+        }
+      ],
+      "endBehavior": "loopLastPart",
       "onStart": {
         "countInOn": false,
         "countInBars": 1,
@@ -539,26 +826,35 @@
       "playedAt": null
     },
     {
-      "id": "demo-14",
+      "id": "demo-21",
       "name": "Three Over Four",
-      "bpm": 90,
-      "pattern": {
-        "beatsPerBar": 4,
-        "stepsPerBeat": 1,
-        "beatUnit": 4,
-        "steps": [
-          "accent",
-          "normal",
-          "normal",
-          "normal"
-        ],
-        "polyrhythm": 3,
-        "polyStates": [
-          "normal",
-          "normal",
-          "normal"
-        ]
-      },
+      "parts": [
+        {
+          "id": "part-1",
+          "name": "Part 1",
+          "bars": 1,
+          "tempoStart": 90,
+          "tempoEnd": 90,
+          "pattern": {
+            "beatsPerBar": 4,
+            "stepsPerBeat": 1,
+            "beatUnit": 4,
+            "steps": [
+              "accent",
+              "normal",
+              "normal",
+              "normal"
+            ],
+            "polyrhythm": 3,
+            "polyStates": [
+              "normal",
+              "normal",
+              "normal"
+            ]
+          }
+        }
+      ],
+      "endBehavior": "loopLastPart",
       "onStart": {
         "countInOn": false,
         "countInBars": 1,
@@ -581,6 +877,7 @@
       "name": "Fri · The Blue Room",
       "songIds": [
         "demo-0",
+        "demo-14",
         "demo-1",
         "demo-2",
         "demo-3",
@@ -590,8 +887,7 @@
         "demo-7",
         "demo-8",
         "demo-9",
-        "demo-10",
-        "demo-11"
+        "demo-10"
       ],
       "playedAt": 1792774800000
     },
@@ -615,7 +911,7 @@
       "songIds": [
         "demo-12",
         "demo-13",
-        "demo-14"
+        "demo-21"
       ],
       "playedAt": 1792562400000
     }

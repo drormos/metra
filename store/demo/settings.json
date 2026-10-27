@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 6,
   "lastBpm": 120,
   "lastPattern": {
     "beatsPerBar": 4,
@@ -30,6 +30,8 @@
   "clickSound": "woodblock",
   "themeMode": "dark",
   "vibrate": true,
+  "partChangeSound": false,
+  "keepScreenOn": "whileOpen",
   "volumes": {
     "accent": 1.0,
     "beat": 0.8,
@@ -48,6 +50,10 @@
     "sets-swipe-hint",
     "examples-added",
     "whats-new-dot:1.5.2",
-    "whats-new:1.5.2"
-  ]
+    "whats-new:1.5.2",
+    "whats-new-dot:1.6.0",
+    "whats-new:1.6.0",
+    "stage-dnd-tip"
+  ],
+  "stageMode": false
 }
