@@ -5,6 +5,7 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 ## [Unreleased]
 
 ### Added
+- A one-time hint the first time a song is loaded (stopped): "Hold the song name to edit its parts".
 - During a count-in, the Stop button shows the count ("Stop · Count-in 3 of 4") on every page, and on the parts page a small count-in tag fills up across the count-in.
 - Song parts: a heads-up before a part changes, on the main screen and in stage mode ("Break in 2 bars · 2/4 · 128", then the beats counting down in the last bar).
 - Settings › "Sound on part changes": a higher click on the first beat of each new part (off by default).

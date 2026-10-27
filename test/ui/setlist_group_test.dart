@@ -218,6 +218,100 @@ void main() {
       expect(find.byKey(MetronomeScreen.tempoNameKey), findsOneWidget);
     });
 
+    group('teaching the way into Song parts', () {
+      const hint = 'Hold the song name to edit its parts';
+      // Past A ("Change anything here"), which has the first load.
+      Future<void> ready(WidgetTester tester) async {
+        await withSet(tester);
+        library.markTipSeen('edit-first-load');
+      }
+
+      Finder titleDimmed() => find.ancestor(
+        of: find.byKey(MetronomeScreen.titleKey),
+        matching: find.byType(Opacity),
+      );
+
+      testWidgets('a song loaded, stopped: the line says it, muted, ~4 s, '
+          'the title brightens once; never again', (tester) async {
+        await ready(tester);
+        await tester.tap(find.byKey(SetlistGroup.nextKey)); // One
+        await tester.pump();
+        expect(find.text(hint), findsOneWidget);
+        expect(
+          tester
+              .widget<Text>(find.byKey(MetronomeScreen.partsHintKey))
+              .style!
+              .color,
+          testTheme.extension<MetraColors>()!.muted,
+        );
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(titleDimmed(), findsWidgets, reason: 'one soft brighten');
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(titleDimmed(), findsNothing);
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pump();
+        await tester.pump(MetraMotion.leave * 2);
+        expect(find.text(hint), findsNothing);
+        expect(find.byKey(MetronomeScreen.tempoNameKey), findsOneWidget);
+        await tester.tap(find.byKey(SetlistGroup.nextKey)); // Two
+        await tester.pump();
+        expect(find.text(hint), findsNothing, reason: 'once');
+        // A stored tip, like the others (saved with the library).
+        expect(library.tipSeen('parts-hold-hint'), isTrue);
+      });
+
+      testWidgets('not at the first load (A has it), not while playing; '
+          'the next stopped load then', (tester) async {
+        await withSet(tester);
+        await tester.tap(find.byKey(SetlistGroup.nextKey)); // One: A
+        await tester.pump();
+        expect(find.text(hint), findsNothing);
+        await tester.pump(const Duration(seconds: 5));
+        await metronome.play();
+        await tester.tap(find.byKey(SetlistGroup.nextKey)); // Two, playing
+        await tester.pump();
+        expect(find.text(hint), findsNothing, reason: 'playing');
+        metronome.stop();
+        await tester.pump();
+        await tester.tap(find.byKey(SetlistGroup.nextKey)); // Three
+        await tester.pump();
+        expect(find.text(hint), findsOneWidget);
+        await tester.pump(const Duration(seconds: 5));
+      });
+
+      testWidgets('not with a screen reader; "Remove animations": the text, '
+          'no brighten', (tester) async {
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            const FakeAccessibilityFeatures(accessibleNavigation: true);
+        await ready(tester);
+        await tester.tap(find.byKey(SetlistGroup.nextKey));
+        await tester.pump();
+        expect(find.text(hint), findsNothing);
+        expect(library.tipSeen('parts-hold-hint'), isFalse);
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            const FakeAccessibilityFeatures(disableAnimations: true);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(SetlistGroup.nextKey));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(find.text(hint), findsOneWidget);
+        expect(titleDimmed(), findsNothing);
+        await tester.pump(const Duration(seconds: 5));
+      });
+
+      testWidgets('not in stage mode', (tester) async {
+        await ready(tester);
+        library.enterStageMode(metronome);
+        await tester.pump();
+        library.nextSong(metronome);
+        await tester.pump();
+        expect(library.tipSeen('parts-hold-hint'), isFalse);
+      });
+    });
+
     group('teaching "edit right here"', () {
       const firstLoad = 'Change anything here, then Save';
       const firstChange = 'Playing your changes. Save keeps them in this song.';

@@ -96,6 +96,7 @@ class MetronomeScreen extends StatelessWidget {
   static const saveAsNewKey = Key('save-as-new');
   static const subtitleKey = Key('subtitle');
   static const titleBlockKey = Key('title-block');
+  static const partsHintKey = Key('parts-hint');
 
   // The polyrhythm lane plus its gap, kept free above the BPM.
   static const _laneSpace = PolyLane.height + 2;
@@ -415,12 +416,18 @@ class MetronomeScreen extends StatelessWidget {
             // edge, where the full-size name's baseline is.
             child: Align(
               alignment: Alignment.topLeft,
-              child: BrightenText(
-                song?.name ?? '',
-                textKey: titleKey,
-                minFontSize: 22,
-                style: _titleStyle,
-                baseline: _baselineOf(context, _titleStyle),
+              // One soft brighten when the parts hint shows.
+              child: ValueListenableBuilder(
+                valueListenable: _TempoLine.titlePulse,
+                builder: (context, pulse, child) =>
+                    BrightenSwap(value: pulse, child: child!),
+                child: BrightenText(
+                  song?.name ?? '',
+                  textKey: titleKey,
+                  minFontSize: 22,
+                  style: _titleStyle,
+                  baseline: _baselineOf(context, _titleStyle),
+                ),
               ),
             ),
           ),
@@ -759,6 +766,13 @@ class _TempoLine extends StatefulWidget {
   static const firstLoadTip = 'edit-first-load';
   static const newSongTip = 'edit-new-song';
   static const firstChangeTip = 'edit-first-change';
+  static const partsHintTip = 'parts-hold-hint';
+
+  /// The way into Song parts, once (ui-spec.md "Teaching the way in").
+  static const partsHintText = 'Hold the song name to edit its parts';
+
+  /// Bumped when the parts hint shows: the title brightens once.
+  static final titlePulse = ValueNotifier(0);
 
   static const firstLoadText = 'Change anything here, then Save';
   static const firstChangeText =
@@ -775,6 +789,9 @@ class _TempoLineState extends State<_TempoLine> {
 
   /// A ("Change anything here...") while true.
   bool _firstLoad = false;
+
+  /// "Hold the song name to edit its parts", while true.
+  bool _partsHint = false;
 
   /// B: Save stands out and the line below shows, while true.
   bool _firstChange = false;
@@ -808,21 +825,23 @@ class _TempoLineState extends State<_TempoLine> {
   /// Shows one line for [duration]; any other one ends.
   void _show({
     bool firstLoad = false,
+    bool partsHint = false,
     bool firstChange = false,
     String? saved,
   }) {
     _timer?.cancel();
     setState(() {
       _firstLoad = firstLoad;
+      _partsHint = partsHint;
       _firstChange = firstChange;
       _saved = saved;
     });
-    final duration = firstLoad
+    final duration = firstLoad || partsHint
         ? _TempoLine.firstLoadFor
         : firstChange
         ? _TempoLine.firstChangeFor
         : _TempoLine.savedFor;
-    if (firstLoad || firstChange || saved != null) {
+    if (firstLoad || partsHint || firstChange || saved != null) {
       _timer = Timer(duration, () {
         if (mounted) _show();
       });
@@ -835,7 +854,7 @@ class _TempoLineState extends State<_TempoLine> {
     final song = library.currentSong;
     if (song?.id != _songId) {
       _songId = song?.id;
-      if (_firstLoad || _saved != null) _show();
+      if (_firstLoad || _partsHint || _saved != null) _show();
       // A song is loaded (never Free play): the first ever, or the first
       // one "+ New song" made.
       final fresh = song != null && song.id == library.freshSongId;
@@ -846,6 +865,19 @@ class _TempoLineState extends State<_TempoLine> {
         if (fresh) library.markTipSeen(_TempoLine.newSongTip);
         _show(firstLoad: true);
         _say(_TempoLine.firstLoadText);
+        return;
+      }
+      // Then, at a later load (never with A), the way into Song parts:
+      // stopped, not in stage mode, and not with a screen reader (the
+      // title has the action).
+      if (song != null &&
+          !library.tipSeen(_TempoLine.partsHintTip) &&
+          !widget.controller.isPlaying &&
+          !library.stageMode &&
+          !MediaQuery.accessibleNavigationOf(context)) {
+        library.markTipSeen(_TempoLine.partsHintTip);
+        _show(partsHint: true);
+        _TempoLine.titlePulse.value++;
         return;
       }
     }
@@ -872,7 +904,13 @@ class _TempoLineState extends State<_TempoLine> {
     if (library == null || !library.songChanged(controller)) {
       final saved = _saved;
       return BrightenSwap(
-        value: saved ?? (_firstLoad ? 'first-load' : _restText),
+        value:
+            saved ??
+            (_firstLoad
+                ? 'first-load'
+                : _partsHint
+                ? 'parts-hint'
+                : _restText),
         child: _quiet(colors),
       );
     }
@@ -900,6 +938,13 @@ class _TempoLineState extends State<_TempoLine> {
               _TempoLine.firstLoadText,
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 15, color: colors.text),
+            )
+          : _partsHint
+          ? Text(
+              _TempoLine.partsHintText,
+              key: MetronomeScreen.partsHintKey,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 15, color: colors.muted),
             )
           : Text(
               _restText,

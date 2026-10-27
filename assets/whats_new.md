@@ -3,7 +3,7 @@
 Newest first. The top version's lines are also the Play Store release notes.
 
 ## 1.6.0 · Oct 2026
-- Song parts: tempo changes, odd bars and sections in one song
+- Song parts: tempo, time-signature and gradual changes inside a song. Open the 4/4 button › Song parts, or hold the song's name.
 - Stage mode: your set full screen, for gigs
 - The screen stays on while Metra is open (Settings)
 - The song map: slide or tap to jump to a part
