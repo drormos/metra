@@ -218,6 +218,31 @@ void main() {
     expect(size(), greaterThanOrEqualTo(22));
   });
 
+  testWidgets('opens while the song is playing (long-press the title)', (
+    tester,
+  ) async {
+    await pump(tester);
+    metronome.setParts([
+      for (final id in ['a', 'b'])
+        SongPart.steady(
+          id: id,
+          name: id,
+          bars: 2,
+          bpm: 120,
+          pattern: const MetronomePattern.standard(),
+        ),
+    ]);
+    await metronome.play();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.longPress(find.byKey(MetronomeScreen.titleBlockKey));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(tester.takeException(), isNull);
+    expect(find.byType(PartsPage), findsOneWidget);
+    metronome.stop();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('Back with unsaved changes: no question; they stay the '
       'song\'s unsaved changes on the main screen', (tester) async {
     await pump(tester);

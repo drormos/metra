@@ -113,7 +113,9 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
     super.initState();
     _library.editingParts = true;
     _metronome.addListener(_onMetronome);
-    _onMetronome();
+    // Opened while playing: the ticker's first frame reads where it is
+    // (not here: no setState or MediaQuery while the page is created).
+    if (_metronome.isPlaying) _follow.start();
   }
 
   @override

@@ -423,10 +423,10 @@ void main() {
       controller.setCountIn(0);
       load([_part('a', 1, 120), _part('b', 1, 120)], end: SongEnd.loopLastPart);
       await controller.play();
+      // From Start, before the first beat sounds: already the countdown.
       expect(
         [for (final c in trace(30000)) c.$2],
         [
-          null,
           'b in 4',
           'b in 3',
           'b in 2',

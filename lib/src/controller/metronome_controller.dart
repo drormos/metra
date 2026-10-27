@@ -233,9 +233,13 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
     final plan = _plan;
     if (parts == null || plan == null) return null;
     final step = _scheduler.stepAt(time);
-    final bar = step?.bar;
-    if (step == null || bar == null || step.countIn != null) return null;
-    final at = plan.locate(bar);
+    // Started, before its first beat sounds (no count-in): the start part's
+    // first beat, so the heads-up shows from Start, not a moment later.
+    final before = step == null && _playing && !countingIn;
+    if (step == null && !before) return null;
+    final bar = before ? 0 : step!.bar;
+    if (bar == null || (step?.countIn != null)) return null;
+    final at = before ? (part: _startPart, bar: 0) : plan.locate(bar);
     if (at == null) return null;
     final current = parts[at.part];
     final barsLeft = current.bars - at.bar;
@@ -255,12 +259,13 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
         beats: null,
       );
     }
-    final beat = step.barPosition ~/ step.pattern.stepsPerBeat;
+    final pattern = step?.pattern ?? current.pattern;
+    final beat = step == null ? 0 : step.barPosition ~/ pattern.stepsPerBeat;
     return (
       current: current,
       next: parts[next.part],
       bars: null,
-      beats: step.pattern.beatsPerBar - beat,
+      beats: pattern.beatsPerBar - beat,
     );
   }
 

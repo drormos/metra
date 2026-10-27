@@ -197,6 +197,10 @@ void main() {
       of: find.byKey(MetronomeScreen.headsUpKey),
       matching: find.text(data),
     );
+    // Between Start and the first beat (1120): already the heads-up, not
+    // the normal line first.
+    await runTo(tester, 1040);
+    expect(text('Verse in 2 bars'), findsOneWidget);
     // Intro (2 bars at 100, from 1120): a short part counts bars from its
     // first, then its last bar's beats.
     await runTo(tester, 1700);
