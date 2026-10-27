@@ -15,6 +15,7 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 - Song parts: every part has a length in bars. "Until you stop" is replaced by "When the song ends": Stop, Loop song or Loop last part (a Gradual last part restarts its ramp each time). Existing songs loop their bar as before. The strip marks a looping last part with a loop icon; the summary reads "45 bars, then loops Outro" and the line under the BPM "Outro · bar 3 of 8 · looping".
 
 ### Fixed
+- Song map: no cut-off sliver of a part past its faded edges.
 - Metra could stay on its launch screen after a system display setting (such as font size) changed while it was open; swiping it away from recent apps now always closes it fully.
 - The count-in line shows "Count-in · 1 of 4" as soon as you press Start (it showed a bare "Count-in", or briefly the next part's heads-up, first).
 - Parts page: an open card can be held and reordered however tall it is.

@@ -263,6 +263,9 @@ class _MapPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Blocks end at the map's edges, under the fade: unclipped, the part
+    // of a block past the edge showed again at full brightness.
+    canvas.clipRect(Offset.zero & size);
     final centre = size.width / 2;
     final fill = Paint();
     // Top and bottom rules, as the ruler's.

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/main.dart';
@@ -48,6 +49,53 @@ void main() {
     SongPart.steady(id: 'v', name: 'Verse', bars: 4, bpm: 120, pattern: _three),
     SongPart.steady(id: 'o', name: 'Outro', bars: 8, bpm: 90, pattern: _four),
   ];
+
+  testWidgets('a block past the map\'s edge is cut at the edge, inside the '
+      'fade: nothing shows beyond it', (tester) async {
+    tester.view
+      ..physicalSize = const Size(380, 200)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final metronome = MetronomeController(FakeClickOutput())
+      ..setParts(threeParts);
+    addTearDown(metronome.dispose);
+    final shot = GlobalKey();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: testTheme,
+        home: Align(
+          alignment: Alignment.topLeft,
+          child: RepaintBoundary(
+            key: shot,
+            child: Container(
+              width: 380,
+              color: testTheme.scaffoldBackgroundColor,
+              // The map is 300 wide, from 40: the Outro runs past 340.
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: SongMap(controller: metronome),
+            ),
+          ),
+        ),
+      ),
+    );
+    final image = (await tester.runAsync(() async {
+      final boundary =
+          shot.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+      final image = await boundary.toImage();
+      return image.toByteData();
+    }))!;
+    final background = testTheme.scaffoldBackgroundColor;
+    int pixel(int x, int y) => image.getUint32((y * 380 + x) * 4);
+    final y = SongMap.height ~/ 2;
+    expect(pixel(300, y), isNot(pixel(10, y)), reason: 'the Outro inside');
+    for (final x in [341, 350, 370]) {
+      expect(
+        pixel(x, y),
+        pixel(10, y),
+        reason: 'x $x is past the map: background ($background)',
+      );
+    }
+  });
 
   /// "Dead Weight" with [parts] (or one plain part) as a single song;
   /// [stage] puts it in a set in stage mode.
