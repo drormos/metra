@@ -1178,6 +1178,9 @@ void main() {
         }
       }
 
+      // Before the first click sounds: already the count, beat 1 unlit.
+      expect(find.text('Count-in · 1 · 1 of 4'), findsOneWidget);
+      expect(find.byKey(const ValueKey('beat-0-on')), findsNothing);
       // 120 bpm: count-in beats every 500 ms from 120 ms, 2 bars.
       await to(140);
       expect(find.byKey(const ValueKey('count-in-1')), findsOneWidget);

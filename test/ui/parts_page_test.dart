@@ -736,6 +736,36 @@ void main() {
       expect([stripWhite(tester, 0), stripWhite(tester, 1)], [false, false]);
     });
 
+    testWidgets('a count-in shows on the card about to play, in place of '
+        'its subtitle, from Start; the fill stays empty until the part', (
+      tester,
+    ) async {
+      await pump(tester);
+      metronome
+        ..setCountIn(1)
+        ..setParts(two(), end: SongEnd.loopLastPart);
+      await openPage(tester);
+      Finder onCard(String text) => find.descendant(
+        of: find.byKey(PartsPage.cardKey(0)),
+        matching: find.text(text),
+      );
+      final subtitle = partLine(two().first);
+      expect(onCard(subtitle), findsOneWidget);
+      await tester.tap(find.byKey(PartsPage.playKey));
+      await tester.pump();
+      expect(onCard('Count-in · 1 of 4'), findsOneWidget, reason: 'at once');
+      expect(onCard(subtitle), findsNothing);
+      // Count-in beats every 500 ms from 1120; a from 3120.
+      await runTo(tester, 1700);
+      expect(onCard('Count-in · 2 of 4'), findsOneWidget);
+      expect(fill(tester, 0), 0);
+      await runTo(tester, 3200);
+      expect(onCard(subtitle), findsOneWidget);
+      expect(fill(tester, 0), greaterThan(0));
+      metronome.stop();
+      await tester.pump();
+    });
+
     // Every frame from Start until [ms]: the fill on [card] starts at 0
     // with the first audible beat and grows in small steps, never jumping.
     Future<void> growsFromZero(WidgetTester tester, int card, int ms) async {

@@ -207,19 +207,44 @@ void main() {
   });
 
   group('going to a part', () {
-    test('playing: on the next bar line', () async {
-      load([_part('a', 4, 120), _part('b', 4, 90, null, _three)]);
+    test('playing: at once, on its beat 1 at its tempo and time signature '
+        '(a Gradual part from its start), no count-in', () async {
+      controller.setCountIn(1);
+      load([_part('a', 4, 120), _part('b', 4, 90, 120, _three)]);
       await controller.play();
-      runTo(1700); // in bar 1
+      runTo(2300); // count-in to 3120: then bar 1
+      runTo(3300);
       controller.jumpToPart(1);
-      runTo(5300);
-      expect(clicks(5200).where((c) => c.$2).map((c) => c.$1), [
-        1120,
-        3120, // b, the next bar line
-        5120, // 3 beats at 90
-      ]);
-      expect(controller.partPosition, (part: 1, bar: 1));
+      expect(controller.countingIn, isFalse);
+      runTo(3400);
+      expect(controller.partPosition, (part: 1, bar: 0));
+      expect(controller.bpm, 90);
+      expect(controller.pattern, _three);
+      runTo(4100);
+      final after = clicks(4100).where((c) => c.$1 > 3120).toList();
+      // Beat 1 a guard (60 ms) after the tap, then 90 bpm; a's 3620 gone.
+      expect(after.first, (3360.0, true));
+      expect(after[1].$1, closeTo(4026.7, 0.1));
+      expect(after[1].$2, isFalse);
+      controller.stop();
+      expect(controller.bpm, 90, reason: 'Start now begins there');
     });
+
+    test(
+      '"Play from here" while playing: the same jump, no count-in',
+      () async {
+        controller.setCountIn(1);
+        load([_part('a', 4, 120), _part('b', 4, 90, null, _three)]);
+        await controller.play();
+        runTo(3300);
+        await controller.playFrom(1);
+        expect(controller.countingIn, isFalse);
+        runTo(3400);
+        expect(controller.partPosition, (part: 1, bar: 0));
+        expect(clicks(3400).last, (3360.0, true));
+        controller.stop();
+      },
+    );
 
     test('stopped: Start begins there, the count-in in its tempo and '
         'time signature', () async {

@@ -1051,57 +1051,77 @@ class RunLine extends StatefulWidget {
   final MetronomeController controller;
   final Widget child;
 
-  static String? labelFor(MetronomeController controller, Duration? now) {
+  /// "Count-in · 3 of 4" ("Count-in · 2 · 3 of 4" in bar 2 of 2) at
+  /// [now], or null outside a count-in. Before the first click sounds it
+  /// already reads beat 1 of bar 1, so it never jumps from a bare
+  /// "Count-in" to the count.
+  static String? countInLabel(MetronomeController controller, Duration? now) {
     final step = now == null ? null : controller.stepAt(now);
     final countIn = step?.countIn;
-    if (step == null || countIn == null) {
-      // Before its first beat has sounded.
-      if (step == null && controller.countingIn) return 'Count-in';
-      // A song with parts: where it is.
-      final parts = controller.parts;
-      final at = now == null ? null : controller.partAt(now);
-      if (parts != null && parts.length > 1 && at != null) {
-        // With Stop after, both, part first: "Chorus · bar 3 of 8 · 4:12
-        // left" (no "next", to keep it one short line).
-        final on = controller.onStart;
-        if (on.stopAfter == StopAfter.off) {
-          return partPositionLabel(
-            parts,
-            at.part,
-            at.bar,
-            end: controller.songEnd,
-          );
-        }
-        final start = controller.runStart;
-        final left = on
-            .copyWith(speedUp: false)
-            .progress(
-              bpm: controller.bpm,
-              from: controller.startBpm,
-              bar: step?.bar ?? -1,
-              elapsed: now == null || start == null || now < start
-                  ? Duration.zero
-                  : now - start,
-            );
-        return '${partPositionLabel(parts, at.part, at.bar, next: false)} · '
-            '$left';
+    final (bar, bars, beat, of) = switch (countIn) {
+      final c? => (
+        c.bar,
+        c.bars,
+        step!.barPosition + 1,
+        step.pattern.beatsPerBar,
+      ),
+      null when step == null && controller.countingIn => (
+        1,
+        controller.onStart.countIn,
+        1,
+        controller.pattern.beatsPerBar,
+      ),
+      null => (0, 0, 0, 0),
+    };
+    if (bars == 0) return null;
+    return bars > 1
+        ? 'Count-in · $bar · $beat of $of'
+        : 'Count-in · $beat of $of';
+  }
+
+  static String? labelFor(MetronomeController controller, Duration? now) {
+    if (countInLabel(controller, now) case final label?) return label;
+    final step = now == null ? null : controller.stepAt(now);
+    // A song with parts: where it is.
+    final parts = controller.parts;
+    final at = now == null ? null : controller.partAt(now);
+    if (parts != null && parts.length > 1 && at != null) {
+      // With Stop after, both, part first: "Chorus · bar 3 of 8 · 4:12
+      // left" (no "next", to keep it one short line).
+      final on = controller.onStart;
+      if (on.stopAfter == StopAfter.off) {
+        return partPositionLabel(
+          parts,
+          at.part,
+          at.bar,
+          end: controller.songEnd,
+        );
       }
-      if (!controller.inRun) return null;
       final start = controller.runStart;
-      final elapsed = now == null || start == null || now < start
-          ? Duration.zero
-          : now - start;
-      return controller.onStart.progress(
-        bpm: controller.bpm,
-        from: controller.startBpm,
-        bar: step?.bar ?? -1,
-        elapsed: elapsed,
-      );
+      final left = on
+          .copyWith(speedUp: false)
+          .progress(
+            bpm: controller.bpm,
+            from: controller.startBpm,
+            bar: step?.bar ?? -1,
+            elapsed: now == null || start == null || now < start
+                ? Duration.zero
+                : now - start,
+          );
+      return '${partPositionLabel(parts, at.part, at.bar, next: false)} · '
+          '$left';
     }
-    final beat = '${step.barPosition + 1} of ${step.pattern.beatsPerBar}';
-    return countIn.bars > 1
-        ? 'Count-in · ${countIn.bar} · $beat'
-        : 'Count-in · $beat';
+    if (!controller.inRun) return null;
+    final start = controller.runStart;
+    final elapsed = now == null || start == null || now < start
+        ? Duration.zero
+        : now - start;
+    return controller.onStart.progress(
+      bpm: controller.bpm,
+      from: controller.startBpm,
+      bar: step?.bar ?? -1,
+      elapsed: elapsed,
+    );
   }
 
   @override

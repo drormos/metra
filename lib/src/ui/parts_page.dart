@@ -15,6 +15,7 @@ import 'dashed_outline.dart';
 import 'editor_scaffold.dart' show confirmDelete;
 import 'fit_text.dart';
 import 'haptics.dart';
+import 'metronome_screen.dart' show RunLine;
 import 'motion.dart';
 import 'save_as_new_dialog.dart';
 import 'subdivision_icon.dart';
@@ -106,6 +107,8 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
   // the part changes.
   late final Ticker _follow = createTicker((_) => _checkPlaying());
   final _progress = ValueNotifier(0.0);
+  // In a count-in: its line, in place of the playing card's subtitle.
+  final _countIn = ValueNotifier<String?>(null);
   int? _playing;
 
   @override
@@ -125,6 +128,7 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
     _undoTimer?.cancel();
     _follow.dispose();
     _progress.dispose();
+    _countIn.dispose();
     _closing?.cancel();
     _reveal?.cancel();
     _anchor.dispose();
@@ -148,10 +152,10 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
   void _checkPlaying() {
     if (!mounted) return;
     final playing = _metronome.isPlaying;
-    final at = playing
-        ? _metronome.playheadAt(
-            SchedulerBinding.instance.currentSystemFrameTimeStamp,
-          )
+    final frame = SchedulerBinding.instance.currentSystemFrameTimeStamp;
+    final at = playing ? _metronome.playheadAt(frame) : null;
+    _countIn.value = playing
+        ? RunLine.countInLabel(_metronome, _metronome.visualTimeAt(frame))
         : null;
     final part = playing ? (at?.part ?? 0) : null;
     if (part != _playing) setState(() => _playing = part);
@@ -792,14 +796,24 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                  Text(
-                                    partLine(part),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: colors.muted,
-                                    ),
+                                  ValueListenableBuilder(
+                                    valueListenable: _countIn,
+                                    builder: (context, countIn, _) {
+                                      final shown = _playing == i
+                                          ? countIn
+                                          : null;
+                                      return Text(
+                                        shown ?? partLine(part),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: shown == null
+                                              ? colors.muted
+                                              : colors.text,
+                                        ),
+                                      );
+                                    },
                                   ),
                                 ],
                               ),

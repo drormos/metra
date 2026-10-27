@@ -163,8 +163,8 @@ void main() {
     expect(metronome.partPosition?.part, 0);
   });
 
-  testWidgets('playing: the line follows the song; a tap jumps on the next '
-      'bar line; the map follows', (tester) async {
+  testWidgets('playing: the line follows the song; a tap jumps at once; '
+      'the map follows', (tester) async {
     await pump(tester, parts: threeParts);
     await tester.tap(find.byKey(MetronomeScreen.playKey));
     await tester.pump();
@@ -172,9 +172,7 @@ void main() {
     await runTo(tester, 1700);
     expect(line(tester), 'Intro · bar 1 of 2 · next: Verse');
     await tapMap(tester, 100); // the Outro
-    await runTo(tester, 3400);
-    expect(metronome.partPosition?.part, 0, reason: 'until the bar line');
-    await runTo(tester, 3700); // bar 2 at 3520
+    await runTo(tester, 1800); // its beat 1 a guard after the tap
     expect(metronome.partPosition, (part: 2, bar: 0));
     expect(line(tester), 'Outro · bar 1 of 8 · looping');
     expect(metronome.bpm, 90);

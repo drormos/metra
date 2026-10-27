@@ -269,18 +269,22 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
     );
   }
 
-  /// Goes to part [index]: stopped, Start begins there; playing, it starts
-  /// on the next bar line.
+  /// Goes to part [index], where Start then begins: playing, it restarts
+  /// there at once on beat 1, like a song change but with no count-in
+  /// (ui-spec.md "Song parts", "Going there").
   void jumpToPart(int index) {
     final parts = _parts;
     if (parts == null || index < 0 || index >= parts.length) return;
-    if (_plan case final plan? when _playing) {
-      _scheduler.replan((bar) => plan.jump(bar, index));
-      return;
-    }
     _startPart = index;
     _bpm = parts[index].tempoStart;
     _pattern = parts[index].pattern;
+    if (_playing && _plan != null) {
+      _scheduler.restartNow(
+        bpm: _bpm.toDouble(),
+        pattern: _pattern,
+        run: _runPlan(true),
+      );
+    }
     notifyListeners();
   }
 
@@ -576,11 +580,10 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
   }
 
   /// Plays from part [index] (the page's "Play from here"; 0: the song's
-  /// "Play"), restarting if it's playing.
-  Future<void> playFrom(int index) {
-    stop();
+  /// "Play"); playing, it jumps there at once (no count-in).
+  Future<void> playFrom(int index) async {
     jumpToPart(index);
-    return play();
+    if (!_playing) await play();
   }
 
   /// Settings' visual offset test: uses the click if it's already
