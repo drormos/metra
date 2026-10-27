@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
@@ -98,7 +99,6 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
   final _arriving = <String>{};
   // Keeps a tapped header still while a card above it closes.
   late final AnimationController _anchor = AnimationController(vsync: this);
-  Timer? _reveal;
   ({SongPart part, int index})? _removed;
   Timer? _undoTimer;
   int _idCounter = 0;
@@ -128,7 +128,6 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
     _follow.dispose();
     _progress.dispose();
     _closing?.cancel();
-    _reveal?.cancel();
     _anchor.dispose();
     _scroll.dispose();
     super.dispose();
@@ -220,11 +219,14 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
   }
 
   /// Opens card [id] (or closes it, open already), in one ~180ms height
-  /// change. Its header stays under the finger: when a card above it
-  /// closes at the same time, the list scrolls by that card's body on the
-  /// same curve. From the strip ([scroll]): scrolls to the card. Never
-  /// waits: a tap mid-animation retargets it.
-  void _open(String id, {bool scroll = false}) {
+  /// change, scrolling it into view only as far as needed (ui-spec.md
+  /// "An opened card scrolls into view"): already in view, nothing moves
+  /// (its header stays under the finger even as a card above it closes);
+  /// fitting in the list, until its bottom is at the list's bottom edge
+  /// (8px above Play); taller, until its header is at the top. The scroll
+  /// runs with the opening, on its curve, toward the final layout. Never
+  /// waits: a tap mid-animation retargets it. Closing never scrolls.
+  void _open(String id) {
     _snapClosed = null;
     if (_heldClosed) {
       _heldClosed = false;
@@ -232,28 +234,86 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
     }
     final previous = _openId;
     final opening = previous != id;
-    final above = opening && previous != null && !scroll
-        ? _bodyAbove(previous, id)
-        : 0.0;
+    final above = opening && previous != null ? _bodyAbove(previous, id) : 0.0;
     setState(() {
       _openId = opening ? id : null;
       // An end equal to its start is a steady part: reopened, it shows
       // the button again.
       _gradual.retainWhere((g) => g == _openId);
     });
-    // Started now, its clock counts from the coming frame, as the closing
-    // card's size animation (started in that frame's layout) does.
-    if (above > 0) _keepStill(above);
-    if (!opening) return;
-    _reveal?.cancel();
-    if (scroll) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollTo(id));
-    } else {
-      // Once open, only if it ends below the screen, only as far as needed.
-      _reveal = Timer(MetraMotion.of(context, MetraMotion.cardExpand), () {
-        _scrollTo(id, end: true);
-      });
+    if (!opening || !_scroll.hasClients) return;
+    // Started now, its clock counts from the coming frame, as the card's
+    // size animation (started in that frame's layout) does; the target is
+    // set once that frame has laid the card out at its full height.
+    final start = _scroll.position.pixels;
+    _scrollTarget = max(0, start - above);
+    void follow() {
+      if (!_scroll.hasClients) return;
+      final t = MetraMotion.cardCurve.transform(_anchor.value);
+      _scroll.position.jumpTo(start + (_scrollTarget - start) * t);
     }
+
+    final duration = MetraMotion.of(context, MetraMotion.cardExpand);
+    _anchor
+      ..stop()
+      ..duration = duration
+      ..addListener(follow)
+      ..forward(from: 0)
+          .whenCompleteOrCancel(() => _anchor.removeListener(follow));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _openId != id || !_scroll.hasClients) return;
+      final target = _revealTarget(id, above, start);
+      if (target == null) {
+        // Not built yet (far down the list): bring it in first.
+        final card = _cardKeys[id]?.currentContext;
+        if (card != null && card.mounted) {
+          Scrollable.ensureVisible(card, duration: duration);
+        }
+        return;
+      }
+      _scrollTarget = target;
+      if (!_anchor.isAnimating) _scroll.position.jumpTo(target);
+    });
+  }
+
+  // Where the open-card scroll ends.
+  double _scrollTarget = 0;
+
+  /// The scroll offset that shows card [id] once open, from the layout
+  /// that has its body at full height: [above] is the body of a card above
+  /// it that is closing, [start] the offset at the tap. Null if the card
+  /// isn't laid out.
+  double? _revealTarget(String id, double above, double start) {
+    final card = _cardKeys[id]?.currentContext?.findRenderObject();
+    final body = _bodyKeys[id]?.currentContext?.findRenderObject();
+    final list = _scroll.position.context.notificationContext
+        ?.findRenderObject();
+    if (card is! RenderBox || body is! RenderBox || list is! RenderBox) {
+      return null;
+    }
+    final position = _scroll.position;
+    final listTop = list.localToGlobal(Offset.zero).dy;
+    // In list content coordinates, after the card above has closed.
+    final top =
+        card.localToGlobal(Offset.zero).dy - listTop + position.pixels - above;
+    final bottom =
+        body.localToGlobal(Offset.zero).dy -
+        listTop +
+        position.pixels -
+        above +
+        body.size.height +
+        1; // the card's border
+    final area = position.viewportDimension;
+    final from = max(0.0, start - above);
+    final double target;
+    if (top >= from && bottom <= from + area) {
+      target = from;
+    } else if (bottom - top <= area) {
+      target = top < from ? top : bottom - area;
+    } else {
+      target = top;
+    }
+    return target.clamp(0.0, max(from, bottom - area));
   }
 
   /// The height of [previous]'s open body when that card sits above [id].
@@ -266,44 +326,6 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
         before.localToGlobal(Offset.zero).dy <
         card.localToGlobal(Offset.zero).dy;
     return above ? body : 0;
-  }
-
-  // shortcut: at the top of the list there's nothing to scroll back, so
-  // the header moves up by what's left; keeping it still there would need
-  // an empty gap above the cards.
-  void _keepStill(double height) {
-    if (!mounted || !_scroll.hasClients) return;
-    final start = _scroll.position.pixels;
-    void follow() {
-      if (!_scroll.hasClients) return;
-      final t = MetraMotion.cardCurve.transform(_anchor.value);
-      _scroll.position.jumpTo((start - height * t).clamp(0, double.infinity));
-    }
-
-    _anchor
-      ..stop()
-      ..duration = MetraMotion.of(context, MetraMotion.cardExpand)
-      ..removeListener(follow)
-      ..addListener(follow)
-      ..forward(from: 0).whenComplete(() => _anchor.removeListener(follow));
-  }
-
-  /// Scrolls card [id] into view: to it (~250ms ease-in-out), or with
-  /// [end] only if it ends below the screen (~200ms).
-  void _scrollTo(String id, {bool end = false}) {
-    final context = _cardKeys[id]?.currentContext;
-    if (context == null || !context.mounted) return;
-    Scrollable.ensureVisible(
-      context,
-      duration: MetraMotion.of(
-        context,
-        end ? MetraMotion.reveal : MetraMotion.jump,
-      ),
-      curve: end ? MetraMotion.cardCurve : Curves.easeInOut,
-      alignmentPolicy: end
-          ? ScrollPositionAlignmentPolicy.keepVisibleAtEnd
-          : ScrollPositionAlignmentPolicy.explicit,
-    );
   }
 
   void _add(Song song) {
@@ -633,7 +655,7 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
                           behavior: HitTestBehavior.opaque,
                           onTap: () {
                             if (_openId != part.id) {
-                              _open(part.id, scroll: true);
+                              _open(part.id);
                             }
                           },
                           child: Padding(
@@ -714,7 +736,14 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
     );
   }
 
+  // A touch on the list stops an open card's scroll at once.
   Widget _list(BuildContext context, Song song, List<SongPart> parts) =>
+      Listener(
+        onPointerDown: (_) => _anchor.stop(),
+        child: _reorderable(context, song, parts),
+      );
+
+  Widget _reorderable(BuildContext context, Song song, List<SongPart> parts) =>
       RowExitHost(
         child: ReorderableListView.builder(
           scrollController: _scroll,

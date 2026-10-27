@@ -662,6 +662,166 @@ void main() {
     });
   });
 
+  group('an opened card scrolls into view, only as far as needed', () {
+    List<SongPart> many(MetronomePattern pattern, [int n = 10]) => [
+      for (var i = 0; i < n; i++)
+        SongPart.steady(
+          id: 'p$i',
+          name: 'Part ${i + 1}',
+          bars: 4,
+          bpm: 120,
+          pattern: pattern,
+        ),
+    ];
+    final twelveEight = MetronomePattern.simple(
+      beatsPerBar: 12,
+      stepsPerBeat: 1,
+      beatUnit: 8,
+    );
+    ScrollPosition list(WidgetTester tester) => tester
+        .state<ScrollableState>(
+          find
+              .descendant(
+                of: find.byType(ReorderableListView),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        )
+        .position;
+    Rect area(WidgetTester tester) =>
+        tester.getRect(find.byType(ReorderableListView));
+    Rect card(WidgetTester tester, int i) => tester.getRect(
+      find
+          .ancestor(
+            of: find.byKey(PartsPage.cardKey(i)),
+            matching: find.byType(SwipeRow),
+          )
+          .first,
+    );
+    double playTop(WidgetTester tester) =>
+        tester.getTopLeft(find.byKey(PartsPage.playKey)).dy;
+    // The lowest card whose header is fully in view.
+    int lowest(WidgetTester tester) {
+      var found = 0;
+      for (var i = 0; i < parts().length; i++) {
+        final header = find.byKey(PartsPage.cardKey(i));
+        if (header.evaluate().isEmpty) break;
+        if (tester.getRect(header).bottom <= area(tester).bottom) found = i;
+      }
+      return found;
+    }
+
+    testWidgets('already in view: nothing scrolls; closing never scrolls', (
+      tester,
+    ) async {
+      await pump(tester);
+      metronome.setParts(many(const MetronomePattern.standard()));
+      await openPage(tester);
+      await tester.tap(find.byKey(PartsPage.cardKey(0)));
+      await tester.pumpAndSettle();
+      expect(list(tester).pixels, 0);
+      expect(card(tester, 0).bottom, lessThanOrEqualTo(area(tester).bottom));
+      list(tester).jumpTo(150);
+      await tester.pump();
+      await tester.tap(find.byKey(PartsPage.cardKey(3)));
+      await tester.pumpAndSettle();
+      final at = list(tester).pixels;
+      await tester.tap(find.byKey(PartsPage.cardKey(3))); // closes
+      await tester.pumpAndSettle();
+      expect(list(tester).pixels, at, reason: 'closing never scrolls');
+    });
+
+    for (final (name, pattern) in [
+      ('4/4', const MetronomePattern.standard()),
+      ('12/8', twelveEight),
+    ]) {
+      testWidgets('fits: scrolls with the opening until its bottom is 8px '
+          'above Play ($name, its real height)', (tester) async {
+        await pump(tester);
+        metronome.setParts(many(pattern));
+        await openPage(tester);
+        final i = lowest(tester);
+        await tester.tap(find.byKey(PartsPage.cardKey(i)));
+        await tester.pump(const Duration(milliseconds: 16));
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(list(tester).pixels, greaterThan(0), reason: 'with the opening');
+        await tester.pump(const Duration(milliseconds: 200));
+        final done = list(tester).pixels;
+        await tester.pumpAndSettle();
+        expect(list(tester).pixels, done, reason: 'done with the opening');
+        expect(card(tester, i).bottom, closeTo(playTop(tester) - 8, 1));
+        expect(card(tester, i).height, lessThan(area(tester).height));
+      });
+    }
+
+    testWidgets('taller than the list area: its header at the top', (
+      tester,
+    ) async {
+      await pump(tester);
+      tester.view.physicalSize = const Size(400, 640);
+      metronome.setParts(many(twelveEight));
+      await openPage(tester);
+      final i = lowest(tester);
+      await tester.tap(find.byKey(PartsPage.cardKey(i)));
+      await tester.pumpAndSettle();
+      expect(card(tester, i).height, greaterThan(area(tester).height));
+      expect(card(tester, i).top, closeTo(area(tester).top, 1));
+    });
+
+    testWidgets('from the strip and from "+ Add part": the same rule', (
+      tester,
+    ) async {
+      await pump(tester);
+      metronome.setParts(many(const MetronomePattern.standard(), 6));
+      await openPage(tester);
+      final i = lowest(tester);
+      await tester.tap(find.byKey(PartsPage.stripKey(i)));
+      await tester.pumpAndSettle();
+      expect(card(tester, i).bottom, closeTo(playTop(tester) - 8, 1));
+      // The new card, last: the open one above closes, so it's in view
+      // with no further scroll.
+      list(tester).jumpTo(list(tester).maxScrollExtent);
+      await tester.pumpAndSettle();
+      await tapIn(tester, find.byKey(PartsPage.addKey));
+      expect(card(tester, 6).top, greaterThanOrEqualTo(area(tester).top));
+      expect(card(tester, 6).bottom, lessThanOrEqualTo(area(tester).bottom));
+    });
+
+    testWidgets('a touch on the list stops it; "Remove animations" jumps', (
+      tester,
+    ) async {
+      await pump(tester);
+      metronome.setParts(many(const MetronomePattern.standard()));
+      await openPage(tester);
+      final i = lowest(tester);
+      await tester.tap(find.byKey(PartsPage.cardKey(i)));
+      await tester.pump(const Duration(milliseconds: 50));
+      final touch = await tester.startGesture(area(tester).center);
+      await tester.pump(const Duration(milliseconds: 16));
+      final stopped = list(tester).pixels;
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(list(tester).pixels, stopped);
+      await touch.up();
+      await tester.pumpAndSettle();
+
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      // All closed, from the top.
+      await tester.tap(find.byKey(PartsPage.cardKey(lowest(tester))));
+      await tester.pumpAndSettle();
+      list(tester).jumpTo(0);
+      await tester.pumpAndSettle();
+      final j = lowest(tester);
+      await tester.tap(find.byKey(PartsPage.cardKey(j)));
+      await tester.pump();
+      await tester.pump();
+      expect(card(tester, j).bottom, closeTo(playTop(tester) - 8, 1));
+    });
+  });
+
   group('the playing card fills like a progress bar', () {
     // The engine clock and the frames together, to [ms].
     Future<void> runTo(WidgetTester tester, int ms) async {
@@ -986,7 +1146,18 @@ void main() {
         const Offset(0, -600),
       );
       await tester.pumpAndSettle();
-      final header = find.byKey(PartsPage.cardKey(8));
+      // The first card fully in view: once open it still fits, so only
+      // the closing body above is taken back.
+      final listTop = tester.getTopLeft(find.byType(ReorderableListView)).dy;
+      final header = find.byKey(
+        PartsPage.cardKey(
+          [for (var n = 2; n < 16; n++) n].firstWhere((n) {
+            final card = find.byKey(PartsPage.cardKey(n));
+            return card.evaluate().isNotEmpty &&
+                tester.getTopLeft(card).dy >= listTop;
+          }),
+        ),
+      );
       final y = tester.getTopLeft(header).dy;
       await tester.tap(header);
       for (var i = 0; i < 15; i++) {
