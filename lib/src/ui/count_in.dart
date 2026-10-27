@@ -1,7 +1,11 @@
+import 'dart:math';
+
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../controller/metronome_controller.dart';
+import 'theme.dart';
 
 /// Where a count-in is: [bar] of [bars], beat [beat] of [of].
 typedef CountIn = ({int bar, int bars, int beat, int of});
@@ -168,4 +172,159 @@ class StopLabel extends StatelessWidget {
       );
     },
   );
+}
+
+/// How much of the whole count-in has played at [now] (0–1, the visual
+/// clock): smooth through each beat, or with [steps] a whole beat as it
+/// sounds ("Remove animations"). 0 before the first click and outside a
+/// count-in.
+double countInProgress(
+  MetronomeController controller,
+  Duration? now, {
+  bool steps = false,
+}) {
+  final step = now == null ? null : controller.stepAt(now);
+  final countIn = step?.countIn;
+  if (step == null || countIn == null) return 0;
+  final beats = step.pattern.beatsPerBar;
+  final interval = controller.stepInterval(step);
+  final into = steps
+      ? 1.0
+      : interval == null || interval == Duration.zero
+      ? 0.0
+      : ((now! - step.time).inMicroseconds / interval.inMicroseconds).clamp(
+          0.0,
+          1.0,
+        );
+  final done = (countIn.bar - 1) * beats + step.barPosition + into;
+  return (done / (countIn.bars * beats)).clamp(0.0, 1.0);
+}
+
+/// The parts page's count-in tag (ui-spec.md "the summary line becomes a
+/// small count-in tag that fills"): "Count-in · 3 of 4" in a 24px outlined
+/// tag as wide as its widest count, filling with the text color left to
+/// right across the whole count-in, the text inverted where filled.
+class CountInTag extends StatefulWidget {
+  const CountInTag({
+    super.key,
+    required this.controller,
+    required this.countIn,
+  });
+
+  static const height = 24.0;
+  static const fillKey = Key('count-in-tag-fill');
+
+  final MetronomeController controller;
+  final CountIn countIn;
+
+  @override
+  State<CountInTag> createState() => _CountInTagState();
+}
+
+class _CountInTagState extends State<CountInTag>
+    with SingleTickerProviderStateMixin {
+  late final Ticker _ticker = createTicker((_) => _read());
+  final _progress = ValueNotifier(0.0);
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker.start();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _read();
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    _progress.dispose();
+    super.dispose();
+  }
+
+  void _read() {
+    final controller = widget.controller;
+    _progress.value = countInProgress(
+      controller,
+      controller.visualTimeAt(SchedulerBinding.instance.currentFrameTimeStamp),
+      steps: MetraMotion.reduced(context),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final of = widget.countIn.of;
+    const style = TextStyle(fontSize: 14, fontWeight: FontWeight.w700);
+    String text(int beat) => 'Count-in · $beat of $of';
+    // As wide as its widest count, so it never jumps as the numbers change.
+    final base = DefaultTextStyle.of(context).style.merge(style);
+    var widest = 0.0;
+    for (var beat = 1; beat <= of; beat++) {
+      final painter = TextPainter(
+        text: TextSpan(text: text(beat), style: base),
+        textScaler: MediaQuery.textScalerOf(context),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      )..layout();
+      widest = max(widest, painter.width);
+      painter.dispose();
+    }
+    Widget label(Color color) => Center(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          text(widget.countIn.beat),
+          maxLines: 1,
+          softWrap: false,
+          style: style.copyWith(color: color),
+        ),
+      ),
+    );
+    final radius = BorderRadius.circular(4);
+    return SizedBox(
+      height: CountInTag.height,
+      width: widest + 2 * (8 + 2),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              border: Border.all(color: colors.text, width: 2),
+              borderRadius: radius,
+            ),
+            child: label(colors.text),
+          ),
+          ClipRect(
+            key: CountInTag.fillKey,
+            clipper: _FillClip(_progress),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.text,
+                borderRadius: radius,
+              ),
+              child: label(colors.background),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The filled part: the left [progress] of the tag.
+class _FillClip extends CustomClipper<Rect> {
+  _FillClip(this.progress) : super(reclip: progress);
+
+  final ValueListenable<double> progress;
+
+  @override
+  Rect getClip(Size size) =>
+      Rect.fromLTWH(0, 0, size.width * progress.value, size.height);
+
+  @override
+  bool shouldReclip(_FillClip old) => old.progress != progress;
 }

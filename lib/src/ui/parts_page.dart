@@ -53,6 +53,7 @@ class PartsPage extends StatefulWidget {
   static const playKey = Key('parts-play');
   static const nameKey = Key('parts-song-name');
   static const summaryKey = Key('parts-summary');
+  static const countInTagKey = Key('parts-count-in-tag');
   static const addKey = Key('parts-add');
   static const endKey = Key('parts-end');
   static const gradualKey = Key('parts-gradual');
@@ -404,39 +405,46 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
                   // Discard cut it short.
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-                    // In a count-in, the count in its place, bold white;
-                    // one fixed line height, so nothing moves.
-                    child: CountInBuilder(
-                      controller: _metronome,
-                      builder: (context, countIn) {
-                        final text = countIn == null
-                            ? partsSummary(parts, _metronome.songEnd)
-                            : countInLine(countIn);
-                        // Brightens into and out of the count-in, not on
-                        // each beat (the main screen's count-in line).
-                        return BrightenSwap(
-                          value: countIn == null ? text : 'count-in',
-                          child: Text(
-                            text,
-                            key: PartsPage.summaryKey,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            strutStyle: const StrutStyle(
-                              fontSize: 13,
-                              forceStrutHeight: true,
+                    // In a count-in, the filling count-in tag in its place;
+                    // always the tag's height, so nothing moves (more
+                    // only when very large text needs it).
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minHeight: CountInTag.height,
+                      ),
+                      child: CountInBuilder(
+                        controller: _metronome,
+                        builder: (context, countIn) {
+                          final summary = partsSummary(
+                            parts,
+                            _metronome.songEnd,
+                          );
+                          // Brightens into and out of the count-in, not on
+                          // each beat.
+                          return BrightenSwap(
+                            value: countIn == null ? summary : 'count-in',
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: countIn == null
+                                  ? Text(
+                                      summary,
+                                      key: PartsPage.summaryKey,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: context.colors.muted,
+                                      ),
+                                    )
+                                  : CountInTag(
+                                      key: PartsPage.countInTagKey,
+                                      controller: _metronome,
+                                      countIn: countIn,
+                                    ),
                             ),
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: countIn == null
-                                  ? null
-                                  : FontWeight.w700,
-                              color: countIn == null
-                                  ? context.colors.muted
-                                  : context.colors.text,
-                            ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
                   Padding(

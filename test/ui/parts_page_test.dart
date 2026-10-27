@@ -8,6 +8,7 @@ import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/model/library.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/storage/library_store.dart';
+import 'package:metra/src/ui/count_in.dart';
 import 'package:metra/src/ui/editor_scaffold.dart' show deleteConfirmKey;
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/on_start_sheet.dart';
@@ -737,9 +738,30 @@ void main() {
       expect([stripWhite(tester, 0), stripWhite(tester, 1)], [false, false]);
     });
 
-    testWidgets('a count-in: the summary line and the Stop button show it '
-        'from Start, in place (nothing moves); the cards and the fill wait '
-        'for the song', (tester) async {
+    // The count-in tag's fill (0–1), its text, its width.
+    double tagFill(WidgetTester tester) =>
+        (tester.widget<ClipRect>(find.byKey(CountInTag.fillKey)).clipper!
+                as dynamic)
+            .progress
+            .value;
+    String tagText(WidgetTester tester) => tester
+        .widget<Text>(
+          find
+              .descendant(
+                of: find.byKey(PartsPage.countInTagKey),
+                matching: find.byType(Text),
+              )
+              .first,
+        )
+        .data!;
+    double tagWidth(WidgetTester tester) =>
+        tester.getSize(find.byKey(PartsPage.countInTagKey)).width;
+
+    testWidgets('a count-in: the summary line becomes a tag that fills across '
+        'it, timed to the clicks, at a fixed width; the Stop button counts '
+        'too; nothing moves; the cards and their fill wait for the song', (
+      tester,
+    ) async {
       await pump(tester);
       metronome
         ..setCountIn(1)
@@ -747,17 +769,16 @@ void main() {
       await openPage(tester);
       final subtitle = partLine(two().first);
       final summary = tester.widget<Text>(find.byKey(PartsPage.summaryKey));
-      final summaryRect = tester.getRect(find.byKey(PartsPage.summaryKey));
+      final stripRect = tester.getRect(find.byKey(PartsPage.stripKey(0)));
       final cardRect = tester.getRect(find.byKey(PartsPage.cardKey(0)));
       await tester.tap(find.byKey(PartsPage.playKey));
       await tester.pump();
-      Text line() => tester.widget<Text>(find.byKey(PartsPage.summaryKey));
-      expect(line().data, 'Count-in · 1 of 4', reason: 'at once');
-      expect(line().style!.fontWeight, FontWeight.w700);
-      expect(
-        tester.getRect(find.byKey(PartsPage.summaryKey)).height,
-        summaryRect.height,
-      );
+      expect(find.byKey(PartsPage.summaryKey), findsNothing);
+      expect(tagText(tester), 'Count-in · 1 of 4', reason: 'at once');
+      expect(tagFill(tester), 0, reason: 'before the first click');
+      expect(tester.getSize(find.byKey(PartsPage.countInTagKey)).height, 24);
+      final width = tagWidth(tester);
+      expect(tester.getRect(find.byKey(PartsPage.stripKey(0))), stripRect);
       expect(tester.getRect(find.byKey(PartsPage.cardKey(0))), cardRect);
       expect(
         buttonText(tester, PartsPage.playKey),
@@ -772,28 +793,87 @@ void main() {
         reason: 'the card stays as it is',
       );
       // Count-in beats every 500 ms from 1120; a from 3120. The count
-      // changes in place: no frame dims it, beat after beat.
+      // changes in place: no frame dims it, the width holds, the fill
+      // only grows.
       await runTo(tester, 1200); // past the brighten into the count-in
-      while (output.time < const Duration(milliseconds: 3000)) {
+      var last = tagFill(tester);
+      while (output.time < const Duration(milliseconds: 3100)) {
         output.time += const Duration(milliseconds: 20);
         await tester.pump(const Duration(milliseconds: 20));
+        final at = output.time;
         expect(
           find.ancestor(
-            of: find.byKey(PartsPage.summaryKey),
+            of: find.byKey(PartsPage.countInTagKey),
             matching: find.byType(Opacity),
           ),
           findsNothing,
-          reason: 'dimmed at ${output.time}',
+          reason: 'dimmed at $at',
         );
-        if (output.time == const Duration(milliseconds: 1700)) {
-          expect(line().data, 'Count-in · 2 of 4');
+        expect(tagWidth(tester), width, reason: 'width at $at');
+        expect(tagFill(tester), greaterThanOrEqualTo(last));
+        expect(tagFill(tester) - last, lessThan(0.02), reason: 'smooth');
+        last = tagFill(tester);
+        if (at == const Duration(milliseconds: 1700)) {
+          expect(tagText(tester), 'Count-in · 2 of 4');
           expect(fill(tester, 0), 0);
         }
+        if (at == const Duration(milliseconds: 2120)) {
+          expect(tagFill(tester), closeTo(0.5, 0.02));
+        }
       }
+      expect(last, closeTo(1, 0.02));
       await runTo(tester, 3200);
-      expect(line().data, summary.data);
+      expect(find.byKey(PartsPage.countInTagKey), findsNothing);
+      expect(
+        tester.widget<Text>(find.byKey(PartsPage.summaryKey)).data,
+        summary.data,
+      );
+      expect(tester.getRect(find.byKey(PartsPage.cardKey(0))), cardRect);
       expect(fill(tester, 0), greaterThan(0));
       expect(buttonText(tester, PartsPage.playKey), 'Stop');
+      metronome.stop();
+      await tester.pump();
+    });
+
+    testWidgets('a 2-bar count-in is one slower fill; the text counts the '
+        'beats of the bar', (tester) async {
+      await pump(tester);
+      metronome
+        ..setCountIn(2)
+        ..setParts(two(), end: SongEnd.loopLastPart);
+      await openPage(tester);
+      await tester.tap(find.byKey(PartsPage.playKey));
+      await tester.pump();
+      await runTo(tester, 2120); // halfway through bar 1
+      expect(tagFill(tester), closeTo(0.25, 0.02));
+      await runTo(tester, 3140); // bar 2, beat 1
+      expect(tagText(tester), 'Count-in · 1 of 4');
+      expect(tagFill(tester), closeTo(0.5, 0.02));
+      metronome.stop();
+      await tester.pump();
+    });
+
+    testWidgets('"Remove animations": the tag fills a beat at a time', (
+      tester,
+    ) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      await pump(tester);
+      metronome
+        ..setCountIn(1)
+        ..setParts(two(), end: SongEnd.loopLastPart);
+      await openPage(tester);
+      await tester.tap(find.byKey(PartsPage.playKey));
+      await tester.pump();
+      await runTo(tester, 1140);
+      expect(tagFill(tester), 0.25);
+      await runTo(tester, 1600);
+      expect(tagFill(tester), 0.25, reason: 'holds through the beat');
+      await runTo(tester, 1640);
+      expect(tagFill(tester), 0.5);
       metronome.stop();
       await tester.pump();
     });
