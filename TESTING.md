@@ -33,7 +33,7 @@
 
 ## Stress tests
 - `test/audio/scheduler_fuzz_test.dart` and `test/storage/load_fuzz_test.dart` run seeded random sessions (300 and 400 in CI). Before a release, or after touching the scheduler or the store, run more: `flutter test test/audio/scheduler_fuzz_test.dart --dart-define=FUZZ_SESSIONS=5000` and `flutter test test/storage/load_fuzz_test.dart --dart-define=LOAD_FUZZ=4000`. A failure prints what was asked and when; replay that seed alone (`--plain-name "random session N"`).
-- The real engine: `flutter test integration_test/drift_test.dart -d macos` (add `--dart-define=DRIFT_SECONDS=300` for 5-minute runs) after any scheduler change.
+- The real engine: `flutter test integration_test/drift_test.dart -d macos` (add `--dart-define=DRIFT_SECONDS=300` for 5-minute runs) after any scheduler change. Run the long ones under `caffeinate -dimsu` with nothing else heavy running: when the Mac idles to sleep (or the app is throttled in the background), the click stops for a while and the run fails on missing beats (seen Oct 27: ~48 s lost at 30 and 300 BPM, both passing once rerun awake).
 
 ## Proving a test
 Before trusting a new test for a fix, run it against the old code (`git stash push <file>`, run, `git stash pop`) and see it fail for the right reason.

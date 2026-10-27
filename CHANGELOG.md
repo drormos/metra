@@ -4,13 +4,22 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-27
+
 ### Added
+- Stage mode: a full-screen, play-only view of the set for gigs (from the set panel's "Stage mode" button). Big Previous / Next / Start, hold to exit, remembered across a restart.
+- Settings → Keep screen on: while Metra is open (new default) or only while playing.
+- Song parts: a song can be a list of parts, each with its own length, tempo (steady or gradual) and rhythm, for tempo changes, odd bars and song structure. Edited on the new parts page ("Song parts ›" in the Rhythm panel, or long-press the title), which replaces the song editor.
+- For a song with parts, the main screen shows the song map in place of the tempo ruler (slide or tap to go to a part) and "Chorus · bar 3 of 8 · next: Break" under the BPM; stage mode shows the map too (tap only).
 - A one-time hint the first time a song is loaded (stopped): "Hold the song name to edit its parts".
 - During a count-in, the Stop button shows the count ("Stop · Count-in 3 of 4") on every page, and on the parts page a small count-in tag fills up across the count-in.
 - Song parts: a heads-up before a part changes, on the main screen and in stage mode ("Break in 2 bars · 2/4 · 128", then the beats counting down in the last bar).
 - Settings › "Sound on part changes": a higher click on the first beat of each new part (off by default).
 
 ### Changed
+- The song editor is replaced by the parts page.
+- Every −/+ stepper repeats while held, speeding up, and its value can be typed (also the Rhythm panel's beats and Settings' visual offset).
+- Vector icons everywhere instead of text symbols (some showed as colored emoji on Android).
 - Parts page: an opened card scrolls into view as it opens, only as far as needed (a tall card shows its top).
 - Opening the app fresh starts Free play with Count-in, Speed up and Stop after switched off (their values are kept), so the first Start is a plain click. Songs keep their own settings.
 - Song parts: tapping a part while playing (song map, stage mode, "Play from here") jumps there at once, on its beat 1, with no count-in.
@@ -22,19 +31,6 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 - The count-in line shows "Count-in · 1 of 4" as soon as you press Start (it showed a bare "Count-in", or briefly the next part's heads-up, first).
 - Parts page: an open card can be held and reordered however tall it is.
 - Parts page: a song that ends while you edit it stays loaded (in a set, it no longer moves on to the next song).
-
-## [1.6.0] - 2026-10-26
-
-### Added
-- Stage mode: a full-screen, play-only view of the set for gigs (from the set panel's "Stage mode" button). Big Previous / Next / Start, hold to exit, remembered across a restart.
-- Settings → Keep screen on: while Metra is open (new default) or only while playing.
-- Song parts: a song can be a list of parts, each with its own length, tempo (steady or gradual) and rhythm, for tempo changes, odd bars and song structure. Edited on the new parts page ("Song parts ›" in the Rhythm panel, or long-press the title), which replaces the song editor.
-- For a song with parts, the main screen shows the song map in place of the tempo ruler (slide or tap to go to a part) and "Chorus · bar 3 of 8 · next: Break" under the BPM; stage mode shows the map too (tap only).
-
-### Changed
-- The song editor is replaced by the parts page.
-- Every −/+ stepper repeats while held, speeding up, and its value can be typed (also the Rhythm panel's beats and Settings' visual offset).
-- Vector icons everywhere instead of text symbols (some showed as colored emoji on Android).
 
 ## [1.5.3] - 2026-10-23
 
@@ -133,7 +129,8 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 - Song editor with live preview; Revert / Save for changes to a loaded song.
 - Stage Black and Daylight themes, per-level click volumes, visual offset.
 
-[Unreleased]: https://github.com/drormos/metra/compare/v1.5.3...HEAD
+[Unreleased]: https://github.com/drormos/metra/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/drormos/metra/compare/v1.5.3...v1.6.0
 [1.5.3]: https://github.com/drormos/metra/compare/v1.5.2...v1.5.3
 [1.5.2]: https://github.com/drormos/metra/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/drormos/metra/compare/v1.5.0...v1.5.1

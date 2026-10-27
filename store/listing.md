@@ -51,9 +51,15 @@ No ads, no account, no tracking. Metra has no internet access: your songs stay o
 
 Made by a drummer who wanted a metronome that just works, in the practice room and on stage.
 
-## Release notes (280 / 500)
+## Release notes (332 / 500)
 
-Song parts: build a song from parts with their own tempo, time signature and length, including gradual speed-ups and slow-downs. A heads-up counts you into every change, and stage mode shows it all at a glance. Count-in now shows on screen, and every fresh start is a plain click.
+The What's new lines of the release (`assets/whats_new.md`), as printed by `tool/release.sh`:
+
+- Song parts: tempo, time-signature and gradual changes inside a song. Open the 4/4 button › Song parts, or hold the song's name.
+- Stage mode: your set full screen, for gigs
+- The screen stays on while Metra is open (Settings)
+- The song map: slide or tap to jump to a part
+- Every stepper repeats when held and takes typed numbers
 
 ## Graphics
 - App icon (512×512): `store/icon-512.png` (from `tool/icon/app-icon.png`)
