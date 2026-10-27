@@ -771,10 +771,25 @@ void main() {
         findsOneWidget,
         reason: 'the card stays as it is',
       );
-      // Count-in beats every 500 ms from 1120; a from 3120.
-      await runTo(tester, 1700);
-      expect(line().data, 'Count-in · 2 of 4');
-      expect(fill(tester, 0), 0);
+      // Count-in beats every 500 ms from 1120; a from 3120. The count
+      // changes in place: no frame dims it, beat after beat.
+      await runTo(tester, 1200); // past the brighten into the count-in
+      while (output.time < const Duration(milliseconds: 3000)) {
+        output.time += const Duration(milliseconds: 20);
+        await tester.pump(const Duration(milliseconds: 20));
+        expect(
+          find.ancestor(
+            of: find.byKey(PartsPage.summaryKey),
+            matching: find.byType(Opacity),
+          ),
+          findsNothing,
+          reason: 'dimmed at ${output.time}',
+        );
+        if (output.time == const Duration(milliseconds: 1700)) {
+          expect(line().data, 'Count-in · 2 of 4');
+          expect(fill(tester, 0), 0);
+        }
+      }
       await runTo(tester, 3200);
       expect(line().data, summary.data);
       expect(fill(tester, 0), greaterThan(0));

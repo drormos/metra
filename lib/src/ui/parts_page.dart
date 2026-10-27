@@ -412,8 +412,10 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
                         final text = countIn == null
                             ? partsSummary(parts, _metronome.songEnd)
                             : countInLine(countIn);
+                        // Brightens into and out of the count-in, not on
+                        // each beat (the main screen's count-in line).
                         return BrightenSwap(
-                          value: text,
+                          value: countIn == null ? text : 'count-in',
                           child: Text(
                             text,
                             key: PartsPage.summaryKey,
