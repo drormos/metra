@@ -807,6 +807,43 @@ void main() {
       },
     );
 
+    test('a fresh launch: Free play\'s count-in, speed up and stop after '
+        'start switched off, their values kept; songs keep theirs', () async {
+      const on = OnStart(
+        countInOn: true,
+        countInBars: 2,
+        speedUp: true,
+        changeBy: 7,
+        stopOn: true,
+        stopBars: 16,
+      );
+      library.attach(metronome);
+      metronome.setOnStart(on); // Free play's, saved
+      final song = library.addSong(
+        name: 'Climb',
+        bpm: 90,
+        pattern: waltz,
+        onStart: on,
+      );
+      final next = await reload();
+      final fresh = MetronomeController(FakeClickOutput());
+      addTearDown(fresh.dispose);
+      next
+        ..attach(fresh)
+        ..startFresh(fresh);
+      expect(next.tab, ModeTab.freePlay);
+      expect(
+        fresh.onStart,
+        on.copyWith(countInOn: false, speedUp: false, stopOn: false),
+      );
+      expect(fresh.onStart.runs, isFalse, reason: 'Start plays a plain click');
+      expect(fresh.onStart.countIn, 0);
+      expect(next.songById(song.id)!.onStart, on, reason: "the song's own");
+      next.playSingleSong(next.songById(song.id)!, fresh);
+      expect(fresh.onStart, on);
+      await next.flush();
+    });
+
     test('empty tabs: nothing to load, the tab shows; the click is kept', () {
       metronome.setBpm(77);
       library.openSongsTab(metronome);

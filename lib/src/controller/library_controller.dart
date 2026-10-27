@@ -183,6 +183,21 @@ class LibraryController extends ChangeNotifier {
     _update(_library.withSession(setlistId: null, songId: null, position: -1));
   }
 
+  /// A fresh launch (ui-spec.md "Modes"): Free play, with the click as it
+  /// last sounded, but "When I press Start" all switched off, so the first
+  /// Start is a plain click. Their values stay for when one is switched
+  /// back on; songs keep their own.
+  void startFresh(MetronomeController metronome) {
+    detachSong();
+    metronome.setOnStart(
+      metronome.onStart.copyWith(
+        countInOn: false,
+        speedUp: false,
+        stopOn: false,
+      ),
+    );
+  }
+
   /// The mode tab that is current. An empty Songs / Setlists tab (nothing
   /// to load yet) is Free play underneath: no song, the click unchanged.
   ModeTab get tab {

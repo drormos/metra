@@ -53,12 +53,13 @@ Future<void> main() async {
     }
     library?.attach(controller);
     // A fresh launch is always Free play, with the click as it last
-    // sounded; the song stays as stored (ui-spec.md "Modes"). Stage mode
-    // is the one exception: it returns on the same set and song.
+    // sounded and "When I press Start" switched off; the song stays as
+    // stored (ui-spec.md "Modes"). Stage mode is the one exception: it
+    // returns on the same set and song.
     if (library != null && library.stageMode) {
       library.resumeStageMode(controller);
     } else {
-      library?.detachSong();
+      library?.startFresh(controller);
     }
     keepScreenAwake(
       controller,

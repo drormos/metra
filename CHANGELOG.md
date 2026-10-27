@@ -10,6 +10,7 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 - Settings › "Sound on part changes": a higher click on the first beat of each new part (off by default).
 
 ### Changed
+- Opening the app fresh starts Free play with Count-in, Speed up and Stop after switched off (their values are kept), so the first Start is a plain click. Songs keep their own settings.
 - Song parts: tapping a part while playing (song map, stage mode, "Play from here") jumps there at once, on its beat 1, with no count-in.
 - Song parts: every part has a length in bars. "Until you stop" is replaced by "When the song ends": Stop, Loop song or Loop last part (a Gradual last part restarts its ramp each time). Existing songs loop their bar as before. The strip marks a looping last part with a loop icon; the summary reads "45 bars, then loops Outro" and the line under the BPM "Outro · bar 3 of 8 · looping".
 
