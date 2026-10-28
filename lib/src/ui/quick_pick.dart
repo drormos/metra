@@ -7,6 +7,7 @@ import 'package:flutter/semantics.dart';
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/library.dart';
+import '../model/share_text.dart';
 import '../platform/android_bridge.dart';
 import 'editor_scaffold.dart';
 import 'free_play_guard.dart';
@@ -368,6 +369,10 @@ class QuickPick extends StatefulWidget {
   static const songLibraryKey = Key('quick-pick-song-library');
   static const setHeaderKey = Key('quick-pick-set-header');
   static const changeSetKey = Key('quick-pick-change-set');
+  static const shareKey = Key('quick-pick-share');
+
+  /// Hands the share text to the phone's share menu; tests replace it.
+  static Future<void> Function(String text) share = AndroidBridge.shareText;
   static const pickBackKey = Key('quick-pick-picker-back');
   static const pickAddKey = Key('quick-pick-picker-add');
   static const pickSearchKey = Key('quick-pick-picker-search');
@@ -1353,6 +1358,29 @@ class _QuickPickState extends State<QuickPick>
                     ),
                   ],
                 ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // 40px square to see, 48dp to touch.
+          Tooltip(
+            message: 'Share setlist as text',
+            excludeFromSemantics: true,
+            child: OutlinedButton(
+              key: QuickPick.shareKey,
+              style: OutlinedButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: const Size(40, 40),
+                fixedSize: const Size(40, 40),
+                tapTargetSize: MaterialTapTargetSize.padded,
+              ),
+              onPressed: () => QuickPick.share(
+                setlistShareText(setlist, _library.visibleSongs),
+              ),
+              child: const Icon(
+                Icons.share_outlined,
+                size: 18,
+                semanticLabel: 'Share setlist as text',
               ),
             ),
           ),

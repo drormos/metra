@@ -197,6 +197,7 @@ class LibraryController extends ChangeNotifier {
         countInOn: false,
         speedUp: false,
         stopOn: false,
+        practiceOn: false,
       ),
     );
   }

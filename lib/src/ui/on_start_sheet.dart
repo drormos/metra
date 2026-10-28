@@ -11,8 +11,8 @@ import 'value_stepper.dart';
 
 /// The "When I press Start" panel (ui-spec.md, `on-start-sheet.reference
 /// .html`), dropping from the stopwatch button (which also closes it):
-/// Count-in, Speed up, Stop after. Changes apply at once and belong to the
-/// loaded song like its tempo.
+/// Count-in, Speed up (Practice speed for a song with parts), Stop after.
+/// Changes apply at once and belong to the loaded song like its tempo.
 Future<void> showOnStartSheet(
   BuildContext context,
   MetronomeController metronome,
@@ -32,11 +32,18 @@ class OnStartSheet extends StatelessWidget {
   static const stopAfterKey = Key('stop-after');
   static const countInBarsKey = Key('count-in-bars');
   static const stopByKey = Key('stop-by');
+  static const practiceKey = Key('practice-speed');
+  static const practiceFromKey = Key('practice-from');
+  static const practiceStepKey = Key('practice-step');
+  static const practiceUpToKey = Key('practice-up-to');
 
   static const countInHint =
       'Beats only, before the song. Not counted in the steps or the limit.';
   static const speedUpHint = 'Each change lands on a bar line.';
   static const stopAfterHint = 'Stops at the next bar line after the limit.';
+  static const practiceHint =
+      'Every part plays at this speed, ramps included. With "Loop song", '
+      'it changes each time the song starts over.';
 
   static const changeLabel = 'Change by';
   static const everyLabel = 'Every';
@@ -56,6 +63,12 @@ class OnStartSheet extends StatelessWidget {
         : ', ${on.limitLabel.toLowerCase()} ${on.upTo}';
     return '${OnStart.changeLabel(on.changeBy)} every $every$limit';
   }
+
+  /// "80%, +5% each loop, up to 100%"; "80%" alone with +0%.
+  static String practiceSummary(OnStart on) => on.practiceStep == 0
+      ? '${on.practiceFrom}%'
+      : '${on.practiceFrom}%, +${on.practiceStep}% each loop, '
+            'up to ${on.practiceUpTo}%';
 
   static String stopAfterSummary(OnStart on) => on.stopBy == StopBy.bars
       ? OnStart.barsLabel(on.stopBars)
@@ -105,9 +118,22 @@ class OnStartSheet extends StatelessWidget {
                     Text(countInHint, style: hint),
                   ],
                 ),
-                // The parts decide the tempo (ui-spec.md "Song parts").
-                if ((metronome.parts?.length ?? 1) > 1)
-                  _notForParts(context)
+                // The parts decide the tempo, so a percentage of them
+                // (ui-spec.md "Practice speed").
+                if (metronome.playsParts)
+                  _part(
+                    context,
+                    switchKey: practiceKey,
+                    name: 'Practice speed',
+                    on: on.practiceOn,
+                    summary: practiceSummary(on),
+                    onChanged: (v) => set(on.copyWith(practiceOn: v)),
+                    controls: [
+                      ..._practice(on, set),
+                      const SizedBox(height: 4),
+                      Text(practiceHint, style: hint),
+                    ],
+                  )
                 else
                   _part(
                     context,
@@ -146,37 +172,6 @@ class OnStartSheet extends StatelessWidget {
               ],
             );
           },
-        ),
-      ),
-    );
-  }
-
-  static const notForParts = 'Not for songs with parts';
-
-  /// Speed up for a song with parts: its name and why it's not there.
-  Widget _notForParts(BuildContext context) {
-    final colors = context.colors;
-    return Container(
-      constraints: const BoxConstraints(minHeight: 56),
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: colors.divider)),
-      ),
-      child: MergeSemantics(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Speed up',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            Text(
-              notForParts,
-              key: speedUpKey,
-              style: TextStyle(fontSize: 13, color: colors.muted),
-            ),
-          ],
         ),
       ),
     );
@@ -271,6 +266,69 @@ class OnStartSheet extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  /// Start at, Each loop, and Up to while Each loop climbs.
+  List<Widget> _practice(OnStart on, void Function(OnStart) set) {
+    const min = OnStart.minPractice, max = OnStart.maxPractice;
+    int fives(String text, int lo, int hi) {
+      final v = int.tryParse(text.replaceAll(RegExp(r'[^0-9]'), '')) ?? lo;
+      return OnStart.clampInt(v - v % 5, lo, hi);
+    }
+
+    final from = on.practiceFrom, step = on.practiceStep;
+    final upTo = on.practiceUpTo;
+    return [
+      ValueStepper(
+        key: practiceFromKey,
+        compact: true,
+        onSheet: true,
+        label: 'Start at',
+        display: '$from%',
+        editText: '$from',
+        onMinus: from > min ? () => set(on.withPracticeFrom(from - 5)) : null,
+        onPlus: from < max ? () => set(on.withPracticeFrom(from + 5)) : null,
+        onTyped: (text) => set(on.withPracticeFrom(fives(text, min, max))),
+      ),
+      ValueStepper(
+        key: practiceStepKey,
+        compact: true,
+        onSheet: true,
+        label: 'Each loop',
+        display: '+$step%',
+        editText: '$step',
+        onMinus: step > 0
+            ? () => set(on.copyWith(practiceStep: step - 5))
+            : null,
+        onPlus: step < OnStart.maxPracticeStep
+            ? () => set(on.copyWith(practiceStep: step + 5))
+            : null,
+        onTyped: (text) => set(
+          on.copyWith(practiceStep: fives(text, 0, OnStart.maxPracticeStep)),
+        ),
+      ),
+      // Nothing to reach without a step.
+      ArriveLeave(
+        child: step == 0
+            ? null
+            : ValueStepper(
+                key: practiceUpToKey,
+                compact: true,
+                onSheet: true,
+                label: 'Up to',
+                display: '$upTo%',
+                editText: '$upTo',
+                onMinus: upTo > from
+                    ? () => set(on.copyWith(practiceUpTo: upTo - 5))
+                    : null,
+                onPlus: upTo < max
+                    ? () => set(on.copyWith(practiceUpTo: upTo + 5))
+                    : null,
+                onTyped: (text) =>
+                    set(on.copyWith(practiceUpTo: fives(text, from, max))),
+              ),
+      ),
+    ];
   }
 
   List<Widget> _speedUp(OnStart on, void Function(OnStart) set) {

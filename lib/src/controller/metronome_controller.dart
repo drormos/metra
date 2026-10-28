@@ -125,8 +125,15 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
 
   int get countIn => _onStart.countIn;
 
+  /// Speed up, or for a song with parts Practice speed, is on.
+  bool get speedOn => playsParts ? _onStart.practiceOn : _onStart.speedUp;
+
+  /// Anything in "When I press Start" on: the stopwatch button is red.
+  bool get onStartLit => _onStart.countInOn || _onStart.stopOn || speedOn;
+
   void setOnStart(OnStart onStart) {
     if (onStart == _onStart) return;
+    final speed = practiceSpeed;
     _onStart = onStart;
     if (_plan case final plan?) {
       plan.onStart = onStart;
@@ -134,8 +141,41 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
     } else if (_runFrom != null) {
       _scheduler.run = onStart.runs ? onStart : null;
     }
+    if (practiceSpeed != speed) _rescale();
     notifyListeners();
   }
+
+  /// Practice speed changed: the tempo shown and, playing a steady part,
+  /// heard (from the next step) follow it; a Gradual part takes it on its
+  /// next beat.
+  void _rescale() {
+    final parts = _parts;
+    final at = partPosition;
+    if (parts == null || at == null) return;
+    final part = parts[at.part];
+    if (_playing && part.gradual) return;
+    _bpm = part.scaled(practiceSpeed ?? 100).tempoStart;
+    if (_playing && _reachesClick) _scheduler.setTempo(_bpm.toDouble());
+  }
+
+  /// Practice speed in percent (ui-spec.md "Practice speed"): where the
+  /// song is now (stopped: Start at); null when it doesn't apply (off, or
+  /// not a song with parts).
+  int? get practiceSpeed => practiceSpeedAt(_output.now());
+
+  /// Practice speed at engine time [time] (as [partAt]).
+  int? practiceSpeedAt(Duration? time) {
+    if (!playsParts || !_onStart.practiceOn) return null;
+    final bar = _playing && time != null ? _scheduler.stepAt(time)?.bar : null;
+    final plan = _plan;
+    return bar == null || plan == null
+        ? _onStart.practiceFrom
+        : plan.speedAt(bar);
+  }
+
+  /// Part [index]'s first tempo as it plays, at Start at.
+  int _startTempo(int index) =>
+      _parts![index].scaled(practiceSpeed ?? 100).tempoStart;
 
   /// 0 switches the count-in off (keeping its bars).
   void setCountIn(int bars) => setOnStart(
@@ -241,7 +281,7 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
     if (bar == null || (step?.countIn != null)) return null;
     final at = before ? (part: _startPart, bar: 0) : plan.locate(bar);
     if (at == null) return null;
-    final current = parts[at.part];
+    final current = parts[at.part].scaled(practiceSpeedAt(time) ?? 100);
     final barsLeft = current.bars - at.bar;
     // A short part counts its bars from its first one (the normal line
     // would show for a bar or two and then give way); a longer one warns
@@ -251,19 +291,18 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
     }
     final next = plan.locate(bar + barsLeft);
     if (next == null || next.part == at.part) return null;
+    // As it will play: a new pass of Loop song may be faster.
+    final coming = parts[next.part].scaled(
+      _onStart.practiceOn ? plan.speedAt(bar + barsLeft) : 100,
+    );
     if (barsLeft > 1) {
-      return (
-        current: current,
-        next: parts[next.part],
-        bars: barsLeft,
-        beats: null,
-      );
+      return (current: current, next: coming, bars: barsLeft, beats: null);
     }
     final pattern = step?.pattern ?? current.pattern;
     final beat = step == null ? 0 : step.barPosition ~/ pattern.stepsPerBeat;
     return (
       current: current,
-      next: parts[next.part],
+      next: coming,
       bars: null,
       beats: pattern.beatsPerBar - beat,
     );
@@ -276,7 +315,7 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
     final parts = _parts;
     if (parts == null || index < 0 || index >= parts.length) return;
     _startPart = index;
-    _bpm = parts[index].tempoStart;
+    _bpm = parts[index].scaled(practiceSpeed ?? 100).tempoStart;
     _pattern = parts[index].pattern;
     if (_playing && _plan != null) {
       _scheduler.restartNow(
@@ -400,7 +439,10 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
   void setBpm(int bpm) {
     final clamped = bpm.clamp(minBpm, maxBpm);
     if (clamped == _bpm) return;
-    _editPart(shift: clamped - _bpm);
+    // At a practice speed the part moves by the step at full speed (at
+    // least 1), so the real tempo lands where it was set.
+    final speed = practiceSpeed ?? 100;
+    _editPart(shift: ((clamped - _bpm) * 100 / speed).round());
     _bpm = clamped;
     if (_reachesClick) _scheduler.setTempo(clamped.toDouble());
     notifyListeners();
@@ -558,7 +600,9 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
     final part = parts[at];
     _applying = true;
     // A Gradual part playing keeps its ramp: the plan sets each beat.
-    final bpm = _playing && part.gradual ? _bpm : part.tempoStart;
+    final bpm = _playing && part.gradual
+        ? _bpm
+        : part.scaled(practiceSpeed ?? 100).tempoStart;
     applyEdit(bpm: bpm, pattern: part.pattern);
     _applying = false;
     notifyListeners();
@@ -665,7 +709,11 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
     _parts = parts == null || partsPlain(parts, end) ? null : parts;
     _startPart = 0;
     if (_parts case final parts?) {
-      bpm = parts.first.tempoStart;
+      bpm = parts.first
+          .scaled(
+            playsParts && _onStart.practiceOn ? _onStart.practiceFrom : 100,
+          )
+          .tempoStart;
       pattern = parts.first.pattern;
     }
     _load(bpm, pattern, run: true);
@@ -733,7 +781,7 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
     _plan = null;
     if (playsParts) {
       // Back to where Start begins, ready to play it again.
-      _bpm = _parts![_startPart].tempoStart;
+      _bpm = _startTempo(_startPart);
       _pattern = _parts![_startPart].pattern;
     } else if (from != null && _onStart.speedUp) {
       _bpm = from;

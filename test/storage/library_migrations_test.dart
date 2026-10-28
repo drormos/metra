@@ -259,6 +259,25 @@ void main() {
     expect(now.lastEnd, SongEnd.stop);
   });
 
+  test('version 7: Practice speed off at 80%, +5%, up to 100% everywhere; '
+      'version 8 keeps it', () async {
+    for (final f in ['library.json', 'settings.json']) {
+      File('test/fixtures/library_v7/$f').copySync('${dir.path}/$f');
+    }
+    final old = await store.load();
+    for (final on in [...old.songs.map((s) => s.onStart), old.lastOnStart]) {
+      expect(on.practiceOn, isFalse);
+      expect((on.practiceFrom, on.practiceStep, on.practiceUpTo), (80, 5, 100));
+    }
+    expect(old.songs.first.onStart.countInBars, 2, reason: 'rest kept');
+    for (final f in ['library.json', 'settings.json']) {
+      File('test/fixtures/library_v8/$f').copySync('${dir.path}/$f');
+    }
+    final on = (await LibraryStore(store.file).load()).songs.first.onStart;
+    expect(on.practiceOn, isTrue);
+    expect((on.practiceFrom, on.practiceStep, on.practiceUpTo), (70, 10, 110));
+  });
+
   test('every step runs in order up to the latest; unknown versions throw', () {
     final latest = migrate({'version': 1, 'songs': [], 'setlists': []});
     expect(latest['version'], Library.version);

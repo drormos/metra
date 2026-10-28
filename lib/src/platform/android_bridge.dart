@@ -101,6 +101,10 @@ abstract final class AndroidBridge {
         : base;
   }
 
+  /// Opens the phone's share menu with [text].
+  static Future<void> shareText(String text) =>
+      _call(android, 'shareText', text);
+
   static Future<Object?> _call(
     MethodChannel channel,
     String method, [

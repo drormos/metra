@@ -494,8 +494,8 @@ class MetronomeScreen extends StatelessWidget {
         Builder(
           builder: (context) => _squareButton(
             key: onStartKey,
-            tooltip: _onStartTooltip(controller.onStart),
-            lit: controller.onStart.anyOn,
+            tooltip: _onStartTooltip(controller),
+            lit: controller.onStartLit,
             onPressed: () => showOnStartSheet(context, controller),
             child: const StopwatchIcon(),
           ),
@@ -597,10 +597,12 @@ class MetronomeScreen extends StatelessWidget {
   }
 
   /// "When I press Start: count-in 1 bar, speed up, stop after".
-  static String _onStartTooltip(OnStart on) {
+  static String _onStartTooltip(MetronomeController controller) {
+    final on = controller.onStart;
     final parts = [
       if (on.countIn > 0) 'count-in ${OnStart.barsLabel(on.countIn)}',
-      if (on.speedUp) 'speed up',
+      if (controller.speedOn)
+        controller.playsParts ? 'practice speed' : 'speed up',
       if (on.stopAfter != StopAfter.off) 'stop after',
     ];
     return parts.isEmpty
@@ -942,10 +944,17 @@ class _TempoLineState extends State<_TempoLine> {
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 15, color: colors.muted),
             )
-          : Text(
-              _restText,
-              key: MetronomeScreen.tempoNameKey,
-              style: TextStyle(fontSize: 16, color: colors.muted),
+          // Shrinks rather than overflowing on narrow phones.
+          : FittedBox(
+              fit: BoxFit.scaleDown,
+              child: PracticeTag.after(
+                Text(
+                  _restText,
+                  key: MetronomeScreen.tempoNameKey,
+                  style: TextStyle(fontSize: 16, color: colors.muted),
+                ),
+                widget.controller.practiceSpeed,
+              ),
             ),
     );
   }
@@ -1026,6 +1035,10 @@ class _TempoLineState extends State<_TempoLine> {
                   }
                 }),
           ),
+          if (controller.practiceSpeed case final speed?) ...[
+            const SizedBox(width: 8),
+            PracticeTag(percent: speed),
+          ],
         ],
       ),
     );
@@ -1066,11 +1079,68 @@ Widget _iconLine(BuildContext context, String label) {
   );
 }
 
+/// Practice speed's small white tag ending the line under the BPM
+/// ("Chorus · bar 3 of 8 · [80%]"), larger in stage mode.
+class PracticeTag extends StatelessWidget {
+  const PracticeTag({super.key, required this.percent, this.large = false});
+
+  final int percent;
+  final bool large;
+
+  static const tagKey = Key('practice-tag');
+
+  /// The line [child] with the tag after it when [percent] is set.
+  static Widget after(Widget child, int? percent, {bool large = false}) =>
+      percent == null
+      ? child
+      : Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            child,
+            const SizedBox(width: 8),
+            PracticeTag(percent: percent, large: large),
+          ],
+        );
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Semantics(
+      label: 'Practice speed $percent%',
+      excludeSemantics: true,
+      child: Container(
+        key: tagKey,
+        padding: EdgeInsets.symmetric(horizontal: large ? 7 : 6, vertical: 1),
+        decoration: BoxDecoration(
+          color: colors.text,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          '$percent%',
+          style: TextStyle(
+            fontSize: large ? 18 : 15,
+            fontWeight: FontWeight.w700,
+            color: colors.background,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class RunLine extends StatefulWidget {
-  const RunLine({super.key, required this.controller, required this.child});
+  const RunLine({
+    super.key,
+    required this.controller,
+    required this.child,
+    this.large = false,
+  });
 
   final MetronomeController controller;
   final Widget child;
+
+  /// Stage mode: a larger practice speed tag.
+  final bool large;
 
   static String? labelFor(MetronomeController controller, Duration? now) {
     if (countInAt(controller, now) case final c?) return countInLine(c);
@@ -1126,6 +1196,8 @@ class _RunLineState extends State<RunLine> with SingleTickerProviderStateMixin {
   String? _label;
   // Before a part changes: what's coming and when (it replaces the label).
   ({String name, String details, int? bars, int? beats})? _headsUp;
+  // Practice speed where the song is, for the tag.
+  int? _speed;
 
   @override
   void initState() {
@@ -1162,6 +1234,7 @@ class _RunLineState extends State<RunLine> with SingleTickerProviderStateMixin {
       SchedulerBinding.instance.currentFrameTimeStamp,
     );
     final label = RunLine.labelFor(controller, now);
+    final speed = controller.practiceSpeedAt(now);
     final up = now == null ? null : controller.headsUpAt(now);
     final headsUp = up == null
         ? null
@@ -1171,10 +1244,11 @@ class _RunLineState extends State<RunLine> with SingleTickerProviderStateMixin {
             bars: up.bars,
             beats: up.beats,
           );
-    if (label != _label || headsUp != _headsUp) {
+    if (label != _label || headsUp != _headsUp || speed != _speed) {
       setState(() {
         _label = label;
         _headsUp = headsUp;
+        _speed = speed;
       });
     }
   }
@@ -1244,9 +1318,13 @@ class _RunLineState extends State<RunLine> with SingleTickerProviderStateMixin {
             // Shrinks rather than overflowing on narrow phones.
             child: FittedBox(
               fit: BoxFit.scaleDown,
-              child: headsUp != null
-                  ? _headsUpLine(context, headsUp)
-                  : _iconLine(context, label!),
+              child: PracticeTag.after(
+                headsUp != null
+                    ? _headsUpLine(context, headsUp)
+                    : _iconLine(context, label!),
+                _speed,
+                large: widget.large,
+              ),
             ),
           ),
       ],

@@ -157,7 +157,6 @@ void main() {
     final off = on.copyWith(countInOn: false, stopOn: false);
     expect(off.countIn, 0);
     expect(off.stopAfter, StopAfter.off);
-    expect(off.anyOn, isFalse);
     final back = off.copyWith(countInOn: true, stopOn: true);
     expect(back.countIn, 2);
     expect(back.stopAfter, StopAfter.time, reason: 'Time by default');
@@ -185,6 +184,33 @@ void main() {
         'upTo': 9,
       }),
       const OnStart(every: 64, upTo: 30),
+    );
+  });
+
+  test('practice speed: Start at, a step each pass while it climbs, held '
+      'at Up to; bad saved values clamped onto the 5% grid', () {
+    const on = OnStart(
+      practiceOn: true,
+      practiceFrom: 80,
+      practiceStep: 5,
+      practiceUpTo: 90,
+    );
+    expect(
+      [for (var p = 0; p < 4; p++) on.practiceAt(p, climbs: true)],
+      [80, 85, 90, 90],
+    );
+    expect(on.practiceAt(3, climbs: false), 80);
+    expect(OnStart.off.practiceAt(3, climbs: true), 100);
+    expect(on.withPracticeFrom(95).practiceUpTo, 95, reason: 'carried');
+    final read = OnStart.fromJson({
+      ...on.toJson(),
+      'practiceFrom': 33,
+      'practiceStep': 27,
+      'practiceUpTo': 52,
+    });
+    expect(
+      (read.practiceFrom, read.practiceStep, read.practiceUpTo),
+      (50, 20, 50),
     );
   });
 }

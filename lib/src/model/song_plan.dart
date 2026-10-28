@@ -8,14 +8,15 @@ import 'song_part.dart';
 /// changes tempo on every beat; at its end the song stops, loops, or
 /// loops its last part (a Gradual one restarts its ramp each time), until
 /// Stop. Stop after still applies; speed up
-/// doesn't (the parts decide the tempo).
+/// doesn't (the parts decide the tempo). Practice speed scales every
+/// part's tempo, climbing each pass of a song that loops whole.
 class SongPlan implements PatternPlan {
   SongPlan({
     required this.parts,
     required this.end,
     required this.onStart,
     int startPart = 0,
-  }) : _jumps = [(bar: 0, part: startPart)];
+  }) : _jumps = [(bar: 0, part: startPart, pass: 0)];
 
   /// The parts, in order; replaced as they're edited while playing.
   List<SongPart> parts;
@@ -26,29 +27,44 @@ class SongPlan implements PatternPlan {
   bool raisesPartChanges = false;
 
   // Where the song plays from: from song bar `bar` on, part `part`'s first
-  // bar (the start, then each jump), oldest first.
-  final List<({int bar, int part})> _jumps;
+  // bar (the start, then each jump), oldest first, and the pass (from 0)
+  // it was on, which a jump keeps.
+  final List<({int bar, int part, int pass})> _jumps;
 
   /// From song bar [bar] on (a bar line not yet played), part [part]
   /// starts over; later jumps already planned are dropped.
   void jump(int bar, int part) {
+    final pass = bar > 0 ? _locate(bar - 1)?.pass ?? 0 : 0;
     _jumps
       ..removeWhere((j) => j.bar >= bar)
-      ..add((bar: bar, part: part));
+      ..add((bar: bar, part: part, pass: pass));
   }
 
   /// The part song bar [bar] (from 0) is in, and the bar within it (from
   /// 0); null past the end of a song that stops.
   ({int part, int bar})? locate(int bar) {
+    final at = _locate(bar);
+    return at == null ? null : (part: at.part, bar: at.bar);
+  }
+
+  /// Practice speed in percent at song bar [bar]: Start at, plus a step
+  /// for each time "Loop song" started over, up to Up to (100 when off).
+  int speedAt(int bar) => onStart.practiceAt(
+    _locate(bar)?.pass ?? 0,
+    climbs: end == SongEnd.loopSong,
+  );
+
+  ({int part, int bar, int pass})? _locate(int bar) {
     final from = _jumps.lastWhere(
       (j) => j.bar <= bar,
       orElse: () => _jumps.first,
     );
     var part = from.part.clamp(0, parts.length - 1);
     var into = bar - from.bar;
+    var pass = from.pass;
     while (true) {
       final bars = parts[part].bars;
-      if (into < bars) return (part: part, bar: into);
+      if (into < bars) return (part: part, bar: into, pass: pass);
       into -= bars;
       if (++part < parts.length) continue;
       // Looping, whole passes are skipped at once.
@@ -60,7 +76,9 @@ class SongPlan implements PatternPlan {
           into %= parts[part].bars;
         case SongEnd.loopSong:
           part = 0;
-          into %= parts.fold(0, (sum, p) => sum + p.bars);
+          final total = parts.fold(0, (sum, p) => sum + p.bars);
+          pass += 1 + into ~/ total;
+          into %= total;
       }
     }
   }
@@ -85,9 +103,11 @@ class SongPlan implements PatternPlan {
   /// a change to the tempo while it plays holds until the next part.
   @override
   double? tempoAt(int bar, int beat, double bpm) {
-    final at = locate(bar);
+    final at = _locate(bar);
     if (at == null) return null;
-    final part = parts[at.part];
+    final part = parts[at.part].scaled(
+      onStart.practiceAt(at.pass, climbs: end == SongEnd.loopSong),
+    );
     if (part.gradual) {
       return part.tempoAtBeat(at.bar * part.pattern.beatsPerBar + beat);
     }

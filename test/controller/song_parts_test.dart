@@ -207,6 +207,117 @@ void main() {
     expect(controller.startBpm, 120);
   });
 
+  group('practice speed', () {
+    // Gaps between live clicks up to [ms], rounded to 0.1 ms.
+    List<double> gaps(int ms, {int from = 0}) {
+      final at = [
+        for (final c in clicks(ms))
+          if (c.$1 >= from) c.$1,
+      ];
+      return [
+        for (var i = 1; i < at.length; i++)
+          ((at[i] - at[i - 1]) * 10).round() / 10,
+      ];
+    }
+
+    OnStart practice(int from, {int step = 0, int upTo = 150}) => OnStart(
+      practiceOn: true,
+      practiceFrom: from,
+      practiceStep: step,
+      practiceUpTo: upTo,
+    );
+
+    test('50%: every part at half its tempo, both ends of a Gradual one; '
+        'the BPM shows the real tempo', () async {
+      controller.setOnStart(practice(50));
+      load([
+        _part('a', 1, 120),
+        _part('b', 1, 60, 120),
+      ], end: SongEnd.loopLastPart);
+      expect(controller.bpm, 60, reason: 'stopped: Start at');
+      expect(controller.practiceSpeed, 50);
+      await controller.play(); // beat 1 at 1120
+      runTo(11000);
+      // a at 60; b 30, 40, 50, 60 bpm (2000, 1500, 1200, 1000 ms); b again.
+      expect(clicks(10900).map((c) => c.$1), [
+        1120, 2120, 3120, 4120, // a
+        5120, 7120, 8620, 9820, 10820, // b, b again
+      ]);
+      expect(controller.bpm, 30);
+      controller.stop();
+      expect(controller.bpm, 60);
+      expect(controller.parts!.first.tempoStart, 120, reason: 'unchanged');
+    });
+
+    test('above 100%: 150% plays faster than the song', () async {
+      controller.setOnStart(practice(150));
+      load([_part('a', 1, 120), _part('b', 1, 100)], end: SongEnd.loopLastPart);
+      expect(controller.bpm, 180);
+      await controller.play();
+      runTo(4500);
+      expect(gaps(4100).map((g) => g.round()), [
+        333, 333, 333, // a at 180
+        333, 400, 400, 400, 400, // b at 150
+      ]);
+      controller.stop();
+    });
+
+    test('Loop song climbs each pass up to Up to, then holds; the heads-up '
+        'shows the next pass\'s tempo', () async {
+      controller.setOnStart(practice(80, step: 10, upTo: 100));
+      load([_part('a', 1, 100), _part('b', 1, 100)], end: SongEnd.loopSong);
+      await controller.play();
+      // In b, pass 1: a comes next, in pass 2.
+      runTo(4200);
+      final h = controller.headsUpAt(output.time);
+      expect(h?.next.name, 'a');
+      expect(h?.next.tempoStart, 90, reason: 'as pass 2 plays it');
+      runTo(20000);
+      final g = gaps(19500);
+      // 8 beats a pass: 80 bpm (750 ms), 90 (666.7), then 100 (600).
+      expect(g.take(8).toSet(), {750});
+      expect(g.skip(8).take(8).map((x) => x.round()).toSet(), {667});
+      expect(g.skip(16).map((x) => x.round()).toSet(), {600});
+      controller.stop();
+      expect(controller.bpm, 80, reason: 'Start at again');
+    });
+
+    test('Stop and Loop last part play at Start at, no climbing', () async {
+      controller.setOnStart(practice(80, step: 10, upTo: 120));
+      load([_part('a', 1, 100), _part('b', 1, 100)], end: SongEnd.loopLastPart);
+      await controller.play();
+      runTo(12000);
+      expect(gaps(11500).toSet(), {750});
+      controller.stop();
+      load([_part('a', 1, 100), _part('b', 1, 100)]);
+      await controller.play();
+      runTo(20000);
+      expect(gaps(19500, from: 12000).toSet(), {750});
+      expect(controller.isPlaying, isFalse, reason: 'ended');
+    });
+
+    test('switching it on or changing it shows the real tempo at once; '
+        '+1 moves the part so the real tempo lands there', () {
+      load([_part('a', 1, 120), _part('b', 1, 100)], end: SongEnd.loopSong);
+      expect(controller.practiceSpeed, isNull, reason: 'off');
+      controller.setOnStart(practice(80));
+      expect(controller.bpm, 96);
+      controller.nudge(1);
+      expect(controller.bpm, 97);
+      expect(controller.parts!.first.tempoStart, 121);
+      controller.setOnStart(controller.onStart.copyWith(practiceOn: false));
+      expect(controller.bpm, 121);
+      expect(controller.practiceSpeed, isNull);
+    });
+
+    test('not for plain songs', () {
+      controller.setOnStart(practice(50));
+      controller.loadSong(bpm: 120, pattern: _four);
+      expect(controller.bpm, 120);
+      expect(controller.practiceSpeed, isNull);
+    });
+  });
+
   group('going to a part', () {
     test('playing: at once, on its beat 1 at its tempo and time signature '
         '(a Gradual part from its start), no count-in', () async {

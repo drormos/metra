@@ -52,6 +52,14 @@ class MainActivity : AudioServiceActivity() {
                         },
                     )
                 }
+                // The phone's share menu with plain text (a setlist).
+                "shareText" -> {
+                    val send = Intent(Intent.ACTION_SEND)
+                        .setType("text/plain")
+                        .putExtra(Intent.EXTRA_TEXT, call.arguments as String)
+                    startActivity(Intent.createChooser(send, null))
+                    result.success(null)
+                }
                 else -> result.notImplemented()
             }
         }

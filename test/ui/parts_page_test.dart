@@ -654,9 +654,8 @@ void main() {
     expect(parts()[0].pattern.timeSignature, '4/4');
   });
 
-  testWidgets('"When I press Start": Speed up isn\'t for songs with parts', (
-    tester,
-  ) async {
+  testWidgets('"When I press Start": Practice speed in Speed up\'s place for '
+      'a song with parts; Up to only while it climbs; the tag', (tester) async {
     await pump(tester);
     await openPage(tester);
     await tapIn(tester, find.byKey(PartsPage.addKey));
@@ -664,8 +663,25 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(MetronomeScreen.onStartKey));
     await tester.pumpAndSettle();
-    expect(find.text(OnStartSheet.notForParts), findsOneWidget);
+    expect(find.text('Speed up'), findsNothing);
+    expect(find.text('Practice speed'), findsOneWidget);
+    await tester.tap(find.byKey(OnStartSheet.practiceKey));
+    await tester.pumpAndSettle();
+    expect(find.text('80%, +5% each loop, up to 100%'), findsOneWidget);
+    expect(find.byKey(OnStartSheet.practiceUpToKey), findsOneWidget);
+    expect(find.text(OnStartSheet.practiceHint), findsOneWidget);
+    final step = find.byKey(OnStartSheet.practiceStepKey);
+    await tester.tap(
+      find.descendant(of: step, matching: find.byIcon(Icons.remove)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('80%'), findsWidgets);
+    expect(find.byKey(OnStartSheet.practiceUpToKey), findsNothing);
     expect(find.byType(SetlistGroup), findsOneWidget);
+    // Closed: the line under the BPM ends with the tag.
+    await tester.tap(find.byKey(MetronomeScreen.onStartKey));
+    await tester.pumpAndSettle();
+    expect(find.byKey(PracticeTag.tagKey), findsOneWidget);
   });
 
   group('fixes after the first phone check', () {

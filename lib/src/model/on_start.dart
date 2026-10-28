@@ -27,6 +27,10 @@ class OnStart implements RunPlan {
     this.stopBy = StopBy.time,
     this.stopBars = 32,
     this.stopTime = const Duration(minutes: 5),
+    this.practiceOn = false,
+    this.practiceFrom = 80,
+    this.practiceStep = 5,
+    this.practiceUpTo = 100,
   });
 
   static const off = OnStart();
@@ -55,6 +59,32 @@ class OnStart implements RunPlan {
   final int stopBars;
   final Duration stopTime;
 
+  /// Practice speed (songs with parts only, in Speed up's place): every
+  /// part's tempo at [practiceFrom] percent, 50–150 in steps of 5; with
+  /// "Loop song" each pass adds [practiceStep] (0–20) up to
+  /// [practiceUpTo] (from [practiceFrom] to 150).
+  final bool practiceOn;
+  final int practiceFrom;
+  final int practiceStep;
+  final int practiceUpTo;
+
+  static const minPractice = 50, maxPractice = 150, maxPracticeStep = 20;
+
+  /// The speed in percent on pass [pass] (from 0) of a song that
+  /// [climbs] (loops whole); 100 when off.
+  int practiceAt(int pass, {required bool climbs}) {
+    if (!practiceOn) return 100;
+    if (!climbs || practiceStep == 0) return practiceFrom;
+    final at = practiceFrom + practiceStep * pass;
+    return at > practiceUpTo ? practiceUpTo : at;
+  }
+
+  /// A new Start at, carrying Up to along when it would fall below.
+  OnStart withPracticeFrom(int from) => copyWith(
+    practiceFrom: from,
+    practiceUpTo: practiceUpTo < from ? from : practiceUpTo,
+  );
+
   static const minChange = -20, maxChange = 20;
   static const minEvery = 1, maxEvery = 64;
   static const minBars = 1, maxBars = 999;
@@ -69,9 +99,6 @@ class OnStart implements RunPlan {
       : stopBy == StopBy.bars
       ? StopAfter.bars
       : StopAfter.time;
-
-  /// Anything on: the stopwatch button is red.
-  bool get anyOn => countInOn || runs;
 
   /// Speed up or stop after: a run, with progress under the BPM.
   bool get runs => speedUp || stopOn;
@@ -89,6 +116,10 @@ class OnStart implements RunPlan {
     StopBy? stopBy,
     int? stopBars,
     Duration? stopTime,
+    bool? practiceOn,
+    int? practiceFrom,
+    int? practiceStep,
+    int? practiceUpTo,
   }) => OnStart(
     countInOn: countInOn ?? this.countInOn,
     countInBars: countInBars ?? this.countInBars,
@@ -100,6 +131,10 @@ class OnStart implements RunPlan {
     stopBy: stopBy ?? this.stopBy,
     stopBars: stopBars ?? this.stopBars,
     stopTime: stopTime ?? this.stopTime,
+    practiceOn: practiceOn ?? this.practiceOn,
+    practiceFrom: practiceFrom ?? this.practiceFrom,
+    practiceStep: practiceStep ?? this.practiceStep,
+    practiceUpTo: practiceUpTo ?? this.practiceUpTo,
   );
 
   /// [upTo] may be null ("No limit"), so it has its own copy.
@@ -114,6 +149,10 @@ class OnStart implements RunPlan {
     stopBy: stopBy,
     stopBars: stopBars,
     stopTime: stopTime,
+    practiceOn: practiceOn,
+    practiceFrom: practiceFrom,
+    practiceStep: practiceStep,
+    practiceUpTo: practiceUpTo,
   );
 
   /// A new Change by; turning from up to down (or back) drops the limit,
@@ -265,6 +304,10 @@ class OnStart implements RunPlan {
     'stopBy': stopBy.name,
     'stopBars': stopBars,
     'stopTimeS': stopTime.inSeconds,
+    'practiceOn': practiceOn,
+    'practiceFrom': practiceFrom,
+    'practiceStep': practiceStep,
+    'practiceUpTo': practiceUpTo,
   };
 
   /// Out-of-range or bad values fall back to their defaults (older shapes
@@ -274,6 +317,12 @@ class OnStart implements RunPlan {
         json[key] is T ? json[key] as T : fallback;
     const d = OnStart.off;
     final change = read('changeBy', d.changeBy);
+    int fives(int v, int min, int max) => clampInt(v - v % 5, min, max);
+    final from = fives(
+      read('practiceFrom', d.practiceFrom),
+      minPractice,
+      maxPractice,
+    );
     return OnStart(
       countInOn: read('countInOn', false),
       countInBars: read('countInBars', 1) == 2 ? 2 : 1,
@@ -292,6 +341,18 @@ class OnStart implements RunPlan {
       stopTime: clampTime(
         Duration(seconds: read('stopTimeS', d.stopTime.inSeconds)),
       ),
+      practiceOn: read('practiceOn', false),
+      practiceFrom: from,
+      practiceStep: fives(
+        read('practiceStep', d.practiceStep),
+        0,
+        maxPracticeStep,
+      ),
+      practiceUpTo: fives(
+        read('practiceUpTo', d.practiceUpTo),
+        from,
+        maxPractice,
+      ),
     );
   }
 
@@ -307,7 +368,11 @@ class OnStart implements RunPlan {
       other.stopOn == stopOn &&
       other.stopBy == stopBy &&
       other.stopBars == stopBars &&
-      other.stopTime == stopTime;
+      other.stopTime == stopTime &&
+      other.practiceOn == practiceOn &&
+      other.practiceFrom == practiceFrom &&
+      other.practiceStep == practiceStep &&
+      other.practiceUpTo == practiceUpTo;
 
   @override
   int get hashCode => Object.hash(
@@ -321,5 +386,9 @@ class OnStart implements RunPlan {
     stopBy,
     stopBars,
     stopTime,
+    practiceOn,
+    practiceFrom,
+    practiceStep,
+    practiceUpTo,
   );
 }

@@ -773,6 +773,47 @@ void main() {
         (w.key! as ValueKey<String>).value,
     ];
 
+    testWidgets('Set ⌄: Share, left of "Change set", hands the set as text '
+        'to the share menu', (tester) async {
+      final shared = <String>[];
+      final before = QuickPick.share;
+      QuickPick.share = (text) async => shared.add(text);
+      addTearDown(() => QuickPick.share = before);
+      await withLibrary(tester, loaded: true);
+      await tester.tap(find.byKey(SetlistGroup.headerKey));
+      await tester.pumpAndSettle();
+      final share = find.byKey(QuickPick.shareKey);
+      expect(tester.getSize(share), const Size(48, 48), reason: 'to touch');
+      expect(
+        tester.getSize(
+          find.descendant(of: share, matching: find.byType(Material)),
+        ),
+        const Size(40, 40),
+        reason: 'to see',
+      );
+      expect(
+        tester.getCenter(share).dx,
+        lessThan(tester.getCenter(find.byKey(QuickPick.changeSetKey)).dx),
+      );
+      expect(
+        tester.getSemantics(share),
+        matchesSemantics(
+          label: 'Share setlist as text',
+          isButton: true,
+          hasTapAction: true,
+          isEnabled: true,
+          hasEnabledState: true,
+          isFocusable: true,
+          hasFocusAction: true,
+        ),
+      );
+      await tester.tap(share);
+      expect(shared, [
+        'Friday set (3 songs)\n1. One · 100\n2. Two · 110\n3. Three · 120\n'
+            '\nShared from Metra',
+      ]);
+    });
+
     testWidgets('Songs ⌄: A–Z; a tap plays it as a single song and closes', (
       tester,
     ) async {

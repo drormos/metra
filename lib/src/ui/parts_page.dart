@@ -940,7 +940,13 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            _tempo(colors, part),
+                            // Playing, as heard (Practice speed).
+                            _tempo(
+                              colors,
+                              _metronome.isPlaying
+                                  ? part.scaled(_metronome.practiceSpeed ?? 100)
+                                  : part,
+                            ),
                           ],
                         ),
                       ),

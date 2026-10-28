@@ -321,11 +321,28 @@ class _StageScreenState extends State<StageScreen>
                       width: box.maxWidth,
                       child: RunLine(
                         controller: _metronome,
+                        large: true,
                         child: Center(
-                          child: Text(
-                            _meterLine(pattern.timeSignature, onStart),
-                            key: StageScreen.meterKey,
-                            style: TextStyle(fontSize: 15, color: colors.muted),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: PracticeTag.after(
+                              Text(
+                                _meterLine(
+                                  pattern.timeSignature,
+                                  onStart,
+                                  parts: pending
+                                      ? partsPlay(song!.parts, song.end)
+                                      : _metronome.playsParts,
+                                ),
+                                key: StageScreen.meterKey,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  color: colors.muted,
+                                ),
+                              ),
+                              pending ? null : _metronome.practiceSpeed,
+                              large: true,
+                            ),
                           ),
                         ),
                       ),
@@ -406,10 +423,15 @@ class _StageScreenState extends State<StageScreen>
 
   /// "4/4 · count-in 1 bar": the time signature plus what's on in "When
   /// I press Start".
-  static String _meterLine(String timeSignature, OnStart on) => [
+  static String _meterLine(
+    String timeSignature,
+    OnStart on, {
+    required bool parts,
+  }) => [
     timeSignature,
     if (on.countIn > 0) 'count-in ${OnStart.barsLabel(on.countIn)}',
-    if (on.speedUp) 'speed up',
+    if (parts ? on.practiceOn : on.speedUp)
+      parts ? 'practice speed' : 'speed up',
     if (on.stopAfter != StopAfter.off) 'stop after',
   ].join(' · ');
 

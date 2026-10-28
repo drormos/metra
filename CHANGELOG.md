@@ -5,6 +5,8 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 ## [Unreleased]
 
 ### Added
+- Practice speed, for songs with parts (in "When I press Start", in Speed up's place): play every part at a percentage of its tempo (50–150%), optionally faster each time "Loop song" starts over, up to a limit. Every tempo shown is the real one, and a white "80%" tag ends the line under the BPM (also in stage mode). Saved with the song.
+- Share a setlist as text: a share button in the set panel, left of "Change set", sends the running order (tempos and time signatures, one line per song) to any app.
 - Song parts in Free play: build parts without naming a song first; they're kept (also when you reopen the app) until you save them as a song. Leaving Free play for a song or set asks whether to save them.
 
 ### Changed

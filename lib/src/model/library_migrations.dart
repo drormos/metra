@@ -21,10 +21,13 @@
 /// - 6 (build 79 on): settings gain `partChangeSound` (off).
 /// - 7 (build 93 on): settings gain Free play's song parts, `lastParts`
 ///   (empty: one plain part, as before) and `lastEnd` (`loopLastPart`).
+/// - 8 (build 95 on): every `onStart` (each song's and `lastOnStart`)
+///   gains Practice speed: `practiceOn` (off), `practiceFrom` (80),
+///   `practiceStep` (5) and `practiceUpTo` (100).
 library;
 
 /// The latest format, and the two files' shapes in it.
-const latestVersion = 7;
+const latestVersion = 8;
 
 typedef Json = Map<String, Object?>;
 
@@ -54,6 +57,7 @@ final List<Json Function(Json)> _steps = [
   _v4ToV5,
   _v5ToV6,
   _v6ToV7,
+  _v7ToV8,
 ];
 
 /// Version 1, in all the shapes it shipped in, to version 2:
@@ -231,6 +235,30 @@ Json _v6ToV7(Json v6) => {
   'lastParts': <Object?>[],
   'lastEnd': 'loopLastPart',
 };
+
+/// Practice speed, off at its defaults, in every "When I press Start".
+Json _v7ToV8(Json v7) {
+  Object? practice(Object? raw) => raw is Json
+      ? {
+          ...raw,
+          'practiceOn': false,
+          'practiceFrom': 80,
+          'practiceStep': 5,
+          'practiceUpTo': 100,
+        }
+      : raw;
+  return {
+    ...v7,
+    'version': 8,
+    if (v7['songs'] case final List songs)
+      'songs': [
+        for (final song in songs)
+          song is Json ? {...song, 'onStart': practice(song['onStart'])} : song,
+      ],
+    if (v7.containsKey('lastOnStart'))
+      'lastOnStart': practice(v7['lastOnStart']),
+  };
+}
 
 /// The one-time hints' names in `tipsSeen` (version 1 had a flag each).
 const swipeHintTip = 'set-swipe-hint';
