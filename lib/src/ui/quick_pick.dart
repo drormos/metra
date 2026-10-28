@@ -1453,16 +1453,7 @@ class _QuickPickState extends State<QuickPick>
         ),
         child: Row(
           children: [
-            SizedBox(
-              width: 16,
-              child: current
-                  ? const PlayMarker(current: true)
-                  : Text(
-                      '${i + 1}',
-                      textAlign: TextAlign.right,
-                      style: TextStyle(fontSize: 13, color: colors.muted),
-                    ),
-            ),
+            PositionNumber(position: i + 1, current: current),
             const SizedBox(width: 12),
             Expanded(
               child: Text(

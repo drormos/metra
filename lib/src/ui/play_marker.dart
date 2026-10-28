@@ -1,6 +1,55 @@
 import 'package:flutter/material.dart';
 
+import 'tabular_text.dart';
 import 'theme.dart';
+
+/// A song's position in a set list ("1" to "99"): one line in a column as
+/// wide as "99" at the current text size, right-aligned with tabular
+/// figures, so every position lines up and "10" never breaks in two
+/// (ui-spec.md "Set ⌄" › "Rows"). The current song's red play icon sits in
+/// the same column.
+class PositionNumber extends StatelessWidget {
+  const PositionNumber({
+    super.key,
+    required this.position,
+    this.current = false,
+  });
+
+  /// From 1.
+  final int position;
+  final bool current;
+
+  static const _fontSize = 13.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = DefaultTextStyle.of(context).style.merge(
+      TextStyle(
+        fontSize: _fontSize,
+        color: context.colors.muted,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+    );
+    final scale = MediaQuery.textScalerOf(context).scale(_fontSize) / _fontSize;
+    // Two of the widest digit, plus a hair against rounding.
+    final width = TabularText.slotWidth(style) * 2 * scale + 1;
+    return SizedBox(
+      width: width < 16 ? 16 : width,
+      child: current
+          ? const Align(
+              alignment: Alignment.centerRight,
+              child: PlayMarker(current: true),
+            )
+          : Text(
+              '$position',
+              maxLines: 1,
+              softWrap: false,
+              textAlign: TextAlign.right,
+              style: style,
+            ),
+    );
+  }
+}
 
 /// The play triangle at the start of a song row (the lists):
 /// outlined and muted, filled in the accent for the current song. Shows

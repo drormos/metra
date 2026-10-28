@@ -14,6 +14,7 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 - Rhythm panel: one time signature editor (beats and 4 | 8) with quick picks for 3/4, 4/4, 6/8 and 12/8, instead of the Common grid and the Custom row.
 
 ### Fixed
+- In the set panel, song numbers from 10 up no longer break into two lines; every position sits in one column, also in stage mode's list.
 - The first time you change a loaded song, no tip line covers the tempo ruler any more; Save just stands out until you use it.
 
 ## [1.6.0] - 2026-10-27

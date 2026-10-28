@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/library_controller.dart';
@@ -58,6 +59,81 @@ void main() {
         home: MetronomeScreen(controller: metronome, library: library),
       ),
     );
+  }
+
+  for (final scale in [1.0, 1.15]) {
+    testWidgets('Set ⌄ at ${scale}x, 12 songs: every position on one line in '
+        'one column, 10–12 too; the play icon in the same column', (
+      tester,
+    ) async {
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await pumpScreen(tester);
+      final gig = library.addSetlist('Twelve');
+      for (var i = 1; i <= 12; i++) {
+        final song = library.addSong(
+          name: 'Song $i',
+          bpm: 100 + i,
+          pattern: const MetronomePattern.standard(),
+        );
+        library.addToSetlist(gig.id, song.id);
+      }
+      library.loadSetlist(gig.id, metronome);
+      for (var k = 0; k < 11; k++) {
+        library.nextSong(metronome); // the last one, so 1–11 are numbers
+      }
+      await tester.pump();
+      await tester.tap(find.byKey(SetlistGroup.headerKey));
+      await tester.pumpAndSettle();
+      final scroll = find.descendant(
+        of: find.byType(QuickPick),
+        matching: find.byType(Scrollable),
+      );
+      Finder position(int n) => find.descendant(
+        of: find.byType(PositionNumber),
+        matching: find.text('$n'),
+      );
+      final rects = <int, Rect>{};
+      for (final n in [1, 2, 9, 10, 11]) {
+        // Opened at the current song, the last: up to 1 first.
+        await tester.scrollUntilVisible(
+          position(n),
+          n == 1 ? -40 : 40,
+          scrollable: scroll.first,
+        );
+        rects[n] = tester.getRect(position(n));
+        final column = tester.getRect(
+          find.ancestor(of: position(n), matching: find.byType(PositionNumber)),
+        );
+        expect(
+          tester
+              .renderObject<RenderParagraph>(position(n))
+              .getMaxIntrinsicWidth(double.infinity),
+          lessThanOrEqualTo(column.width),
+          reason: '"$n" fits its column',
+        );
+      }
+      final one = rects[1]!;
+      for (final MapEntry(key: n, value: r) in rects.entries) {
+        expect(r.height, lessThan(one.height * 1.5), reason: '"$n" one line');
+        expect(r.right, moreOrLessEquals(one.right), reason: '"$n" aligned');
+      }
+      final columns = tester
+          .widgetList<PositionNumber>(find.byType(PositionNumber))
+          .map((p) => p.current);
+      expect(columns, contains(true), reason: 'the play icon is in it');
+      final marker = find.ancestor(
+        of: find.byType(PlayMarker),
+        matching: find.byType(PositionNumber),
+      );
+      final number = find.ancestor(
+        of: position(11),
+        matching: find.byType(PositionNumber),
+      );
+      expect(tester.getRect(marker).left, tester.getRect(number).left);
+      expect(tester.getSize(marker).width, tester.getSize(number).width);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   group('setlist group', () {

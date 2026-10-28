@@ -15,6 +15,7 @@ import 'haptics.dart';
 import 'metronome_screen.dart';
 import 'song_map.dart';
 import 'tempo_controls.dart';
+import 'play_marker.dart';
 import 'theme.dart';
 
 /// Stage mode (ui-spec.md "Stage mode", `stage-mode.reference.html`): the
@@ -487,10 +488,7 @@ class _StageScreenState extends State<StageScreen>
               selected: i == current,
               selectedColor: colors.text,
               selectedTileColor: colors.selectedRow,
-              leading: Text(
-                '${i + 1}',
-                style: TextStyle(fontSize: 13, color: colors.muted),
-              ),
+              leading: PositionNumber(position: i + 1),
               title: Text(
                 songs[i].name,
                 maxLines: 1,

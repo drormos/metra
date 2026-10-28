@@ -10,6 +10,7 @@ import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/model/on_start.dart';
 import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
+import 'package:metra/src/ui/play_marker.dart';
 import 'package:metra/src/ui/quick_pick.dart';
 import 'package:metra/src/ui/setlist_group.dart';
 import 'package:metra/src/ui/stage_screen.dart';
@@ -213,6 +214,8 @@ void main() {
     await pump(tester);
     await tester.tap(find.byKey(StageScreen.positionKey));
     await tester.pumpAndSettle();
+    // The same position column as the set panel (one line, 1–99 aligned).
+    expect(find.byType(PositionNumber), findsNWidgets(4));
     await tester.tap(find.byKey(const ValueKey('stage-song-2')));
     await tester.pumpAndSettle();
     expect(library.currentSong!.name, 'Three');
