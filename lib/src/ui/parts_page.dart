@@ -72,6 +72,8 @@ class PartsPage extends StatefulWidget {
   static const undoKey = Key('parts-undo');
   static const discardKey = Key('parts-discard');
   static const saveKey = Key('parts-save');
+  static const saveAsSongKey = Key('parts-save-as-song');
+  static const notSaved = 'Not saved';
 
   static Key cardKey(int i) => ValueKey('parts-card-$i');
   static Key stripKey(int i) => ValueKey('parts-strip-$i');
@@ -109,6 +111,9 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
   late final Ticker _follow = createTicker((_) => _checkPlaying());
   final _progress = ValueNotifier(0.0);
   int? _playing;
+  // Opened on (or since saved as) a song: if it goes, the page goes. Free
+  // play (no song) is edited in place.
+  bool _hadSong = false;
 
   @override
   void initState() {
@@ -166,15 +171,15 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
     _progress.value = ((at.bar + into) / bars).clamp(0.0, 1.0);
   }
 
-  /// The loaded song's parts as they play now: a plain one-part song's
-  /// one part from the click itself.
-  List<SongPart> _parts(Song song) =>
+  /// The parts as they play now (the loaded song's, or Free play's with
+  /// no [song]): a plain one-part song's one part from the click itself.
+  List<SongPart> _parts(Song? song) =>
       _metronome.parts ??
       [
         SongPart.steady(
-          id: song.parts.first.id,
-          name: song.parts.first.name,
-          bars: song.parts.first.bars,
+          id: song?.parts.first.id ?? SongPart.firstId,
+          name: song?.parts.first.name ?? SongPart.firstName,
+          bars: song?.parts.first.bars ?? 1,
           bpm: _metronome.startBpm,
           pattern: _metronome.pattern,
         ),
@@ -183,7 +188,7 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
   void _set(List<SongPart> parts, {SongEnd? end}) =>
       _metronome.setParts(parts, end: end);
 
-  void _edit(Song song, int i, SongPart Function(SongPart) change) {
+  void _edit(Song? song, int i, SongPart Function(SongPart) change) {
     final parts = [..._parts(song)];
     parts[i] = change(parts[i]);
     _set(parts);
@@ -328,7 +333,7 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
     return above ? body : 0;
   }
 
-  void _add(Song song) {
+  void _add(Song? song) {
     var parts = _parts(song);
     // The first add on a plain song (one part of 1 bar, a length never
     // really chosen): both parts get 8 bars, a real starting point.
@@ -352,7 +357,7 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
     _open(added.id);
   }
 
-  void _duplicate(Song song, int i) {
+  void _duplicate(Song? song, int i) {
     final parts = _parts(song);
     final p = parts[i];
     final copy = SongPart(
@@ -369,7 +374,7 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
     _open(copy.id);
   }
 
-  void _remove(Song song, int i) {
+  void _remove(Song? song, int i) {
     final parts = [..._parts(song)];
     if (parts.length < 2) return;
     final part = parts.removeAt(i);
@@ -381,7 +386,7 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
     });
   }
 
-  void _undo(Song song) {
+  void _undo(Song? song) {
     final removed = _removed;
     if (removed == null) return;
     _undoTimer?.cancel();
@@ -393,7 +398,7 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
   }
 
   /// Part [from] moves to position [to] (counted without it).
-  void _reorder(Song song, int from, int to) {
+  void _reorder(Song? song, int from, int to) {
     final parts = [..._parts(song)];
     if (to == from) return;
     parts.insert(to, parts.removeAt(from));
@@ -405,7 +410,8 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
     listenable: Listenable.merge([_library, _metronome]),
     builder: (context, _) {
       final song = _library.currentSong;
-      if (song == null) {
+      if (song != null) _hadSong = true;
+      if (song == null && _hadSong) {
         // Deleted or unloaded elsewhere: nothing left to edit.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) Navigator.maybePop(context);
@@ -488,10 +494,11 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
 
   Widget _topBar(
     BuildContext context,
-    Song song,
+    Song? song,
     List<SongPart> parts, {
     required bool changed,
   }) {
+    if (song == null) return _freePlayBar(context);
     final colors = context.colors;
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 6, 16, 6),
@@ -612,6 +619,75 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Free play's top (ui-spec.md "Parts in Free play"): "Free play" over a
+  /// muted "Not saved", and a filled "Save as song" (the New song dialog;
+  /// then the page and the main screen are on the new song). No Discard:
+  /// to start over, remove the parts.
+  Widget _freePlayBar(BuildContext context) {
+    final colors = context.colors;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 6, 16, 6),
+      child: Row(
+        children: [
+          IconButton(
+            tooltip: 'Back',
+            onPressed: () => Navigator.maybePop(context),
+            icon: const Icon(Icons.chevron_left, size: 28),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FitText(
+                  'Free play',
+                  textKey: PartsPage.titleKey,
+                  minFontSize: 22,
+                  style: const TextStyle(
+                    fontFamily: MetraFonts.condensed,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  PartsPage.notSaved,
+                  style: TextStyle(fontSize: 13, color: colors.muted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          MediaQuery.withClampedTextScaling(
+            maxScaleFactor: 1.3,
+            child: SizedBox(
+              height: 48,
+              child: Center(
+                child: FilledButton(
+                  key: PartsPage.saveAsSongKey,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colors.text,
+                    foregroundColor: colors.background,
+                    minimumSize: const Size(64, 38),
+                    fixedSize: const Size.fromHeight(38),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  onPressed: () {
+                    Haptics.tick();
+                    showSaveAsNewSong(context, _library, _metronome);
+                  },
+                  child: const Text(
+                    'Save as song',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -737,13 +813,13 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
   }
 
   // A touch on the list stops an open card's scroll at once.
-  Widget _list(BuildContext context, Song song, List<SongPart> parts) =>
+  Widget _list(BuildContext context, Song? song, List<SongPart> parts) =>
       Listener(
         onPointerDown: (_) => _anchor.stop(),
         child: _reorderable(context, song, parts),
       );
 
-  Widget _reorderable(BuildContext context, Song song, List<SongPart> parts) =>
+  Widget _reorderable(BuildContext context, Song? song, List<SongPart> parts) =>
       RowExitHost(
         child: ReorderableListView.builder(
           scrollController: _scroll,
@@ -785,7 +861,7 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
         ),
       );
 
-  Widget _card(BuildContext context, Song song, List<SongPart> parts, int i) {
+  Widget _card(BuildContext context, Song? song, List<SongPart> parts, int i) {
     final colors = context.colors;
     final part = parts[i];
     final open = part.id == _openId;
@@ -992,7 +1068,7 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
 
   Widget _openCard(
     BuildContext context,
-    Song song,
+    Song? song,
     List<SongPart> parts,
     int i,
   ) {
@@ -1334,7 +1410,7 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
   };
 
   /// "+ Add part" (dashed) and "At the end" (when the song ends).
-  Widget _footer(BuildContext context, Song song, List<SongPart> parts) {
+  Widget _footer(BuildContext context, Song? song, List<SongPart> parts) {
     final colors = context.colors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1387,7 +1463,7 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _undoBar(BuildContext context, Song song, SongPart part) {
+  Widget _undoBar(BuildContext context, Song? song, SongPart part) {
     final colors = context.colors;
     return Semantics(
       liveRegion: true,
@@ -1478,7 +1554,7 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
   }
 
   /// The Rhythm panel's controls for part [i], in a bottom sheet.
-  Future<void> _rhythm(BuildContext context, Song song, int i) =>
+  Future<void> _rhythm(BuildContext context, Song? song, int i) =>
       showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
@@ -1607,10 +1683,11 @@ class _NameDialogState extends State<_NameDialog> {
   }
 }
 
-/// The Rhythm panel's last row (ui-spec.md "The parts page" → "Getting
-/// there"): "Song parts ›" with the count, opening the parts page; in Free
-/// play "Save as a song to add parts", which saves first. [opener] is the
-/// main screen's context (the panel closes before the page opens).
+/// The Rhythm panel's first row (ui-spec.md "The row explains itself
+/// and comes first"): an outlined 56px row, a three-block icon, "Song
+/// parts" over "Tempo and time-signature changes", the count and ›. It
+/// opens the parts page, in Free play too (on Free play's click). [opener]
+/// is the main screen's context (the panel closes before the page opens).
 class SongPartsRow extends StatelessWidget {
   const SongPartsRow({
     super.key,
@@ -1624,51 +1701,108 @@ class SongPartsRow extends StatelessWidget {
   final BuildContext opener;
 
   static const rowKey = Key('song-parts-row');
-  static const saveFirst = 'Save as a song to add parts';
+  static const description = 'Tempo and time-signature changes';
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final song = library.currentSong;
-    final count = (metronome.parts ?? song?.parts ?? const []).length;
-    return InkWell(
-      key: rowKey,
-      onTap: () async {
-        TopPanel.close();
-        if (library.currentSong == null &&
-            !await showSaveAsNewSong(opener, library, metronome)) {
-          return;
-        }
-        if (opener.mounted) await openPartsPage(opener, library, metronome);
-      },
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 56),
-        decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: colors.divider)),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                song == null ? saveFirst : 'Song parts',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+    final count =
+        metronome.parts?.length ?? library.currentSong?.parts.length ?? 1;
+    final radius = BorderRadius.circular(6);
+    return Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        key: rowKey,
+        borderRadius: radius,
+        onTap: () {
+          TopPanel.close();
+          openPartsPage(opener, library, metronome);
+        },
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 56),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            border: Border.all(color: colors.border, width: 2),
+            borderRadius: radius,
+          ),
+          child: Row(
+            children: [
+              CustomPaint(
+                size: const Size(22, 12),
+                painter: _SectionsIcon(colors.text),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Song parts',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      description,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 13, color: colors.muted),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            if (song != null)
-              Text(
-                count == 1 ? '1 part' : '$count parts',
-                style: TextStyle(fontSize: 14, color: colors.muted),
+              const SizedBox(width: 8),
+              // Very large text on a narrow phone: the count shrinks
+              // rather than pushing past the edge.
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    count == 1 ? '1 part' : '$count parts',
+                    style: TextStyle(fontSize: 14, color: colors.muted),
+                  ),
+                ),
               ),
-            const SizedBox(width: 8),
-            Icon(Icons.chevron_right, size: 22, color: colors.muted),
-          ],
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right, size: 22, color: colors.muted),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+/// A song in sections: three blocks of different widths.
+class _SectionsIcon extends CustomPainter {
+  _SectionsIcon(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    const gap = 2.0;
+    final unit = (size.width - 2 * gap) / 7; // widths 2 : 4 : 1
+    var x = 0.0;
+    for (final w in [2, 4, 1]) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(x, 0, unit * w, size.height),
+          const Radius.circular(1.5),
+        ),
+        paint,
+      );
+      x += unit * w + gap;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SectionsIcon old) => old.color != color;
 }
 
 /// A new card grows in (height and fade, ~200ms, "arrive").

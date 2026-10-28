@@ -242,12 +242,31 @@ void main() {
     expect((song['parts'] as List).single, {'bars': 8});
   });
 
+  test('version 6: Free play has no parts (one plain part, as before); '
+      'version 7 keeps them', () async {
+    for (final f in ['library.json', 'settings.json']) {
+      File('test/fixtures/library_v6/$f').copySync('${dir.path}/$f');
+    }
+    final old = await store.load();
+    expect(old.lastParts, isEmpty);
+    expect(old.lastEnd, SongEnd.loopLastPart);
+    for (final f in ['library.json', 'settings.json']) {
+      File('test/fixtures/library_v7/$f').copySync('${dir.path}/$f');
+    }
+    final now = await LibraryStore(store.file).load();
+    expect([for (final p in now.lastParts) p.name], ['Verse', 'Build']);
+    expect(now.lastParts[1].tempoEnd, 120);
+    expect(now.lastEnd, SongEnd.stop);
+  });
+
   test('every step runs in order up to the latest; unknown versions throw', () {
     final latest = migrate({'version': 1, 'songs': [], 'setlists': []});
     expect(latest['version'], Library.version);
     expect(latest['keepScreenOn'], 'whileOpen');
     expect(latest['stageMode'], false);
     expect(latest['partChangeSound'], false, reason: 'version 6: off');
+    expect(latest['lastParts'], isEmpty, reason: 'version 7: Free play');
+    expect(latest['lastEnd'], 'loopLastPart');
     expect(() => migrate({'version': 0}), throwsFormatException);
     expect(latestVersion, Library.version);
   });

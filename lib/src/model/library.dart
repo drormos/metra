@@ -208,6 +208,8 @@ class Library {
     required this.lastPattern,
     required this.visualOffset,
     this.lastOnStart = OnStart.off,
+    this.lastParts = const [],
+    this.lastEnd = SongEnd.loopLastPart,
     this.clickSound = ClickSound.woodblock,
     this.themeMode = ThemeMode.system,
     this.vibrate = true,
@@ -241,6 +243,11 @@ class Library {
   /// The click's count-in, speed up, stop after (Free play's own after a
   /// fresh launch).
   final OnStart lastOnStart;
+
+  /// Free play's song parts and end (ui-spec.md "Parts in Free play"),
+  /// kept across a fresh launch; empty for one plain part (the click).
+  final List<SongPart> lastParts;
+  final SongEnd lastEnd;
   final Duration visualOffset;
   final ClickSound clickSound;
 
@@ -282,6 +289,8 @@ class Library {
     int? lastBpm,
     MetronomePattern? lastPattern,
     OnStart? lastOnStart,
+    List<SongPart>? lastParts,
+    SongEnd? lastEnd,
     Duration? visualOffset,
     ClickSound? clickSound,
     ThemeMode? themeMode,
@@ -297,6 +306,8 @@ class Library {
     lastBpm: lastBpm ?? this.lastBpm,
     lastPattern: lastPattern ?? this.lastPattern,
     lastOnStart: lastOnStart ?? this.lastOnStart,
+    lastParts: lastParts ?? this.lastParts,
+    lastEnd: lastEnd ?? this.lastEnd,
     visualOffset: visualOffset ?? this.visualOffset,
     clickSound: clickSound ?? this.clickSound,
     themeMode: themeMode ?? this.themeMode,
@@ -323,6 +334,8 @@ class Library {
     lastBpm: lastBpm,
     lastPattern: lastPattern,
     lastOnStart: lastOnStart,
+    lastParts: lastParts,
+    lastEnd: lastEnd,
     visualOffset: visualOffset,
     clickSound: clickSound,
     themeMode: themeMode,
@@ -342,6 +355,8 @@ class Library {
     'lastBpm': lastBpm,
     'lastPattern': lastPattern.toJson(),
     'lastOnStart': lastOnStart.toJson(),
+    'lastParts': [for (final part in lastParts) part.toJson()],
+    'lastEnd': lastEnd.name,
     'visualOffsetMs': visualOffset.inMilliseconds,
     'clickSound': clickSound.name,
     'themeMode': themeMode.name,
@@ -386,6 +401,12 @@ class Library {
                 OnStart.fromJson(latest['lastOnStart'] as Map<String, Object?>),
           ) ??
           OnStart.off,
+      lastParts: [
+        for (final part in read<List<Object?>>('lastParts', const []))
+          ?_orNull(() => SongPart.fromJson(part! as Map<String, Object?>)),
+      ],
+      lastEnd:
+          SongEnd.values.asNameMap()[latest['lastEnd']] ?? SongEnd.loopLastPart,
       visualOffset: Duration(milliseconds: read('visualOffsetMs', 0)),
       clickSound:
           ClickSound.values.asNameMap()[latest['clickSound']] ??
@@ -464,6 +485,8 @@ class Library {
       lastBpm: bpm(lastBpm),
       lastPattern: _fixPattern(lastPattern),
       lastOnStart: lastOnStart,
+      lastParts: _fixParts(lastParts),
+      lastEnd: lastEnd,
       visualOffset: Duration(milliseconds: offset),
       clickSound: clickSound,
       themeMode: themeMode,

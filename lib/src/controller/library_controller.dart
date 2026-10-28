@@ -161,6 +161,9 @@ class LibraryController extends ChangeNotifier {
   }
 
   List<Song> get songs => _library.songs;
+
+  /// Free play's saved song parts (empty: one plain part).
+  List<SongPart> get lastParts => _library.lastParts;
   List<Setlist> get setlists => _library.setlists;
 
   /// The loaded setlist; null is Free play. A deleted set reads as Free
@@ -1076,18 +1079,38 @@ class LibraryController extends ChangeNotifier {
         nextSong(metronome);
       }
     };
+    // Free play's parts come back from their first part (ui-spec.md
+    // "Parts in Free play"): tempo and rhythm first, so they don't edit a
+    // part.
+    final freeParts = _library.lastParts;
     metronome
-      ..setBpm(_library.lastBpm)
-      ..setPattern(_library.lastPattern)
+      ..setBpm(
+        freeParts.isEmpty ? _library.lastBpm : freeParts.first.tempoStart,
+      )
+      ..setPattern(
+        freeParts.isEmpty ? _library.lastPattern : freeParts.first.pattern,
+      )
       ..setOnStart(_library.lastOnStart)
       ..setVisualOffset(_library.visualOffset)
       ..setPartChangeSound(_library.partChangeSound)
       ..setClickSound(_library.clickSound, preview: false)
       ..setVolumes(_library.volumes);
+    if (freeParts.isNotEmpty) {
+      metronome.setParts(freeParts, end: _library.lastEnd);
+    }
     metronome.addListener(() {
+      // Free play's own parts; a loaded song keeps its in the song.
+      final parts = currentSong == null
+          ? metronome.parts ?? const <SongPart>[]
+          : const <SongPart>[];
+      final end = currentSong == null
+          ? metronome.songEnd
+          : SongEnd.loopLastPart;
       if (metronome.startBpm == _library.lastBpm &&
           metronome.pattern == _library.lastPattern &&
           metronome.onStart == _library.lastOnStart &&
+          listEquals(parts, _library.lastParts) &&
+          end == _library.lastEnd &&
           metronome.visualOffset == _library.visualOffset &&
           metronome.clickSound == _library.clickSound &&
           metronome.volumes == _library.volumes) {
@@ -1098,6 +1121,8 @@ class LibraryController extends ChangeNotifier {
           lastBpm: metronome.startBpm,
           lastPattern: metronome.pattern,
           lastOnStart: metronome.onStart,
+          lastParts: parts,
+          lastEnd: end,
           visualOffset: metronome.visualOffset,
           clickSound: metronome.clickSound,
           volumes: metronome.volumes,
@@ -1111,13 +1136,23 @@ class LibraryController extends ChangeNotifier {
 
   void _update(Library library) {
     final before = _library;
-    _library = library;
     // Only a change of mode or song counts: the session stored by the last
     // run (until main detaches it) is not this session's.
     final moved =
         library.activeSetlistId != before.activeSetlistId ||
         library.currentSongId != before.currentSongId ||
         library.currentPosition != before.currentPosition;
+    // On a song, Free play has no parts of its own (they were saved or
+    // discarded on the way out); the click may already hold the song's.
+    if (moved &&
+        library.currentSongId != null &&
+        library.lastParts.isNotEmpty) {
+      library = library.copyWith(
+        lastParts: const [],
+        lastEnd: SongEnd.loopLastPart,
+      );
+    }
+    _library = library;
     if (moved) {
       if (activeSetlist case final set?) {
         _sessionSet = (

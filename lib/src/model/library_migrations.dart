@@ -19,10 +19,12 @@
 ///   `endBehavior` (`stop` | `loopSong` | `loopLastPart`), and an open
 ///   last part became 1 bar with `loopLastPart`.
 /// - 6 (build 79 on): settings gain `partChangeSound` (off).
+/// - 7 (build 93 on): settings gain Free play's song parts, `lastParts`
+///   (empty: one plain part, as before) and `lastEnd` (`loopLastPart`).
 library;
 
 /// The latest format, and the two files' shapes in it.
-const latestVersion = 6;
+const latestVersion = 7;
 
 typedef Json = Map<String, Object?>;
 
@@ -51,6 +53,7 @@ final List<Json Function(Json)> _steps = [
   _v3ToV4,
   _v4ToV5,
   _v5ToV6,
+  _v6ToV7,
 ];
 
 /// Version 1, in all the shapes it shipped in, to version 2:
@@ -220,6 +223,14 @@ Json _v4ToV5(Json v4) => {
 
 /// Version 5 to 6: "Sound on part changes", off.
 Json _v5ToV6(Json v5) => {...v5, 'version': 6, 'partChangeSound': false};
+
+/// Free play had no parts: none, ending as one plain part does.
+Json _v6ToV7(Json v6) => {
+  ...v6,
+  'version': 7,
+  'lastParts': <Object?>[],
+  'lastEnd': 'loopLastPart',
+};
 
 /// The one-time hints' names in `tipsSeen` (version 1 had a flag each).
 const swipeHintTip = 'set-swipe-hint';

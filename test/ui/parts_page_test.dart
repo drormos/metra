@@ -13,6 +13,8 @@ import 'package:metra/src/ui/editor_scaffold.dart' show deleteConfirmKey;
 import 'package:metra/src/ui/metronome_screen.dart';
 import 'package:metra/src/ui/on_start_sheet.dart';
 import 'package:metra/src/ui/parts_page.dart';
+import 'package:metra/src/ui/song_map.dart';
+import 'package:metra/src/ui/free_play_guard.dart';
 import 'package:metra/src/ui/save_as_new_dialog.dart';
 import 'package:metra/src/ui/swipe_row.dart';
 import 'package:metra/src/ui/setlist_group.dart';
@@ -119,15 +121,107 @@ void main() {
       await openPage(tester);
     });
 
-    testWidgets('in Free play the row saves as a song first, then opens the '
-        'page', (tester) async {
+    testWidgets('in Free play the row opens the page on Free play\'s click: '
+        '"Free play", "Not saved", "Save as song" (no Discard); the parts '
+        'stay after Back, on the main screen too', (tester) async {
       await pump(tester, freePlay: true);
       await tester.tap(find.byKey(MetronomeScreen.meterKey));
       await tester.pumpAndSettle();
-      await tapIn(tester, find.text(SongPartsRow.saveFirst));
+      expect(find.text(SongPartsRow.description), findsOneWidget);
+      await tapIn(tester, find.byKey(SongPartsRow.rowKey));
+      expect(find.byType(PartsPage), findsOneWidget);
+      expect(library.currentSong, isNull, reason: 'not saved first');
+      expect(find.text('Free play'), findsWidgets);
+      expect(find.text(PartsPage.notSaved), findsOneWidget);
+      expect(find.byKey(PartsPage.saveAsSongKey), findsOneWidget);
+      expect(find.byKey(PartsPage.discardKey), findsNothing);
+      await tapIn(tester, find.byKey(PartsPage.addKey));
+      expect(metronome.parts, hasLength(2));
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(metronome.parts, hasLength(2), reason: 'kept');
+      expect(find.byType(SongMap), findsOneWidget);
+      expect(library.lastParts, hasLength(2), reason: 'saved for a relaunch');
+    });
+
+    testWidgets('"Save as song" from Free play: the New song dialog, then the '
+        'page and the main screen are on the new song', (tester) async {
+      await pump(tester, freePlay: true);
+      await tester.tap(find.byKey(MetronomeScreen.meterKey));
+      await tester.pumpAndSettle();
+      await tapIn(tester, find.byKey(SongPartsRow.rowKey));
+      await tapIn(tester, find.byKey(PartsPage.addKey));
+      await tapIn(tester, find.byKey(PartsPage.saveAsSongKey));
       await tester.tap(find.byKey(SaveAsNewKeys.save));
       await tester.pumpAndSettle();
+      final song = library.currentSong!;
+      expect(song.parts, hasLength(2));
       expect(find.byType(PartsPage), findsOneWidget);
+      expect(find.text(song.name), findsWidgets);
+      expect(find.byKey(PartsPage.saveAsSongKey), findsNothing);
+      expect(library.lastParts, isEmpty, reason: 'now the song\'s');
+    });
+  });
+
+  group('leaving Free play with parts asks first', () {
+    Future<void> withFreeParts(WidgetTester tester) async {
+      await pump(tester, freePlay: true);
+      metronome.setParts([
+        for (final id in ['a', 'b', 'c', 'd'])
+          SongPart.steady(
+            id: id,
+            name: id,
+            bars: 2,
+            bpm: 120,
+            pattern: const MetronomePattern.standard(),
+          ),
+      ]);
+      await tester.pump();
+      await tester.tap(find.byKey(SetlistGroup.songsTabKey));
+      await tester.pumpAndSettle();
+      expect(find.text('Save your song parts?'), findsOneWidget);
+      expect(
+        find.text('Free play has 4 parts that aren\'t saved.'),
+        findsOneWidget,
+      );
+    }
+
+    testWidgets('Cancel: stays in Free play with its parts', (tester) async {
+      await withFreeParts(tester);
+      await tester.tap(find.byKey(LeaveFreePlayKeys.cancel));
+      await tester.pumpAndSettle();
+      expect(library.currentSong, isNull);
+      expect(metronome.parts, hasLength(4));
+    });
+
+    testWidgets('Discard: one part again, then on to the song', (tester) async {
+      await withFreeParts(tester);
+      await tester.tap(find.byKey(LeaveFreePlayKeys.discard));
+      await tester.pumpAndSettle();
+      expect(library.currentSong?.name, 'Dead Weight');
+      expect(library.lastParts, isEmpty);
+      await tester.tap(find.byKey(SetlistGroup.freePlayTabKey));
+      await tester.pumpAndSettle();
+      expect(metronome.parts, isNull, reason: 'Free play: one plain part');
+    });
+
+    testWidgets('Save as song: the New song dialog, then on', (tester) async {
+      await withFreeParts(tester);
+      await tester.tap(find.byKey(LeaveFreePlayKeys.save));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(SaveAsNewKeys.save));
+      await tester.pumpAndSettle();
+      final saved = library.songs.where((s) => s.parts.length == 4);
+      expect(saved, hasLength(1), reason: 'the parts kept in a song');
+      expect(library.currentSong, isNotNull);
+      expect(library.lastParts, isEmpty);
+    });
+
+    testWidgets('one plain part: no question', (tester) async {
+      await pump(tester, freePlay: true);
+      await tester.tap(find.byKey(SetlistGroup.songsTabKey));
+      await tester.pumpAndSettle();
+      expect(find.text('Save your song parts?'), findsNothing);
       expect(library.currentSong, isNotNull);
     });
   });

@@ -189,10 +189,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('poly-3')));
       await tester.pumpAndSettle();
       expect(controller.pattern.polyrhythm, 3);
-      expect(
-        find.text('3 against 4: three even clicks per bar, in their own sound'),
-        findsOneWidget,
-      );
+      expect(find.text('3 against 4, in its own sound'), findsOneWidget);
       expect(
         find.byKey(TopPanel.surfaceKey),
         findsOneWidget,

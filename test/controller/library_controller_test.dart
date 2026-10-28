@@ -844,6 +844,44 @@ void main() {
       await next.flush();
     });
 
+    test('a fresh launch keeps Free play\'s song parts (from the first '
+        'part); only When I press Start resets', () async {
+      library.attach(metronome);
+      metronome
+        ..setOnStart(const OnStart(speedUp: true))
+        ..setParts([
+          SongPart.steady(
+            id: 'a',
+            name: 'Groove',
+            bars: 4,
+            bpm: 90,
+            pattern: waltz,
+          ),
+          const SongPart(
+            id: 'b',
+            name: 'Lift',
+            bars: 2,
+            tempoStart: 100,
+            tempoEnd: 120,
+            pattern: MetronomePattern.standard(),
+          ),
+        ], end: SongEnd.stop);
+      expect(library.lastParts, hasLength(2));
+      final next = await reload();
+      final fresh = MetronomeController(FakeClickOutput());
+      addTearDown(fresh.dispose);
+      next
+        ..attach(fresh)
+        ..startFresh(fresh);
+      expect([for (final p in fresh.parts!) p.name], ['Groove', 'Lift']);
+      expect(fresh.songEnd, SongEnd.stop);
+      expect(fresh.bpm, 90, reason: 'from the first part');
+      expect(fresh.pattern, waltz);
+      expect(fresh.parts![0].tempoStart, 90, reason: 'no part edited');
+      expect(fresh.onStart.speedUp, isFalse);
+      await next.flush();
+    });
+
     test('empty tabs: nothing to load, the tab shows; the click is kept', () {
       metronome.setBpm(77);
       library.openSongsTab(metronome);

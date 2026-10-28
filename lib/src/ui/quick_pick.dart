@@ -9,6 +9,7 @@ import '../controller/metronome_controller.dart';
 import '../model/library.dart';
 import '../platform/android_bridge.dart';
 import 'editor_scaffold.dart';
+import 'free_play_guard.dart';
 import 'haptics.dart';
 import 'icons.dart';
 import 'motion.dart';
@@ -603,7 +604,11 @@ class _QuickPickState extends State<QuickPick>
   }
 
   /// Applies a choice and closes, with the song-change haptic.
-  void _choose(VoidCallback load) {
+  // Leaving Free play with parts asks about them first.
+  Future<void> _choose(VoidCallback load) async {
+    if (!await leaveFreePlay(context, _library, widget.metronome) || !mounted) {
+      return;
+    }
     Haptics.medium();
     load();
     Navigator.pop(context);

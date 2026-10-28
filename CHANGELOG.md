@@ -4,6 +4,12 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+- Song parts in Free play: build parts without naming a song first; they're kept (also when you reopen the app) until you save them as a song. Leaving Free play for a song or set asks whether to save them.
+
+### Changed
+- The Song parts row is now at the top of the Rhythm panel, with a short description: "Tempo and time-signature changes".
+
 ### Fixed
 - The first time you change a loaded song, no tip line covers the tempo ruler any more; Save just stands out until you use it.
 

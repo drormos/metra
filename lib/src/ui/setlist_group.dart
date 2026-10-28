@@ -5,6 +5,7 @@ import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/library.dart';
 import 'fit_text.dart';
+import 'free_play_guard.dart';
 import 'haptics.dart';
 import 'icons.dart';
 import 'quick_pick.dart';
@@ -124,8 +125,16 @@ class SetlistGroup extends StatelessWidget {
   Widget _tabs(BuildContext context, ModeTab current) {
     final colors = context.colors;
     // Tap = you're there; the tab you're on does nothing.
-    void go(ModeTab tab, VoidCallback open) {
+    Future<void> go(ModeTab tab, VoidCallback open) async {
       if (tab == current) return;
+      // Leaving Free play for a song or set asks about its parts first; an
+      // empty tab loads nothing, so it stays Free play underneath.
+      final loads = switch (tab) {
+        ModeTab.songs => library.songs.isNotEmpty,
+        ModeTab.setlists => library.setlists.isNotEmpty,
+        ModeTab.freePlay => false,
+      };
+      if (loads && !await leaveFreePlay(context, library, metronome)) return;
       Haptics.medium(); // the song changed or detached
       open();
     }

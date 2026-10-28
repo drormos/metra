@@ -519,7 +519,7 @@ class MetronomeScreen extends StatelessWidget {
                 onPressed: () => showTimeSignatureSheet(
                   context,
                   controller,
-                  footer: library == null
+                  header: library == null
                       ? null
                       : SongPartsRow(
                           library: library,

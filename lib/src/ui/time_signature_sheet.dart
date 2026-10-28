@@ -17,22 +17,23 @@ import 'top_panel.dart';
 /// playing, the next beat starts a bar; a subdivision lands on the next
 /// beat.
 /// Opens (or, open already, closes) the Rhythm panel under the top row.
-/// [footer] goes under the controls (the main screen's "Song parts ›").
+/// [header] goes right under the heading (the main screen's "Song parts"
+/// row, ui-spec.md "The row explains itself and comes first").
 Future<void> showTimeSignatureSheet(
   BuildContext context,
   MetronomeController metronome, {
-  Widget? footer,
+  Widget? header,
 }) => TopPanel.toggle(
   context,
   id: TimeSignatureSheet,
-  child: TimeSignatureSheet(rhythm: metronome, footer: footer),
+  child: TimeSignatureSheet(rhythm: metronome, header: header),
 );
 
 class TimeSignatureSheet extends StatelessWidget {
-  const TimeSignatureSheet({super.key, required this.rhythm, this.footer});
+  const TimeSignatureSheet({super.key, required this.rhythm, this.header});
 
   final RhythmTarget rhythm;
-  final Widget? footer;
+  final Widget? header;
 
   static const subdivisionKey = Key('subdivision');
 
@@ -76,6 +77,12 @@ class TimeSignatureSheet extends StatelessWidget {
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                   ),
                 ),
+                // Room to fit on one screen (ui-spec.md "The whole panel
+                // must still fit"): 4dp less above each section label.
+                if (header case final header?) ...[
+                  header,
+                  const SizedBox(height: 12),
+                ],
                 Text('Common', style: label),
                 const SizedBox(height: 8),
                 for (final row in [common.sublist(0, 4), common.sublist(4)])
@@ -100,7 +107,7 @@ class TimeSignatureSheet extends StatelessWidget {
                       ],
                     ),
                   ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 Text('Custom', style: label),
                 const SizedBox(height: 8),
                 MeterControl(
@@ -112,7 +119,7 @@ class TimeSignatureSheet extends StatelessWidget {
                     rhythm.setMeter(beats, unit);
                   },
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 Text('Subdivision', style: label),
                 const SizedBox(height: 8),
                 Segmented<int>(
@@ -125,7 +132,7 @@ class TimeSignatureSheet extends StatelessWidget {
                     rhythm.setSubdivision(steps);
                   },
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 Text('Polyrhythm', style: label),
                 const SizedBox(height: 8),
                 _polyrhythm(colors, pattern.polyrhythm, pattern.beatsPerBar),
@@ -134,10 +141,6 @@ class TimeSignatureSheet extends StatelessWidget {
                   polyrhythmHint(pattern.polyrhythm, pattern.beatsPerBar),
                   style: label.copyWith(height: 1.4),
                 ),
-                if (footer case final footer?) ...[
-                  const SizedBox(height: 16),
-                  footer,
-                ],
               ],
             );
           },
@@ -149,19 +152,7 @@ class TimeSignatureSheet extends StatelessWidget {
   /// The muted line under the Polyrhythm row, in plain words.
   static String polyrhythmHint(int n, int beats) => n == 0
       ? 'Add a second pulse across each bar'
-      : '$n against $beats: ${_words[n]} even clicks per bar, in their own '
-            'sound';
-
-  static const _words = [
-    '',
-    '',
-    'two',
-    'three',
-    'four',
-    'five',
-    'six',
-    'seven',
-  ];
+      : '$n against $beats, in its own sound';
 
   /// "Off · 2 … 7" in one frame; the beat count itself is dimmed and can't
   /// be chosen (n against n is just the beat). Applies at once (while
@@ -241,8 +232,9 @@ class TimeSignatureSheet extends StatelessWidget {
     int beats,
     int unit, {
     required bool selected,
-  }) => ConstrainedBox(
-    constraints: const BoxConstraints(minHeight: 56),
+  }) => SizedBox(
+    // 56dp at any text size: the label shrinks rather than the row growing.
+    height: 56,
     child: OutlinedButton(
       key: ValueKey('common-$beats-$unit'),
       style: OutlinedButton.styleFrom(
@@ -256,12 +248,15 @@ class TimeSignatureSheet extends StatelessWidget {
         rhythm.setMeter(beats, unit);
         Navigator.pop(context);
       },
-      child: Text(
-        '$beats/$unit',
-        style: const TextStyle(
-          fontFamily: MetraFonts.condensed,
-          fontSize: 26,
-          fontWeight: FontWeight.w700,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          '$beats/$unit',
+          style: const TextStyle(
+            fontFamily: MetraFonts.condensed,
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     ),
