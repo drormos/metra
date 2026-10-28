@@ -370,6 +370,7 @@ class QuickPick extends StatefulWidget {
   static const setHeaderKey = Key('quick-pick-set-header');
   static const changeSetKey = Key('quick-pick-change-set');
   static const shareKey = Key('quick-pick-share');
+  static const shareLabel = 'Share setlist';
 
   /// Hands the share text to the phone's share menu; tests replace it.
   static Future<void> Function(String text) share = AndroidBridge.shareText;
@@ -1212,43 +1213,112 @@ class _QuickPickState extends State<QuickPick>
       actions: [
         // The panel's main action, so an outlined button, not a row
         // (ui-spec.md "Adding songs to sets").
-        // "Add songs" and "Stage mode" share the row, half width each
-        // (ui-spec.md "Stage mode").
+        // "Add songs" · "Share" · "Stage mode", three equal buttons with
+        // the icon over the word; when "Stage mode" can't fit a third of
+        // the row, two half-width buttons and a 48px icon-only Share
+        // (ui-spec.md "Stage mode": labels are never cut).
         Padding(
           padding: const EdgeInsets.all(8),
-          child: Row(
-            children: [
-              Expanded(
-                child: _outlined(
-                  key: QuickPick.addSongsKey,
-                  colors: colors,
-                  onPressed: () => _openPicker(setlist.id),
-                  icon: const SetlistIcon(),
-                  label: 'Add songs',
-                ),
-              ),
-              const SizedBox(width: 8),
-              // An empty set has nothing to play: dimmed, with the hint.
-              Expanded(
-                child: _hintWhen(
-                  songs.isEmpty,
-                  'Add songs first',
-                  _outlined(
-                    key: QuickPick.stageModeKey,
-                    colors: colors,
-                    onPressed: songs.isEmpty
-                        ? null
-                        : () {
-                            Haptics.medium();
-                            Navigator.pop(context);
-                            _library.enterStageMode(widget.metronome);
-                          },
-                    icon: const StageIcon(),
-                    label: 'Stage mode',
+          child: LayoutBuilder(
+            builder: (context, box) {
+              void share() => QuickPick.share(setlistShareText(setlist, songs));
+              final stage = songs.isEmpty
+                  ? null
+                  : () {
+                      Haptics.medium();
+                      Navigator.pop(context);
+                      _library.enterStageMode(widget.metronome);
+                    };
+              final third = (box.maxWidth - 2 * _gap) / 3;
+              if (_labelFits(context, 'Stage mode', third)) {
+                return IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: _stacked(
+                          key: QuickPick.addSongsKey,
+                          colors: colors,
+                          onPressed: () => _openPicker(setlist.id),
+                          icon: const SetlistIcon(),
+                          label: 'Add songs',
+                        ),
+                      ),
+                      const SizedBox(width: _gap),
+                      Expanded(
+                        child: _stacked(
+                          key: QuickPick.shareKey,
+                          colors: colors,
+                          onPressed: share,
+                          icon: const Icon(Icons.share_outlined, size: 20),
+                          label: 'Share',
+                          semanticsLabel: QuickPick.shareLabel,
+                        ),
+                      ),
+                      const SizedBox(width: _gap),
+                      // An empty set has nothing to play: dimmed, with the
+                      // hint.
+                      Expanded(
+                        child: _hintWhen(
+                          songs.isEmpty,
+                          'Add songs first',
+                          _stacked(
+                            key: QuickPick.stageModeKey,
+                            colors: colors,
+                            onPressed: stage,
+                            icon: const StageIcon(),
+                            label: 'Stage mode',
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ),
-            ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(
+                    child: _outlined(
+                      key: QuickPick.addSongsKey,
+                      colors: colors,
+                      onPressed: () => _openPicker(setlist.id),
+                      icon: const SetlistIcon(),
+                      label: 'Add songs',
+                    ),
+                  ),
+                  const SizedBox(width: _gap),
+                  Expanded(
+                    child: _hintWhen(
+                      songs.isEmpty,
+                      'Add songs first',
+                      _outlined(
+                        key: QuickPick.stageModeKey,
+                        colors: colors,
+                        onPressed: stage,
+                        icon: const StageIcon(),
+                        label: 'Stage mode',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: _gap),
+                  OutlinedButton(
+                    key: QuickPick.shareKey,
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      fixedSize: const Size(48, 48),
+                      minimumSize: const Size(48, 48),
+                      side: BorderSide(color: colors.border, width: 2),
+                    ),
+                    onPressed: share,
+                    child: const Icon(
+                      Icons.share_outlined,
+                      size: 20,
+                      semanticLabel: QuickPick.shareLabel,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ],
@@ -1265,6 +1335,61 @@ class _QuickPickState extends State<QuickPick>
       : child;
 
   /// A 48px outlined button of the set panel's pinned row.
+  static const _gap = 8.0;
+  static const _labelStyle = TextStyle(
+    fontSize: 15,
+    fontWeight: FontWeight.w600,
+  );
+
+  /// Whether [label] fits on one line in a stacked button [width] wide
+  /// (its padding and border taken off), at the system text size.
+  static bool _labelFits(BuildContext context, String label, double width) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: DefaultTextStyle.of(context).style.merge(_labelStyle),
+      ),
+      textScaler: MediaQuery.textScalerOf(context),
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+    )..layout();
+    final fits = painter.width <= width - 2 * 6 - 2 * 2;
+    painter.dispose();
+    return fits;
+  }
+
+  /// One of three bottom buttons: the icon over a short word.
+  Widget _stacked({
+    required Key key,
+    required MetraColors colors,
+    required VoidCallback? onPressed,
+    required Widget icon,
+    required String label,
+    String? semanticsLabel,
+  }) => OutlinedButton(
+    key: key,
+    style: OutlinedButton.styleFrom(
+      minimumSize: const Size.fromHeight(64),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+      side: BorderSide(color: colors.border, width: 2),
+    ),
+    onPressed: onPressed,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        icon,
+        const SizedBox(height: 4),
+        Text(
+          label,
+          semanticsLabel: semanticsLabel,
+          maxLines: 1,
+          softWrap: false,
+          style: _labelStyle,
+        ),
+      ],
+    ),
+  );
+
   Widget _outlined({
     required Key key,
     required MetraColors colors,
@@ -1284,7 +1409,7 @@ class _QuickPickState extends State<QuickPick>
       label,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+      style: _labelStyle,
     ),
   );
 
@@ -1362,28 +1487,6 @@ class _QuickPickState extends State<QuickPick>
             ),
           ),
           const SizedBox(width: 8),
-          // 40px square to see, 48dp to touch.
-          Tooltip(
-            message: 'Share setlist as text',
-            excludeFromSemantics: true,
-            child: OutlinedButton(
-              key: QuickPick.shareKey,
-              style: OutlinedButton.styleFrom(
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(40, 40),
-                fixedSize: const Size(40, 40),
-                tapTargetSize: MaterialTapTargetSize.padded,
-              ),
-              onPressed: () => QuickPick.share(
-                setlistShareText(setlist, _library.visibleSongs),
-              ),
-              child: const Icon(
-                Icons.share_outlined,
-                size: 18,
-                semanticLabel: 'Share setlist as text',
-              ),
-            ),
-          ),
           const SizedBox(width: 8),
           // Large system text: the button gives way before the name does.
           Flexible(

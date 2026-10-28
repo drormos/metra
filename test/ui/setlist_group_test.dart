@@ -773,46 +773,63 @@ void main() {
         (w.key! as ValueKey<String>).value,
     ];
 
-    testWidgets('Set ⌄: Share, left of "Change set", hands the set as text '
-        'to the share menu', (tester) async {
-      final shared = <String>[];
-      final before = QuickPick.share;
-      QuickPick.share = (text) async => shared.add(text);
-      addTearDown(() => QuickPick.share = before);
-      await withLibrary(tester, loaded: true);
-      await tester.tap(find.byKey(SetlistGroup.headerKey));
-      await tester.pumpAndSettle();
-      final share = find.byKey(QuickPick.shareKey);
-      expect(tester.getSize(share), const Size(48, 48), reason: 'to touch');
-      expect(
-        tester.getSize(
-          find.descendant(of: share, matching: find.byType(Material)),
-        ),
-        const Size(40, 40),
-        reason: 'to see',
-      );
-      expect(
-        tester.getCenter(share).dx,
-        lessThan(tester.getCenter(find.byKey(QuickPick.changeSetKey)).dx),
-      );
-      expect(
-        tester.getSemantics(share),
-        matchesSemantics(
-          label: 'Share setlist as text',
-          isButton: true,
-          hasTapAction: true,
-          isEnabled: true,
-          hasEnabledState: true,
-          isFocusable: true,
-          hasFocusAction: true,
-        ),
-      );
-      await tester.tap(share);
-      expect(shared, [
-        'Friday set (3 songs)\n1. One · 100\n2. Two · 110\n3. Three · 120\n'
-            '\nShared from Metra',
-      ]);
-    });
+    for (final (scale, three) in [(0.5, true), (1.15, false)]) {
+      testWidgets('Set ⌄ at ${scale}x: Share in the bottom row '
+          '(${three ? 'three equal buttons, icon over word' : 'a 48px icon '
+                    'at the end: "Stage mode" doesn\'t fit a third'}), '
+          'never in the header; it hands the set to the share menu', (
+        tester,
+      ) async {
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final shared = <String>[];
+        final before = QuickPick.share;
+        QuickPick.share = (text) async => shared.add(text);
+        addTearDown(() => QuickPick.share = before);
+        await withLibrary(tester, loaded: true);
+        await tester.tap(find.byKey(SetlistGroup.headerKey));
+        await tester.pumpAndSettle();
+        final share = find.byKey(QuickPick.shareKey);
+        final add = tester.getRect(find.byKey(QuickPick.addSongsKey));
+        final stage = tester.getRect(find.byKey(QuickPick.stageModeKey));
+        final at = tester.getRect(share);
+        expect(
+          at.top,
+          greaterThan(
+            tester.getRect(find.byKey(QuickPick.changeSetKey)).bottom,
+          ),
+          reason: 'not in the header',
+        );
+        if (three) {
+          expect([add.width, at.width], [stage.width, stage.width]);
+          expect(add.right, lessThan(at.left));
+          expect(at.right, lessThan(stage.left));
+          expect(find.text('Share'), findsOneWidget);
+        } else {
+          expect(at.size, const Size(48, 48));
+          expect(at.left, greaterThan(stage.right), reason: 'at the end');
+          expect(find.text('Share'), findsNothing);
+        }
+        expect(
+          tester.getSemantics(share),
+          matchesSemantics(
+            label: QuickPick.shareLabel,
+            isButton: true,
+            hasTapAction: true,
+            isEnabled: true,
+            hasEnabledState: true,
+            isFocusable: true,
+            hasFocusAction: true,
+          ),
+        );
+        expect(tester.takeException(), isNull);
+        await tester.tap(share);
+        expect(shared, [
+          'Friday set (3 songs)\n1. One · 100\n2. Two · 110\n3. Three · 120\n'
+              '\nShared from Metra',
+        ]);
+      });
+    }
 
     testWidgets('Songs ⌄: A–Z; a tap plays it as a single song and closes', (
       tester,

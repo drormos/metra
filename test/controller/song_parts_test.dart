@@ -310,6 +310,36 @@ void main() {
       expect(controller.practiceSpeed, isNull);
     });
 
+    test('±1 and ±5 at a practice speed round-trip exactly: the stored '
+        'tempo and the one shown come back', () {
+      for (final speed in [80, 110]) {
+        load([
+          _part('a', 1, 148),
+          _part('b', 1, 120, 140),
+        ], end: SongEnd.loopSong);
+        controller.setOnStart(practice(speed));
+        final shown = controller.bpm;
+        for (final step in [1, 5]) {
+          for (final at in [0, 1]) {
+            controller.jumpToPart(at);
+            final before = controller.parts![at];
+            final bpm = controller.bpm;
+            controller.nudge(step);
+            expect(controller.bpm, bpm + step, reason: '$speed%: as seen');
+            expect(controller.parts![at], isNot(before));
+            controller.nudge(-step);
+            expect(controller.bpm, bpm, reason: '$speed%: back');
+            expect(controller.parts![at], before, reason: '$speed%: stored');
+            controller.nudge(-step);
+            controller.nudge(step);
+            expect(controller.parts![at], before, reason: '$speed%: − then +');
+          }
+        }
+        controller.jumpToPart(0);
+        expect(controller.bpm, shown);
+      }
+    });
+
     test('not for plain songs', () {
       controller.setOnStart(practice(50));
       controller.loadSong(bpm: 120, pattern: _four);
