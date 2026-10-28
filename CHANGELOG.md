@@ -4,6 +4,9 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Fixed
+- The first time you change a loaded song, no tip line covers the tempo ruler any more; Save just stands out until you use it.
+
 ## [1.6.0] - 2026-10-27
 
 ### Added

@@ -89,7 +89,6 @@ class MetronomeScreen extends StatelessWidget {
   static const headsUpKey = Key('heads-up');
   static const headsUpTagKey = Key('heads-up-tag');
   static const revertKey = Key('revert');
-  static const firstChangeKey = Key('first-change-line');
   static const settingsKey = Key('settings-button');
   static const updateDotKey = Key('update-dot');
   static const saveToSongKey = Key('save-to-song');
@@ -745,7 +744,7 @@ class _AnnouncerState extends State<_Announcer> {
 /// `edit-on-main.reference.html`), never moving anything:
 /// A, once: "Change anything here, then Save" at the first load ever and
 /// the first load of a song "+ New song" made; B, once: at the first
-/// change, Save stands out and a muted line floats below; C, every save:
+/// change, Save stands out; C, every save:
 /// a short "✓ Saved ..." confirmation.
 class _TempoLine extends StatefulWidget {
   const _TempoLine({
@@ -775,8 +774,6 @@ class _TempoLine extends StatefulWidget {
   static final titlePulse = ValueNotifier(0);
 
   static const firstLoadText = 'Change anything here, then Save';
-  static const firstChangeText =
-      'Playing your changes. Save keeps them in this song.';
   static const savedText = 'Saved to the song';
   static const savedAsNewText = 'Saved as a new song';
 
@@ -793,7 +790,7 @@ class _TempoLineState extends State<_TempoLine> {
   /// "Hold the song name to edit its parts", while true.
   bool _partsHint = false;
 
-  /// B: Save stands out and the line below shows, while true.
+  /// B: Save stands out (white, semibold), while true.
   bool _firstChange = false;
 
   /// C: the "✓ Saved ..." text, while set.
@@ -885,7 +882,6 @@ class _TempoLineState extends State<_TempoLine> {
         !library.tipSeen(_TempoLine.firstChangeTip)) {
       library.markTipSeen(_TempoLine.firstChangeTip);
       _show(firstChange: true);
-      _say(_TempoLine.firstChangeText);
     }
   }
 
@@ -970,7 +966,7 @@ class _TempoLineState extends State<_TempoLine> {
     );
   }
 
-  /// Revert · Save · Save as new; B's line floats below the first time.
+  /// Revert · Save · Save as new; the first time, Save is lit (B).
   Widget _actions(MetraColors colors, LibraryController library) {
     final controller = widget.controller;
     // Plain grey text buttons, "Revert · Save · Save as new": quiet, one
@@ -1033,30 +1029,7 @@ class _TempoLineState extends State<_TempoLine> {
         ],
       ),
     );
-    // B's line floats below, over the space above the ruler (nothing
-    // moves): it arrives and just fades away.
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Center(child: actions),
-        Positioned(
-          left: -24,
-          right: -24,
-          top: 40,
-          child: ArriveLeave(
-            closes: false,
-            child: _firstChange
-                ? Text(
-                    _TempoLine.firstChangeText,
-                    key: MetronomeScreen.firstChangeKey,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, color: colors.muted),
-                  )
-                : null,
-          ),
-        ),
-      ],
-    );
+    return Center(child: actions);
   }
 }
 
