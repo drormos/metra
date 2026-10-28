@@ -1214,111 +1214,58 @@ class _QuickPickState extends State<QuickPick>
         // The panel's main action, so an outlined button, not a row
         // (ui-spec.md "Adding songs to sets").
         // "Add songs" · "Share" · "Stage mode", three equal buttons with
-        // the icon over the word; when "Stage mode" can't fit a third of
-        // the row, two half-width buttons and a 48px icon-only Share
-        // (ui-spec.md "Stage mode": labels are never cut).
+        // the icon over the word; a word that doesn't fit wraps (the row
+        // grows), never cut (ui-spec.md "Stage mode").
         Padding(
           padding: const EdgeInsets.all(8),
-          child: LayoutBuilder(
-            builder: (context, box) {
-              void share() => QuickPick.share(setlistShareText(setlist, songs));
-              final stage = songs.isEmpty
-                  ? null
-                  : () {
-                      Haptics.medium();
-                      Navigator.pop(context);
-                      _library.enterStageMode(widget.metronome);
-                    };
-              final third = (box.maxWidth - 2 * _gap) / 3;
-              if (_labelFits(context, 'Stage mode', third)) {
-                return IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: _stacked(
-                          key: QuickPick.addSongsKey,
-                          colors: colors,
-                          onPressed: () => _openPicker(setlist.id),
-                          icon: const SetlistIcon(),
-                          label: 'Add songs',
-                        ),
-                      ),
-                      const SizedBox(width: _gap),
-                      Expanded(
-                        child: _stacked(
-                          key: QuickPick.shareKey,
-                          colors: colors,
-                          onPressed: share,
-                          icon: const Icon(Icons.share_outlined, size: 20),
-                          label: 'Share',
-                          semanticsLabel: QuickPick.shareLabel,
-                        ),
-                      ),
-                      const SizedBox(width: _gap),
-                      // An empty set has nothing to play: dimmed, with the
-                      // hint.
-                      Expanded(
-                        child: _hintWhen(
-                          songs.isEmpty,
-                          'Add songs first',
-                          _stacked(
-                            key: QuickPick.stageModeKey,
-                            colors: colors,
-                            onPressed: stage,
-                            icon: const StageIcon(),
-                            label: 'Stage mode',
-                          ),
-                        ),
-                      ),
-                    ],
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _stacked(
+                    key: QuickPick.addSongsKey,
+                    colors: colors,
+                    onPressed: () => _openPicker(setlist.id),
+                    icon: const SetlistIcon(),
+                    label: 'Add songs',
                   ),
-                );
-              }
-              return Row(
-                children: [
-                  Expanded(
-                    child: _outlined(
-                      key: QuickPick.addSongsKey,
-                      colors: colors,
-                      onPressed: () => _openPicker(setlist.id),
-                      icon: const SetlistIcon(),
-                      label: 'Add songs',
-                    ),
-                  ),
-                  const SizedBox(width: _gap),
-                  Expanded(
-                    child: _hintWhen(
-                      songs.isEmpty,
-                      'Add songs first',
-                      _outlined(
-                        key: QuickPick.stageModeKey,
-                        colors: colors,
-                        onPressed: stage,
-                        icon: const StageIcon(),
-                        label: 'Stage mode',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: _gap),
-                  OutlinedButton(
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _stacked(
                     key: QuickPick.shareKey,
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      fixedSize: const Size(48, 48),
-                      minimumSize: const Size(48, 48),
-                      side: BorderSide(color: colors.border, width: 2),
-                    ),
-                    onPressed: share,
-                    child: const Icon(
-                      Icons.share_outlined,
-                      size: 20,
-                      semanticLabel: QuickPick.shareLabel,
+                    colors: colors,
+                    onPressed: () =>
+                        QuickPick.share(setlistShareText(setlist, songs)),
+                    icon: const Icon(Icons.share_outlined, size: 20),
+                    label: 'Share',
+                    semanticsLabel: QuickPick.shareLabel,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // An empty set has nothing to play: dimmed, with the hint.
+                Expanded(
+                  child: _hintWhen(
+                    songs.isEmpty,
+                    'Add songs first',
+                    _stacked(
+                      key: QuickPick.stageModeKey,
+                      colors: colors,
+                      onPressed: songs.isEmpty
+                          ? null
+                          : () {
+                              Haptics.medium();
+                              Navigator.pop(context);
+                              _library.enterStageMode(widget.metronome);
+                            },
+                      icon: const StageIcon(),
+                      label: 'Stage mode',
                     ),
                   ),
-                ],
-              );
-            },
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -1335,28 +1282,10 @@ class _QuickPickState extends State<QuickPick>
       : child;
 
   /// A 48px outlined button of the set panel's pinned row.
-  static const _gap = 8.0;
   static const _labelStyle = TextStyle(
     fontSize: 15,
     fontWeight: FontWeight.w600,
   );
-
-  /// Whether [label] fits on one line in a stacked button [width] wide
-  /// (its padding and border taken off), at the system text size.
-  static bool _labelFits(BuildContext context, String label, double width) {
-    final painter = TextPainter(
-      text: TextSpan(
-        text: label,
-        style: DefaultTextStyle.of(context).style.merge(_labelStyle),
-      ),
-      textScaler: MediaQuery.textScalerOf(context),
-      textDirection: TextDirection.ltr,
-      maxLines: 1,
-    )..layout();
-    final fits = painter.width <= width - 2 * 6 - 2 * 2;
-    painter.dispose();
-    return fits;
-  }
 
   /// One of three bottom buttons: the icon over a short word.
   Widget _stacked({
@@ -1382,34 +1311,10 @@ class _QuickPickState extends State<QuickPick>
         Text(
           label,
           semanticsLabel: semanticsLabel,
-          maxLines: 1,
-          softWrap: false,
+          textAlign: TextAlign.center,
           style: _labelStyle,
         ),
       ],
-    ),
-  );
-
-  Widget _outlined({
-    required Key key,
-    required MetraColors colors,
-    required VoidCallback? onPressed,
-    required Widget icon,
-    required String label,
-  }) => OutlinedButton.icon(
-    key: key,
-    style: OutlinedButton.styleFrom(
-      minimumSize: const Size.fromHeight(48),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      side: BorderSide(color: colors.border, width: 2),
-    ),
-    onPressed: onPressed,
-    icon: icon,
-    label: Text(
-      label,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: _labelStyle,
     ),
   );
 
@@ -1976,45 +1881,52 @@ class _Panel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (top case final top?) ...[
-          top,
-          Divider(height: 1, thickness: 1, color: colors.divider),
-        ],
-        // The lists' scroll slop: past it, vertical movement scrolls and a
-        // pending long-press is off.
-        Flexible(
-          fit: _FillsPanel.of(context) ? FlexFit.tight : FlexFit.loose,
-          // Where committed rows slide off and the gap closes.
-          child: RowExitHost(
-            child: MediaQuery(
-              data: MediaQuery.of(context)
-                  .copyWith(gestureSettings: RowGestures.listSettings),
-              child: list,
+    return LayoutBuilder(
+      builder: (context, box) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (top case final top?) ...[
+            top,
+            Divider(height: 1, thickness: 1, color: colors.divider),
+          ],
+          // The lists' scroll slop: past it, vertical movement scrolls and a
+          // pending long-press is off.
+          Flexible(
+            fit: _FillsPanel.of(context) ? FlexFit.tight : FlexFit.loose,
+            // Where committed rows slide off and the gap closes.
+            child: RowExitHost(
+              child: MediaQuery(
+                data: MediaQuery.of(context)
+                    .copyWith(gestureSettings: RowGestures.listSettings),
+                child: list,
+              ),
             ),
           ),
-        ),
-        ?note,
-        ?bar,
-        Container(
-          decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: colors.border, width: 2)),
+          ?note,
+          ?bar,
+          Container(
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: colors.border, width: 2)),
+            ),
+            // Very large text can make the actions taller than a third of the
+            // panel (their words wrap, never cut): then they scroll there.
+            constraints: BoxConstraints(maxHeight: box.maxHeight / 3),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final (i, action) in actions.indexed) ...[
+                    if (i > 0)
+                      Divider(height: 1, thickness: 1, color: colors.divider),
+                    action,
+                  ],
+                ],
+              ),
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final (i, action) in actions.indexed) ...[
-                if (i > 0)
-                  Divider(height: 1, thickness: 1, color: colors.divider),
-                action,
-              ],
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

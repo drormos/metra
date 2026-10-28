@@ -773,13 +773,11 @@ void main() {
         (w.key! as ValueKey<String>).value,
     ];
 
-    for (final (scale, three) in [(0.5, true), (1.15, false)]) {
-      testWidgets('Set ⌄ at ${scale}x: Share in the bottom row '
-          '(${three ? 'three equal buttons, icon over word' : 'a 48px icon '
-                    'at the end: "Stage mode" doesn\'t fit a third'}), '
-          'never in the header; it hands the set to the share menu', (
-        tester,
-      ) async {
+    for (final scale in [1.0, 1.15, 2.0]) {
+      testWidgets('Set ⌄ at ${scale}x: "Add songs" · "Share" · "Stage mode", '
+          'three equal buttons of one height, a word that doesn\'t fit '
+          'wrapping (never cut); Share never in the header; it hands the set '
+          'to the share menu', (tester) async {
         tester.platformDispatcher.textScaleFactorTestValue = scale;
         addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
         final shared = <String>[];
@@ -800,15 +798,13 @@ void main() {
           ),
           reason: 'not in the header',
         );
-        if (three) {
-          expect([add.width, at.width], [stage.width, stage.width]);
-          expect(add.right, lessThan(at.left));
-          expect(at.right, lessThan(stage.left));
-          expect(find.text('Share'), findsOneWidget);
-        } else {
-          expect(at.size, const Size(48, 48));
-          expect(at.left, greaterThan(stage.right), reason: 'at the end');
-          expect(find.text('Share'), findsNothing);
+        expect([add.size, at.size], [stage.size, stage.size]);
+        expect(add.right, lessThan(at.left));
+        expect(at.right, lessThan(stage.left));
+        for (final label in ['Add songs', 'Share', 'Stage mode']) {
+          final text = tester.widget<Text>(find.text(label));
+          expect(text.maxLines, isNull, reason: '$label wraps');
+          expect(text.overflow, isNull, reason: '$label is never cut');
         }
         expect(
           tester.getSemantics(share),
