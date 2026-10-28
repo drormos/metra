@@ -1757,8 +1757,10 @@ class SongPartsRow extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               // Very large text on a narrow phone: the count shrinks
-              // rather than pushing past the edge.
-              Flexible(
+              // rather than pushing past the edge (never taking the
+              // description's room).
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 72),
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(

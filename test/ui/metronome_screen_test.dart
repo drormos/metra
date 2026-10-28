@@ -189,7 +189,10 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('poly-3')));
       await tester.pumpAndSettle();
       expect(controller.pattern.polyrhythm, 3);
-      expect(find.text('3 against 4, in its own sound'), findsOneWidget);
+      expect(
+        find.text('3 against 4: three even clicks per bar, in their own sound'),
+        findsOneWidget,
+      );
       expect(
         find.byKey(TopPanel.surfaceKey),
         findsOneWidget,
@@ -603,26 +606,28 @@ void main() {
       });
     });
 
-    testWidgets('time signature picker sets the meter', (tester) async {
+    testWidgets('a quick pick sets the meter', (tester) async {
       await pumpScreen(tester);
-      await pick(tester, MetronomeScreen.meterKey, '7/8');
-      expect(controller.pattern.timeSignature, '7/8');
-      expect(find.byKey(const ValueKey('beat-6-off')), findsOneWidget);
-      expect(find.byKey(const ValueKey('beat-7-off')), findsNothing);
+      await pick(tester, MetronomeScreen.meterKey, '6/8');
+      expect(controller.pattern.timeSignature, '6/8');
+      expect(find.byKey(const ValueKey('beat-5-off')), findsOneWidget);
+      expect(find.byKey(const ValueKey('beat-6-off')), findsNothing);
     });
 
-    testWidgets('a common meter applies and closes the sheet', (tester) async {
+    testWidgets('a quick pick applies and closes the sheet', (tester) async {
       await pumpScreen(tester);
       await tester.tap(find.byKey(MetronomeScreen.meterKey));
       await tester.pumpAndSettle();
       expect(find.text('Rhythm'), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('common-12-8')));
+      await tester.tap(find.byKey(const ValueKey('quick-12-8')));
       await tester.pumpAndSettle();
       expect(controller.pattern.timeSignature, '12/8');
       expect(find.byType(TimeSignatureSheet), findsNothing);
     });
 
-    testWidgets('custom applies as it changes and stays open', (tester) async {
+    testWidgets('the editor applies as it changes and stays open', (
+      tester,
+    ) async {
       await pumpScreen(tester);
       controller.cycleBeat(1); // beat 2 accented
       await tester.tap(find.byKey(MetronomeScreen.meterKey));

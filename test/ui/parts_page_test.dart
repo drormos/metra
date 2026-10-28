@@ -578,9 +578,9 @@ void main() {
     await openPage(tester);
     await tapIn(tester, find.byKey(PartsPage.addKey));
     await tapIn(tester, find.byKey(PartsPage.rhythmKey));
-    await tester.tap(find.text('7/8'));
+    await tester.tap(find.text('6/8'));
     await tester.pumpAndSettle();
-    expect(parts()[1].pattern.timeSignature, '7/8');
+    expect(parts()[1].pattern.timeSignature, '6/8');
     expect(parts()[0].pattern.timeSignature, '4/4');
   });
 

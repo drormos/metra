@@ -90,7 +90,7 @@ void main() {
         expect(scroll.pixels, 0, reason: 'opens at the top');
         final sheet = tester.getRect(find.byType(TimeSignatureSheet));
         expect(
-          tester.getRect(find.byKey(const ValueKey('common-12-8'))).bottom,
+          tester.getRect(find.byKey(const ValueKey('quick-12-8'))).bottom,
           lessThanOrEqualTo(sheet.bottom),
           reason: 'the time signatures in view',
         );
@@ -99,11 +99,16 @@ void main() {
         expect(row.height, greaterThanOrEqualTo(56));
         expect(
           row.top,
-          lessThan(tester.getTopLeft(find.text('Common')).dy),
+          lessThan(tester.getTopLeft(find.text('Time signature')).dy),
           reason: 'right under the heading',
         );
         expect(find.text(SongPartsRow.description), findsOneWidget);
-        expect(find.text('3 against 7, in its own sound'), findsOneWidget);
+        expect(
+          find.text(
+            '3 against 7: three even clicks per bar, in their own sound',
+          ),
+          findsOneWidget,
+        );
       });
     }
   }

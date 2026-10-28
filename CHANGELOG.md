@@ -9,6 +9,7 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ### Changed
 - The Song parts row is now at the top of the Rhythm panel, with a short description: "Tempo and time-signature changes".
+- Rhythm panel: one time signature editor (beats and 4 | 8) with quick picks for 3/4, 4/4, 6/8 and 12/8, instead of the Common grid and the Custom row.
 
 ### Fixed
 - The first time you change a loaded song, no tip line covers the tempo ruler any more; Save just stands out until you use it.

@@ -10,8 +10,9 @@ import 'subdivision_icon.dart';
 import 'theme.dart';
 import 'top_panel.dart';
 
-/// The Rhythm sheet (ui-spec.md, `on-start.reference.html`): "Common"
-/// meters apply with one tap and close it; "Custom", Subdivision and
+/// The Rhythm sheet (ui-spec.md, `on-start.reference.html`): the quick
+/// picks apply with one tap and close it; the time signature editor,
+/// Subdivision and
 /// Polyrhythm apply as they change and keep it open. Through
 /// [MetronomeController.setMeter], so beat states are kept and, while
 /// playing, the next beat starts a bar; a subdivision lands on the next
@@ -45,16 +46,8 @@ class TimeSignatureSheet extends StatelessWidget {
     4: 'Sixteenth notes',
   };
 
-  static const common = [
-    (2, 4),
-    (3, 4),
-    (4, 4),
-    (5, 4),
-    (6, 8),
-    (7, 8),
-    (9, 8),
-    (12, 8),
-  ];
+  /// The quick picks under the editor, always in the same place.
+  static const quickPicks = [(3, 4), (4, 4), (6, 8), (12, 8)];
 
   @override
   Widget build(BuildContext context) {
@@ -77,38 +70,14 @@ class TimeSignatureSheet extends StatelessWidget {
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                   ),
                 ),
-                // Room to fit on one screen (ui-spec.md "The whole panel
-                // must still fit"): 4dp less above each section label.
                 if (header case final header?) ...[
                   header,
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                 ],
-                Text('Common', style: label),
-                const SizedBox(height: 8),
-                for (final row in [common.sublist(0, 4), common.sublist(4)])
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        for (final (i, (beats, unit)) in row.indexed) ...[
-                          if (i > 0) const SizedBox(width: 8),
-                          Expanded(
-                            child: _commonButton(
-                              context,
-                              colors,
-                              beats,
-                              unit,
-                              selected:
-                                  pattern.beatsPerBar == beats &&
-                                  pattern.beatUnit == unit,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                const SizedBox(height: 12),
-                Text('Custom', style: label),
+                // One editor, and one row of quick picks under it
+                // (ui-spec.md "Time signature: one editor + one row of quick
+                // picks").
+                Text('Time signature', style: label),
                 const SizedBox(height: 8),
                 MeterControl(
                   size: 52,
@@ -119,7 +88,26 @@ class TimeSignatureSheet extends StatelessWidget {
                     rhythm.setMeter(beats, unit);
                   },
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    for (final (i, (beats, unit)) in quickPicks.indexed) ...[
+                      if (i > 0) const SizedBox(width: 8),
+                      Expanded(
+                        child: _quickPick(
+                          context,
+                          colors,
+                          beats,
+                          unit,
+                          selected:
+                              pattern.beatsPerBar == beats &&
+                              pattern.beatUnit == unit,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 24),
                 Text('Subdivision', style: label),
                 const SizedBox(height: 8),
                 Segmented<int>(
@@ -132,7 +120,7 @@ class TimeSignatureSheet extends StatelessWidget {
                     rhythm.setSubdivision(steps);
                   },
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
                 Text('Polyrhythm', style: label),
                 const SizedBox(height: 8),
                 _polyrhythm(colors, pattern.polyrhythm, pattern.beatsPerBar),
@@ -152,7 +140,19 @@ class TimeSignatureSheet extends StatelessWidget {
   /// The muted line under the Polyrhythm row, in plain words.
   static String polyrhythmHint(int n, int beats) => n == 0
       ? 'Add a second pulse across each bar'
-      : '$n against $beats, in its own sound';
+      : '$n against $beats: ${_words[n]} even clicks per bar, in their own '
+            'sound';
+
+  static const _words = [
+    '',
+    '',
+    'two',
+    'three',
+    'four',
+    'five',
+    'six',
+    'seven',
+  ];
 
   /// "Off · 2 … 7" in one frame; the beat count itself is dimmed and can't
   /// be chosen (n against n is just the beat). Applies at once (while
@@ -226,36 +226,52 @@ class TimeSignatureSheet extends StatelessWidget {
     ),
   );
 
-  Widget _commonButton(
+  /// A pill chip (36px in a 48dp touch target): the current one filled
+  /// and outlined in the text color; tap applies it and closes the sheet.
+  Widget _quickPick(
     BuildContext context,
     MetraColors colors,
     int beats,
     int unit, {
     required bool selected,
-  }) => SizedBox(
-    // 56dp at any text size: the label shrinks rather than the row growing.
-    height: 56,
-    child: OutlinedButton(
-      key: ValueKey('common-$beats-$unit'),
-      style: OutlinedButton.styleFrom(
-        padding: EdgeInsets.zero,
-        backgroundColor: selected ? colors.text : null,
-        foregroundColor: selected ? colors.background : colors.text,
-        side: selected ? BorderSide.none : null,
-      ),
-      onPressed: () {
+  }) => Semantics(
+    button: true,
+    selected: selected,
+    child: InkWell(
+      key: ValueKey('quick-$beats-$unit'),
+      customBorder: const StadiumBorder(),
+      onTap: () {
         Haptics.tick();
         rhythm.setMeter(beats, unit);
         Navigator.pop(context);
       },
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Text(
-          '$beats/$unit',
-          style: const TextStyle(
-            fontFamily: MetraFonts.condensed,
-            fontSize: 26,
-            fontWeight: FontWeight.w700,
+      child: SizedBox(
+        height: 48,
+        child: Center(
+          child: Container(
+            height: 36,
+            decoration: ShapeDecoration(
+              color: selected ? colors.tickResting : null,
+              shape: StadiumBorder(
+                side: BorderSide(
+                  color: selected ? colors.text : colors.border,
+                  width: 2,
+                ),
+              ),
+            ),
+            alignment: Alignment.center,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                '$beats/$unit',
+                style: TextStyle(
+                  fontFamily: MetraFonts.condensed,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? colors.text : colors.muted,
+                ),
+              ),
+            ),
           ),
         ),
       ),
