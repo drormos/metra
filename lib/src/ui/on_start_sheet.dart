@@ -219,7 +219,8 @@ class OnStartSheet extends StatelessWidget {
                       if (on)
                         Text(
                           summary,
-                          maxLines: 1,
+                          // Practice speed's is long; it wraps, never cut.
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(fontSize: 13, color: colors.muted),
                         ),
