@@ -1685,7 +1685,8 @@ class _NameDialogState extends State<_NameDialog> {
 
 /// The Rhythm panel's first row (ui-spec.md "The row explains itself
 /// and comes first"): an outlined 56px row, a three-block icon, "Song
-/// parts" over "Tempo and time-signature changes", the count and ›. It
+/// parts" over "Tempo and time-signature changes", and › (no count: it's
+/// on the parts page). It
 /// opens the parts page, in Free play too (on Free play's click). [opener]
 /// is the main screen's context (the panel closes before the page opens).
 class SongPartsRow extends StatelessWidget {
@@ -1706,8 +1707,6 @@ class SongPartsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final count =
-        metronome.parts?.length ?? library.currentSong?.parts.length ?? 1;
     final radius = BorderRadius.circular(6);
     return Material(
       type: MaterialType.transparency,
@@ -1746,30 +1745,15 @@ class SongPartsRow extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    // Never cut: at large text it wraps to a second line.
                     Text(
                       description,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 13, color: colors.muted),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              // Very large text on a narrow phone: the count shrinks
-              // rather than pushing past the edge (never taking the
-              // description's room).
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 72),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    count == 1 ? '1 part' : '$count parts',
-                    style: TextStyle(fontSize: 14, color: colors.muted),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
               Icon(Icons.chevron_right, size: 22, color: colors.muted),
             ],
           ),

@@ -104,13 +104,20 @@ void main() {
   }
 
   group('getting there', () {
-    testWidgets('"Song parts ›" at the bottom of the Rhythm panel, with the '
-        'count; long-pressing the title too', (tester) async {
+    testWidgets('"Song parts ›" at the top of the Rhythm panel, its '
+        'description whole and no count; long-pressing the title too', (
+      tester,
+    ) async {
       await pump(tester);
       await tester.tap(find.byKey(MetronomeScreen.meterKey));
       await tester.pumpAndSettle();
       expect(find.text('Song parts'), findsOneWidget);
-      expect(find.text('1 part'), findsOneWidget);
+      expect(find.text('1 part'), findsNothing, reason: 'on the parts page');
+      final description = tester.widget<Text>(
+        find.text(SongPartsRow.description),
+      );
+      expect(description.overflow, isNot(TextOverflow.ellipsis));
+      expect(description.maxLines, isNull, reason: 'wraps, never cut');
       await tapIn(tester, find.byKey(SongPartsRow.rowKey));
       expect(find.byType(PartsPage), findsOneWidget);
       expect(find.byType(TimeSignatureSheet), findsNothing);
@@ -185,6 +192,69 @@ void main() {
         findsOneWidget,
       );
     }
+
+    testWidgets('the look: Save as song the only filled button, Discard red '
+        'text, Cancel muted text; one line when they fit', (tester) async {
+      await withFreeParts(tester);
+      // Room for one line with the (wide) test font.
+      tester.view.physicalSize = const Size(1000, 900);
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byType(Dialog),
+          matching: find.byType(FilledButton),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget(find.byKey(LeaveFreePlayKeys.save)),
+        isA<FilledButton>(),
+      );
+      expect(
+        tester.widget(find.byKey(LeaveFreePlayKeys.discard)),
+        isA<TextButton>(),
+      );
+      expect(
+        tester.widget(find.byKey(LeaveFreePlayKeys.cancel)),
+        isA<TextButton>(),
+      );
+      final colors = testTheme.extension<MetraColors>()!;
+      Color? fg(Key key) => tester
+          .widget<ButtonStyleButton>(find.byKey(key))
+          .style!
+          .foregroundColor!
+          .resolve({});
+      expect(fg(LeaveFreePlayKeys.discard), colors.accent);
+      expect(fg(LeaveFreePlayKeys.cancel), colors.muted);
+      final ys = {
+        for (final key in [
+          LeaveFreePlayKeys.cancel,
+          LeaveFreePlayKeys.discard,
+          LeaveFreePlayKeys.save,
+        ])
+          tester.getCenter(find.byKey(key)).dy,
+      };
+      expect(ys, hasLength(1), reason: 'one line');
+    });
+
+    testWidgets('too wide for one line: all three full width, Save as song, '
+        'Discard, Cancel', (tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await withFreeParts(tester);
+      final rects = [
+        for (final key in [
+          LeaveFreePlayKeys.save,
+          LeaveFreePlayKeys.discard,
+          LeaveFreePlayKeys.cancel,
+        ])
+          tester.getRect(find.byKey(key)),
+      ];
+      expect(rects[0].top, lessThan(rects[1].top));
+      expect(rects[1].top, lessThan(rects[2].top));
+      expect({for (final r in rects) r.width}, hasLength(1), reason: 'wide');
+      expect(tester.takeException(), isNull);
+    });
 
     testWidgets('Cancel: stays in Free play with its parts', (tester) async {
       await withFreeParts(tester);

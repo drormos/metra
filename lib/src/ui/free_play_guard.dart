@@ -50,26 +50,69 @@ class _LeaveDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    Widget button(Key key, String label, _Leave value, {Color? fill}) =>
-        SizedBox(
-          height: 48,
-          child: fill == null
-              ? OutlinedButton(
-                  key: key,
-                  onPressed: () => Navigator.pop(context, value),
-                  child: Text(label, style: _label),
-                )
-              : FilledButton(
-                  key: key,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: fill,
-                    foregroundColor: colors.background,
-                    padding: const EdgeInsets.symmetric(horizontal: 18),
-                  ),
-                  onPressed: () => Navigator.pop(context, value),
-                  child: Text(label, style: _label),
-                ),
+    // Save as song is the only filled button; Discard is red text, Cancel
+    // muted text (ui-spec.md "Parts in Free play" › "Button look").
+    final buttons = [
+      (cancelKey, 'Cancel', _Leave.cancel, colors.muted, null),
+      (discardKey, 'Discard', _Leave.discard, colors.accent, null),
+      (saveKey, 'Save as song', _Leave.save, colors.background, colors.text),
+    ];
+    const pad = 18.0, gap = 8.0;
+    Widget button((Key, String, _Leave, Color, Color?) b, {bool wide = false}) {
+      final (key, label, value, color, fill) = b;
+      final style =
+          (fill == null ? TextButton.styleFrom : FilledButton.styleFrom)(
+            foregroundColor: color,
+            backgroundColor: fill,
+            minimumSize: Size(wide ? double.infinity : 48, 48),
+            padding: const EdgeInsets.symmetric(horizontal: pad),
+          );
+      void tap() => Navigator.pop(context, value);
+      final text = Text(label, style: _label);
+      return fill == null
+          ? TextButton(key: key, style: style, onPressed: tap, child: text)
+          : FilledButton(key: key, style: style, onPressed: tap, child: text);
+    }
+
+    // One line when the three fit; otherwise all three full width, the
+    // filled one first (never two and one).
+    final actions = LayoutBuilder(
+      builder: (context, box) {
+        final scaler = MediaQuery.textScalerOf(context);
+        final base = DefaultTextStyle.of(context).style.merge(_label);
+        var width = gap * (buttons.length - 1);
+        for (final (_, label, _, _, _) in buttons) {
+          final painter = TextPainter(
+            text: TextSpan(text: label, style: base),
+            textScaler: scaler,
+            textDirection: TextDirection.ltr,
+            maxLines: 1,
+          )..layout();
+          width += painter.width + 2 * pad;
+          painter.dispose();
+        }
+        if (width <= box.maxWidth) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              for (final (i, b) in buttons.indexed) ...[
+                if (i > 0) const SizedBox(width: gap),
+                button(b),
+              ],
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final (i, b) in buttons.reversed.indexed) ...[
+              if (i > 0) const SizedBox(height: gap),
+              button(b, wide: true),
+            ],
+          ],
         );
+      },
+    );
     return Dialog(
       backgroundColor: colors.surface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24),
@@ -99,22 +142,7 @@ class _LeaveDialog extends StatelessWidget {
               style: TextStyle(fontSize: 14, height: 1.45, color: colors.muted),
             ),
             const SizedBox(height: 18),
-            // Wraps rather than overflowing (long labels, large text).
-            Wrap(
-              alignment: WrapAlignment.end,
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                button(cancelKey, 'Cancel', _Leave.cancel),
-                button(
-                  discardKey,
-                  'Discard',
-                  _Leave.discard,
-                  fill: colors.accent,
-                ),
-                button(saveKey, 'Save as song', _Leave.save, fill: colors.text),
-              ],
-            ),
+            actions,
           ],
         ),
       ),
