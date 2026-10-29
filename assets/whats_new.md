@@ -2,6 +2,12 @@
 
 Newest first. The top version's lines are also the Play Store release notes.
 
+## 1.7.0 · Oct 2026
+- Song parts are at the top of the 4/4 panel, and you can build them right in Free play, then save them as a song.
+- Practice speed for songs with parts: play the whole song at 80% (or 110%) and speed up each time it loops.
+- Share a setlist: send the running order with tempos to your band.
+- Simpler time signatures: any count over 4 or 8, plus one-tap 3/4, 4/4, 6/8 and 12/8.
+
 ## 1.6.0 · Oct 2026
 - Song parts: tempo, time-signature and gradual changes inside a song. Open the 4/4 button › Song parts, or hold the song's name.
 - Stage mode: your set full screen, for gigs

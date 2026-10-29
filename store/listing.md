@@ -6,7 +6,7 @@ App name (30): **Metra**
 
 A precise metronome with tempo changes, setlists and a stage mode. No ads.
 
-## Full description (2522 / 4000)
+## Full description (2822 / 4000)
 
 Metra is a metronome for every hour you play: practice, rehearsal and the stage. The click stays exactly on time, the screen reads at a glance, and a whole song, tempo changes and all, plays from one tap.
 
@@ -28,15 +28,17 @@ SETLISTS AND STAGE MODE
 • Step through a set with Previous / Next, the lock screen, or a Bluetooth page-turner pedal.
 • Stage mode: a large, simple screen with only what you need on stage: big Previous, Next and Start, and a hold to leave, so a stray touch never takes you out.
 • Change anything on the main screen while it plays, then Save, Revert, or Save as a new song.
+• Share a setlist as text: send the running order, with tempos and time signatures, to your band in any app.
 
 PRACTICE
 • Count-in of 1 or 2 bars, shown on screen as it counts.
 • Speed up: add a few bpm every few bars, up to a target tempo.
+• Practice speed for songs with parts: play the whole song at 80% (or 110%), every tempo change in proportion, a little faster each time it loops.
 • Stop after a number of bars or a length of time.
 • Tap tempo, a fast tempo ruler, and ±1 / ±5 buttons.
 
 RHYTHM
-• Any time signature, 2/4 to 12/8 and custom.
+• Any time signature from 1 to 16 beats over 4 or 8, with one-tap 3/4, 4/4, 6/8 and 12/8.
 • Quarters, eighths, triplets and sixteenths; tap a beat to accent or mute it.
 • Polyrhythms from 2 to 7 against the beat, in their own sound.
 • Four click sounds (Woodblock, Beep, Cowbell, Bell), with volumes for accents, beats, subdivisions and polyrhythm.
@@ -51,15 +53,14 @@ No ads, no account, no tracking. Metra has no internet access: your songs stay o
 
 Made by a drummer who wanted a metronome that just works, in the practice room and on stage.
 
-## Release notes (332 / 500)
+## Release notes (378 / 500)
 
 The What's new lines of the release (`assets/whats_new.md`), as printed by `tool/release.sh`:
 
-- Song parts: tempo, time-signature and gradual changes inside a song. Open the 4/4 button › Song parts, or hold the song's name.
-- Stage mode: your set full screen, for gigs
-- The screen stays on while Metra is open (Settings)
-- The song map: slide or tap to jump to a part
-- Every stepper repeats when held and takes typed numbers
+- Song parts are at the top of the 4/4 panel, and you can build them right in Free play, then save them as a song.
+- Practice speed for songs with parts: play the whole song at 80% (or 110%) and speed up each time it loops.
+- Share a setlist: send the running order with tempos to your band.
+- Simpler time signatures: any count over 4 or 8, plus one-tap 3/4, 4/4, 6/8 and 12/8.
 
 ## Graphics
 - App icon (512×512): `store/icon-512.png` (from `tool/icon/app-icon.png`)
@@ -71,7 +72,7 @@ The What's new lines of the release (`assets/whats_new.md`), as printed by `tool
   4. `04-set-list.png`: the set list open at 4/12
   5. `05-when-i-press-start.png`: count-in and speed up on
   6. `06-count-in-parts-page.png`: the parts page counting in, the tag filling, "Stop · Count-in 3 of 4"
-  7. `07-rhythm-panel.png`: 7/8, eighths, polyrhythm 3
+  7. `07-rhythm-panel.png`: the Rhythm panel (Song parts row, time signature editor with quick picks): 7/8, eighths, polyrhythm 3
   8. `08-daylight.png`: Glass Harbor playing in Daylight, Verse bar 2 of 8
 
 ## Redoing the screenshots

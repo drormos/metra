@@ -3,9 +3,9 @@
 ## Overview
 A sample-accurate metronome for Android (and macOS / iOS), built with Flutter and `flutter_soloud`. Click timing comes from the C++ engine clock, so playback doesn't drift. Map of the code: [ARCHITECTURE.md](ARCHITECTURE.md). How it was built, phase by phase, with every decision: [docs/history.md](docs/history.md).
 
-## Status (2026-10-27)
-- Release ready: 1.6.0 (build 91), the first 1.6.0 testers get (build 66 was never uploaded): stage mode, keep the screen on, song parts with the parts page, the song map, heads-ups and count-in display, one stepper app-wide, vector icons. The AAB goes to Play by hand (closed test). On Play now: 1.5.3 (build 55), with the store listing assets in `store/` (refreshed for 1.6.0).
-- Next: upload 1.6.0 (build 91) to the closed test. Testers only ever move up a build (a build older than 58 can't read the version 4 files).
+## Status (2026-10-29)
+- Release ready: 1.7.0 (build 99): Practice speed for songs with parts (saved format 8), share a setlist as text, song parts in Free play (format 7), the Rhythm panel's one time signature editor with quick picks and the Song parts row at its top, set positions in one column. The AAB goes to Play by hand (closed test). In the closed test now: 1.6.0 (build 91).
+- Next: upload 1.7.0 (build 99) to the closed test, then tag v1.7.0. Queued, not started: sharing full sets and songs (`docs/design/next-prompt-sharing.md`).
 
 ## Working rules
 - One step per commit; stage specific paths (never `git add -A`: the designer edits `docs/design/` in parallel and those drafts aren't ours to commit).
