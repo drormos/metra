@@ -17,6 +17,15 @@ class SoloudClickOutput implements ClickOutput {
     final soloud = SoLoud.instance;
     await soloud.init();
     soloud.setMaxActiveVoiceCount(maxVoices);
+    // Overlapping clicks (accent + subdivision + polyrhythm) can sum past
+    // full scale: a brickwall look-ahead limiter catches them instead of
+    // the hard clip. No drive, so a single click passes untouched; the
+    // 1 ms look-ahead delays every click alike (the grid is unchanged).
+    final limiter = soloud.filters.limiterFilter..activate();
+    limiter.threshold.value = 0;
+    limiter.outputCeiling.value = -0.1;
+    limiter.attackTime.value = 1;
+    limiter.releaseTime.value = 50;
     // All sounds up front (a few KB each), so switching never waits.
     return SoloudClickOutput._({
       for (final sound in ClickSound.values)
@@ -37,11 +46,6 @@ class SoloudClickOutput implements ClickOutput {
   final Map<ClickSound, ({AudioSource accent, AudioSource normal})> _sources;
   var _sound = ClickSound.woodblock;
   var _volumes = ClickVolumes.defaults;
-
-  // The samples peak at 0.9 (accent) and 0.7 (normal) of full scale. This
-  // boost makes every level peak at its volume × 0.9, so the per-level
-  // volumes alone set the balance.
-  static const _normalBoost = 0.9 / 0.7;
 
   @override
   Stream<void> get deviceFailures =>
@@ -69,23 +73,33 @@ class SoloudClickOutput implements ClickOutput {
   @override
   ClickHandle schedule(StepLevel level, Duration at, {bool raised = false}) =>
       _Click(
-        raised
-            // The accent, two semitones up: heard as "something changed",
-            // not mistaken for a polyrhythm pulse (a fifth up).
-            ? SoLoud.instance.playScheduled(
-                _sources[_sound]!.accent,
-                at,
-                volume: _gain(StepLevel.accent),
-                scale: partChangeSpeed,
-              )
-            : SoLoud.instance.playScheduled(
-                level == StepLevel.accent
-                    ? _sources[_sound]!.accent
-                    : _sources[_sound]!.normal,
-                at,
-                volume: _gain(level),
-              ),
+        _full(
+          raised
+              // The accent, two semitones up: heard as "something changed",
+              // not mistaken for a polyrhythm pulse (a fifth up).
+              ? SoLoud.instance.playScheduled(
+                  _sources[_sound]!.accent,
+                  at,
+                  volume: _gain(StepLevel.accent),
+                  scale: partChangeSpeed,
+                )
+              : SoLoud.instance.playScheduled(
+                  level == StepLevel.accent
+                      ? _sources[_sound]!.accent
+                      : _sources[_sound]!.normal,
+                  at,
+                  volume: _gain(level),
+                ),
+        ),
       );
+
+  /// A mono click at full level in both channels: SoLoud's default centre
+  /// pan is constant-power (0.707 a side, −3 dB), a fixed loss for a click
+  /// that's the only thing playing.
+  static SoundHandle _full(SoundHandle handle) {
+    SoLoud.instance.setPanAbsolute(handle, 1, 1);
+    return handle;
+  }
 
   /// The first beat of a new part: two semitones up (2^(2/12)).
   static const partChangeSpeed = 1.1225;
@@ -98,19 +112,21 @@ class SoloudClickOutput implements ClickOutput {
     final accent = level == StepLevel.accent;
     final source = accent ? _sources[_sound]!.accent : _sources[_sound]!.normal;
     // Accented pulses at the polyrhythm volume, regular ones softer.
-    final gain = _volumes.polyrhythm * (accent ? 1 : 0.75 * _normalBoost);
+    final gain = _volumes.polyrhythm * (accent ? 1 : 0.75);
     return _Click(
-      SoLoud.instance.playScheduled(
-        source,
-        at,
-        volume: gain,
-        scale: pulseSpeed,
+      _full(
+        SoLoud.instance.playScheduled(
+          source,
+          at,
+          volume: gain,
+          scale: pulseSpeed,
+        ),
       ),
     );
   }
 
-  double _gain(StepLevel level) =>
-      _volumes.forLevel(level) * (level == StepLevel.accent ? 1 : _normalBoost);
+  /// 100% is the sample as it is.
+  double _gain(StepLevel level) => _volumes.forLevel(level);
 
   @override
   set sound(ClickSound value) => _sound = value;
@@ -125,9 +141,11 @@ class SoloudClickOutput implements ClickOutput {
   void preview() {
     final previous = _preview;
     if (previous != null) unawaited(SoLoud.instance.stop(previous));
-    _preview = SoLoud.instance.play(
-      _sources[_sound]!.accent,
-      volume: _gain(StepLevel.accent),
+    _preview = _full(
+      SoLoud.instance.play(
+        _sources[_sound]!.accent,
+        volume: _gain(StepLevel.accent),
+      ),
     );
   }
 

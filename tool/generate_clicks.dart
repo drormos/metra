@@ -4,8 +4,9 @@
 // Run with: dart run tool/generate_clicks.dart
 //
 // Every sound starts at its loudest on sample 0 (cosine phase), so the
-// files have zero leading silence. Peaks are normalized so all sounds play
-// at the same level: accent 0.9, normal 0.7 of full scale. Cowbell and Bell
+// files have zero leading silence. Every file peaks at −0.5 dBFS, so 100%
+// on a volume slider is the sample at full level (the engine's limiter
+// only acts when clicks overlap). Cowbell and Bell
 // are ports of the voices chosen by ear in
 // docs/design/sounds/click_prototypes.py (cowbell_d, bell_a).
 import 'dart:io';
@@ -122,7 +123,8 @@ void _write(String name, List<double> Function(bool accent) voice) {
   for (final accent in [true, false]) {
     final shaped = voice(accent);
     final peak = shaped.map((x) => x.abs()).reduce(max);
-    final target = accent ? 0.9 : 0.7;
+    // −0.5 dBFS.
+    const target = 0.944;
     final samples = Int16List.fromList([
       for (final x in shaped) (x / peak * target * 32767).round(),
     ]);

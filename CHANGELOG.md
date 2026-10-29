@@ -4,6 +4,9 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Changed
+- The click is about 3.4 dB louder at the same settings: every sound plays at full level, and only clicks that overlap (accents, subdivisions and a polyrhythm together) are limited, never clipped.
+
 ## [1.8.0] - 2026-10-29
 
 ### Added
