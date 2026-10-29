@@ -5,6 +5,7 @@ import 'package:flutter/material.dart'
     show ChangeNotifier, ThemeMode, debugPrint;
 
 import '../model/library.dart';
+import '../model/share_export.dart';
 import '../model/library_migrations.dart';
 import '../model/metronome_pattern.dart';
 import '../model/on_start.dart';
@@ -1026,6 +1027,33 @@ class LibraryController extends ChangeNotifier {
     final setlist = Setlist(id: id, name: name, songIds: songIds);
     updateSetlist(setlist);
     return setlist;
+  }
+
+  /// The Metra export in [text] planned against the library (what adding
+  /// it would do), or null when there's nothing Metra-shaped in it.
+  ImportPlan? planImport(String text) => switch (parseShared(text)) {
+    final shared? => ImportPlan.of(_library, shared, _newId),
+    null => null,
+  };
+
+  /// Adds [plan]'s new songs and set (nothing is overwritten), then loads
+  /// what was shared like choosing it: the set at song 1, or the song in
+  /// Single song.
+  void applyImport(ImportPlan plan, MetronomeController metronome) {
+    if (plan.newSongs.isNotEmpty || plan.newSet != null) {
+      _update(
+        _library.copyWith(
+          songs: [...songs, ...plan.newSongs],
+          setlists: [...setlists, ?plan.newSet],
+        ),
+      );
+    }
+    final set = plan.newSet ?? plan.sameSet;
+    if (set != null && set.songIds.isNotEmpty) {
+      loadSetlist(set.id, metronome);
+    } else if (plan.ids.isNotEmpty) {
+      playSingleSong(songById(plan.ids.first)!, metronome);
+    }
   }
 
   Setlist addSetlist(String name) {

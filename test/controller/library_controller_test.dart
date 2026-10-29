@@ -9,6 +9,7 @@ import 'package:metra/src/model/click_volumes.dart';
 import 'package:metra/src/model/metronome_pattern.dart';
 import 'package:metra/src/model/library.dart';
 import 'package:metra/src/model/on_start.dart';
+import 'package:metra/src/model/share_export.dart';
 import 'package:metra/src/storage/library_store.dart';
 
 import '../audio/fake_click_output.dart';
@@ -1124,6 +1125,45 @@ void main() {
       expect(library.songs.map((s) => s.name), ['Mine']);
       expect(library.setlists, isEmpty);
     });
+  });
+
+  test('import: a shared set adds only its new songs, loads at song 1, and '
+      'survives a reload; the same message again adds nothing', () async {
+    final metronome = MetronomeController(FakeClickOutput());
+    addTearDown(metronome.dispose);
+    final rock = library.addSong(
+      name: 'Rock',
+      bpm: 100,
+      pattern: const MetronomePattern.standard(),
+      onStart: const OnStart(countInOn: true),
+    );
+    final text = exportSetText(
+      const Setlist(id: 'x', name: 'Fri', songIds: []),
+      [
+        rock,
+        Song(
+          id: 'w',
+          name: 'Waltz',
+          bpm: 90,
+          pattern: MetronomePattern.simple(beatsPerBar: 3, stepsPerBeat: 1),
+        ),
+      ],
+    );
+    expect(library.planImport('hello'), isNull);
+    final plan = library.planImport(text)!;
+    expect(plan.existing, 1);
+    library.applyImport(plan, metronome);
+    expect(library.songs.map((s) => s.name), ['Rock', 'Waltz']);
+    expect(library.activeSetlist!.name, 'Fri');
+    expect(library.currentIndex, 0);
+    expect(library.currentSong!.id, rock.id);
+    expect(library.currentSong!.onStart.countInOn, isTrue, reason: 'yours');
+    await library.flush();
+    final loaded = await reload();
+    expect(loaded.setlists.single.songIds, [rock.id, loaded.songs[1].id]);
+    final again = loaded.planImport(text)!;
+    expect(again.newSongs, isEmpty);
+    expect(again.sameSet, isNotNull);
   });
 }
 
