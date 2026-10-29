@@ -4,6 +4,9 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Changed
+- Practice speed: "Each loop" steps through Stay, +1%, +2%, +2.5%, +5%, +10%, +15% and +20%, so a hard song can creep up slowly; "Start at" takes any whole percent when typed (e.g. 83%).
+
 ## [1.7.0] - 2026-10-29
 
 ### Added

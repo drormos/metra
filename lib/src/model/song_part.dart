@@ -66,7 +66,7 @@ class SongPart {
 
   /// This part at [percent] of its tempo (Practice speed): both ends
   /// scaled and rounded, within 30–300, so what shows is what plays.
-  SongPart scaled(int percent) {
+  SongPart scaled(num percent) {
     if (percent == 100) return this;
     int scale(int bpm) => (bpm * percent / 100).round().clamp(30, 300);
     return copyWith(tempoStart: scale(tempoStart), tempoEnd: scale(tempoEnd));

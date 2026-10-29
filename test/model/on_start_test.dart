@@ -188,7 +188,7 @@ void main() {
   });
 
   test('practice speed: Start at, a step each pass while it climbs, held '
-      'at Up to; bad saved values clamped onto the 5% grid', () {
+      'at Up to; bad saved values clamped', () {
     const on = OnStart(
       practiceOn: true,
       practiceFrom: 80,
@@ -206,11 +206,41 @@ void main() {
       ...on.toJson(),
       'practiceFrom': 33,
       'practiceStep': 27,
-      'practiceUpTo': 52,
+      'practiceUpTo': 40,
     });
     expect(
       (read.practiceFrom, read.practiceStep, read.practiceUpTo),
       (50, 20, 50),
     );
+    expect(
+      OnStart.fromJson({...on.toJson(), 'practiceFrom': 83}).practiceFrom,
+      83,
+      reason: 'any whole percent',
+    );
+  });
+
+  test('Each loop: Stay, +1, +2, +2.5, +5, +10, +15, +20; anything else '
+      'snaps to the nearest; +2.5% climbs to Up to and holds', () {
+    expect(OnStart.practiceSteps, [0, 1, 2, 2.5, 5, 10, 15, 20]);
+    expect(
+      [
+        for (final v in [-3, 0.4, 1.4, 2.2, 3, 3.8, 7.4, 12, 17.6, 99])
+          OnStart.nearestStep(v),
+      ],
+      [0, 0, 1, 2, 2.5, 5, 5, 10, 20, 20],
+    );
+    const on = OnStart(
+      practiceOn: true,
+      practiceFrom: 80,
+      practiceStep: 2.5,
+      practiceUpTo: 90,
+    );
+    expect(
+      [for (var p = 0; p < 6; p++) on.practiceAt(p, climbs: true)],
+      [80, 82.5, 85, 87.5, 90, 90],
+    );
+    expect(OnStart.percentLabel(82.5), '82.5%');
+    expect(OnStart.percentLabel(85.0), '85%');
+    expect(OnStart.fromJson(on.toJson()), on, reason: 'saved as 2.5');
   });
 }

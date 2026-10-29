@@ -161,10 +161,10 @@ class MetronomeController extends ChangeNotifier implements RhythmTarget {
   /// Practice speed in percent (ui-spec.md "Practice speed"): where the
   /// song is now (stopped: Start at); null when it doesn't apply (off, or
   /// not a song with parts).
-  int? get practiceSpeed => practiceSpeedAt(_output.now());
+  num? get practiceSpeed => practiceSpeedAt(_output.now());
 
   /// Practice speed at engine time [time] (as [partAt]).
-  int? practiceSpeedAt(Duration? time) {
+  num? practiceSpeedAt(Duration? time) {
     if (!playsParts || !_onStart.practiceOn) return null;
     final bar = _playing && time != null ? _scheduler.stepAt(time)?.bar : null;
     final plan = _plan;

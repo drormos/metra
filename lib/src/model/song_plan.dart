@@ -49,7 +49,7 @@ class SongPlan implements PatternPlan {
 
   /// Practice speed in percent at song bar [bar]: Start at, plus a step
   /// for each time "Loop song" started over, up to Up to (100 when off).
-  int speedAt(int bar) => onStart.practiceAt(
+  num speedAt(int bar) => onStart.practiceAt(
     _locate(bar)?.pass ?? 0,
     climbs: end == SongEnd.loopSong,
   );

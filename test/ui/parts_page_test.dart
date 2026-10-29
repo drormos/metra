@@ -670,13 +670,37 @@ void main() {
     expect(find.text('80%, +5% each loop, up to 100%'), findsOneWidget);
     expect(find.byKey(OnStartSheet.practiceUpToKey), findsOneWidget);
     expect(find.text(OnStartSheet.practiceHint), findsOneWidget);
+    // Each loop steps +5 → +2.5 → +2 → +1 → Stay.
     final step = find.byKey(OnStartSheet.practiceStepKey);
-    await tester.tap(
-      find.descendant(of: step, matching: find.byIcon(Icons.remove)),
+    final minus = find.descendant(
+      of: step,
+      matching: find.byIcon(Icons.remove),
     );
-    await tester.pumpAndSettle();
-    expect(find.text('80%'), findsWidgets);
+    final shown = <String>[];
+    for (var i = 0; i < 4; i++) {
+      await tester.tap(minus);
+      await tester.pumpAndSettle();
+      shown.add(OnStartSheet.stepLabel(metronome.onStart.practiceStep));
+    }
+    expect(shown, ['+2.5%', '+2%', '+1%', 'Stay']);
+    expect(find.text('Stay'), findsOneWidget);
+    expect(find.text('80%'), findsWidgets, reason: 'the summary alone');
     expect(find.byKey(OnStartSheet.practiceUpToKey), findsNothing);
+    // Typed: any whole Start at; Each loop snaps to the nearest step.
+    Future<void> type(String label, String text) async {
+      final field = find.byKey(ValueStepper.fieldKey(label));
+      await tester.tap(field);
+      await tester.pump();
+      await tester.enterText(field, text);
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+    }
+
+    await type('Start at', '83');
+    expect(metronome.onStart.practiceFrom, 83);
+    await type('Each loop', '3');
+    expect(metronome.onStart.practiceStep, 2.5);
+    expect(find.text('83%, +2.5% each loop, up to 100%'), findsOneWidget);
     expect(find.byType(SetlistGroup), findsOneWidget);
     // Closed: the line under the BPM ends with the tag.
     await tester.tap(find.byKey(MetronomeScreen.onStartKey));

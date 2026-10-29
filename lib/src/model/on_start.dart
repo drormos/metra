@@ -60,24 +60,35 @@ class OnStart implements RunPlan {
   final Duration stopTime;
 
   /// Practice speed (songs with parts only, in Speed up's place): every
-  /// part's tempo at [practiceFrom] percent, 50–150 in steps of 5; with
-  /// "Loop song" each pass adds [practiceStep] (0–20) up to
-  /// [practiceUpTo] (from [practiceFrom] to 150).
+  /// part's tempo at [practiceFrom] percent (any whole percent 50–150);
+  /// with "Loop song" each pass adds [practiceStep] (one of
+  /// [practiceSteps]) up to [practiceUpTo] (from [practiceFrom] to 150).
   final bool practiceOn;
   final int practiceFrom;
-  final int practiceStep;
+  final num practiceStep;
   final int practiceUpTo;
 
-  static const minPractice = 50, maxPractice = 150, maxPracticeStep = 20;
+  static const minPractice = 50, maxPractice = 150;
+
+  /// "Each loop": Stay, +1%, +2%, +2.5%, +5%, +10%, +15%, +20%.
+  static const practiceSteps = <num>[0, 1, 2, 2.5, 5, 10, 15, 20];
+
+  /// The step of [practiceSteps] nearest to [v] (the lower one on a tie).
+  static num nearestStep(num v) =>
+      practiceSteps.reduce((a, b) => (b - v).abs() < (a - v).abs() ? b : a);
 
   /// The speed in percent on pass [pass] (from 0) of a song that
-  /// [climbs] (loops whole); 100 when off.
-  int practiceAt(int pass, {required bool climbs}) {
+  /// [climbs] (loops whole); 100 when off. It can be fractional (+2.5%).
+  num practiceAt(int pass, {required bool climbs}) {
     if (!practiceOn) return 100;
     if (!climbs || practiceStep == 0) return practiceFrom;
     final at = practiceFrom + practiceStep * pass;
     return at > practiceUpTo ? practiceUpTo : at;
   }
+
+  /// "80%", "85.5%".
+  static String percentLabel(num v) =>
+      '${v == v.roundToDouble() ? v.round() : v.toStringAsFixed(1)}%';
 
   /// A new Start at, carrying Up to along when it would fall below.
   OnStart withPracticeFrom(int from) => copyWith(
@@ -118,7 +129,7 @@ class OnStart implements RunPlan {
     Duration? stopTime,
     bool? practiceOn,
     int? practiceFrom,
-    int? practiceStep,
+    num? practiceStep,
     int? practiceUpTo,
   }) => OnStart(
     countInOn: countInOn ?? this.countInOn,
@@ -317,8 +328,7 @@ class OnStart implements RunPlan {
         json[key] is T ? json[key] as T : fallback;
     const d = OnStart.off;
     final change = read('changeBy', d.changeBy);
-    int fives(int v, int min, int max) => clampInt(v - v % 5, min, max);
-    final from = fives(
+    final from = clampInt(
       read('practiceFrom', d.practiceFrom),
       minPractice,
       maxPractice,
@@ -343,12 +353,8 @@ class OnStart implements RunPlan {
       ),
       practiceOn: read('practiceOn', false),
       practiceFrom: from,
-      practiceStep: fives(
-        read('practiceStep', d.practiceStep),
-        0,
-        maxPracticeStep,
-      ),
-      practiceUpTo: fives(
+      practiceStep: nearestStep(read<num>('practiceStep', d.practiceStep)),
+      practiceUpTo: clampInt(
         read('practiceUpTo', d.practiceUpTo),
         from,
         maxPractice,

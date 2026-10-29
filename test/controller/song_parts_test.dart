@@ -282,6 +282,31 @@ void main() {
       expect(controller.bpm, 80, reason: 'Start at again');
     });
 
+    test('+2.5% each loop climbs 80, 82.5, 85 and holds at Up to; tempos '
+        'round to whole BPM (82.5% of 100 plays 83)', () async {
+      controller.setOnStart(
+        const OnStart(
+          practiceOn: true,
+          practiceFrom: 80,
+          practiceStep: 2.5,
+          practiceUpTo: 85,
+        ),
+      );
+      load([_part('a', 1, 100), _part('b', 1, 100)], end: SongEnd.loopSong);
+      await controller.play();
+      runTo(7500); // pass 1 starts at 7120 (8 beats of 750 ms from 1120)
+      expect(controller.practiceSpeed, 82.5);
+      expect(controller.bpm, 83);
+      runTo(26000);
+      final g = gaps(25500).map((x) => x.round()).toList();
+      // 8 beats a pass: 80 bpm (750), 83 (723), then 85 (706) on.
+      expect(g.take(8).toSet(), {750});
+      expect(g.skip(8).take(8).toSet(), {723});
+      expect(g.skip(16).toSet(), {706});
+      expect(controller.practiceSpeed, 85);
+      controller.stop();
+    });
+
     test('Stop and Loop last part play at Start at, no climbing', () async {
       controller.setOnStart(practice(80, step: 10, upTo: 120));
       load([_part('a', 1, 100), _part('b', 1, 100)], end: SongEnd.loopLastPart);

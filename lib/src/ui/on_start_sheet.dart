@@ -67,8 +67,12 @@ class OnStartSheet extends StatelessWidget {
   /// "80%, +5% each loop, up to 100%"; "80%" alone with +0%.
   static String practiceSummary(OnStart on) => on.practiceStep == 0
       ? '${on.practiceFrom}%'
-      : '${on.practiceFrom}%, +${on.practiceStep}% each loop, '
+      : '${on.practiceFrom}%, ${stepLabel(on.practiceStep)} each loop, '
             'up to ${on.practiceUpTo}%';
+
+  /// "Stay", "+2.5%".
+  static String stepLabel(num step) =>
+      step == 0 ? 'Stay' : '+${OnStart.percentLabel(step)}';
 
   static String stopAfterSummary(OnStart on) => on.stopBy == StopBy.bars
       ? OnStart.barsLabel(on.stopBars)
@@ -272,13 +276,20 @@ class OnStartSheet extends StatelessWidget {
   /// Start at, Each loop, and Up to while Each loop climbs.
   List<Widget> _practice(OnStart on, void Function(OnStart) set) {
     const min = OnStart.minPractice, max = OnStart.maxPractice;
-    int fives(String text, int lo, int hi) {
-      final v = int.tryParse(text.replaceAll(RegExp(r'[^0-9]'), '')) ?? lo;
-      return OnStart.clampInt(v - v % 5, lo, hi);
-    }
+    // Typed: any whole percent, within [lo]–[hi].
+    int typed(String text, int lo, int hi) => OnStart.clampInt(
+      int.tryParse(text.replaceAll(RegExp(r'[^0-9]'), '')) ?? lo,
+      lo,
+      hi,
+    );
+    // − / + move on the 5% grid (83 → 85 / 80).
+    int up(int v, int hi) => OnStart.stepUp(v, const [(max, 5)], hi);
+    int down(int v, int lo) => OnStart.stepDown(v, const [(max, 5)], lo);
 
     final from = on.practiceFrom, step = on.practiceStep;
     final upTo = on.practiceUpTo;
+    const steps = OnStart.practiceSteps;
+    final at = steps.indexOf(step);
     return [
       ValueStepper(
         key: practiceFromKey,
@@ -287,26 +298,34 @@ class OnStartSheet extends StatelessWidget {
         label: 'Start at',
         display: '$from%',
         editText: '$from',
-        onMinus: from > min ? () => set(on.withPracticeFrom(from - 5)) : null,
-        onPlus: from < max ? () => set(on.withPracticeFrom(from + 5)) : null,
-        onTyped: (text) => set(on.withPracticeFrom(fives(text, min, max))),
+        onMinus: from > min
+            ? () => set(on.withPracticeFrom(down(from, min)))
+            : null,
+        onPlus: from < max
+            ? () => set(on.withPracticeFrom(up(from, max)))
+            : null,
+        onTyped: (text) => set(on.withPracticeFrom(typed(text, min, max))),
       ),
       ValueStepper(
         key: practiceStepKey,
         compact: true,
         onSheet: true,
         label: 'Each loop',
-        display: '+$step%',
-        editText: '$step',
-        onMinus: step > 0
-            ? () => set(on.copyWith(practiceStep: step - 5))
+        display: stepLabel(step),
+        editText: step == 0 ? '0' : '$step',
+        onMinus: at > 0
+            ? () => set(on.copyWith(practiceStep: steps[at - 1]))
             : null,
-        onPlus: step < OnStart.maxPracticeStep
-            ? () => set(on.copyWith(practiceStep: step + 5))
+        onPlus: at < steps.length - 1
+            ? () => set(on.copyWith(practiceStep: steps[at + 1]))
             : null,
-        onTyped: (text) => set(
-          on.copyWith(practiceStep: fives(text, 0, OnStart.maxPracticeStep)),
-        ),
+        // Snaps to the nearest step.
+        onTyped: (text) {
+          final v = num.tryParse(
+            text.replaceAll(',', '.').replaceAll(RegExp(r'[^0-9.]'), ''),
+          );
+          if (v != null) set(on.copyWith(practiceStep: OnStart.nearestStep(v)));
+        },
       ),
       // Nothing to reach without a step.
       ArriveLeave(
@@ -320,13 +339,13 @@ class OnStartSheet extends StatelessWidget {
                 display: '$upTo%',
                 editText: '$upTo',
                 onMinus: upTo > from
-                    ? () => set(on.copyWith(practiceUpTo: upTo - 5))
+                    ? () => set(on.copyWith(practiceUpTo: down(upTo, from)))
                     : null,
                 onPlus: upTo < max
-                    ? () => set(on.copyWith(practiceUpTo: upTo + 5))
+                    ? () => set(on.copyWith(practiceUpTo: up(upTo, max)))
                     : null,
                 onTyped: (text) =>
-                    set(on.copyWith(practiceUpTo: fives(text, from, max))),
+                    set(on.copyWith(practiceUpTo: typed(text, from, max))),
               ),
       ),
     ];

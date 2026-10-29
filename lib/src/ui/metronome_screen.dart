@@ -1084,13 +1084,13 @@ Widget _iconLine(BuildContext context, String label) {
 class PracticeTag extends StatelessWidget {
   const PracticeTag({super.key, required this.percent, this.large = false});
 
-  final int percent;
+  final num percent;
   final bool large;
 
   static const tagKey = Key('practice-tag');
 
   /// The line [child] with the tag after it when [percent] is set.
-  static Widget after(Widget child, int? percent, {bool large = false}) =>
+  static Widget after(Widget child, num? percent, {bool large = false}) =>
       percent == null
       ? child
       : Row(
@@ -1106,7 +1106,7 @@ class PracticeTag extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Semantics(
-      label: 'Practice speed $percent%',
+      label: 'Practice speed ${OnStart.percentLabel(percent)}',
       excludeSemantics: true,
       child: Container(
         key: tagKey,
@@ -1116,7 +1116,7 @@ class PracticeTag extends StatelessWidget {
           borderRadius: BorderRadius.circular(4),
         ),
         child: Text(
-          '$percent%',
+          OnStart.percentLabel(percent),
           style: TextStyle(
             fontSize: large ? 18 : 15,
             fontWeight: FontWeight.w700,
@@ -1197,7 +1197,7 @@ class _RunLineState extends State<RunLine> with SingleTickerProviderStateMixin {
   // Before a part changes: what's coming and when (it replaces the label).
   ({String name, String details, int? bars, int? beats})? _headsUp;
   // Practice speed where the song is, for the tag.
-  int? _speed;
+  num? _speed;
 
   @override
   void initState() {
