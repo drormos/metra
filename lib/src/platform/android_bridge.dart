@@ -13,6 +13,25 @@ import '../controller/metronome_controller.dart';
 abstract final class AndroidBridge {
   static const android = MethodChannel('metra/android');
   static const tile = MethodChannel('metra/tile');
+  static const share = MethodChannel('metra/share');
+
+  /// Text shared to Metra from another app (a Metra export), waiting for
+  /// the main screen to offer the import; null when there's none.
+  static final sharedText = ValueNotifier<String?>(null);
+
+  /// Listens for text shared to Metra, including a share that opened it.
+  static Future<void> attachShareTarget() async {
+    Future<void> take() async {
+      if (await _call(share, 'take') case final String text) {
+        sharedText.value = text;
+      }
+    }
+
+    share.setMethodCallHandler((call) async {
+      if (call.method == 'shared') await take();
+    });
+    await take();
+  }
 
   /// Keeps the splash screen's theme in step with the app's theme
   /// setting, for the next launch.

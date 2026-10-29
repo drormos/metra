@@ -4,6 +4,10 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+- Send whole sets and songs to bandmates, parts and all: Share › Export set (set panel), Share › Export a song… (Songs list) or Share this song (parts page) makes a message any chat app can carry. Import it from the same menus, with Paste shared in the sets view, or by sharing the message to Metra. Songs you already have are reused, never overwritten; a different song with the same name arrives as "(shared)". Count-in, Speed up, Practice speed and Stop after stay personal and aren't sent.
+- The Songs list's bottom row: New song · Share; the sets view's: New setlist · Paste shared.
+
 ### Changed
 - Practice speed: "Each loop" steps through Stay, +1%, +2%, +2.5%, +5%, +10%, +15% and +20%, so a hard song can creep up slowly; "Start at" takes any whole percent when typed (e.g. 83%).
 

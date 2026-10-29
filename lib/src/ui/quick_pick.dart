@@ -7,6 +7,7 @@ import 'package:flutter/semantics.dart';
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/library.dart';
+import '../model/share_export.dart';
 import '../model/share_text.dart';
 import '../platform/android_bridge.dart';
 import 'editor_scaffold.dart';
@@ -16,6 +17,7 @@ import 'icons.dart';
 import 'motion.dart';
 import 'play_marker.dart';
 import 'search_match.dart';
+import 'share_menu.dart';
 import 'swipe_row.dart';
 import 'panel_motion.dart';
 import 'theme.dart';
@@ -371,6 +373,12 @@ class QuickPick extends StatefulWidget {
   static const changeSetKey = Key('quick-pick-change-set');
   static const shareKey = Key('quick-pick-share');
   static const shareLabel = 'Share setlist';
+  static const songsShareKey = Key('quick-pick-songs-share');
+  static const pasteSharedKey = Key('quick-pick-paste-shared');
+  static const exportPickCancelKey = Key('quick-pick-export-cancel');
+
+  /// The Songs list's pick mode bar.
+  static const exportPickText = 'Tap the song to export';
 
   /// Hands the share text to the phone's share menu; tests replace it.
   static Future<void> Function(String text) share = AndroidBridge.shareText;
@@ -442,6 +450,9 @@ class _QuickPickState extends State<QuickPick>
   // The song picker (ui-spec.md "Song picker"): the set it adds to, the
   // ticked songs in tick order, its search and list, and where Back goes.
   String? _pickFor;
+
+  // "Export a song…": the Songs list picks the song to export.
+  bool _exportPick = false;
   bool _pickReturnsToSets = false;
   final _picked = <String>[];
   final _pickSearch = TextEditingController();
@@ -625,12 +636,15 @@ class _QuickPickState extends State<QuickPick>
   bool get _backStaysOpen =>
       _renaming != null ||
       _pickFor != null ||
+      _exportPick ||
       (_kind == QuickPickKind.sets && _library.activeSetlist != null);
 
   void _back() => setState(() {
     if (_renaming != null) {
       _renaming = null;
       _renameKind = null;
+    } else if (_exportPick) {
+      _exportPick = false;
     } else if (_pickFor != null) {
       _pickFor = null; // nothing added
     } else {
@@ -680,7 +694,9 @@ class _QuickPickState extends State<QuickPick>
     ];
     final current = _library.currentSong?.id;
     return _Panel(
-      top: all.length > QuickPick.searchAbove
+      top: _exportPick
+          ? _exportPickBar(colors)
+          : all.length > QuickPick.searchAbove
           ? Padding(
               padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
               child: SearchField(
@@ -742,12 +758,17 @@ class _QuickPickState extends State<QuickPick>
                               song,
                               key: ValueKey('quick-song-${song.id}'),
                               current: song.id == current,
-                              onTap: () => _choose(
-                                () => _library.playSingleSong(
-                                  song,
-                                  widget.metronome,
-                                ),
-                              ),
+                              onTap: _exportPick
+                                  ? () {
+                                      setState(() => _exportPick = false);
+                                      QuickPick.share(exportSongText(song));
+                                    }
+                                  : () => _choose(
+                                      () => _library.playSingleSong(
+                                        song,
+                                        widget.metronome,
+                                      ),
+                                    ),
                             ),
                           ),
                         ),
@@ -756,13 +777,41 @@ class _QuickPickState extends State<QuickPick>
       note: ArriveLeave(child: _hintNote(colors)),
       // Swiped away, the bar is already gone: no leaving copy.
       bar: ArriveLeave(key: ValueKey(_undoSwiped), child: _undoBar(colors)),
+      // "+ New song" · "Share", the set panel's bottom row style; hidden
+      // while picking the song to export.
       actions: [
-        _action(
-          key: QuickPick.newSongKey,
-          label: '+ New song',
-          opens: true,
-          onTap: _newSong,
-        ),
+        if (!_exportPick)
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: _stacked(
+                      key: QuickPick.newSongKey,
+                      colors: colors,
+                      onPressed: (_) => _newSong(),
+                      icon: const Icon(Icons.add, size: 20),
+                      label: 'New song',
+                      semanticsLabel: 'New song',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _stacked(
+                      key: QuickPick.songsShareKey,
+                      colors: colors,
+                      onPressed: _songsShare,
+                      icon: const Icon(Icons.share_outlined, size: 20),
+                      label: 'Share',
+                      semanticsLabel: 'Share songs',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -1119,12 +1168,37 @@ class _QuickPickState extends State<QuickPick>
       note: ArriveLeave(child: _hintNote(colors)),
       // Swiped away, the bar is already gone: no leaving copy.
       bar: ArriveLeave(key: ValueKey(_undoSwiped), child: _undoBar(colors)),
+      // "+ New setlist" · "Paste shared" (sets or songs from a Metra
+      // export on the clipboard), the bottom row style.
       actions: [
-        _action(
-          key: QuickPick.newSetlistKey,
-          label: '+ New setlist',
-          opens: true,
-          onTap: _newSetlist,
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _stacked(
+                    key: QuickPick.newSetlistKey,
+                    colors: colors,
+                    onPressed: (_) => _newSetlist(),
+                    icon: const Icon(Icons.add, size: 20),
+                    label: 'New setlist',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _stacked(
+                    key: QuickPick.pasteSharedKey,
+                    colors: colors,
+                    onPressed: (_) => _import(),
+                    icon: const Icon(Icons.content_paste, size: 20),
+                    label: 'Paste shared',
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );
@@ -1226,7 +1300,7 @@ class _QuickPickState extends State<QuickPick>
                   child: _stacked(
                     key: QuickPick.addSongsKey,
                     colors: colors,
-                    onPressed: () => _openPicker(setlist.id),
+                    onPressed: (_) => _openPicker(setlist.id),
                     icon: const SetlistIcon(),
                     label: 'Add songs',
                   ),
@@ -1236,8 +1310,7 @@ class _QuickPickState extends State<QuickPick>
                   child: _stacked(
                     key: QuickPick.shareKey,
                     colors: colors,
-                    onPressed: () =>
-                        QuickPick.share(setlistShareText(setlist, songs)),
+                    onPressed: (button) => _setShare(button, setlist, songs),
                     icon: const Icon(Icons.share_outlined, size: 20),
                     label: 'Share',
                     semanticsLabel: QuickPick.shareLabel,
@@ -1254,7 +1327,7 @@ class _QuickPickState extends State<QuickPick>
                       colors: colors,
                       onPressed: songs.isEmpty
                           ? null
-                          : () {
+                          : (_) {
                               Haptics.medium();
                               Navigator.pop(context);
                               _library.enterStageMode(widget.metronome);
@@ -1272,6 +1345,89 @@ class _QuickPickState extends State<QuickPick>
     );
   }
 
+  /// The set's share menu: the song list as text, the set as a Metra
+  /// export, or an import.
+  Future<void> _setShare(
+    BuildContext button,
+    Setlist setlist,
+    List<Song> songs,
+  ) async {
+    final choice = await showShareMenu(button, [
+      (
+        value: 'list',
+        name: 'Send song list',
+        line: 'Names and tempos as text, for anyone',
+      ),
+      (
+        value: 'export',
+        name: 'Export set',
+        line: 'Every song with its parts, for another Metra user to import',
+      ),
+      (value: 'import', name: 'Import a set', line: ShareMenus.forImport),
+    ]);
+    switch (choice) {
+      case 'list':
+        await QuickPick.share(setlistShareText(setlist, songs));
+      case 'export':
+        await QuickPick.share(exportSetText(setlist, songs));
+      case 'import':
+        await _import();
+    }
+  }
+
+  /// The Songs list's share menu: pick a song to export, or an import.
+  Future<void> _songsShare(BuildContext button) async {
+    final choice = await showShareMenu(button, [
+      (
+        value: 'export',
+        name: 'Export a song…',
+        line: 'Pick one, for another Metra user to import',
+      ),
+      (value: 'import', name: 'Import a song', line: ShareMenus.forImport),
+    ]);
+    if (!mounted) return;
+    switch (choice) {
+      case 'export':
+        setState(() => _exportPick = true);
+      case 'import':
+        await _import();
+    }
+  }
+
+  /// A Metra export from the clipboard; once it's loaded, the panel closes.
+  Future<void> _import() async {
+    if (await importShared(context, _library, widget.metronome) && mounted) {
+      Navigator.pop(context);
+    }
+  }
+
+  /// Pick mode's bar: what to do, and Cancel.
+  Widget _exportPickBar(MetraColors colors) => Padding(
+    padding: const EdgeInsets.fromLTRB(14, 4, 4, 4),
+    child: Row(
+      children: [
+        const Expanded(
+          child: Text(
+            QuickPick.exportPickText,
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+        ),
+        TextButton(
+          key: QuickPick.exportPickCancelKey,
+          style: TextButton.styleFrom(
+            foregroundColor: colors.muted,
+            minimumSize: const Size(48, 48),
+          ),
+          onPressed: () => setState(() => _exportPick = false),
+          child: const Text(
+            'Cancel',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    ),
+  );
+
   /// [child] with a tooltip shown on tap, only when [on].
   static Widget _hintWhen(bool on, String hint, Widget child) => on
       ? Tooltip(
@@ -1287,34 +1443,37 @@ class _QuickPickState extends State<QuickPick>
     fontWeight: FontWeight.w600,
   );
 
-  /// One of three bottom buttons: the icon over a short word.
+  /// One of the bottom row's buttons: the icon over a short word.
+  /// [onPressed] gets the button's context (a menu drops from it).
   Widget _stacked({
     required Key key,
     required MetraColors colors,
-    required VoidCallback? onPressed,
+    required void Function(BuildContext button)? onPressed,
     required Widget icon,
     required String label,
     String? semanticsLabel,
-  }) => OutlinedButton(
-    key: key,
-    style: OutlinedButton.styleFrom(
-      minimumSize: const Size.fromHeight(64),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-      side: BorderSide(color: colors.border, width: 2),
-    ),
-    onPressed: onPressed,
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        icon,
-        const SizedBox(height: 4),
-        Text(
-          label,
-          semanticsLabel: semanticsLabel,
-          textAlign: TextAlign.center,
-          style: _labelStyle,
-        ),
-      ],
+  }) => Builder(
+    builder: (button) => OutlinedButton(
+      key: key,
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(64),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        side: BorderSide(color: colors.border, width: 2),
+      ),
+      onPressed: onPressed == null ? null : () => onPressed(button),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          icon,
+          const SizedBox(height: 4),
+          Text(
+            label,
+            semanticsLabel: semanticsLabel,
+            textAlign: TextAlign.center,
+            style: _labelStyle,
+          ),
+        ],
+      ),
     ),
   );
 
@@ -1809,43 +1968,6 @@ class _QuickPickState extends State<QuickPick>
       style: TextStyle(fontSize: 15, color: context.colors.muted),
     ),
   );
-
-  /// A pinned action row; [opens] adds the › of a row that opens a page.
-  Widget _action({
-    required Key key,
-    required String label,
-    required VoidCallback onTap,
-    Widget? icon,
-    bool opens = false,
-  }) {
-    final colors = context.colors;
-    return InkWell(
-      key: key,
-      onTap: onTap,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 48),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: Row(
-            children: [
-              if (icon != null) ...[icon, const SizedBox(width: 12)],
-              Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              if (opens)
-                Icon(Icons.chevron_right, size: 18, color: colors.muted),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 /// Pinned [top], the scrolling [list], then the pinned [actions] under a

@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import '../controller/library_controller.dart';
 import '../controller/metronome_controller.dart';
 import '../model/on_start.dart';
+import '../platform/android_bridge.dart';
 import '../model/song_part.dart';
 import '../model/tempo_name.dart';
 import '../model/whats_new.dart';
@@ -22,6 +23,7 @@ import 'on_start_sheet.dart';
 import 'parts_page.dart';
 import 'poly_lane.dart';
 import 'setlist_group.dart';
+import 'share_menu.dart';
 import 'song_map.dart';
 import 'save_as_new_dialog.dart';
 import 'settings_screen.dart';
@@ -183,7 +185,13 @@ class MetronomeScreen extends StatelessWidget {
           body: _Announcer(
             controller: controller,
             library: library,
-            child: metronome,
+            child: library == null
+                ? metronome
+                : _ShareInbox(
+                    controller: controller,
+                    library: library,
+                    child: metronome,
+                  ),
           ),
         ),
       ),
@@ -682,6 +690,48 @@ class MetronomeScreen extends StatelessWidget {
 
 /// What a screen reader hears unasked (ui-spec.md "Accessibility"): only
 /// Start / Stop and song changes, never anything per click.
+/// Text shared to Metra from another app (a Metra export): offered for
+/// import here, on the main screen (ui-spec.md "Receiving").
+class _ShareInbox extends StatefulWidget {
+  const _ShareInbox({
+    required this.controller,
+    required this.library,
+    required this.child,
+  });
+
+  final MetronomeController controller;
+  final LibraryController library;
+  final Widget child;
+
+  @override
+  State<_ShareInbox> createState() => _ShareInboxState();
+}
+
+class _ShareInboxState extends State<_ShareInbox> {
+  @override
+  void initState() {
+    super.initState();
+    AndroidBridge.sharedText.addListener(_check);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _check());
+  }
+
+  @override
+  void dispose() {
+    AndroidBridge.sharedText.removeListener(_check);
+    super.dispose();
+  }
+
+  void _check() {
+    final text = AndroidBridge.sharedText.value;
+    if (text == null || !mounted) return;
+    AndroidBridge.sharedText.value = null;
+    importShared(context, widget.library, widget.controller, text: text);
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
 class _Announcer extends StatefulWidget {
   const _Announcer({
     required this.controller,

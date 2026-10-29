@@ -11,6 +11,7 @@ import '../controller/rhythm_target.dart';
 import '../model/library.dart';
 import '../model/metronome_pattern.dart';
 import '../model/on_start.dart';
+import '../model/share_export.dart';
 import 'beat_indicator.dart' show MutedLine;
 import 'count_in.dart';
 import 'dashed_outline.dart';
@@ -18,6 +19,7 @@ import 'editor_scaffold.dart' show confirmDelete;
 import 'fit_text.dart';
 import 'haptics.dart';
 import 'motion.dart';
+import 'quick_pick.dart' show QuickPick;
 import 'save_as_new_dialog.dart';
 import 'subdivision_icon.dart';
 import 'swipe_row.dart';
@@ -57,6 +59,7 @@ class PartsPage extends StatefulWidget {
   static const countInTagKey = Key('parts-count-in-tag');
   static const addKey = Key('parts-add');
   static const endKey = Key('parts-end');
+  static const shareSongKey = Key('parts-share-song');
   static const gradualKey = Key('parts-gradual');
   static const titleKey = Key('parts-title');
   static Key fillKey(int i) => ValueKey('parts-fill-$i');
@@ -1465,6 +1468,33 @@ class _PartsPageState extends State<PartsPage> with TickerProviderStateMixin {
             ],
           ),
         ),
+        // Exports the song as it is here (not in unsaved Free play).
+        if (song != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: OutlinedButton.icon(
+              key: PartsPage.shareSongKey,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(44),
+                side: BorderSide(color: colors.border, width: 2),
+              ),
+              onPressed: () => QuickPick.share(
+                exportSongText(
+                  Song.withParts(
+                    id: song.id,
+                    name: song.name,
+                    parts: parts,
+                    end: _metronome.songEnd,
+                  ),
+                ),
+              ),
+              icon: const Icon(Icons.share_outlined, size: 18),
+              label: const Text(
+                'Share this song',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
       ],
     );
   }

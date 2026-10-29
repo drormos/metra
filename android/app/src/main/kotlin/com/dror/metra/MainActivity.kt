@@ -26,6 +26,7 @@ class MainActivity : AudioServiceActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         TileBridge.attach(this, flutterEngine)
+        ShareBridge.attach(flutterEngine)
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "metra/android")
         this.channel = channel
         CallMonitor.attach(this, channel)

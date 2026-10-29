@@ -896,6 +896,11 @@ void main() {
         );
         expect(tester.takeException(), isNull);
         await tester.tap(share);
+        await tester.pumpAndSettle();
+        expect(find.text('Export set'), findsOneWidget);
+        expect(find.text('Import a set'), findsOneWidget);
+        await tester.tap(find.text('Send song list'));
+        await tester.pumpAndSettle();
         expect(shared, [
           'Friday set (3 songs)\n1. One · 100\n2. Two · 110\n3. Three · 120\n'
               '\nShared from Metra',

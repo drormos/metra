@@ -78,6 +78,7 @@ Future<void> main() async {
       // Not awaited: a start from the tile waits for the first frame.
       AndroidBridge.attachTile(controller, stop: handler?.stop);
       AndroidBridge.attachCalls(CallPause(controller, stop: handler?.stop));
+      AndroidBridge.attachShareTarget();
     }
   }
   // Edge to edge: the screens keep clear of the bars with SafeArea.
