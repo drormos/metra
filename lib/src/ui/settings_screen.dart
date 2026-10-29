@@ -145,7 +145,7 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  /// After an update, at the top: "New in 1.4.0", up to 3 lines, and two
+  /// After an update, at the top: "New in 1.4.0", up to 4 lines, and two
   /// quiet buttons, "All updates ›" and "Got it" (hides it until the next
   /// update).
   Widget _whatsNew(
@@ -176,7 +176,7 @@ class SettingsScreen extends StatelessWidget {
             'New in ${latest.version}',
             style: TextStyle(fontSize: 14, color: colors.muted),
           ),
-          for (final line in latest.lines.take(3))
+          for (final line in latest.lines.take(4))
             Padding(
               padding: const EdgeInsets.only(top: 6, right: 8),
               child: Text(line, style: const TextStyle(fontSize: 15)),

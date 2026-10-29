@@ -357,6 +357,7 @@ void main() {
 - Two
 - Three
 - Four
+- Five
 
 ## 1.0–1.3 · Sep–Oct 2026
 - Test builds
@@ -365,7 +366,7 @@ void main() {
     tearDown(() => WhatsNew.releases = const []);
 
     testWidgets('after an update: a dot on the gear; Settings shows the '
-        'block on top (3 lines); opening clears the dot; "Got it" hides it', (
+        'block on top (4 lines); opening clears the dot; "Got it" hides it', (
       tester,
     ) async {
       await openSettingsScreen(tester, open: false);
@@ -374,8 +375,8 @@ void main() {
       await tester.tap(find.byKey(MetronomeScreen.settingsKey));
       await tester.pumpAndSettle();
       expect(find.text('New in 1.4.0'), findsOneWidget);
-      expect(find.text('Three'), findsOneWidget);
-      expect(find.text('Four'), findsNothing, reason: 'up to 3 lines');
+      expect(find.text('Four'), findsOneWidget);
+      expect(find.text('Five'), findsNothing, reason: 'up to 4 lines');
       expect(
         tester.getTopLeft(find.byKey(SettingsScreen.whatsNewKey)).dy,
         lessThan(tester.getTopLeft(find.text('Theme')).dy),
