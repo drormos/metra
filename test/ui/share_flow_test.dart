@@ -112,6 +112,36 @@ void main() {
     pattern: const MetronomePattern.standard(),
   );
 
+  testWidgets('both share menus open upward from Share, centred on it '
+      '(within 16px of the screen edges), 8px above it', (tester) async {
+    await pump(tester);
+    void check(Key button) {
+      final at = tester.getRect(find.byKey(button));
+      final menu = tester.getRect(find.byKey(shareMenuKey));
+      expect(menu.bottom, moreOrLessEquals(at.top - 8), reason: '8px above');
+      expect(menu.left, greaterThanOrEqualTo(16));
+      expect(menu.right, lessThanOrEqualTo(400 - 16));
+      final clamped = menu.left == 16 || menu.right == 400 - 16;
+      if (!clamped) {
+        expect(menu.center.dx, moreOrLessEquals(at.center.dx));
+      }
+    }
+
+    await openSetPanel(tester);
+    await tap(tester, find.byKey(QuickPick.shareKey));
+    check(QuickPick.shareKey);
+    await tester.tapAt(const Offset(200, 60)); // outside: closes
+    await tester.pumpAndSettle();
+    expect(find.byKey(shareMenuKey), findsNothing);
+    expect(find.byType(QuickPick), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    await openSongs(tester);
+    await tap(tester, find.byKey(QuickPick.songsShareKey));
+    check(QuickPick.songsShareKey);
+  });
+
   testWidgets('Set ⌄ › Share › Export set: the whole set as a Metra export', (
     tester,
   ) async {

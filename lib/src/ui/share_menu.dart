@@ -7,51 +7,184 @@ import '../model/share_export.dart';
 import '../model/share_text.dart';
 import 'free_play_guard.dart';
 import 'haptics.dart';
+import 'panel_motion.dart';
 import 'theme.dart';
 
 /// One item of a share menu: a semibold [name] with a muted [line] under
 /// it saying who it's for (ui-spec.md "Sharing sets and songs").
 typedef ShareItem<T> = ({T value, String name, String line});
 
-/// The share menu, the "At the end" menu's style, dropping from the button
-/// at [anchor]: the chosen item's value, or null.
+/// The share menu (ui-spec.md "The share menu"): opens upward from the
+/// button at [anchor], centred on it, its bottom edge 8px above the
+/// button and 16px inside the screen edges; it grows out of the button
+/// and shrinks back into it, with the panels' motion. The chosen item's
+/// value, or null.
 Future<T?> showShareMenu<T>(BuildContext anchor, List<ShareItem<T>> items) {
+  final navigator = Navigator.of(anchor);
   final box = anchor.findRenderObject()! as RenderBox;
-  final overlay =
-      Navigator.of(anchor).overlay!.context.findRenderObject()! as RenderBox;
-  final rect = Rect.fromPoints(
-    box.localToGlobal(Offset.zero, ancestor: overlay),
-    box.localToGlobal(box.size.bottomRight(Offset.zero), ancestor: overlay),
+  final overlay = navigator.overlay!.context.findRenderObject()! as RenderBox;
+  final button = box.localToGlobal(Offset.zero, ancestor: overlay) & box.size;
+  return navigator.push(
+    _ShareMenuRoute<T>(
+      button: button,
+      items: items,
+      reduced: MetraMotion.reduced(anchor),
+    ),
   );
-  final colors = anchor.colors;
-  return showMenu<T>(
-    context: anchor,
-    position: RelativeRect.fromRect(rect, Offset.zero & overlay.size),
-    items: [
-      for (final item in items)
-        PopupMenuItem<T>(
-          key: ValueKey('share-${item.value}'),
-          value: item.value,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+}
+
+/// The menu itself, for tests.
+const shareMenuKey = Key('share-menu');
+
+class _ShareMenuRoute<T> extends PopupRoute<T> {
+  _ShareMenuRoute({
+    required this.button,
+    required this.items,
+    required this.reduced,
+  });
+
+  final Rect button;
+  final List<ShareItem<T>> items;
+  final bool reduced;
+
+  static const gap = 8.0, inset = 16.0, maxWidth = 340.0;
+
+  @override
+  Color? get barrierColor => null;
+
+  @override
+  bool get barrierDismissible => true;
+
+  @override
+  String get barrierLabel => 'Close menu';
+
+  // The panels' open and close (PanelMotion).
+  @override
+  Duration get transitionDuration =>
+      reduced ? Duration.zero : const Duration(milliseconds: 200);
+
+  @override
+  Duration get reverseTransitionDuration =>
+      reduced ? Duration.zero : PanelMotion.settle;
+
+  @override
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) {
+    final colors = context.colors;
+    final menu = Material(
+      key: shareMenuKey,
+      color: colors.sheet,
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: colors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: IntrinsicWidth(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                item.name,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+              for (final item in items)
+                InkWell(
+                  key: ValueKey('share-${item.value}'),
+                  onTap: () => Navigator.pop(context, item.value),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          item.line,
+                          style: TextStyle(fontSize: 13, color: colors.muted),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-              Text(
-                item.line,
-                style: TextStyle(fontSize: 13, color: colors.muted),
-              ),
             ],
           ),
         ),
-    ],
-  );
+      ),
+    );
+    final top = MediaQuery.paddingOf(context).top + inset;
+    return CustomSingleChildLayout(delegate: _Above(button, top), child: menu);
+  }
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final size = MediaQuery.sizeOf(context);
+    // Scaled about the button's top centre: out of it, back into it.
+    final origin = Alignment(
+      button.center.dx / size.width * 2 - 1,
+      button.top / size.height * 2 - 1,
+    );
+    final curved = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOut,
+      reverseCurve: Curves.easeIn,
+    );
+    return FadeTransition(
+      opacity: curved,
+      child: ScaleTransition(
+        alignment: origin,
+        scale: Tween(begin: PanelMotion.openScale, end: 1.0).animate(curved),
+        child: child,
+      ),
+    );
+  }
+}
+
+/// Above [button], centred on it, within the screen's 16px margins and
+/// below [top] (taller menus scroll).
+class _Above extends SingleChildLayoutDelegate {
+  _Above(this.button, this.top);
+
+  final Rect button;
+  final double top;
+
+  static const gap = _ShareMenuRoute.gap, inset = _ShareMenuRoute.inset;
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) =>
+      BoxConstraints(
+        maxWidth: (constraints.maxWidth - 2 * inset).clamp(
+          0,
+          _ShareMenuRoute.maxWidth,
+        ),
+        maxHeight: (button.top - gap - top).clamp(0, double.infinity),
+      );
+
+  @override
+  Offset getPositionForChild(Size size, Size child) {
+    final x = (button.center.dx - child.width / 2).clamp(
+      inset,
+      size.width - inset - child.width,
+    );
+    return Offset(x, button.top - gap - child.height);
+  }
+
+  @override
+  bool shouldRelayout(_Above old) => old.button != button || old.top != top;
 }
 
 /// The menus' lines (ui-spec.md "The share menu").

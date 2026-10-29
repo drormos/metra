@@ -19,8 +19,8 @@ const exportVersion = 1;
 
 /// The line between the readable part and the data.
 const importHelp =
-    'To import this into Metra: share this message to Metra, or copy it '
-    'and tap Import in Metra.';
+    'To import into Metra: copy this whole message, then in Metra tap '
+    'Share › Import.';
 
 /// A set as an export: its song list, the help line, the data.
 String exportSetText(Setlist setlist, List<Song> songs) {
