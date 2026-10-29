@@ -2,6 +2,10 @@
 
 Newest first. The top version's lines are also the Play Store release notes.
 
+## 1.8.0 · Oct 2026
+- Send a whole setlist or song to a bandmate: Share › Export, they copy it and tap Share › Import.
+- Practice speed climbs in smaller steps: +1%, +2%, +2.5% and up.
+
 ## 1.7.0 · Oct 2026
 - Song parts are at the top of the 4/4 panel, and you can build them right in Free play, then save them as a song.
 - Practice speed for songs with parts: play the whole song at 80% (or 110%) and speed up each time it loops.

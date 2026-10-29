@@ -53,14 +53,12 @@ No ads, no account, no tracking. Metra has no internet access: your songs stay o
 
 Made by a drummer who wanted a metronome that just works, in the practice room and on stage.
 
-## Release notes (378 / 500)
+## Release notes (164 / 500)
 
 The What's new lines of the release (`assets/whats_new.md`), as printed by `tool/release.sh`:
 
-- Song parts are at the top of the 4/4 panel, and you can build them right in Free play, then save them as a song.
-- Practice speed for songs with parts: play the whole song at 80% (or 110%) and speed up each time it loops.
-- Share a setlist: send the running order with tempos to your band.
-- Simpler time signatures: any count over 4 or 8, plus one-tap 3/4, 4/4, 6/8 and 12/8.
+- Send a whole setlist or song to a bandmate: Share › Export, they copy it and tap Share › Import.
+- Practice speed climbs in smaller steps: +1%, +2%, +2.5% and up.
 
 ## Graphics
 - App icon (512×512): `store/icon-512.png` (from `tool/icon/app-icon.png`)
