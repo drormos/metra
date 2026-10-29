@@ -5,7 +5,7 @@ A sample-accurate metronome for Android (and macOS / iOS), built with Flutter an
 
 ## Status (2026-10-29)
 - Release ready: 1.7.0 (build 100; What's new shows up to 4 lines): Practice speed for songs with parts (saved format 8), share a setlist as text, song parts in Free play (format 7), the Rhythm panel's one time signature editor with quick picks and the Song parts row at its top, set positions in one column. The AAB goes to Play by hand (closed test). In the closed test now: 1.6.0 (build 91).
-- Next: upload 1.7.0 (build 100) to the closed test, then tag v1.7.0. Queued, not started: sharing full sets and songs (`docs/design/next-prompt-sharing.md`).
+- Next: upload 1.7.0 (build 100) to the closed test, then tag v1.7.0. Built for 1.8.0 (not released, no AAB): Practice speed steps (format 9) and sharing full sets and songs (export / import, Metra as a share target), phone-checked on build 101.
 
 ## Working rules
 - One step per commit; stage specific paths (never `git add -A`: the designer edits `docs/design/` in parallel and those drafts aren't ours to commit).
