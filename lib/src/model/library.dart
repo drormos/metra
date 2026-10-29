@@ -453,7 +453,7 @@ class Library {
     final songIds = <String>{};
     final fixedSongs = [
       for (final song in songs)
-        if (songIds.add(song.id)) song.copyWith(parts: _fixParts(song.parts)),
+        if (songIds.add(song.id)) song.copyWith(parts: fixParts(song.parts)),
     ];
     final setIds = <String>{};
     final fixedSets = [
@@ -485,7 +485,7 @@ class Library {
       lastBpm: bpm(lastBpm),
       lastPattern: _fixPattern(lastPattern),
       lastOnStart: lastOnStart,
-      lastParts: _fixParts(lastParts),
+      lastParts: fixParts(lastParts),
       lastEnd: lastEnd,
       visualOffset: Duration(milliseconds: offset),
       clickSound: clickSound,
@@ -504,7 +504,7 @@ class Library {
   }
 
   /// Tempos and patterns in range, and 1–999 bars.
-  static List<SongPart> _fixParts(List<SongPart> parts) => [
+  static List<SongPart> fixParts(List<SongPart> parts) => [
     for (final part in parts)
       part.copyWith(
         bars: part.bars.clamp(1, 999),
