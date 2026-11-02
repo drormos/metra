@@ -50,7 +50,7 @@ New test `test/controller/tuner_guitar_test.dart`:
 - `flutter analyze` and `flutter test` (1700) pass.
 - Scheduler fuzz: 5,000 sessions pass. Load fuzz: 4,000 runs pass.
 - Drift suite (5 minutes per tempo): the first run overlapped the Gradle build and the emulator and lost beats (126 of 150 at 30 BPM, 253 of 300 at 60 BPM). That is the busy-Mac failure TESTING.md describes. I re-ran it alone, and all 12 tests passed (30, 60, 120 and 300 BPM for 5 minutes each, plus the short tests; 20:45 in total).
-- To make the drift suite less of a wait, `tool/release.sh --drift` now runs it through the new `tool/drift_parallel.sh`. All tempos run at once, and only after every build is done, so ~10 minutes covers gates, AAB and drift instead of ~25. See TESTING.md and the release skill.
+- To make the drift suite less of a wait, `tool/release.sh --drift` now runs it through the new `tool/drift_parallel.sh`. All tempos run at once, and only after every build is done, Trial: all passed in 12:33, against 20:45 one by one. That run included cold builds of the five copies (~7 min); the copies are kept, so later runs build faster. See TESTING.md and the release skill.
 
 ## Not done (needs Dror)
 - `git push origin main` (publishes PRIVACY.md), then upload the AAB to the closed test.

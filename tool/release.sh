@@ -3,12 +3,21 @@
 # Run after bumping pubspec.yaml and writing assets/whats_new.md and
 # CHANGELOG.md. Builds the signed AAB (Play) and APK (sideload copy),
 # prints the Play release notes, and with --tag tags the release locally.
+# With --drift it also runs tool/drift_parallel.sh: the drift copies build
+# alongside the gates and the AAB, and their runs start once those are done.
 # It never pushes: the commands to publish are printed at the end.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 tag=false
-[[ "${1:-}" == "--tag" ]] && tag=true
+drift=false
+for arg in "$@"; do
+  case $arg in
+    --tag) tag=true ;;
+    --drift) drift=true ;;
+    *) echo "Unknown option $arg" >&2; exit 1 ;;
+  esac
+done
 
 version_line=$(grep -E '^version: [0-9]+\.[0-9]+\.[0-9]+\+[0-9]+$' pubspec.yaml)
 version=${version_line#version: }
@@ -40,10 +49,19 @@ if [[ "$pinned" != "$installed" ]]; then
   exit 1
 fi
 
+if $drift; then
+  export DRIFT_ROOT=${TMPDIR:-/tmp}/metra-drift
+  mkdir -p "$DRIFT_ROOT" && touch "$DRIFT_ROOT/hold"
+  tool/drift_parallel.sh >"$DRIFT_ROOT/summary.log" 2>&1 &
+  drift_pid=$!
+  trap 'rm -f "$DRIFT_ROOT/hold"' EXIT
+fi
+
 flutter analyze
 flutter test
 flutter build appbundle --release
 flutter build apk --release
+$drift && rm -f "$DRIFT_ROOT/hold"
 
 # PRIVACY.md promises no network access and one permission prompt (the
 # tuner's microphone): no dependency may add internet or notifications.
@@ -54,6 +72,13 @@ for permission in INTERNET POST_NOTIFICATIONS; do
     exit 1
   fi
 done
+
+if $drift; then
+  echo "Waiting for the drift runs (~5 minutes, keep the Mac idle)..."
+  if wait "$drift_pid"; then drift_ok=true; else drift_ok=false; fi
+  cat "$DRIFT_ROOT/summary.log"
+  $drift_ok || { echo "Drift failed: re-run a failed tempo alone before trusting it (TESTING.md)." >&2; exit 1; }
+fi
 
 if $tag; then
   git tag "v$name"

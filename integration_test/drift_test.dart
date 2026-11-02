@@ -5,6 +5,7 @@
 //   flutter test integration_test/drift_test.dart -d macos \
 //       --dart-define=DRIFT_SECONDS=300   # full 5-minute runs
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_soloud/flutter_soloud.dart';
@@ -17,6 +18,10 @@ import 'package:metra/src/model/on_start.dart';
 import 'package:metra/src/model/song_part.dart';
 
 const _seconds = int.fromEnvironment('DRIFT_SECONDS', defaultValue: 20);
+// tool/drift_parallel.sh: each copy says it's built, then waits for "go",
+// so no timed run overlaps a build.
+const _barrier = String.fromEnvironment('DRIFT_BARRIER');
+const _job = String.fromEnvironment('DRIFT_JOB');
 const _sampleRate = 44100; // engine default
 // Step times are rounded to microseconds, then to samples by the engine.
 const _toleranceFrames = 2;
@@ -27,7 +32,15 @@ void main() {
   late SoloudClickOutput output;
   late MetronomeController controller;
 
-  setUpAll(() async => output = await SoloudClickOutput.create());
+  setUpAll(() async {
+    if (_barrier.isNotEmpty) {
+      File('$_barrier/$_job.ready').writeAsStringSync('');
+      while (!File('$_barrier/go').existsSync()) {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      }
+    }
+    output = await SoloudClickOutput.create();
+  });
   setUp(() => controller = MetronomeController(output));
   tearDown(() => controller.dispose());
 
