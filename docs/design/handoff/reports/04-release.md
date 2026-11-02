@@ -61,3 +61,10 @@ These live in the session scratchpad (not committed):
 - `/private/tmp/claude-501/-Users-dror-Developer-metra/1f7e935d-37d5-4b22-9dbb-3649795d5e24/scratchpad/u1.png`: Free play after the upgrade.
 - `/private/tmp/claude-501/-Users-dror-Developer-metra/1f7e935d-37d5-4b22-9dbb-3649795d5e24/scratchpad/u2.png`: Glass Harbor's Practice speed after the upgrade.
 - `/private/tmp/claude-501/-Users-dror-Developer-metra/1f7e935d-37d5-4b22-9dbb-3649795d5e24/scratchpad/u4.png`: the tuner, A4 440, listening.
+
+## Update: build 109
+When Dror uploaded build 108, Play warned that it no longer supported 17 devices (7 phones, 10 tablets) that 1.8.0 supported.
+- **Why:** the tuner's RECORD_AUDIO permission makes Play require a microphone (`android.hardware.microphone`) unless the app says it's optional.
+- **Fix:** the manifest now declares the microphone `required="false"`. On a device without one, the tuner page just keeps saying "Play a string"; the rest of the app is unaffected.
+- **Guard:** `tool/release.sh` now refuses a build that requires a microphone.
+- **New build:** 1.9.0 (build 109), same release notes. The AAB is at the same path.
