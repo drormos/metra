@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <!-- The tuner only: asked when it first opens, used while it's open. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- RECORD_AUDIO alone makes Play require a microphone; without one the
+         tuner just never hears a note, the rest of the app works. -->
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <application
         android:label="${appLabel}"
         android:name="${applicationName}"

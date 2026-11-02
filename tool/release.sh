@@ -72,6 +72,12 @@ for permission in INTERNET POST_NOTIFICATIONS; do
     exit 1
   fi
 done
+# A permission implies a required feature on Play (RECORD_AUDIO: a
+# microphone), which drops devices without it (1.9.0 build 108: 17 devices).
+if ! grep -A1 'android.hardware.microphone' "$merged" | grep -q 'required="false"'; then
+  echo "The release build requires a microphone: declare android.hardware.microphone required=\"false\"." >&2
+  exit 1
+fi
 
 if $drift; then
   echo "Waiting for the drift runs (~5 minutes, keep the Mac idle)..."
