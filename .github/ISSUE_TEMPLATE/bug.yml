@@ -1,0 +1,33 @@
+name: Bug report
+description: Something in Metra doesn't work as it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what Metra did instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Metra version
+      description: Settings › About shows it (for example 1.9.0).
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Phone and Android version
+      description: For example "Pixel 8, Android 15". For a timing problem, also the output (speaker, wired or Bluetooth headphones).
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to make it happen again
+      placeholder: |
+        1. Open a song with parts
+        2. Tap Start
+        3. ...

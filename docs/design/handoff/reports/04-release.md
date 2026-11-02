@@ -68,3 +68,6 @@ When Dror uploaded build 108, Play warned that it no longer supported 17 devices
 - **Fix:** the manifest now declares the microphone `required="false"`. On a device without one, the tuner page just keeps saying "Play a string"; the rest of the app is unaffected.
 - **Guard:** `tool/release.sh` now refuses a build that requires a microphone.
 - **New build:** 1.9.0 (build 109), same release notes. The AAB is at the same path.
+
+## For the designer: open-source licences screen
+Metra bundles libraries (Flutter, flutter_soloud with the SoLoud engine, and others) whose licences ask apps that ship them to show their notices. The app has no screen for that yet. Flutter generates one (`showLicensePage`: the app name, version, and every package's licence, collected automatically). Proposal: an "Open-source licences" row in Settings › About, under "Privacy policy", opening that page. Dror agreed to queue it for design: please decide its place and wording, and whether the standard page needs Metra styling.
