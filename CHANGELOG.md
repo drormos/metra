@@ -4,6 +4,8 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-03
+
 ### Added
 - A tuner for guitar, bass, keys and voice: the tuning-fork button on the main screen opens it. A big note name, how many cents off, a meter with a smooth needle, "In tune" within 3 cents, and Reference A4 from 430 to 450 Hz. The click pauses while it's open. It uses the microphone only while the tuner is on screen; nothing is recorded or sent.
 

@@ -2,6 +2,12 @@
 
 Newest first. The top version's lines are also the Play Store release notes.
 
+## 1.9.0 · Nov 2026
+- New: a tuner for guitar and bass. Tap the tuning fork at the top.
+- The click is louder at full volume.
+- The time signature button is now a small square that never changes size.
+- Tap anywhere outside a panel to close it.
+
 ## 1.8.0 · Oct 2026
 - Send a whole setlist or song to a bandmate: Share › Export, they copy it and tap Share › Import.
 - Practice speed climbs in smaller steps: +1%, +2%, +2.5% and up.
