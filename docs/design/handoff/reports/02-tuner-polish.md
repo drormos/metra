@@ -19,7 +19,7 @@ Also:
 
 ## Phone checks (from reports/01-tuner.md): what I saw
 - **Top row at 115%:** four equal squares, "4/4" centred, the tuning fork clear. I didn't check the title's shrink with a long song name on the phone; the screen tests cover it.
-- **Permission flow:** the first opening showed the privacy line with Android's dialog over it ("Allow Metra dev to record audio?"). Dror allowed it. **Refusing, "Allow microphone" and the app-settings route were not tried on the phone**; the widget and controller tests cover them.
+- **Permission flow:** the first opening showed the privacy line with Android's dialog over it ("Allow Metra dev to record audio?"). Dror allowed it. **Refusal path (checked after Dror removed the permission in Settings):** opening the tuner showed the line and "Allow microphone", with no dialog. Tapping it showed Android's dialog. After one "Don't allow", the next tap opened Metra dev's page in Settings, because Android counted the removal in Settings as a refusal. Allowed there, the tuner started listening by itself on return and read A3 "In tune".
 - **Tuning:** the phone read the test tones exactly: 234.16 Hz for an A♯3 8 cents sharp (shown "+8 cents · 234.2 Hz"), and 220.00 Hz for A3 ("In tune", the needle white and thick). It went back to "Play a string" about a second after the tone stopped. **Not tried with a real guitar string**, so the low E is still open.
 - **Click:** it was playing when the tuner opened, stopped, and was still stopped after Back.
 - **Microphone:** recording (Android's record monitor, UNPROCESSED source) only while the tuner is open. It stopped on Back, stopped on Home with the tuner open, and restarted on returning to the tuner.
@@ -27,4 +27,3 @@ Also:
 
 ## Still worth a check by hand
 - A real guitar, especially the low E2.
-- Refusing the permission twice, then "Allow microphone" opening Metra dev's settings page. To reset the dialog: Settings › Apps › Metra dev › Permissions › Microphone › "Ask every time" or "Don't allow".
