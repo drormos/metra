@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/audio/mic_input.dart';
 import 'package:metra/src/controller/library_controller.dart';
@@ -9,6 +10,7 @@ import 'package:metra/src/controller/metronome_controller.dart';
 import 'package:metra/src/controller/tuner_controller.dart';
 import 'package:metra/src/storage/library_store.dart';
 import 'package:metra/src/ui/metronome_screen.dart';
+import 'package:metra/src/ui/icons.dart';
 import 'package:metra/src/ui/theme.dart';
 import 'package:metra/src/ui/tuner_page.dart';
 import 'package:metra/src/ui/value_stepper.dart';
@@ -17,6 +19,24 @@ import '../audio/fake_click_output.dart';
 import '../audio/fake_mic_input.dart';
 import '../audio/pitch_detector_test.dart' show tone;
 import 'test_theme.dart';
+
+/// The real fonts: the test font's glyphs are full 1 em squares, which
+/// would cover the cents line and change every width.
+Future<void> loadFonts(WidgetTester tester) => tester.runAsync(() async {
+  for (final (family, files) in [
+    (MetraFonts.body, ['Saira-Medium', 'Saira-SemiBold']),
+    (
+      MetraFonts.condensed,
+      ['SairaExtraCondensed-Bold', 'SairaExtraCondensed-SemiBold'],
+    ),
+  ]) {
+    final loader = FontLoader(family);
+    for (final file in files) {
+      loader.addFont(rootBundle.load('assets/fonts/$file.ttf'));
+    }
+    await loader.load();
+  }
+});
 
 void main() {
   late MetronomeController metronome;
@@ -102,31 +122,20 @@ void main() {
     await pumpPage(tester);
     expect(find.text('Play a string'), findsOneWidget);
     await play(tester, 110 * 1.00695555, 0.4); // A2 +12 cents
-    expect(find.textContaining('A'), findsWidgets);
-    final note = tester.widget<RichText>(
-      find.descendant(
-        of: find.byKey(TunerPage.noteKey),
-        matching: find.byType(RichText),
-      ),
+    expect(tester.widget<Text>(find.byKey(TunerPage.noteKey)).data, 'A');
+    expect(tester.widget<Text>(find.byKey(TunerPage.octaveKey)).data, '2');
+    expect(
+      find.byType(AccidentalIcon),
+      findsNWidgets(2),
+      reason: 'only the meter\'s ♭ and ♯: A has none',
     );
-    expect(note.text.toPlainText(), 'A2');
     expect(find.text('+12 cents · 110.8 Hz'), findsOneWidget);
     await play(tester, 110, 0.4);
     expect(find.text('In tune'), findsOneWidget);
     await play(tester, null, 1.2);
     expect(find.text('Play a string'), findsOneWidget);
-    expect(
-      tester
-          .widget<RichText>(
-            find.descendant(
-              of: find.byKey(TunerPage.noteKey),
-              matching: find.byType(RichText),
-            ),
-          )
-          .text
-          .toPlainText(),
-      '–',
-    );
+    expect(tester.widget<Text>(find.byKey(TunerPage.noteKey)).data, '–');
+    expect(find.byKey(TunerPage.octaveKey), findsNothing);
     await tester.pumpWidget(const SizedBox());
     expect(mic.running, isFalse, reason: 'leaving stops the microphone');
   });
@@ -215,6 +224,7 @@ void main() {
   ]) {
     testWidgets('$name: tap targets, labels and contrast, listening and '
         'refused', (tester) async {
+      await loadFonts(tester);
       final handle = tester.ensureSemantics();
       for (final state in [MicPermission.granted, MicPermission.denied]) {
         mic.state = state;
@@ -226,5 +236,66 @@ void main() {
       }
       handle.dispose();
     });
+  }
+
+  // The phone: 363 × 792dp, minus the status and gesture bars.
+  for (final (size, scale) in [
+    (const Size(360, 720), 1.15),
+    (const Size(412, 870), 1.0),
+  ]) {
+    testWidgets(
+      'layout on ${size.width.toInt()}dp at ${(scale * 100).round()}%: '
+      'one screen, no scrolling; the note ~200dp, the meter 88dp and full '
+      'width; ♯ and octave in one column right of the letter, the group '
+      'centered',
+      (tester) async {
+        await loadFonts(tester);
+        await pumpPage(tester, size: size, textScale: scale);
+        await play(tester, 116.54, 0.4); // A♯2
+        expect(tester.takeException(), isNull);
+        final scroll = tester.state<ScrollableState>(
+          find
+              .descendant(
+                of: find.byType(SingleChildScrollView),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        expect(scroll.position.maxScrollExtent, 0, reason: 'fits');
+        expect(find.text('A4 ='), findsOneWidget);
+        final a4 = tester.getRect(find.text('A4 ='));
+        final hz = tester.getRect(find.text('440 Hz'));
+        expect(a4.center.dy, closeTo(hz.center.dy, 1), reason: 'one line');
+
+        final meter = tester.getRect(find.byKey(TunerPage.meterKey));
+        expect(meter.height, 88);
+        expect(meter.width, size.width - 48);
+
+        // The letter's line box is 1 em; its cap 0.688 em.
+        final letter = tester.getRect(find.byKey(TunerPage.noteKey));
+        expect(0.688 * letter.height, closeTo(200, 1));
+        final sharp = tester.getRect(
+          find.descendant(
+            of: find.byType(Row),
+            matching: find.byWidgetPredicate(
+              (w) => w is AccidentalIcon && w.size > 40,
+            ),
+          ),
+        );
+        final octave = tester.getRect(find.byKey(TunerPage.octaveKey));
+        final capTop = letter.top + 0.160 * letter.height;
+        final baseline = letter.top + 0.848 * letter.height;
+        // The sign's drawing starts 5.5/24 into its box.
+        final drawnLeft = sharp.left + sharp.width * 5.5 / 24;
+        expect(drawnLeft, closeTo(octave.left, 0.5), reason: 'one column');
+        expect(drawnLeft - letter.right, lessThan(10), reason: 'tight');
+        expect(sharp.top + sharp.height * 2 / 24, closeTo(capTop, 1));
+        expect(octave.top + 0.848 * octave.height, closeTo(baseline, 1));
+        final drawnRight = sharp.left + sharp.width * 19 / 24;
+        final right = drawnRight > octave.right ? drawnRight : octave.right;
+        final group = Rect.fromLTRB(letter.left, letter.top, right, 0);
+        expect(group.center.dx, closeTo(size.width / 2, 1), reason: 'centered');
+      },
+    );
   }
 }

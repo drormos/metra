@@ -40,6 +40,7 @@ class TunerPage extends StatefulWidget {
   final MicInput? mic;
 
   static const noteKey = Key('tuner-note');
+  static const octaveKey = Key('tuner-octave');
   static const centsKey = Key('tuner-cents');
   static const meterKey = Key('tuner-meter');
   static const allowKey = Key('tuner-allow');
@@ -143,13 +144,13 @@ class _TunerPageState extends State<TunerPage> {
           builder: (context, _) {
             final a4 = _referenceA4;
             return Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Expanded(
-                  child: Text(
-                    TunerPage.referenceLabel,
-                    style: TextStyle(fontSize: 17),
-                  ),
+                // Wraps only at the largest text sizes.
+                const Flexible(
+                  child: Text('A4 =', style: TextStyle(fontSize: 17)),
                 ),
+                const SizedBox(width: 12),
                 ValueStepper(
                   label: TunerPage.referenceLabel,
                   showLabel: false,
@@ -223,6 +224,112 @@ class _Permission extends StatelessWidget {
 
 /// The note, the cents line and the meter; "–" and "Play a string" in
 /// silence.
+/// The note: the letter ~200dp tall (cap height), and a small column
+/// tight to its right with the sharp at the cap height and the muted
+/// octave on the baseline, centered as one group. "–" in silence.
+class _NoteName extends StatelessWidget {
+  const _NoteName(this.note);
+
+  final TunerNote? note;
+
+  /// Saira Extra Condensed: cap height 0.688 em. With height 1 and even
+  /// leading the cap sits from 0.160 em to the baseline at 0.848 em.
+  static const _size = 290.0;
+  static const _cap = 0.688 * _size;
+  static const _capTop = 0.160 * _size;
+  static const _baseline = 0.848 * _size;
+  static const _octave = 0.3 * _size;
+  static const _sharp = 0.26 * _size;
+  static const _even = TextHeightBehavior(
+    leadingDistribution: TextLeadingDistribution.even,
+  );
+
+  static TextStyle _style(double size, Color color) => TextStyle(
+    fontFamily: MetraFonts.condensed,
+    fontWeight: FontWeight.w700,
+    fontSize: size,
+    height: 1,
+    leadingDistribution: TextLeadingDistribution.even,
+    color: color,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final note = this.note;
+    final group = Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          note?.name ?? '–',
+          key: TunerPage.noteKey,
+          style: _style(_size, note == null ? colors.muted : colors.text),
+          textHeightBehavior: _even,
+        ),
+        if (note != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 6),
+            child: SizedBox(
+              height: _size,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // The sign's drawing starts 2/24 into its box.
+                  const SizedBox(height: _capTop - _sharp * 2 / 24),
+                  if (note.sharp)
+                    // Only its drawing (5.5 to 19 of 24) takes room, its
+                    // left edge on the octave's, so the group centres on
+                    // what's seen.
+                    SizedBox(
+                      width: _sharp * 13.5 / 24,
+                      height: _sharp,
+                      child: OverflowBox(
+                        alignment: Alignment.centerLeft,
+                        minWidth: _sharp,
+                        maxWidth: _sharp,
+                        child: Transform.translate(
+                          offset: const Offset(-_sharp * 5.5 / 24, 0),
+                          child: AccidentalIcon(
+                            sharp: true,
+                            size: _sharp,
+                            color: colors.text,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    const SizedBox(height: _sharp),
+                  const Spacer(),
+                  Text(
+                    '${note.octave}',
+                    key: TunerPage.octaveKey,
+                    style: _style(_octave, colors.muted),
+                    textHeightBehavior: _even,
+                  ),
+                  // Its baseline on the letter's.
+                  const SizedBox(height: _size - _baseline - 0.152 * _octave),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+    // Laid out on the full 1 em line; only the cap (plus a little) takes
+    // room, the empty top and bottom of the line overflow unpainted.
+    return SizedBox(
+      height: _cap + 16,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Align(
+          heightFactor: (_cap + 16) / _size,
+          child: MediaQuery.withNoTextScaling(child: group),
+        ),
+      ),
+    );
+  }
+}
+
 class _Reading extends StatelessWidget {
   const _Reading(this.note);
 
@@ -238,48 +345,8 @@ class _Reading extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // Read through the announcements, never per frame.
-          ExcludeSemantics(
-            child: SizedBox(
-              height: 170,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: MediaQuery.withNoTextScaling(
-                  child: Text.rich(
-                    key: TunerPage.noteKey,
-                    TextSpan(
-                      children: [
-                        TextSpan(text: note?.name ?? '–'),
-                        if (note != null && note.sharp)
-                          WidgetSpan(
-                            alignment: PlaceholderAlignment.top,
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 28),
-                              child: AccidentalIcon(
-                                sharp: true,
-                                size: 56,
-                                color: colors.text,
-                              ),
-                            ),
-                          ),
-                        if (note != null)
-                          TextSpan(
-                            text: '${note.octave}',
-                            style: TextStyle(fontSize: 48, color: colors.muted),
-                          ),
-                      ],
-                    ),
-                    style: TextStyle(
-                      fontFamily: MetraFonts.condensed,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 150,
-                      height: 1.1,
-                      color: note == null ? colors.muted : colors.text,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
+          ExcludeSemantics(child: _NoteName(note)),
+          const SizedBox(height: 12),
           Text(
             note?.line ?? 'Play a string',
             key: TunerPage.centsKey,
@@ -290,7 +357,7 @@ class _Reading extends StatelessWidget {
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
           ExcludeSemantics(
             child: _Meter(
               cents: note?.cents ?? 0,
@@ -386,7 +453,7 @@ class _MeterState extends State<_Meter> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) => SizedBox(
     key: TunerPage.meterKey,
-    height: 64,
+    height: 88,
     width: double.infinity,
     child: CustomPaint(
       painter: _MeterPainter(
@@ -421,7 +488,7 @@ class _MeterPainter extends CustomPainter {
     final tick = Paint()..strokeWidth = 2;
     for (var c = -50; c <= 50; c += 5) {
       final long = c % 25 == 0;
-      final half = c == 0 ? 18.0 : (long ? 14.0 : 8.0);
+      final half = size.height * (c == 0 ? 0.42 : (long ? 0.32 : 0.18));
       tick.color = c == 0 ? colors.text : (long ? colors.muted : colors.border);
       canvas.drawLine(
         Offset(x(c.toDouble()), mid - half),
@@ -430,7 +497,7 @@ class _MeterPainter extends CustomPainter {
       );
     }
     final needle = Paint()
-      ..strokeWidth = inTune ? 6 : 3
+      ..strokeWidth = inTune ? 6 : 4
       ..strokeCap = StrokeCap.round
       ..color = !heard
           ? colors.accent.withValues(alpha: 0.35)

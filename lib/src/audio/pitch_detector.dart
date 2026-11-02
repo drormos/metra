@@ -22,8 +22,9 @@ class PitchDetector {
   static const minHz = 60.0;
   static const maxHz = 1500.0;
 
-  /// Quieter than this (RMS of full scale) is silence.
-  static const silence = 0.004;
+  /// Quieter than this (RMS of full scale, −54 dBFS) is silence. The
+  /// unprocessed microphone is quiet: a speaker a metre away read 0.007.
+  static const silence = 0.002;
 
   /// How periodic a frame must be (NSDF peak, 0–1) to count as a note.
   static const clarity = 0.85;
