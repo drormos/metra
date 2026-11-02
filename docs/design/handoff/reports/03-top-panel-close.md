@@ -1,6 +1,6 @@
 # 03 · Top panels: tapping above closes them too: report
 
-Build 1.8.0+107. `flutter analyze` is clean and `flutter test` passes (1676 tests). **Not installed on the phone yet:** wireless debugging dropped during the install, so there are no screenshots and no phone check at 115%.
+Build 1.8.0+107. `flutter analyze` is clean and `flutter test` passes (1676 tests). Installed on the phone (Metra dev, 115% text).
 
 ## What changed
 1. **Above the panel:** while the stopwatch or 4/4 panel is open, everything above it (the title, empty space, the status bar, the tuner, settings and the other panel's button) catches touches. A tap there only closes the panel. Nothing opens and nothing underneath reacts. The top row stays visible and sharp (it isn't dimmed). A long-press or a drag there does nothing at all: the panel stays open.
@@ -17,7 +17,7 @@ Tests cover each case for both panels: own button, Back, the other button, tuner
 ## For the designer
 - **Bottom panels (set panel, Songs list, pickers):** the edited "Open and close from the button (all panels)" line now says a tap outside uses the plain leave, but the plain leave is only described for top panels ("6px move up"). I left bottom panels as they were (they shrink back toward the center button on a dim tap). Should they also use a plain leave, and should it move 6px down?
 
-## Phone checks (to do once the phone is back, at 115%)
-- With each panel open: tap the title, the tuner, settings and the other panel's button. Each should only close the panel, fading upward.
-- Tap the panel's own button: it should shrink back into the button. Back should do the same.
-- Long-press settings with a panel open: nothing should happen.
+## Phone checks (115%): what I saw
+- **4/4 panel open:** a tap on the tuner, settings, the stopwatch or the empty title area each closed the panel. Nothing else opened: no tuner, no Settings, no stopwatch panel. The panel's own button closed it. A long-press on settings left the panel open and opened nothing. Back closed it.
+- **Stopwatch panel open:** a tap on 4/4 or settings only closed it, and so did its own button. A tap on the dim over Start closed it without starting the click.
+- **Not checked by eye:** the close motions (shrink into the button vs. the plain fade upward). Screenshots can't catch an ~180ms motion, and I can't record the screen here. The widget tests check both motions frame by frame. Worth a glance by hand.
