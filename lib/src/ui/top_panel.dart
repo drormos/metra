@@ -10,9 +10,11 @@ import 'theme.dart';
 /// sits just under the top row, 12px from the screen edges, fits its
 /// content, down to 16px above the screen's bottom (over the dimmed
 /// context row; taller content scrolls inside); the screen below the top
-/// row is dimmed, the top row stays sharp and usable. It grows out of its
-/// button ([PanelMotion]); tap outside, the same button again, Back, or a
-/// swipe up closes it. The click keeps playing.
+/// row is dimmed, the top row stays sharp. It grows out of its button
+/// ([PanelMotion]); the same button again or Back shrinks it back into it;
+/// a tap anywhere else (the dim, or anything above the panel: nothing
+/// there opens) closes it with the plain leave motion; a swipe up flings
+/// it off. The click keeps playing.
 abstract final class TopPanel {
   /// The main screen's top row, which the panel hangs under.
   static final topRowKey = GlobalKey(debugLabel: 'top-row');
@@ -38,7 +40,7 @@ abstract final class TopPanel {
     final route = _TopPanelRoute(
       id: id,
       child: child,
-      origin: box.localToGlobal(box.size.center(Offset.zero)),
+      button: box.localToGlobal(Offset.zero) & box.size,
       reduced: RowGestures.reduceMotion(context),
       dim: context.colors.dim,
     );
@@ -62,14 +64,15 @@ class _TopPanelRoute extends PopupRoute<void> {
   _TopPanelRoute({
     required this.id,
     required this.child,
-    required this.origin,
+    required this.button,
     required this.reduced,
     required this.dim,
   });
 
   final Object id;
   final Widget child;
-  final Offset origin;
+  // The button that opened it (global).
+  final Rect button;
   final bool reduced;
   final Color dim;
 
@@ -82,10 +85,9 @@ class _TopPanelRoute extends PopupRoute<void> {
   @override
   String? get barrierLabel => null;
 
-  // No touch barrier: the top row above the panel stays usable (its
-  // buttons toggle the panel); the page dims and closes on the rest. A
-  // screen reader stays in the panel, as with a sheet (the dimmed area is
-  // its Close).
+  // No touch barrier: the top row above the panel stays visible and sharp
+  // (the page catches taps on it and dims the rest). A screen reader stays
+  // in the panel, as with a sheet (the dimmed area is its Close).
   @override
   Widget buildModalBarrier() =>
       const BlockSemantics(child: IgnorePointer(child: SizedBox.expand()));
@@ -105,10 +107,11 @@ class _TopPanelRoute extends PopupRoute<void> {
     Animation<double> secondaryAnimation,
   ) => PanelMotion(
     route: this,
-    origin: origin,
+    origin: button.center,
     edge: PanelEdge.top,
+    leaveOnOutsideTap: true,
     builder: (context, motion) =>
-        _TopPanelPage(motion: motion, dim: dim, child: child),
+        _TopPanelPage(motion: motion, dim: dim, button: button, child: child),
   );
 }
 
@@ -116,11 +119,13 @@ class _TopPanelPage extends StatelessWidget {
   const _TopPanelPage({
     required this.motion,
     required this.dim,
+    required this.button,
     required this.child,
   });
 
   final PanelMotionState motion;
   final Color dim;
+  final Rect button;
   final Widget child;
 
   static double? _bottomOf(GlobalKey key) {
@@ -148,6 +153,24 @@ class _TopPanelPage extends StatelessWidget {
     final t = motion.dim;
     return Stack(
       children: [
+        // Above the panel (ui-spec.md "Above a top panel closes it too"): a
+        // tap only closes it, back into the button when it's the panel's
+        // own; long-presses and drags here do nothing.
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          height: top,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            excludeFromSemantics: true,
+            onTapUp: (d) => button.contains(d.globalPosition)
+                ? Navigator.of(context).maybePop()
+                : motion.closeOutside(),
+            onLongPress: () {},
+            onPanStart: (_) {},
+          ),
+        ),
         // Below the top row: dimmed; a touch starting here closes.
         Positioned(
           left: 0,
@@ -278,6 +301,8 @@ class CloseOnTouch extends StatelessWidget {
 
   /// Once: a second finger lifting while the panel leaves pops nothing.
   static void _close(BuildContext context) {
+    final motion = context.findAncestorStateOfType<PanelMotionState>();
+    if (motion != null) return motion.closeOutside();
     final route = ModalRoute.of(context);
     if (route != null && route.isCurrent) Navigator.of(context).pop();
   }

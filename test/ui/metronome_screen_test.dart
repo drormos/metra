@@ -17,6 +17,7 @@ import 'package:metra/src/ui/haptics.dart';
 import 'package:metra/src/ui/tempo_ruler.dart';
 import 'package:metra/src/ui/time_signature_sheet.dart';
 import 'package:metra/src/ui/top_panel.dart';
+import 'package:metra/src/ui/tuner_page.dart';
 
 import '../audio/fake_click_output.dart';
 import 'button_text.dart';
@@ -252,9 +253,8 @@ void main() {
     });
     testWidgets('the panels drop from the top row: under it, 12px from the '
         'edges, the top row sharp above; tap outside, the same button, Back '
-        'or a swipe up closes; the other button swaps; the click plays on', (
-      tester,
-    ) async {
+        'or a swipe up closes; the other button only closes; the click plays '
+        'on', (tester) async {
       await pumpScreen(tester);
       await tester.tap(find.byKey(MetronomeScreen.playKey));
       await tester.pump();
@@ -286,12 +286,18 @@ void main() {
       await tester.tapAt(const Offset(4, 300)); // beside the panel
       await settle();
       expect(find.byType(TimeSignatureSheet), findsNothing);
-      // The other top-row button swaps to its panel.
+      // The other top-row button only closes it.
       await tester.tap(find.byKey(MetronomeScreen.meterKey));
       await settle();
-      await tester.tap(find.byKey(MetronomeScreen.onStartKey));
+      await tester.tap(
+        find.byKey(MetronomeScreen.onStartKey),
+        warnIfMissed: false,
+      );
       await settle();
       expect(find.byType(TimeSignatureSheet), findsNothing);
+      expect(find.byType(OnStartSheet), findsNothing);
+      await tester.tap(find.byKey(MetronomeScreen.onStartKey));
+      await settle();
       expect(find.byType(OnStartSheet), findsOneWidget);
       // Back closes it.
       await tester.binding.handlePopRoute();
@@ -421,6 +427,137 @@ void main() {
       );
       // The x scale (z stays 1).
       double scale(WidgetTester tester) => scaleOf(tester).transform.storage[0];
+      // The move outside the scale (up is negative).
+      double shift(WidgetTester tester) => tester
+          .widget<Transform>(
+            find
+                .ancestor(of: surface(), matching: find.byType(Transform))
+                .at(1),
+          )
+          .transform
+          .storage[13];
+
+      for (final (name, own, other) in [
+        ('stopwatch', MetronomeScreen.onStartKey, MetronomeScreen.meterKey),
+        ('4/4', MetronomeScreen.meterKey, MetronomeScreen.onStartKey),
+      ]) {
+        group('$name panel closes', () {
+          Future<void> open(WidgetTester tester) async {
+            await tester.tap(find.byKey(own));
+            await tester.pumpAndSettle();
+            expect(surface(), findsOneWidget);
+          }
+
+          // Halfway through the close: shrinking toward the button, or the
+          // plain leave (full size, moving up); gone in ~180ms.
+          Future<void> expectClose(
+            WidgetTester tester, {
+            required bool button,
+          }) async {
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 90));
+            expect(opacity(tester), inExclusiveRange(0, 1));
+            if (button) {
+              expect(scale(tester), inExclusiveRange(0.96, 1));
+              expect(shift(tester), 0);
+            } else {
+              expect(scale(tester), 1);
+              expect(shift(tester), inExclusiveRange(-6, 0));
+            }
+            await tester.pump(const Duration(milliseconds: 100));
+            expect(surface(), findsNothing);
+            await tester.pumpAndSettle();
+            expect(find.byType(TunerPage), findsNothing);
+            expect(find.text('Settings'), findsNothing);
+          }
+
+          testWidgets('by its own button: back into the button', (
+            tester,
+          ) async {
+            await pumpScreen(tester);
+            await open(tester);
+            await tester.tap(find.byKey(own), warnIfMissed: false);
+            await expectClose(tester, button: true);
+          });
+
+          testWidgets('by Back: back into the button', (tester) async {
+            await pumpScreen(tester);
+            await open(tester);
+            await tester.binding.handlePopRoute();
+            await expectClose(tester, button: true);
+          });
+
+          testWidgets('by the other panel\'s button: plain leave, the other '
+              'doesn\'t open', (tester) async {
+            await pumpScreen(tester);
+            await open(tester);
+            await tester.tap(find.byKey(other), warnIfMissed: false);
+            await expectClose(tester, button: false);
+          });
+
+          for (final (what, key) in [
+            ('tuner', MetronomeScreen.tunerKey),
+            ('settings', MetronomeScreen.settingsKey),
+            ('title', MetronomeScreen.titleBlockKey),
+          ]) {
+            testWidgets('by a tap on the $what: plain leave, nothing opens', (
+              tester,
+            ) async {
+              await pumpScreen(tester);
+              await open(tester);
+              await tester.tap(find.byKey(key), warnIfMissed: false);
+              await expectClose(tester, button: false);
+            });
+          }
+
+          testWidgets('by a tap on empty space above: plain leave', (
+            tester,
+          ) async {
+            await pumpScreen(tester);
+            await open(tester);
+            final row = tester.getRect(find.byKey(MetronomeScreen.tunerKey));
+            await tester.tapAt(Offset(row.left - 2, row.top - 2));
+            await expectClose(tester, button: false);
+          });
+
+          testWidgets('by a tap on the dim below: plain leave', (tester) async {
+            await pumpScreen(tester);
+            await open(tester);
+            // Beside the panel, in the 12px gutter.
+            await tester.tapAt(Offset(4, tester.getCenter(surface()).dy));
+            await expectClose(tester, button: false);
+          });
+
+          testWidgets('a long-press above does nothing', (tester) async {
+            await pumpScreen(tester);
+            await open(tester);
+            await tester.longPress(
+              find.byKey(MetronomeScreen.settingsKey),
+              warnIfMissed: false,
+            );
+            await tester.pumpAndSettle();
+            expect(surface(), findsOneWidget);
+            expect(find.text('Settings'), findsNothing);
+          });
+
+          testWidgets('with Remove animations: instant', (tester) async {
+            tester.platformDispatcher.accessibilityFeaturesTestValue =
+                const FakeAccessibilityFeatures(disableAnimations: true);
+            addTearDown(
+              tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+            );
+            await pumpScreen(tester);
+            await open(tester);
+            await tester.tap(
+              find.byKey(MetronomeScreen.tunerKey),
+              warnIfMissed: false,
+            );
+            await tester.pump();
+            await tester.pump();
+            expect(surface(), findsNothing);
+          });
+        });
+      }
 
       testWidgets('opens out of its button: 0.96 → 1 about the button with '
           'a fade in ~200ms; closing by tap or the button is the reverse', (
@@ -986,7 +1123,7 @@ void main() {
       }
 
       Future<void> tapStep(WidgetTester tester, Key key) async {
-        await tester.tap(find.byKey(key));
+        await tester.tap(find.byKey(key), warnIfMissed: false);
         await tester.pump();
       }
 

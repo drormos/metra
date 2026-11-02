@@ -22,6 +22,9 @@ enum PanelEdge { top, bottom }
 ///   second fade.
 /// - An Android back gesture scales it 1 → 0.9 toward the button and dims
 ///   it slightly; commit closes it as Back does, cancel springs back.
+/// - With [leaveOnOutsideTap], a tap outside the panel ([closeOutside])
+///   closes it with the plain leave motion instead (ui-spec.md "Which
+///   close motion"): a fade and a 6px move toward [edge], no shrink.
 /// With Remove animations on, all of it is instant.
 class PanelMotion extends StatefulWidget {
   const PanelMotion({
@@ -30,9 +33,11 @@ class PanelMotion extends StatefulWidget {
     required this.origin,
     required this.edge,
     required this.builder,
+    this.leaveOnOutsideTap = false,
   });
 
   final ModalRoute<void> route;
+  final bool leaveOnOutsideTap;
   final Offset origin;
   final PanelEdge edge;
 
@@ -63,6 +68,8 @@ class PanelMotionState extends State<PanelMotion>
   // While flung: the distance left to go when released (for the fade).
   double? _flungFrom;
   bool _gone = false;
+  // Closing by a tap outside: the plain leave motion.
+  bool _plain = false;
 
   bool get _reduced => MetraMotion.reduced(context);
   double get _sign => widget.edge == PanelEdge.top ? -1 : 1;
@@ -162,6 +169,15 @@ class PanelMotionState extends State<PanelMotion>
         .whenComplete(_remove);
   }
 
+  /// A tap outside the panel (the dim, the grab strip's outside part, or
+  /// above a top panel) closes it.
+  void closeOutside() {
+    final route = widget.route;
+    if (_gone || !route.isCurrent) return;
+    _plain = widget.leaveOnOutsideTap;
+    route.navigator?.pop();
+  }
+
   void _remove() {
     if (_gone || !mounted) return;
     _gone = true;
@@ -251,8 +267,7 @@ class PanelMotionState extends State<PanelMotion>
               final outside = top
                   ? d.localPosition.dy > grabIn
                   : d.localPosition.dy < grabOut;
-              final route = widget.route;
-              if (outside && route.isCurrent) route.navigator?.pop();
+              if (outside) closeOutside();
             },
           ),
         ),
@@ -260,9 +275,11 @@ class PanelMotionState extends State<PanelMotion>
     );
     final shown = _shown;
     final back = _back.value;
-    final scale =
-        (PanelMotion.openScale + (1 - PanelMotion.openScale) * shown) *
-        (1 - (1 - PanelMotion.backScale) * back);
+    final scale = _plain
+        ? 1.0
+        : (PanelMotion.openScale + (1 - PanelMotion.openScale) * shown) *
+              (1 - (1 - PanelMotion.backScale) * back);
+    final leave = _plain ? MetraMotion.arriveRise * (1 - shown) : 0.0;
     final rect = _boxRect;
     // About the button: as a fraction of the panel (the first frame, at
     // opacity 0, uses its centre).
@@ -278,7 +295,7 @@ class PanelMotionState extends State<PanelMotion>
       child: Opacity(
         opacity: (dim * (1 - PanelMotion.backFade * back)).clamp(0.0, 1.0),
         child: Transform.translate(
-          offset: Offset(0, _swipe.value * _sign),
+          offset: Offset(0, (_swipe.value + leave) * _sign),
           child: Transform.scale(
             scale: scale,
             alignment: alignment,

@@ -146,7 +146,7 @@ void main() {
       await tester.tap(find.byKey(MetronomeScreen.onStartKey));
       await tester.pumpAndSettle();
       await checkAll(tester, '$theme when I press Start');
-      await tester.tapAt(const Offset(200, 700));
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
 
       await tester.tap(find.byTooltip('Settings'));
