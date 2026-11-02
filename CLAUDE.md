@@ -14,7 +14,8 @@ See `PLAN.md` for phases and scope. Work one step at a time and stop for review 
   - While playing, call `setAudioDeviceIdleTimeout(null)` and `await startAudioDevice()` before anchoring; restore the default on stop. The default 500 ms idle stop freezes the engine clock between slow beats.
 - **VISUAL SYNC:** Read `getEngineTime()` once per frame (a `Ticker`). Flash when engine time ≥ step time + visual offset. The user-adjustable offset is signed; it defaults to 0 ms (measured on MacBook speakers) and higher-latency outputs such as wireless headsets need a positive value. `getOutputLatency()` is zero unless render-ahead is enabled. Do not poll a voice's playback position.
 - **ENGINE LIFECYCLE:** `SoLoud.instance.init()` runs once in `main()`; calling it again unloads every sound. Listen to `audioDeviceStartFailures` and recover with `startAudioDevice()`. Headphone/route-change events are not in the public API; don't rely on them.
-- **SAMPLE RULES:** Click samples must have zero leading silence.
+- **SAMPLE RULES:** Click samples must have zero leading silence and peak at −0.5 dBFS.
+- **GAIN:** 100% on every slider is unity; voices play at `setPanAbsolute(1, 1)`. No fixed headroom: overlaps go through the global look-ahead limiter only (see PLAN.md, "Louder click").
 
 ## Verify, Don't Guess (CRITICAL)
 - Before writing engine code, read the package's metronome example (`reference_soloud/example/lib/metronome/`) and the `flutter_soloud` skills in `.claude/skills/`.
