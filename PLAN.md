@@ -5,7 +5,7 @@ A sample-accurate metronome for Android (and macOS / iOS), built with Flutter an
 
 ## Status (2026-11-03)
 - Release ready: 1.9.0 (build 108): the tuner, the louder click (unity gain + look-ahead limiter), the square time signature button, a tap outside a panel closes it; settings format 10 (Reference A4). The AAB goes to Play by hand (closed test). In the closed test now: 1.8.0 (build 103; Dror confirmed it's uploaded).
-- Next: upload 1.9.0 (build 108) to the closed test.
+- Next: push `main` (PRIVACY.md's microphone paragraph goes online), upload 1.9.0 (build 108) to the closed test, then tag v1.9.0 (and v1.8.0 at 46f1473).
 
 ## Working rules
 - One step per commit; stage specific paths (never `git add -A`: the designer edits `docs/design/` in parallel and those drafts aren't ours to commit).
