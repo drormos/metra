@@ -6,7 +6,7 @@ App name (30): **Metra**
 
 A precise metronome with tempo changes, setlists and a stage mode. No ads.
 
-## Full description (2822 / 4000)
+## Full description (3033 / 4000)
 
 Metra is a metronome for every hour you play: practice, rehearsal and the stage. The click stays exactly on time, the screen reads at a glance, and a whole song, tempo changes and all, plays from one tap.
 
@@ -47,6 +47,9 @@ EASY ON THE EYES
 • High-contrast Stage Black theme, plus a Daylight theme for bright rooms.
 • Every control is big enough for a quick tap; nothing jumps around while you play.
 • Large text, TalkBack and "Remove animations" are supported.
+
+TUNER
+• A chromatic tuner for the whole band: a big note name, cents off, and a smooth needle. Reference A4 from 430 to 450 Hz. The microphone is used only while the tuner is open; nothing is recorded or sent.
 
 PRIVATE AND FREE
 No ads, no account, no tracking. Metra has no internet access: your songs stay on your phone.

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:metra/src/ui/subdivision_icon.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:metra/src/controller/metronome_controller.dart';
@@ -200,8 +199,11 @@ void main() {
       );
       await tester.tapAt(const Offset(10, 10));
       await tester.pumpAndSettle();
-      expect(find.text(' · 3'), findsOneWidget);
-      expect(find.bySemanticsLabel('Rhythm 4/4, polyrhythm 3'), findsOneWidget);
+      expect(find.text(' · 3'), findsNothing, reason: 'shown by its lane');
+      expect(
+        find.bySemanticsLabel('Time signature 4/4, polyrhythm 3'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('Stop leaves no polyrhythm cell lit, even mid-pulse', (
@@ -650,9 +652,9 @@ void main() {
     });
 
     testWidgets('the Rhythm sheet sets the subdivision live and stays '
-        'open; the 4/4 button shows its note', (tester) async {
+        'open; the 4/4 button says its note', (tester) async {
       await pumpScreen(tester);
-      expect(find.bySemanticsLabel('Rhythm 4/4'), findsOneWidget);
+      expect(find.bySemanticsLabel('Time signature 4/4'), findsOneWidget);
       await tester.tap(find.byKey(MetronomeScreen.meterKey));
       await tester.pumpAndSettle();
       expect(find.text('Rhythm'), findsOneWidget);
@@ -671,11 +673,14 @@ void main() {
       expect(controller.pattern.timeSignature, '4/4');
       expect(find.byKey(const ValueKey('beat-3-off')), findsOneWidget);
       expect(find.byKey(const ValueKey('tick-3-1-off')), findsOneWidget);
-      expect(find.bySemanticsLabel('Rhythm 4/4, eighth notes'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('Time signature 4/4, eighth notes'),
+        findsOneWidget,
+      );
       controller.setPolyrhythm(3);
       await tester.pump();
       expect(
-        find.bySemanticsLabel('Rhythm 4/4, eighth notes, polyrhythm 3'),
+        find.bySemanticsLabel('Time signature 4/4, eighth notes, polyrhythm 3'),
         findsOneWidget,
       );
     });
@@ -716,9 +721,9 @@ void main() {
   });
 
   for (final scale in [1.0, 1.3, 2.0]) {
-    testWidgets('top row at ${(scale * 100).round()}% text: stopwatch, 4/4 '
-        'and gear share one visible 44px box on one line; 4/4 only wider; '
-        '48dp touch targets', (tester) async {
+    testWidgets('top row at ${(scale * 100).round()}% text: stopwatch, 4/4, '
+        'tuner and gear: four equal 44px boxes on one line, 8px apart, the '
+        'widest time signature inside; 48dp touch targets', (tester) async {
       controller
         ..setPattern(
           MetronomePattern.simple(
@@ -748,20 +753,23 @@ void main() {
         for (final key in [
           MetronomeScreen.onStartKey,
           MetronomeScreen.meterKey,
+          MetronomeScreen.tunerKey,
           MetronomeScreen.settingsKey,
         ])
           box(key),
       ];
-      for (final b in boxes) {
-        expect(b.height, 44);
+      for (final (i, b) in boxes.indexed) {
+        expect(b.size, const Size.square(44));
         expect(b.top, boxes.first.top);
+        if (i > 0) expect(b.left - boxes[i - 1].right, 8);
       }
-      expect(boxes[0].width, 44);
-      expect(boxes[2].width, 44);
-      expect(boxes[1].width, greaterThan(44));
+      final label = tester.getRect(find.byKey(MetronomeScreen.meterLabelKey));
+      expect(boxes[1].deflate(2).contains(label.topLeft), isTrue);
+      expect(boxes[1].deflate(2).contains(label.bottomRight), isTrue);
       for (final key in [
         MetronomeScreen.onStartKey,
         MetronomeScreen.meterKey,
+        MetronomeScreen.tunerKey,
       ]) {
         expect(tester.getSize(find.byKey(key)).height, 48, reason: 'touch');
       }
@@ -774,7 +782,7 @@ void main() {
   }
 
   testWidgets('the 4/4 label is optically centred in its 44px box (cap '
-      'height, real font); the note icon on the same line', (tester) async {
+      'height, real font)', (tester) async {
     await tester.runAsync(() async {
       final loader = FontLoader(MetraFonts.condensed)
         ..addFont(rootBundle.load('assets/fonts/SairaExtraCondensed-Bold.ttf'));
@@ -814,8 +822,6 @@ void main() {
     final above = capTop - (box.top + 2); // inside the 2px border
     final below = (box.bottom - 2) - baseline;
     expect(above, closeTo(below, 0.5));
-    final icon = tester.getRect(find.byType(SubdivisionIcon));
-    expect(icon.center.dy, closeTo((capTop + baseline) / 2, 1));
   });
 
   group('when I press Start', () {

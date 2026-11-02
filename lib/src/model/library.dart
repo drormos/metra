@@ -215,6 +215,7 @@ class Library {
     this.vibrate = true,
     this.partChangeSound = false,
     this.keepScreenOn = KeepScreenOn.whileOpen,
+    this.referenceA4 = 440,
     this.volumes = ClickVolumes.defaults,
     this.activeSetlistId,
     this.currentSongId,
@@ -265,6 +266,9 @@ class Library {
   /// "Keep screen on": while Metra is open, or only while playing.
   final KeepScreenOn keepScreenOn;
 
+  /// The tuner's "Reference A4" in Hz (430–450), app-wide.
+  final int referenceA4;
+
   final ClickVolumes volumes;
 
   /// The loaded setlist; null is Free play (the first-launch default).
@@ -297,6 +301,7 @@ class Library {
     bool? vibrate,
     bool? partChangeSound,
     KeepScreenOn? keepScreenOn,
+    int? referenceA4,
     ClickVolumes? volumes,
     Set<String>? tipsSeen,
     bool? stageMode,
@@ -314,6 +319,7 @@ class Library {
     vibrate: vibrate ?? this.vibrate,
     partChangeSound: partChangeSound ?? this.partChangeSound,
     keepScreenOn: keepScreenOn ?? this.keepScreenOn,
+    referenceA4: referenceA4 ?? this.referenceA4,
     volumes: volumes ?? this.volumes,
     activeSetlistId: activeSetlistId,
     currentSongId: currentSongId,
@@ -342,6 +348,7 @@ class Library {
     vibrate: vibrate,
     partChangeSound: partChangeSound,
     keepScreenOn: keepScreenOn,
+    referenceA4: referenceA4,
     volumes: volumes,
     activeSetlistId: setlistId,
     currentSongId: songId,
@@ -363,6 +370,7 @@ class Library {
     'vibrate': vibrate,
     'partChangeSound': partChangeSound,
     'keepScreenOn': keepScreenOn.name,
+    'referenceA4': referenceA4,
     'volumes': volumes.toJson(),
     'activeSetlistId': activeSetlistId,
     'currentSongId': currentSongId,
@@ -418,6 +426,7 @@ class Library {
       keepScreenOn:
           KeepScreenOn.values.asNameMap()[latest['keepScreenOn']] ??
           KeepScreenOn.whileOpen,
+      referenceA4: read('referenceA4', 440),
       volumes:
           _orNull(
             () => ClickVolumes.fromJson(
@@ -493,6 +502,7 @@ class Library {
       vibrate: vibrate,
       partChangeSound: partChangeSound,
       keepScreenOn: keepScreenOn,
+      referenceA4: referenceA4.clamp(430, 450),
       volumes: volumes,
       activeSetlistId: active?.id,
       currentSongId: songId,

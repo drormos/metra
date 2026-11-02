@@ -121,6 +121,14 @@ class LibraryController extends ChangeNotifier {
     }
   }
 
+  /// The tuner's "Reference A4" in Hz (430–450, default 440).
+  int get referenceA4 => _library.referenceA4;
+
+  void setReferenceA4(int hz) {
+    final value = hz.clamp(430, 450);
+    if (value != referenceA4) _update(_library.copyWith(referenceA4: value));
+  }
+
   /// Stage mode (ui-spec.md "Stage mode"): on the active set until exited,
   /// remembered across a relaunch. Without a set it's over.
   bool get stageMode => _library.stageMode && activeSetlist != null;

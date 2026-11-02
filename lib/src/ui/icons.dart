@@ -135,6 +135,119 @@ class _StopwatchPainter extends CustomPainter {
   bool shouldRepaint(_StopwatchPainter old) => old.color != color;
 }
 
+/// The tuner: a tuning fork (two prongs joined in a U, on a stem).
+class TuningForkIcon extends StatelessWidget {
+  const TuningForkIcon({super.key, this.size = 22, this.color});
+
+  final double size;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+    size: Size.square(size),
+    painter: _TuningForkPainter(color ?? IconTheme.of(context).color!),
+  );
+}
+
+class _TuningForkPainter extends CustomPainter {
+  _TuningForkPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 24);
+    final stroke = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round;
+    canvas
+      ..drawPath(
+        Path()
+          ..moveTo(8, 2.5)
+          ..lineTo(8, 10.5)
+          ..arcToPoint(
+            const Offset(16, 10.5),
+            radius: const Radius.circular(4),
+            clockwise: false,
+          )
+          ..lineTo(16, 2.5),
+        stroke,
+      )
+      ..drawLine(const Offset(12, 14.5), const Offset(12, 21.5), stroke);
+  }
+
+  @override
+  bool shouldRepaint(_TuningForkPainter old) => old.color != color;
+}
+
+/// A sharp or a flat (the tuner's note and meter), drawn rather than
+/// typed: the fonts have no ♯ / ♭ and Android may draw them as emoji.
+class AccidentalIcon extends StatelessWidget {
+  const AccidentalIcon({
+    super.key,
+    required this.sharp,
+    this.size = 22,
+    this.color,
+  });
+
+  final bool sharp;
+  final double size;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+    size: Size.square(size),
+    painter: _AccidentalPainter(
+      sharp,
+      color ?? DefaultTextStyle.of(context).style.color!,
+    ),
+  );
+}
+
+class _AccidentalPainter extends CustomPainter {
+  _AccidentalPainter(this.sharp, this.color);
+
+  final bool sharp;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 24);
+    final thin = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    if (sharp) {
+      final thick = Paint()
+        ..color = color
+        ..strokeWidth = 3.6
+        ..strokeCap = StrokeCap.butt;
+      canvas
+        ..drawLine(const Offset(9.5, 3), const Offset(9.5, 21), thin)
+        ..drawLine(const Offset(14.5, 2), const Offset(14.5, 20), thin)
+        ..drawLine(const Offset(5.5, 10), const Offset(18.5, 7.5), thick)
+        ..drawLine(const Offset(5.5, 16.5), const Offset(18.5, 14), thick);
+    } else {
+      canvas
+        ..drawLine(const Offset(8, 2), const Offset(8, 21), thin)
+        ..drawPath(
+          Path()
+            ..moveTo(8, 21)
+            ..cubicTo(14, 18, 19, 14, 16.5, 12)
+            ..cubicTo(14.5, 10.5, 11, 11.5, 8, 14),
+          thin..strokeWidth = 2.4,
+        );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_AccidentalPainter old) =>
+      old.sharp != sharp || old.color != color;
+}
+
 /// Stage mode: a stage (floor and riser) with an arrow up onto it.
 class StageIcon extends StatelessWidget {
   const StageIcon({super.key, this.size = 16, this.color});

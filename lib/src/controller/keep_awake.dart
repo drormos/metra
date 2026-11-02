@@ -1,9 +1,11 @@
 import '../model/library.dart';
 import 'library_controller.dart';
 import 'metronome_controller.dart';
+import 'tuner_controller.dart';
 
 /// Keeps the screen on (ui-spec.md "Keep the screen on"): always in stage
-/// mode, else while Metra is open or only while playing, as set. The flag
+/// mode and on the tuner, else while Metra is open or only while playing,
+/// as set. The flag
 /// only holds while Metra is in front, so leaving the app lets the phone
 /// lock. Calls [setAwake] only when the answer changes.
 void keepScreenAwake(
@@ -15,6 +17,7 @@ void keepScreenAwake(
   void sync() {
     final want =
         metronome.isPlaying ||
+        TunerController.isOpen.value ||
         library == null ||
         library.stageMode ||
         library.keepScreenOn == KeepScreenOn.whileOpen;
@@ -25,5 +28,6 @@ void keepScreenAwake(
 
   metronome.addListener(sync);
   library?.addListener(sync);
+  TunerController.isOpen.addListener(sync);
   sync();
 }

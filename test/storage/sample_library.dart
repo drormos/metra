@@ -97,6 +97,7 @@ final sampleLibrary = Library(
   vibrate: false,
   partChangeSound: true,
   keepScreenOn: KeepScreenOn.whilePlaying,
+  referenceA4: 442,
   volumes: const ClickVolumes(
     accent: 0.9,
     beat: 0.7,

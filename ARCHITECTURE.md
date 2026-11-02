@@ -12,7 +12,7 @@ flutter_soloud engine clock
             └─ ui/    MetronomeScreen and its panels; widgets read the controllers, hold no metronome state
 model/ (pure Dart, no Flutter UI): MetronomePattern, Library/Song/Setlist, SongPart/SongPlan, OnStart, ClickVolumes, migrations
 timing/ (pure Dart): BeatGrid, TapTempo, EngineClockSmoother
-platform/: AndroidBridge (MainActivity, Quick Settings tile, calls)
+platform/: AndroidBridge (MainActivity, Quick Settings tile, calls); the tuner's mic: audio/mic_input.dart ↔ MicBridge.kt
 ```
 
 Timing never comes from Dart timers: the scheduler hands every click to the engine ahead of time (`playScheduled` at engine times), a 25 ms timer only tops it up, and visuals read the engine clock once per frame. Tests replace the engine with `test/audio/fake_click_output.dart` (a clock you set).
@@ -32,7 +32,7 @@ Timing never comes from Dart timers: the scheduler hands every click to the engi
 | Transport and state | `controller/metronome_controller.dart` | `play/stop/loadSong/applyEdit`; `onStart` (count-in, speed up, stop after; Practice speed for a song with parts: `SongPlan.speedAt`, `practiceSpeed`); `startBpm` (the tempo outside a run: what songs compare and save). |
 | Library and session | `controller/library_controller.dart` | Modes (Free play, Single song, setlist), next/previous, unsaved changes (`songChanged`, Revert, Save, Save as new), one-time tips (`tipSeen`). Every change saves (coalesced). |
 | Saved data | `model/library.dart`, `model/library_migrations.dart`, `storage/library_store.dart` | Two files (`library.json`, `settings.json`), versioned; migrations on raw JSON; `Library.repaired()`. Any change: the data-format-change skill. |
-| Main screen | `ui/metronome_screen.dart` | Top row (title, stopwatch, "4/4", gear), beat blocks, BPM, tempo line (`_TempoLine`, `_RunLine`), ruler, ±buttons, Start/Tap, `SetlistGroup`. |
+| Main screen | `ui/metronome_screen.dart` | Top row (title, stopwatch, "4/4", tuner, gear), beat blocks, BPM, tempo line (`_TempoLine`, `_RunLine`), ruler, ±buttons, Start/Tap, `SetlistGroup`. |
 | Count-in display | `ui/count_in.dart` | `countInAt` (where a count-in is, from Start on), `CountInBuilder` (per frame while playing), `StopLabel` ("■ Stop · Count-in 3 of 4" on the main screen, parts page and stage mode; two lines when it doesn't fit). |
 | Leaving Free play | `ui/free_play_guard.dart` | `leaveFreePlay`: "Save your song parts?" before a tab or pick loads a song or set while Free play has parts. |
 | Beat lights | `ui/beat_indicator.dart`, `ui/poly_lane.dart` | Per-frame from the engine clock; `beatPulse` (up, lit, down). |
@@ -44,6 +44,7 @@ Timing never comes from Dart timers: the scheduler hands every click to the engi
 | Stage mode | `ui/stage_screen.dart`, `controller/keep_awake.dart` | Shown instead of the main screen while `LibraryController.stageMode`; taps settle into one restart. |
 | Parts page | `ui/parts_page.dart` (`PartsPage`, `SongPartsRow`) | The song editor: strip, cards, edits through `MetronomeController.setParts`; the Rhythm panel via `RhythmTarget`. |
 | Song map | `ui/song_map.dart` | The ruler's slot for a song with parts; follows `MetronomeController.playheadAt`, goes with `jumpToPart`. |
+| Tuner | `ui/tuner_page.dart`, `controller/tuner_controller.dart`, `audio/pitch_detector.dart` (MPM, pure Dart), `audio/mic_input.dart` (`MicInput`; `MicBridge.kt`), `model/tuner_note.dart` | Opened from the top row's tuning fork; stops the click. The microphone runs only while the page is visible; time is counted in samples heard. Tests: `test/audio/fake_mic_input.dart`. |
 | Settings, About | `ui/settings_screen.dart`, `ui/about.dart`, `model/whats_new.dart` (`assets/whats_new.md`) | |
 | Android | `android/app/src/main/kotlin/.../MainActivity.kt`, `PlaybackTile.kt`, `res/xml/` (backup rules) | |
 

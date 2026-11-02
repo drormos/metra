@@ -295,6 +295,17 @@ void main() {
     expect((on.practiceFrom, on.practiceStep, on.practiceUpTo), (83, 2.5, 110));
   });
 
+  test('version 9: Reference A4 at 440 Hz; version 10 keeps it', () async {
+    for (final f in ['library.json', 'settings.json']) {
+      File('test/fixtures/library_v9/$f').copySync('${dir.path}/$f');
+    }
+    expect((await store.load()).referenceA4, 440);
+    for (final f in ['library.json', 'settings.json']) {
+      File('test/fixtures/library_v10/$f').copySync('${dir.path}/$f');
+    }
+    expect((await LibraryStore(store.file).load()).referenceA4, 442);
+  });
+
   test('every step runs in order up to the latest; unknown versions throw', () {
     final latest = migrate({'version': 1, 'songs': [], 'setlists': []});
     expect(latest['version'], Library.version);
@@ -303,6 +314,7 @@ void main() {
     expect(latest['partChangeSound'], false, reason: 'version 6: off');
     expect(latest['lastParts'], isEmpty, reason: 'version 7: Free play');
     expect(latest['lastEnd'], 'loopLastPart');
+    expect(latest['referenceA4'], 440, reason: 'version 10: the tuner');
     expect(() => migrate({'version': 0}), throwsFormatException);
     expect(latestVersion, Library.version);
   });

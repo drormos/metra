@@ -28,10 +28,11 @@
 ///   `practiceFrom` any whole percent; every older value stays valid, so
 ///   the step only bumps the version (an older app then refuses the file
 ///   instead of misreading 2.5).
+/// - 10 (build 105 on): settings gain the tuner's `referenceA4` (440 Hz).
 library;
 
 /// The latest format, and the two files' shapes in it.
-const latestVersion = 9;
+const latestVersion = 10;
 
 typedef Json = Map<String, Object?>;
 
@@ -63,6 +64,7 @@ final List<Json Function(Json)> _steps = [
   _v6ToV7,
   _v7ToV8,
   _v8ToV9,
+  _v9ToV10,
 ];
 
 /// Version 1, in all the shapes it shipped in, to version 2:
@@ -267,6 +269,9 @@ Json _v7ToV8(Json v7) {
 
 /// Nothing to convert: every version 8 value is a valid version 9 one.
 Json _v8ToV9(Json v8) => {...v8, 'version': 9};
+
+/// The tuner's Reference A4, at the usual 440 Hz.
+Json _v9ToV10(Json v9) => {...v9, 'version': 10, 'referenceA4': 440};
 
 /// The one-time hints' names in `tipsSeen` (version 1 had a flag each).
 const swipeHintTip = 'set-swipe-hint';

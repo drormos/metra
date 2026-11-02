@@ -4,7 +4,11 @@ All notable changes to Metra. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+- A tuner for guitar, bass, keys and voice: the tuning-fork button on the main screen opens it. A big note name, how many cents off, a meter with a smooth needle, "In tune" within 3 cents, and Reference A4 from 430 to 450 Hz. The click pauses while it's open. It uses the microphone only while the tuner is on screen; nothing is recorded or sent.
+
 ### Changed
+- The time signature button is now the same small square as the others and shows only the time signature ("4/4", "12/8"); the subdivision shows under the beats and a polyrhythm in its own lane, as before.
 - The click is about 3.4 dB louder at the same settings: every sound plays at full level, and only clicks that overlap (accents, subdivisions and a polyrhythm together) are limited, never clipped.
 
 ## [1.8.0] - 2026-10-29

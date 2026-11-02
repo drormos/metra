@@ -1,10 +1,12 @@
 # Metra privacy policy
 
-Effective 23 October 2026.
+Effective 2 November 2026.
 
 Metra is a metronome app for Android by Dror Makes, the developer of Metra on Google Play. It has no ads, no account and no tracking, and your songs stay on your phone.
 
 **What Metra collects:** nothing. Metra doesn't access, collect, use or share personal or sensitive user data. The app has no internet access (it doesn't request Android's internet permission), so it can't send anything anywhere. There is no analytics, no crash reporting, no advertising and no other third-party code that collects or sends data.
+
+**The tuner and the microphone:** Metra's tuner uses your phone's microphone to hear the note you play. It listens only while the tuner page is open on screen and stops as soon as you leave the page or the app. The sound is analysed on your phone, as it comes in, to find its pitch; it is never recorded, stored or sent anywhere.
 
 **Who data is shared with:** no one. Metra shares no data with any party, and sells none.
 
@@ -16,7 +18,7 @@ Metra is a metronome app for Android by Dror Makes, the developer of Metra on Go
 
 **Sending feedback:** "Send feedback" in Settings opens your own email app with a message to the developer that starts with Metra's version, your phone model and your Android version. Nothing is sent unless you send that email yourself, from your own email app. Feedback emails are used only to reply and to improve Metra, aren't shared with anyone, and are deleted on request (write to the address below).
 
-**Permissions:** Metra asks for no permission you have to approve, including notifications. It uses Android's media playback service so the click keeps playing with the screen off; its playback card on the lock screen and in the notification shade is a media control, which Android shows without asking. (Early test builds before version 1.1 asked for the notification permission; current versions don't.)
+**Permissions:** the only permission Metra asks you to approve is the microphone, for the tuner, the first time you open the tuner (never at launch); the rest of the app works the same if you refuse it. Metra doesn't ask for the notification permission. It uses Android's media playback service so the click keeps playing with the screen off; its playback card on the lock screen and in the notification shade is a media control, which Android shows without asking. (Early test builds before version 1.1 asked for the notification permission; current versions don't.)
 
 **Children:** Metra collects no data from anyone, including children.
 

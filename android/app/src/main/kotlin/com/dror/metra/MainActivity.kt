@@ -27,6 +27,7 @@ class MainActivity : AudioServiceActivity() {
         super.configureFlutterEngine(flutterEngine)
         TileBridge.attach(this, flutterEngine)
         ShareBridge.attach(flutterEngine)
+        MicBridge.attach(this, flutterEngine)
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "metra/android")
         this.channel = channel
         CallMonitor.attach(this, channel)
@@ -75,6 +76,21 @@ class MainActivity : AudioServiceActivity() {
     override fun onPostResume() {
         super.onPostResume()
         channel?.invokeMethod("redraw", null)
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == MicBridge.REQUEST) MicBridge.onPermissionResult()
+    }
+
+    // The microphone never outlives the app's screen.
+    override fun onDestroy() {
+        MicBridge.stop()
+        super.onDestroy()
     }
 
     // Already running (warm): the tile asked to start.

@@ -28,11 +28,11 @@ import 'song_map.dart';
 import 'save_as_new_dialog.dart';
 import 'settings_screen.dart';
 import 'icons.dart';
-import 'subdivision_icon.dart';
 import 'tempo_controls.dart';
 import 'tempo_ruler.dart';
 import 'time_signature_sheet.dart';
 import 'top_panel.dart';
+import 'tuner_page.dart';
 import 'theme.dart';
 
 /// Main screen (ui-spec.md), the same phone layout on every platform.
@@ -92,6 +92,7 @@ class MetronomeScreen extends StatelessWidget {
   static const headsUpTagKey = Key('heads-up-tag');
   static const revertKey = Key('revert');
   static const settingsKey = Key('settings-button');
+  static const tunerKey = Key('tuner-button');
   static const updateDotKey = Key('update-dot');
   static const saveToSongKey = Key('save-to-song');
   static const saveAsNewKey = Key('save-as-new');
@@ -509,78 +510,61 @@ class MetronomeScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 4),
-        // The same visible 44px box as the square buttons (only wider), its
-        // 48dp touch target invisible padding around it: centred, so the
-        // 48px row never stretches the outline.
-        SizedBox(
-          height: 48,
-          child: Center(
-            child: Builder(
-              builder: (context) => OutlinedButton(
-                key: meterKey,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  minimumSize: const Size(44, 44),
-                  fixedSize: const Size.fromHeight(44),
-                  tapTargetSize: MaterialTapTargetSize.padded,
-                ),
-                onPressed: () => showTimeSignatureSheet(
-                  context,
-                  controller,
-                  header: library == null
-                      ? null
-                      : SongPartsRow(
-                          library: library,
-                          metronome: controller,
-                          opener: context,
-                        ),
-                ),
-                child: Semantics(
-                  label: [
-                    'Rhythm ${pattern.timeSignature}',
-                    if (pattern.stepsPerBeat > 1)
-                      TimeSignatureSheet.subdivisionNames[pattern.stepsPerBeat]!
-                          .toLowerCase(),
-                    if (pattern.polyrhythm > 0)
-                      'polyrhythm ${pattern.polyrhythm}',
-                  ].join(', '),
-                  excludeSemantics: true,
-                  // "4/4 ♪♪ · 3": the note only off quarters. One fixed line
-                  // that shrinks rather than growing the box.
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    // A symmetric line box: the font's ascent (1.135 em) is
-                    // much taller than its descent (0.439), so proportional
-                    // leading set the digits ~0.12 em above centre; even
-                    // leading centres their cap height (0.688) within
-                    // 0.004 em. The note icon is centred on the same line.
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          pattern.timeSignature,
-                          key: meterLabelKey,
-                          style: meterLabelStyle,
-                          strutStyle: _meterStrut,
-                          textHeightBehavior: _meterLine,
-                        ),
-                        if (pattern.stepsPerBeat > 1) ...[
-                          const SizedBox(width: 5),
-                          SubdivisionIcon(pattern.stepsPerBeat, size: 20),
-                        ],
-                        if (pattern.polyrhythm > 0)
-                          Text(
-                            ' · ${pattern.polyrhythm}',
-                            style: meterLabelStyle,
-                            strutStyle: _meterStrut,
-                            textHeightBehavior: _meterLine,
-                          ),
-                      ],
+        // A fixed square like the others, so the title never jumps; the
+        // subdivision and polyrhythm show on the beat row, and in the name.
+        Builder(
+          builder: (context) => _squareButton(
+            key: meterKey,
+            tooltip: [
+              'Time signature ${pattern.timeSignature}',
+              if (pattern.stepsPerBeat > 1)
+                TimeSignatureSheet.subdivisionNames[pattern.stepsPerBeat]!
+                    .toLowerCase(),
+              if (pattern.polyrhythm > 0) 'polyrhythm ${pattern.polyrhythm}',
+            ].join(', '),
+            onPressed: () => showTimeSignatureSheet(
+              context,
+              controller,
+              header: library == null
+                  ? null
+                  : SongPartsRow(
+                      library: library,
+                      metronome: controller,
+                      opener: context,
                     ),
+            ),
+            // A symmetric line box: the font's ascent (1.135 em) is much
+            // taller than its descent (0.439), so proportional leading set
+            // the digits ~0.12 em above centre; even leading centres their
+            // cap height (0.688) within 0.004 em. "12/8" at large text
+            // shrinks rather than growing the box.
+            child: ExcludeSemantics(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 3),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    pattern.timeSignature,
+                    key: meterLabelKey,
+                    style: meterLabelStyle,
+                    strutStyle: _meterStrut,
+                    textHeightBehavior: _meterLine,
                   ),
                 ),
               ),
             ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Builder(
+          builder: (context) => _squareButton(
+            key: tunerKey,
+            tooltip: 'Tuner',
+            onPressed: () {
+              TopPanel.close();
+              openTuner(context, metronome: controller, library: library);
+            },
+            child: const TuningForkIcon(),
           ),
         ),
         const SizedBox(width: 4),
